@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -37,6 +36,10 @@ import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
 import { toast } from 'sonner';
 import { formatCnpj } from '@/utils/cnpj';
 import { validarCnpjDaObra } from '@/lib/obra-cnpj';
+import { CampoCnpj } from '@/components/shared/CampoCnpj';
+import type { CnpjData } from '@/lib/cnpj';
+import { enderecoToString } from '@/lib/cep';
+import { SeletorMarcadorObra } from '@/components/obras/SeletorMarcadorObra';
 import { ColumnSettings, type ColumnDefinition } from '@/components/shared/ColumnSettings';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { useTableSettings } from '@/hooks/use-table-settings';
@@ -75,10 +78,6 @@ const OBRA_FIELDS: ColumnDefinition[] = [
   { id: 'actions', label: 'Ações', locked: false },
 ];
 
-// O <Select> do Radix não aceita item com valor vazio, então "sem marcador" precisa de um
-// valor de mentirinha na tela. Ele nunca chega ao banco: vira `null` na hora de salvar.
-const SEM_MARCADOR = '__sem_marcador__';
-
 /**
  * A linha de obra como a lista a manipula.
  *
@@ -100,25 +99,67 @@ type ObraNaLista = {
   [chave: string]: unknown;
 };
 
+/** Os dois campos que a consulta do CNPJ pode preencher. */
+type CamposPreenchiveisPeloCnpj = { nome_obra: string; endereco_entrega: string };
+
 /**
- * O que aparece no lugar do campo quando a empresa ainda não criou marcador nenhum.
+ * O endereço que a Receita devolve, montado num texto só — o formato que o campo de endereço
+ * da obra usa.
  *
- * A lista nasce vazia de propósito (decisão do dono do produto), e por isso a tela é obrigada
- * a dizer isso em voz alta. O modelo antigo — "Status Inicial" com dropdown em branco e
- * nenhuma explicação — deixava a pessoa parada num campo que parecia quebrado, sem nenhum
- * caminho para sair dali. Aqui a frase explica o vazio e o botão resolve na mesma tela.
+ * ⚠️ **É o endereço da SEDE da empresa, não o do canteiro.** Numa SPE os dois às vezes
+ * coincidem, mas o caso comum é a sede ser o escritório da construtora — e é o endereço da
+ * obra que vira o pino no mapa. Por isso ele só entra em campo vazio, e a tela diz de onde
+ * veio (ver `AvisoEnderecoDaReceita`). Preencher e ficar calado é o que poria obra no lugar
+ * errado do mapa sem ninguém notar.
  */
-function MarcadorVazio({ onGerenciar }: { onGerenciar: () => void }) {
+function enderecoDaReceita(dados: CnpjData): string {
+  // `enderecoToString` (src/lib/cep.ts:55) espera `cidade`; a Receita chama de `municipio`.
+  return enderecoToString({
+    cep: dados.cep || '',
+    logradouro: dados.logradouro || '',
+    numero: dados.numero || '',
+    complemento: dados.complemento || '',
+    bairro: dados.bairro || '',
+    cidade: dados.municipio || '',
+    uf: dados.uf || '',
+  });
+}
+
+/**
+ * O que a consulta da Receita preenche nos dois formulários de obra — e o que ela nunca toca.
+ *
+ * **Só preenche campo vazio.** É a mesma regra que já existe em Clientes (`Clientes.tsx:643`),
+ * e é ela que impede o nome da obra ("Torre B — Ponta Negra") de virar sozinho a razão social
+ * da construtora depois de já digitado. Corrigir o CNPJ de uma obra meio preenchida não pode
+ * reescrever o que a pessoa acabou de escrever.
+ *
+ * Recebe o estado ANTERIOR e devolve o próximo, para ser usado dentro do `set…(prev => …)`: a
+ * consulta pode demorar até 10 segundos, e nesse tempo a pessoa continua digitando. Ler o
+ * estado pela closure do momento do clique desfaria justamente o que ela escreveu enquanto
+ * esperava.
+ */
+function aplicarDadosDoCnpj<T extends CamposPreenchiveisPeloCnpj>(anterior: T, dados: CnpjData): T {
+  // Nome fantasia é o plano B: há empresa cuja razão social vem em branco da Receita.
+  const nomeVindo = (dados.razao_social || dados.nome_fantasia || '').trim();
+  const enderecoVindo = enderecoDaReceita(dados);
+
+  return {
+    ...anterior,
+    nome_obra: nomeVindo && !(anterior.nome_obra || '').trim() ? nomeVindo : anterior.nome_obra,
+    endereco_entrega:
+      enderecoVindo && !(anterior.endereco_entrega || '').trim()
+        ? enderecoVindo
+        : anterior.endereco_entrega,
+  };
+}
+
+/** A frase que conta de onde veio o endereço preenchido sozinho. Ver `enderecoDaReceita`. */
+function AvisoEnderecoDaReceita() {
   return (
-    <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-3 space-y-2">
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        Nenhum marcador cadastrado ainda. Marcador é opcional — a obra pode ser criada sem um.
-      </p>
-      <Button type="button" variant="outline" size="sm" className="h-8 gap-2 text-xs" onClick={onGerenciar}>
-        <Tag className="h-3.5 w-3.5" />
-        Criar o primeiro marcador
-      </Button>
-    </div>
+    <p className="text-xs text-muted-foreground leading-relaxed">
+      Endereço da <span className="font-medium text-foreground">sede</span> da empresa, vindo da
+      Receita Federal. Confira se é mesmo o canteiro — é este endereço que marca a obra no mapa.
+    </p>
   );
 }
 
@@ -178,6 +219,13 @@ export default function Obras() {
 
   const [newObraCnpjError, setNewObraCnpjError] = useState('');
   const [editObraCnpjError, setEditObraCnpjError] = useState('');
+
+  // O endereço que a última consulta de CNPJ devolveu. Guarda o TEXTO, e não um "sim/não":
+  // assim o aviso "isso é o endereço da sede" aparece só enquanto o campo continuar igual ao
+  // que veio da Receita, e some sozinho no instante em que a pessoa corrige o endereço — sem
+  // precisar de um segundo estado para desligar.
+  const [newObraEnderecoDaReceita, setNewObraEnderecoDaReceita] = useState('');
+  const [editObraEnderecoDaReceita, setEditObraEnderecoDaReceita] = useState('');
 
 
   const { data: marcadores } = useMarcadoresObras();
@@ -779,13 +827,17 @@ export default function Obras() {
                         nome_obra: selectedObra.nome_obra,
                         cliente_id: selectedObra.cliente_id,
                         endereco_entrega: selectedObra.endereco_entrega || '',
-                        // Vazio = sem marcador. O <Select> traduz isso para a opção "Nenhum".
+                        // Vazio = sem marcador. O <SeletorMarcadorObra> traduz isso na tela
+                        // para "Sem marcador", e vira `null` de volta na hora de salvar.
                         marcador_id: selectedObra.marcador_id || '',
                         // Com máscara, e não cru. O banco guarda só os 14 dígitos, mas a
                         // validação cobra os 18 caracteres do formato — sem `formatCnpj`
                         // aqui, obra COM CNPJ salvo era reprovada por "CNPJ obrigatório".
                         spe_cnpj: formatCnpj(selectedObra.spe_cnpj || ''),
                       });
+                      // O endereço veio do banco, não de uma consulta: nada de aviso de sede.
+                      setEditObraEnderecoDaReceita('');
+                      setEditObraCnpjError('');
                       setEditDialogOpen(true);
                       setSelectedObra(null);
                     }}>Editar</Button>
@@ -829,9 +881,28 @@ export default function Obras() {
               });
             }} className="flex min-h-0 flex-1 flex-col gap-4">
               <CorpoDialogo className="space-y-4">
+                {/* O CNPJ abre o formulário: é ele que preenche o resto. Continua OPCIONAL —
+                    nem toda obra é uma SPE com CNPJ próprio, e a obrigatoriedade é escolha de
+                    cada empresa em Configurações → Campos (`obraObrigatorio`, padrão falso). */}
+                <CampoCnpj
+                  label="SPE / CNPJ"
+                  obrigatorio={obraObrigatorio('spe_cnpj', false)}
+                  value={editObra.spe_cnpj}
+                  onChange={(v) => {
+                    setEditObra(prev => ({ ...prev, spe_cnpj: v }));
+                    setEditObraCnpjError('');
+                  }}
+                  onDadosEncontrados={(dados) => {
+                    setEditObra(prev => aplicarDadosDoCnpj(prev, dados));
+                    setEditObraEnderecoDaReceita(enderecoDaReceita(dados));
+                  }}
+                  erro={editObraCnpjError}
+                  descricao="Opcional. Preenchido, completa o nome e o endereço que ainda estiverem em branco."
+                />
+
                 <div className="space-y-2">
                   <Label>Nome da Obra</Label>
-                  <Input 
+                  <Input
                     required
                     placeholder="Ex: Edifício Horizonte"
                     value={editObra.nome_obra}
@@ -848,32 +919,11 @@ export default function Obras() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Marcador</Label>
-                  {marcadores?.length === 0 ? (
-                    <MarcadorVazio onGerenciar={() => setMarcadoresDialogOpen(true)} />
-                  ) : (
-                    <Select
-                      value={editObra.marcador_id || SEM_MARCADOR}
-                      onValueChange={(v) => setEditObra(prev => ({ ...prev, marcador_id: v === SEM_MARCADOR ? '' : v }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o marcador" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={SEM_MARCADOR}>Nenhum</SelectItem>
-                        {marcadores?.map(m => (
-                          <SelectItem key={m.id} value={m.id}>
-                            <span className="flex items-center gap-2">
-                              <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', `bg-${m.cor}`)} />
-                              {m.nome}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
+                <SeletorMarcadorObra
+                  value={editObra.marcador_id}
+                  onChange={(v) => setEditObra(prev => ({ ...prev, marcador_id: v }))}
+                  onGerenciar={() => setMarcadoresDialogOpen(true)}
+                />
 
                 <div className="space-y-2">
                   <Label>Endereço de Entrega</Label>
@@ -881,20 +931,10 @@ export default function Obras() {
                     value={editObra.endereco_entrega}
                     onChange={(v) => setEditObra(prev => ({ ...prev, endereco_entrega: v }))}
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>SPE / CNPJ</Label>
-                  <Input 
-                    placeholder="00.000.000/0000-00"
-                    maxLength={18}
-                    value={editObra.spe_cnpj}
-                    onChange={(e) => {
-                      setEditObra(prev => ({ ...prev, spe_cnpj: formatCnpj(e.target.value) }));
-                      setEditObraCnpjError('');
-                    }}
-                  />
-                  {editObraCnpjError && <p className="text-[0.8rem] font-medium text-destructive">{editObraCnpjError}</p>}
+                  {!!editObraEnderecoDaReceita &&
+                    editObra.endereco_entrega === editObraEnderecoDaReceita && (
+                      <AvisoEnderecoDaReceita />
+                    )}
                 </div>
               </CorpoDialogo>
 
@@ -948,10 +988,31 @@ export default function Obras() {
                   setNewObra({ nome_obra: '', cliente_id: '', endereco_entrega: '', marcador_id: '', spe_cnpj: '' });
                   setCamposExtrasObra({});
                   setNewObraCnpjError('');
+                  setNewObraEnderecoDaReceita('');
                 }
               });
             }} className="flex min-h-0 flex-1 flex-col gap-4">
               <CorpoDialogo className="space-y-4">
+                {/* O CNPJ vem primeiro de propósito: quem cadastra uma SPE tem o CNPJ em mãos e
+                    a consulta traz nome e endereço prontos. Continua OPCIONAL — obra sem CNPJ
+                    próprio é o caso comum, e quem quiser exigir marca em Configurações →
+                    Campos (`obraObrigatorio('spe_cnpj', false)`). */}
+                <CampoCnpj
+                  label="SPE / CNPJ"
+                  obrigatorio={obraObrigatorio('spe_cnpj', false)}
+                  value={newObra.spe_cnpj}
+                  onChange={(v) => {
+                    setNewObra(prev => ({ ...prev, spe_cnpj: v }));
+                    setNewObraCnpjError('');
+                  }}
+                  onDadosEncontrados={(dados) => {
+                    setNewObra(prev => aplicarDadosDoCnpj(prev, dados));
+                    setNewObraEnderecoDaReceita(enderecoDaReceita(dados));
+                  }}
+                  erro={newObraCnpjError}
+                  descricao="Opcional. Preenchido, completa o nome e o endereço que ainda estiverem em branco."
+                />
+
                 <div className="space-y-2">
                   <Label>Nome da Obra{obraObrigatorio('nome_obra', true) && ' *'}</Label>
                   <Input
@@ -973,32 +1034,11 @@ export default function Obras() {
 
                 {/* Marcador é sempre OPCIONAL — não passa por `obraObrigatorio`. Foi campo
                     obrigatório com lista vazia que travou o cadastro no modelo antigo. */}
-                <div className="space-y-2">
-                  <Label>Marcador</Label>
-                  {marcadores?.length === 0 ? (
-                    <MarcadorVazio onGerenciar={() => setMarcadoresDialogOpen(true)} />
-                  ) : (
-                    <Select
-                      value={newObra.marcador_id || SEM_MARCADOR}
-                      onValueChange={(v) => setNewObra(prev => ({ ...prev, marcador_id: v === SEM_MARCADOR ? '' : v }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o marcador" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={SEM_MARCADOR}>Nenhum</SelectItem>
-                        {marcadores?.map(m => (
-                          <SelectItem key={m.id} value={m.id}>
-                            <span className="flex items-center gap-2">
-                              <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', `bg-${m.cor}`)} />
-                              {m.nome}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
+                <SeletorMarcadorObra
+                  value={newObra.marcador_id}
+                  onChange={(v) => setNewObra(prev => ({ ...prev, marcador_id: v }))}
+                  onGerenciar={() => setMarcadoresDialogOpen(true)}
+                />
 
                 <div className="space-y-2">
                   <Label>Endereço de Entrega{obraObrigatorio('endereco_entrega', false) && ' *'}</Label>
@@ -1006,20 +1046,10 @@ export default function Obras() {
                     value={newObra.endereco_entrega}
                     onChange={(v) => setNewObra(prev => ({ ...prev, endereco_entrega: v }))}
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>SPE / CNPJ{obraObrigatorio('spe_cnpj', false) && ' *'}</Label>
-                  <Input
-                    placeholder="00.000.000/0000-00"
-                    maxLength={18}
-                    value={newObra.spe_cnpj}
-                    onChange={(e) => {
-                      setNewObra(prev => ({ ...prev, spe_cnpj: formatCnpj(e.target.value) }));
-                      setNewObraCnpjError('');
-                    }}
-                  />
-                  {newObraCnpjError && <p className="text-[0.8rem] font-medium text-destructive">{newObraCnpjError}</p>}
+                  {!!newObraEnderecoDaReceita &&
+                    newObra.endereco_entrega === newObraEnderecoDaReceita && (
+                      <AvisoEnderecoDaReceita />
+                    )}
                 </div>
 
                 {(camposConfigObras ?? []).filter(c => c.origem === 'customizado').map(campo => (

@@ -9,6 +9,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
 import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { useMarcadores } from '@/hooks/use-marcadores';
@@ -30,6 +31,10 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { CampoMoeda } from '@/components/shared/CampoMoeda';
+import { CampoCnpj } from '@/components/shared/CampoCnpj';
+import { SeletorMarcadorObra } from '@/components/obras/SeletorMarcadorObra';
+import { validarCnpjDaObra } from '@/lib/obra-cnpj';
+import type { CnpjData } from '@/lib/cnpj';
 import { formatarMoedaBRL } from '@/lib/moeda';
 import { getNomeNegocioAutomatico } from '@/lib/nome-negocio';
 
@@ -108,6 +113,12 @@ function NovoNegocioFormContent({
   const [fabricanteOpen, setFabricanteOpen] = useState(false);
   const [obraDialogOpen, setObraDialogOpen] = useState(false);
   const [newObraNome, setNewObraNome] = useState('');
+  // O CNPJ fica guardado COM máscara (é o contrato do <CampoCnpj>); só vira dígito puro na
+  // hora de salvar. Marcador vazio = obra sem marcador, que é o padrão e um estado válido.
+  const [newObraCnpj, setNewObraCnpj] = useState('');
+  const [newObraMarcadorId, setNewObraMarcadorId] = useState('');
+  const [newObraCnpjErro, setNewObraCnpjErro] = useState<string | null>(null);
+  const [newObraNomeVeioDoCnpj, setNewObraNomeVeioDoCnpj] = useState(false);
 
   const [origens, setOrigens] = useState(() => {
     const saved = localStorage.getItem('custom_origens');
@@ -396,6 +407,36 @@ function NovoNegocioFormContent({
     }
   };
 
+  /**
+   * Limpa o atalho inteiro ao sair dele. Com três campos (CNPJ, nome e marcador) deixar
+   * resto do preenchimento anterior — inclusive a mensagem de erro do CNPJ — faria a
+   * próxima obra nascer com dado que ninguém digitou de novo.
+   */
+  const fecharDialogoObra = () => {
+    setObraDialogOpen(false);
+    setNewObraNome('');
+    setNewObraCnpj('');
+    setNewObraMarcadorId('');
+    setNewObraCnpjErro(null);
+    setNewObraNomeVeioDoCnpj(false);
+  };
+
+  /**
+   * A consulta da Receita NUNCA sobrescreve o que a pessoa já digitou — só preenche campo
+   * vazio. É a mesma regra que já existe em Clientes, e é o que impede o nome da obra de
+   * trocar sozinho depois de escrito.
+   *
+   * Só o NOME é preenchido aqui. O endereço que a Receita devolve é o da SEDE da empresa,
+   * que costuma ser o escritório da construtora e não o canteiro — e este atalho nem tem
+   * campo de endereço de obra: o `endereco_entrega` desta tela é do NEGÓCIO.
+   */
+  const preencherObraComDadosDoCnpj = (dados: CnpjData) => {
+    const nomeDaReceita = (dados.razao_social || dados.nome_fantasia || '').trim();
+    if (!nomeDaReceita || newObraNome.trim()) return;
+    setNewObraNome(nomeDaReceita);
+    setNewObraNomeVeioDoCnpj(true);
+  };
+
   const handleCreateObra = async () => {
     if (!clienteId) {
       toast.error('Selecione um cliente primeiro');
@@ -403,6 +444,15 @@ function NovoNegocioFormContent({
     }
     if (!newObraNome.trim()) {
       toast.error('Informe o nome da obra');
+      return;
+    }
+
+    // O `false` é a regra do produto: nem toda obra é uma SPE com CNPJ próprio, então o
+    // campo é OPCIONAL aqui. Campo vazio passa; preenchido pela metade, não.
+    const erroCnpj = validarCnpjDaObra(newObraCnpj, false);
+    setNewObraCnpjErro(erroCnpj);
+    if (erroCnpj) {
+      toast.error(erroCnpj);
       return;
     }
 
@@ -414,19 +464,31 @@ function NovoNegocioFormContent({
       if (existingObra) {
         setObraId(existingObra.id);
         if (existingObra.endereco_entrega) setEnderecoEntrega(existingObra.endereco_entrega);
-        toast.info('Esta obra já existia e foi selecionada automaticamente.');
-        setObraDialogOpen(false);
-        setNewObraNome('');
+        // Selecionar a que já existe não altera o cadastro dela. Se a pessoa tinha digitado
+        // CNPJ ou marcador, dizer que eles ficaram de fora evita a impressão de que a obra
+        // antiga foi atualizada em silêncio.
+        const tinhaDadosNovos = newObraCnpj.trim() !== '' || newObraMarcadorId !== '';
+        toast.info(
+          'Esta obra já existia e foi selecionada automaticamente.',
+          tinhaDadosNovos
+            ? { description: 'O CNPJ e o marcador digitados não foram aplicados na obra existente.' }
+            : undefined,
+        );
+        fecharDialogoObra();
         return;
       }
 
       await createObraMutation.mutateAsync({
         nome_obra: newObraNome,
         cliente_id: clienteId,
+        // O banco guarda só os 14 dígitos; a máscara existe apenas na tela.
+        spe_cnpj: newObraCnpj.replace(/\D/g, ""),
+        // String vazia NÃO serve: a coluna é uuid, e `marcador_id = ''` faz o banco recusar
+        // a linha inteira. "Sem marcador" é null.
+        marcador_id: newObraMarcadorId || null,
       });
       toast.success('Obra criada com sucesso!');
-      setObraDialogOpen(false);
-      setNewObraNome('');
+      fecharDialogoObra();
     } catch (err: any) {
       toast.error('Erro ao criar obra: ' + err.message);
     }
@@ -1004,32 +1066,62 @@ function NovoNegocioFormContent({
         </DialogFooter>
       </DialogContent>
 
-      <Dialog open={obraDialogOpen} onOpenChange={setObraDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
+      {/* Atalho "Nova Obra". Usa <ConteudoDialogo> (e não <DialogContent> cru) porque agora
+          é um formulário de três campos: sem teto de altura e sem rolagem, num notebook
+          1366x768 o botão Criar some por baixo e o "X" some por cima ao mesmo tempo — e
+          este projeto desligou Esc e clique-fora, então a pessoa fica sem saída. */}
+      <Dialog open={obraDialogOpen} onOpenChange={(aberto) => (aberto ? setObraDialogOpen(true) : fecharDialogoObra())}>
+        <ConteudoDialogo>
+          <CabecalhoDialogo>
             <DialogTitle>Nova Obra</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Nome da Obra *</Label>
-              <Input
-                value={newObraNome}
-                onChange={(e) => setNewObraNome(e.target.value)}
-                placeholder="Ex: Edifício Horizonte"
+          </CabecalhoDialogo>
+          <CorpoDialogo>
+            <div className="space-y-4 py-4">
+              {/* O CNPJ vem ANTES do nome de propósito: quando a obra é uma SPE, a consulta
+                  já traz a razão social e o nome sai de graça. */}
+              <CampoCnpj
+                label="CNPJ da Obra"
+                value={newObraCnpj}
+                onChange={(comMascara) => {
+                  setNewObraCnpj(comMascara);
+                  setNewObraCnpjErro(null);
+                }}
+                onDadosEncontrados={preencherObraComDadosDoCnpj}
+                erro={newObraCnpjErro ?? undefined}
+                descricao="Opcional — só quando a obra tem CNPJ próprio (SPE). Preenchendo, o nome vem da Receita."
               />
+              <div className="space-y-2">
+                <Label>Nome da Obra *</Label>
+                <Input
+                  value={newObraNome}
+                  onChange={(e) => {
+                    setNewObraNome(e.target.value);
+                    setNewObraNomeVeioDoCnpj(false);
+                  }}
+                  placeholder="Ex: Edifício Horizonte"
+                />
+                {newObraNomeVeioDoCnpj && (
+                  <p className="text-xs text-muted-foreground">
+                    Preenchido pela consulta do CNPJ na Receita Federal. Confira antes de criar.
+                  </p>
+                )}
+              </div>
+              {/* Sem `onGerenciar`: a tela de gerenciar marcadores não está à mão aqui, e o
+                  componente ajusta a frase do estado vazio sozinho. */}
+              <SeletorMarcadorObra value={newObraMarcadorId} onChange={setNewObraMarcadorId} />
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Cliente</Label>
+                <p className="text-sm font-medium">{selectedCliente?.empresa || 'Cliente selecionado'}</p>
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Cliente</Label>
-              <p className="text-sm font-medium">{selectedCliente?.empresa || 'Cliente selecionado'}</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setObraDialogOpen(false)}>Cancelar</Button>
+          </CorpoDialogo>
+          <RodapeDialogo>
+            <Button variant="outline" onClick={fecharDialogoObra}>Cancelar</Button>
             <Button onClick={handleCreateObra} disabled={createObraMutation.isPending}>
               {createObraMutation.isPending ? 'Criando...' : 'Criar Obra'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
+          </RodapeDialogo>
+        </ConteudoDialogo>
       </Dialog>
       <Dialog open={origemDialogOpen} onOpenChange={setOrigemDialogOpen}>
         <DialogContent>

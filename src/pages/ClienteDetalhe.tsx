@@ -12,12 +12,10 @@ import { useAuth } from '@/hooks/use-auth';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { NovoNegocioDialog } from '@/components/pedidos/NovoNegocioDialog';
 import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra, useUpdateContato } from '@/hooks/use-mutations';
-import { useMarcadoresObras } from '@/hooks/use-marcadores-obras';
-
-// O <Select> do Radix não aceita item com valor vazio, então "sem marcador" precisa de um
-// valor de mentirinha só na tela. Ele nunca chega ao banco — vira nulo ao salvar. Mesma
-// convenção da tela de Obras.
-const SEM_MARCADOR_CLIENTE = '__sem_marcador__';
+import { SeletorMarcadorObra } from '@/components/obras/SeletorMarcadorObra';
+import { CampoCnpj } from '@/components/shared/CampoCnpj';
+import { validarCnpjDaObra } from '@/lib/obra-cnpj';
+import type { CnpjData } from '@/lib/cnpj';
 import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -73,6 +71,10 @@ const NEGOCIOS_CLIENTE_COLUMNS: ColumnDefinition[] = [
 // Exatamente as quatro colunas que a ficha já mostrava: quem nunca mexer na configuração
 // continua vendo a mesma tabela de sempre.
 const NEGOCIOS_CLIENTE_DEFAULT_VISIBLE = ['fabricante', 'valor', 'etapa', 'data_pedido'];
+
+// O formulário de obra em branco, escrito uma vez só: ele é reposto em três pontos do
+// cadastro rápido (obra duplicada, cadastro concluído e o estado inicial).
+const NOVA_OBRA_VAZIA = { nome_obra: '', endereco_entrega: '', marcador_id: '', spe_cnpj: '' };
 
 // Formata datas ISO ("aaaa-mm-dd" ou timestamp completo) para dd/mm/aaaa sem passar
 // por conversão de timezone do navegador (o valor já representa a data salva pelo backend).
@@ -320,8 +322,48 @@ const ClienteDetalhe = () => {
   const [selectedContatoId, setSelectedContatoId] = useState('');
   const updateContato = useUpdateContato();
   const createObra = useCreateObra();
-  const { data: marcadoresObras } = useMarcadoresObras();
-  const [novaObra, setNovaObra] = useState({ nome_obra: '', endereco_entrega: '', marcador_id: '', spe_cnpj: '' });
+  const [novaObra, setNovaObra] = useState(NOVA_OBRA_VAZIA);
+  const [erroCnpjObra, setErroCnpjObra] = useState('');
+  // Liga a frase que diz de onde veio o endereço. Só aparece quando foi a consulta do CNPJ
+  // que preencheu o campo — endereço digitado à mão não precisa de aviso nenhum.
+  const [enderecoVeioDoCnpj, setEnderecoVeioDoCnpj] = useState(false);
+
+  // O que fazer com os dados que a Receita devolve. Regra que já vale no cadastro de
+  // Clientes: só preenche campo VAZIO. Sem isso, corrigir um dígito do CNPJ dispara a
+  // consulta de novo e troca sozinho o nome que a pessoa acabou de escrever.
+  const preencherObraComCnpj = (dados: CnpjData) => {
+    const nomeVazio = !novaObra.nome_obra.trim();
+    const enderecoVazio = !novaObra.endereco_entrega.trim();
+
+    // A razão social é o nome oficial; o fantasia entra só quando ela vem vazia.
+    const nomeDaReceita = (dados.razao_social || '').trim() || (dados.nome_fantasia || '').trim();
+    // O endereço da Receita é o da SEDE da empresa — muitas vezes o escritório da
+    // construtora, não o canteiro. Por isso ele só entra em campo vazio, e a tela avisa
+    // de onde veio para a pessoa conferir antes de o pino cair no mapa.
+    const enderecoDaReceita = enderecoToString({
+      cep: dados.cep || '',
+      logradouro: dados.logradouro || '',
+      numero: dados.numero || '',
+      complemento: dados.complemento || '',
+      bairro: dados.bairro || '',
+      cidade: dados.municipio || '',
+      uf: dados.uf || '',
+    });
+
+    setNovaObra(o => ({
+      ...o,
+      nome_obra: nomeVazio && nomeDaReceita ? nomeDaReceita : o.nome_obra,
+      endereco_entrega: enderecoVazio && enderecoDaReceita ? enderecoDaReceita : o.endereco_entrega,
+    }));
+    if (enderecoVazio && enderecoDaReceita) setEnderecoVeioDoCnpj(true);
+  };
+
+  // Volta o formulário ao estado de fábrica, incluindo o erro do CNPJ e o aviso do endereço.
+  const limparNovaObra = () => {
+    setNovaObra(NOVA_OBRA_VAZIA);
+    setErroCnpjObra('');
+    setEnderecoVeioDoCnpj(false);
+  };
   const [pedidosPage, setPedidosPage] = useState(1);
   const [pedidosPageSize, setPedidosPageSize] = useState(5);
   const [pedidosBusca, setPedidosBusca] = useState('');
@@ -1170,6 +1212,16 @@ const ClienteDetalhe = () => {
                         toast.error('O nome da obra é obrigatório');
                         return;
                       }
+                      // Aqui o CNPJ é SEMPRE opcional: esta tela não lê a configuração de
+                      // campos obrigatórios da empresa, então passa `false`. A validação
+                      // deixa passar campo vazio e só barra CNPJ pela metade ou inválido —
+                      // antes disso, dava para gravar qualquer texto no campo.
+                      const erroCnpj = validarCnpjDaObra(novaObra.spe_cnpj, false);
+                      if (erroCnpj) {
+                        setErroCnpjObra(erroCnpj);
+                        return;
+                      }
+                      setErroCnpjObra('');
                       try {
                         // Verificar se já existe obra com este nome (evitar duplicados)
                         const normalizedNewName = novaObra.nome_obra.trim().toLowerCase();
@@ -1178,7 +1230,7 @@ const ClienteDetalhe = () => {
                         if (existingObra) {
                           toast.info('Esta obra já existe para este cliente.');
                           setAddObraOpen(false);
-                          setNovaObra({ nome_obra: '', endereco_entrega: '', marcador_id: '', spe_cnpj: '' });
+                          limparNovaObra();
                           return;
                         }
 
@@ -1187,10 +1239,12 @@ const ClienteDetalhe = () => {
                           // Campo vazio não é identificador: mandar '' faria o banco recusar.
                           // Obra sem marcador é o estado normal e se escreve como nulo.
                           marcador_id: novaObra.marcador_id || null,
+                          // Na tela o CNPJ tem máscara; no banco são só os 14 dígitos.
+                          spe_cnpj: novaObra.spe_cnpj.replace(/\D/g, ''),
                           cliente_id: id!
                         });
                         toast.success('Obra cadastrada com sucesso!');
-                        setNovaObra({ nome_obra: '', endereco_entrega: '', marcador_id: '', spe_cnpj: '' });
+                        limparNovaObra();
                         setAddObraOpen(false);
                       } catch (err: any) {
                         toast.error('Erro ao cadastrar obra: ' + err.message);
@@ -1198,6 +1252,21 @@ const ClienteDetalhe = () => {
                     }} 
                     className="space-y-4 pt-4"
                   >
+                    {/* O CNPJ vem PRIMEIRO de propósito: quando a obra é uma SPE, digitar o
+                        CNPJ já traz o nome e o endereço da Receita, e o resto do formulário
+                        chega preenchido. Continua opcional — a maioria das obras não tem CNPJ
+                        próprio, e o campo em branco é estado normal. */}
+                    <CampoCnpj
+                      label="CNPJ / SPE"
+                      value={novaObra.spe_cnpj}
+                      onChange={v => {
+                        setErroCnpjObra('');
+                        setNovaObra(o => ({ ...o, spe_cnpj: v }));
+                      }}
+                      onDadosEncontrados={preencherObraComCnpj}
+                      erro={erroCnpjObra}
+                      descricao="Opcional — só quando a obra tem CNPJ próprio (SPE). Preenchendo, o nome e o endereço vêm da Receita Federal."
+                    />
                     <div className="space-y-2">
                       <Label>Nome da Obra *</Label>
                       <Input
@@ -1211,49 +1280,33 @@ const ClienteDetalhe = () => {
                       <Label>Endereço de Entrega</Label>
                       <Input
                         value={novaObra.endereco_entrega}
-                        onChange={e => setNovaObra(o => ({ ...o, endereco_entrega: e.target.value }))}
+                        onChange={e => {
+                          // Assim que a pessoa encosta no campo, o aviso de origem sai: o
+                          // texto passou a ser dela, não mais o que veio da Receita.
+                          setEnderecoVeioDoCnpj(false);
+                          setNovaObra(o => ({ ...o, endereco_entrega: e.target.value }));
+                        }}
                         placeholder="Rua, número, bairro..."
                       />
+                      {enderecoVeioDoCnpj && (
+                        <p className="text-xs text-muted-foreground">
+                          Endereço da SEDE da empresa, vindo da Receita Federal. Confira antes de
+                          salvar — é ele que marca a obra no mapa, e o canteiro costuma ficar
+                          longe do escritório.
+                        </p>
+                      )}
                     </div>
                     {/* Era um Status com quatro opções CRAVADAS NO CÓDIGO, que ignoravam a
                         lista configurável e gravavam 'ativa' por padrão. Foi este formulário —
                         e não o da tela de Obras — que criou as 2.312 obras apagadas em
                         agosto/2026, todas com status 'ativa'. Agora fala a mesma língua da
-                        tela de Obras: marcador, opcional, da lista da empresa. */}
-                    <div className="space-y-2">
-                      <Label>Marcador</Label>
-                      {(marcadoresObras ?? []).length === 0 ? (
-                        <p className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                          Nenhum marcador cadastrado. Marcador é opcional — dá para criar a obra
-                          sem um, e cadastrar os marcadores depois, na tela de Obras.
-                        </p>
-                      ) : (
-                        <Select
-                          value={novaObra.marcador_id || SEM_MARCADOR_CLIENTE}
-                          onValueChange={v =>
-                            setNovaObra(o => ({ ...o, marcador_id: v === SEM_MARCADOR_CLIENTE ? '' : v }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sem marcador" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={SEM_MARCADOR_CLIENTE}>Sem marcador</SelectItem>
-                            {(marcadoresObras ?? []).map(m => (
-                              <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label>CNPJ / SPE</Label>
-                      <Input
-                        value={novaObra.spe_cnpj}
-                        onChange={e => setNovaObra(o => ({ ...o, spe_cnpj: e.target.value }))}
-                        placeholder="00.000.000/0000-00"
-                      />
-                    </div>
+                        tela de Obras: marcador, opcional, da lista da empresa. Sem
+                        `onGerenciar` — a tela de gerenciar marcadores não existe aqui, e o
+                        componente já diz onde cadastrá-los. */}
+                    <SeletorMarcadorObra
+                      value={novaObra.marcador_id}
+                      onChange={v => setNovaObra(o => ({ ...o, marcador_id: v }))}
+                    />
                     <div className="flex justify-end gap-3 pt-4">
                       <Button type="button" variant="outline" onClick={() => setAddObraOpen(false)}>
                         Cancelar
