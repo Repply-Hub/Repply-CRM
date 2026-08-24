@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ObraComCoordenada {
@@ -91,25 +92,65 @@ export async function geocodificar(endereco: string): Promise<{ lat: number; lng
   return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
 }
 
+/** Obra que já passou pela geocodificação e ficou sem ponto: o endereço não foi encontrado.
+ *  Predicado único para o mapa e o painel lateral não divergirem na definição. */
+export function obraSemPontoNoMapa(o: ObraComCoordenada): boolean {
+  return (o.latitude === null || o.longitude === null) && !!o.geocoded_at;
+}
+
 export function useGeocodeObras(obras: ObraComCoordenada[] | undefined) {
+  const qc = useQueryClient();
   const [items, setItems] = useState<ObraComCoordenada[]>(obras ?? []);
   const [progresso, setProgresso] = useState({ atual: 0, total: 0 });
   const [carregando, setCarregando] = useState(false);
+  // Espelho do estado para o efeito ler o valor corrente sem entrar nas dependências.
+  const itemsRef = useRef<ObraComCoordenada[]>(items);
+  itemsRef.current = items;
 
-  // A chave inclui o `geocoded_at` de propósito: editar o endereço de uma obra zera o
-  // carimbo (ver o submit de edição em Obras.tsx), e é essa mudança que faz o efeito
-  // rodar de novo e re-geocodificar. Com a chave só por id, obra corrigida ficava presa
-  // com o pino velho (ou sem pino) até recarregar a página.
+  // A chave inclui endereço e nome de propósito: editar o endereço de uma obra zera o
+  // carimbo (ver o submit de edição em Obras.tsx), e é a mudança do TEXTO que faz o efeito
+  // rodar de novo e re-geocodificar — com a chave só por id, obra corrigida ficava presa
+  // com o pino velho (ou sem pino) até recarregar a página. O `geocoded_at` NÃO entra na
+  // chave: o próprio laço grava esse carimbo no cache a cada obra processada, e ele na
+  // chave faria o laço se cancelar e recomeçar a cada gravação.
   const chaveObras = useMemo(
-    () => obras?.map((o) => `${o.id}:${o.geocoded_at ?? ''}`).join(',') ?? '',
+    () =>
+      obras
+        ?.map((o) => `${o.id}:${o.endereco_entrega ?? ''}:${o.nome_obra ?? ''}`)
+        .join('|') ?? '',
     [obras]
   );
 
   useEffect(() => {
     if (!obras) return;
-    setItems(obras);
 
-    const pendentes = obras.filter(
+    // Mescla com o que ESTA SESSÃO já geocodificou: mudar filtro/busca re-deriva a lista a
+    // partir do cache de obras, e o cache pode ainda não ter a coordenada recém-gravada.
+    // Sem a mescla, um clique num chip de marcador apagava os pinos da sessão e refazia
+    // todas as consultas ao Nominatim do zero. A mescla só vale quando endereço e nome não
+    // mudaram — se mudaram, o carimbo foi zerado de propósito pela edição e a obra DEVE
+    // ser re-geocodificada.
+    const conhecidas = new Map(itemsRef.current.map((o) => [o.id, o]));
+    const mesclado = obras.map((o) => {
+      const local = conhecidas.get(o.id);
+      if (
+        local?.geocoded_at &&
+        !o.geocoded_at &&
+        local.endereco_entrega === o.endereco_entrega &&
+        local.nome_obra === o.nome_obra
+      ) {
+        return {
+          ...o,
+          latitude: local.latitude,
+          longitude: local.longitude,
+          geocoded_at: local.geocoded_at,
+        };
+      }
+      return o;
+    });
+    setItems(mesclado);
+
+    const pendentes = mesclado.filter(
       (o) => (!!o.endereco_entrega || !!o.nome_obra) && (o.latitude === null || o.longitude === null) && !o.geocoded_at
     );
     
@@ -162,6 +203,19 @@ export function useGeocodeObras(obras: ObraComCoordenada[] | undefined) {
                 : o
             )
           );
+
+          // Atualiza também o CACHE da lista de obras — é dele que o painel lateral e a
+          // projeção do mapa derivam. Sem isto, o cache ficava mentindo (coordenada nula)
+          // até um refetch, e o painel contradizia o mapa na mesma tela.
+          qc.setQueriesData({ queryKey: ['obras'] }, (velho: unknown) =>
+            Array.isArray(velho)
+              ? velho.map((o: { id: string }) =>
+                  o.id === obra.id
+                    ? { ...o, latitude: coord.lat, longitude: coord.lng, geocoded_at: agora }
+                    : o
+                )
+              : velho
+          );
         } else {
           console.warn(`[useGeocodeObras] Falha ao geocodificar ${obra.nome_obra}`);
           // O carimbo de "já tentei" é gravado ATÉ na falha, de propósito: sem ele, cada
@@ -180,6 +234,13 @@ export function useGeocodeObras(obras: ObraComCoordenada[] | undefined) {
           // aparecer na hora, sem esperar recarregar a lista.
           setItems((prev) =>
             prev.map((o) => (o.id === obra.id ? { ...o, geocoded_at: agora } : o))
+          );
+          qc.setQueriesData({ queryKey: ['obras'] }, (velho: unknown) =>
+            Array.isArray(velho)
+              ? velho.map((o: { id: string }) =>
+                  o.id === obra.id ? { ...o, geocoded_at: agora } : o
+                )
+              : velho
           );
         }
 
