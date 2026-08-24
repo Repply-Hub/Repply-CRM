@@ -2624,7 +2624,6 @@ export type Database = {
           longitude: number | null
           nome_obra: string | null
           spe_cnpj: string | null
-          status: string
         }
         Insert: {
           campos_extras?: Json
@@ -2638,7 +2637,6 @@ export type Database = {
           longitude?: number | null
           nome_obra?: string | null
           spe_cnpj?: string | null
-          status?: string
         }
         Update: {
           campos_extras?: Json
@@ -2652,7 +2650,6 @@ export type Database = {
           longitude?: number | null
           nome_obra?: string | null
           spe_cnpj?: string | null
-          status?: string
         }
         Relationships: [
           {
@@ -3275,42 +3272,6 @@ export type Database = {
           items?: Json
           updated_at?: string
           user_id?: string
-        }
-        Relationships: []
-      }
-      status_obras: {
-        Row: {
-          cor: string
-          created_at: string
-          empresa_id: string
-          id: string
-          is_sistema: boolean
-          nome: string
-          ordem: number
-          slug: string
-          updated_at: string
-        }
-        Insert: {
-          cor?: string
-          created_at?: string
-          empresa_id: string
-          id?: string
-          is_sistema?: boolean
-          nome: string
-          ordem?: number
-          slug: string
-          updated_at?: string
-        }
-        Update: {
-          cor?: string
-          created_at?: string
-          empresa_id?: string
-          id?: string
-          is_sistema?: boolean
-          nome?: string
-          ordem?: number
-          slug?: string
-          updated_at?: string
         }
         Relationships: []
       }
@@ -4302,10 +4263,6 @@ export type Database = {
           p_role: string
         }
         Returns: Json
-      }
-      seed_default_status_obras: {
-        Args: { target_empresa_id: string }
-        Returns: undefined
       }
       set_whatsapp_assinar_remetente_global: {
         Args: { p_valor: boolean }
