@@ -1,12 +1,27 @@
 # Publicar o site
 
-> ✅ **Enviar para o `main` publica.** Desde 24/08/2026, commit no `main` vira site no ar em
-> cerca de 30 segundos, sem ninguém rodar comando nenhum. O ✓ ou ✗ ao lado do commit no
-> GitHub é o resultado da publicação.
+> 🔴 **Enviar para o `main` NÃO publica.** Depois do `git push`, alguém precisa rodar
+> `npx vercel --prod`. Se você commitou e não rodou o comando, **o que você fez não está no
+> ar** — e o ✗ vermelho ao lado do commit no GitHub é a Vercel recusando, não um erro seu.
 
 ---
 
-## Os dois dias em que não publicou, e o diagnóstico errado
+## Por que é manual, e a história que explica o ✗ vermelho
+
+**A regra hoje (24/08/2026, decisão do Lucas):** o repositório é PRIVADO e pertence à
+organização `Repply-Hub`. O plano gratuito da Vercel recusa exatamente essa combinação, e a
+recusa aparece em todo commit:
+
+```
+Cannot deploy from a private GitHub organization repository on the Hobby plan
+```
+
+Manter o código fechado é decisão de negócio — é um SaaS com cliente pagante. O preço dela é
+publicar por comando. As alternativas (Vercel Pro, ou Cloudflare Pages, cujo plano grátis
+aceita repositório privado **e** permite uso comercial) estão comparadas em
+[`migrar-hospedagem.md`](migrar-hospedagem.md).
+
+### O diagnóstico errado que custou dois dias
 
 Entre 22 e 24/08/2026 a publicação foi manual. O motivo escrito aqui na época — e repetido
 no `CLAUDE.md`, no `README.md` e em três conversas — era:
@@ -92,10 +107,9 @@ Isso cria uma pasta `.vercel/` local, que **não vai para o repositório** (est�
 
 ---
 
-## Publicar à mão — só para o que NÃO está commitado
+## Publicar — sempre à mão
 
-Em uso normal isto não é necessário: o `git push` já publica. O comando serve para provar
-alguma coisa antes de commitar, ou se a publicação automática cair.
+É o caminho normal, não a exceção. Depois de todo `git push` que precise ir ao ar.
 
 > ⚠️ **Nunca publique da pasta de trabalho quando houver outra sessão codando nela.** O
 > `vercel --prod` manda o **disco**, não o commitado — sobe junto o que a outra sessão

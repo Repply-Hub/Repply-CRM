@@ -682,20 +682,25 @@ Login na **conta da Vercel da Repply** — não na conta pessoal —, e `npx ver
 do projeto. É assim que dev de fora publica também: o acesso vem da conta compartilhada, não do
 repositório.
 
-### Quando ainda é preciso publicar à mão
+### Publicar é SEMPRE à mão
 
-Só quando o que precisa ir ao ar **não está commitado**, o que na prática significa: nunca, em
-uso normal. Se for necessário mesmo assim:
+Não existe caso em que o `git push` publique. Depois de subir o código, alguém roda:
 
 ```sh
 npx vercel --prod
 ```
 
-> ⚠️ **Nunca publique da pasta de trabalho quando houver outra sessão codando nela.** O
-> `vercel --prod` manda o disco, não o commitado — sobe junto o que a outra sessão deixou pela
-> metade. Publique de uma cópia limpa (`git clone --local` num diretório temporário, `npm ci`,
-> e apague o `.env` antes de mandar; sem isso o site vai ao ar sem a chave do Google Maps e
-> sem mapa, sem erro nenhum aparecer).
+> 🔴 **Nunca publique da pasta de trabalho quando houver outra sessão codando nela.** O
+> `vercel --prod` manda o **disco**, não o commitado — sobe junto o que a outra sessão deixou
+> pela metade. Aconteceu de verdade em 24/08/2026 e foi evitado publicando de uma cópia limpa:
+>
+> ```sh
+> git clone --local . /tmp/publicar && cd /tmp/publicar && npm ci && rm -f .env
+> ```
+>
+> O `rm -f .env` não é zelo: o `.env` das máquinas de desenvolvimento não é igual ao da
+> Vercel, e um build local com ele publicaria variável ausente ou velha **sem nenhum erro
+> aparecer**.
 
 ### A Vercel do desenvolvedor anterior — desconectada em 24/08/2026
 

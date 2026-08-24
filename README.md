@@ -32,9 +32,10 @@ Produto da **Repply** (Grupo MD · Natal/RN). Cliente-âncora: **MD Representaç
 
 Três fatos que mudam como se trabalha neste repositório:
 
-1. **Enviar para o `main` publica.** Commit no `main` vai ao ar em ~30s, sem comando
-   nenhum. Ficou manual entre 22 e 24/08/2026, por um motivo que se descobriu ser outro —
-   ver [`docs/operacao/publicar-na-vercel.md`](docs/operacao/publicar-na-vercel.md).
+1. **Enviar para o `main` NÃO publica.** Depois do `git push`, alguém precisa rodar
+   `npx vercel --prod`. O repositório é privado e pertence a uma organização, e o plano
+   gratuito da Vercel recusa essa combinação — ver
+   [`docs/operacao/publicar-na-vercel.md`](docs/operacao/publicar-na-vercel.md).
 2. **Quase não existe rede de proteção automática.** São 10 arquivos de teste para 78 mil
    linhas; o TypeScript está configurado de forma frouxa de propósito; e o `npm run lint`
    **não passa** — são 498 problemas herdados no `main`. O critério prático é *o número

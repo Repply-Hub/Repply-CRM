@@ -439,9 +439,22 @@ etapa registrada na importação (18–21/08). Com corte de 3 dias, **todos entr
 tempo** na primeira semana. A banda de 3 a 7 segura a tela, mas o link "ver os outros 186" vai
 ser grande no começo. É honesto — eles estão parados mesmo — e melhora sozinho.
 
-**Consulta sob regra de segurança.** A função tem que ser `SECURITY DEFINER` repetindo as
-cláusulas da política, senão cai na armadilha do `CLAUDE.md` §7.9 — a mesma que fez a busca do
-WhatsApp levar 12 segundos. **Medir antes e depois, e escrever o número.**
+**Consulta sob regra de segurança — mas confira o índice ANTES de culpar a RLS.**
+
+> ⚠️ **Correção de 24/08/2026, mesma tarde.** A primeira versão deste documento dizia que a
+> lentidão da lista de negócios (2.118 ms) era a armadilha do `CLAUDE.md` §7.9 — a política de
+> RLS cobrada por linha — e que o conserto era `SECURITY DEFINER`. **Estava errado**, e outra
+> sessão derrubou por medição: faltava índice em `pedidos.created_at`, que é a ordenação
+> padrão da lista. Sem ele o banco varria as 11.911 linhas para entregar 10 — e a política era
+> cobrada 11.911 vezes como CONSEQUÊNCIA, não como causa.
+>
+> Com `idx_pedidos_created_at_id` criado e a política reescrita, medido nesta base:
+> **2.118 ms → 18,6 ms**, e de 34.957 blocos lidos para 234.
+
+A lição para quem for construir a pauta: a consulta ordena e corta poucas linhas, então
+**garanta que a ordenação bate com um índice existente** antes de partir para `SECURITY
+DEFINER`. Medir antes e depois, e escrever o número, continua valendo — foi medição que
+derrubou o diagnóstico errado.
 
 **DNS não é reversível em minutos.** Errar SPF ou DKIM pode fazer e-mail parar de chegar,
 inclusive os que hoje chegam. Fazer com o site no ar, conferindo entrega antes de trocar o
