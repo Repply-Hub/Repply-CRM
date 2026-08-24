@@ -44,7 +44,20 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
         }
       });
 
+    // Aba em segundo plano sofre throttling do navegador no timer de heartbeat do
+    // Realtime (25s), o socket cai sem disparar nenhum evento visível e o presence
+    // trava marcando o usuário como offline até alguém reabrir a tela. Ao voltar o
+    // foco, se o canal não estiver mais "joined" força um novo track() em vez de
+    // esperar a reconexão espontânea da lib, que pode demorar vários ciclos de backoff.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (channel.state === 'joined') return;
+      channel.track({ usuario_id: myId, online_at: new Date().toISOString() });
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       supabase.removeChannel(channel);
     };
   }, [myId, empresaId]);

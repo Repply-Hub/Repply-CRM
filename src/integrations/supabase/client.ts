@@ -11,4 +11,13 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     persistSession: true,
     autoRefreshToken: true,
   },
+  realtime: {
+    // Valores iguais ao default da lib (@supabase/realtime-js), fixados aqui de propósito
+    // para não depender de um default silencioso: 25s de heartbeat e backoff de reconexão
+    // 1s/2s/5s/10s (10s daí em diante). Abas em segundo plano sofrem throttling do
+    // navegador nesse intervalo e o socket cai sem avisar — o listener de
+    // visibilitychange em use-presence.tsx é quem repara o presence ao voltar o foco.
+    heartbeatIntervalMs: 25000,
+    reconnectAfterMs: (tries: number) => [1000, 2000, 5000, 10000][tries - 1] || 10000,
+  },
 });
