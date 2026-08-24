@@ -100,7 +100,7 @@ traduza para inglês**, a consistência vale mais que a preferência.
 | **Usuário** | `usuarios` | Membro da equipe. Antigamente `vendedores` |
 | **Empresa** | `empresas` | O **assinante do SaaS**, não o cliente dele |
 
-### Três ambiguidades que já causaram bug
+### Quatro ambiguidades que já causaram bug
 
 1. **"empresa" significa duas coisas.** `empresas` é o assinante do SaaS. Mas `clientes`
    tem um campo `empresa` de texto, que é o nome da empresa **cliente**. Inquilino é
@@ -111,6 +111,18 @@ traduza para inglês**, a consistência vale mais que a preferência.
    `usuarios` / `usuario_id` / `get_my_usuario_id()`. **Não remova os antigos** sem varrer
    as políticas de segurança que ainda os usam.
 3. **"Negócio" na tela é `pedidos` no banco.** Não renomeie nenhum dos dois.
+4. 🔴 **`prazo_resposta` NÃO é prazo de resposta — é a DATA DE FECHAMENTO.** O nome da coluna
+   mente. A tela escreve "Data de Fechamento" (`NovoNegocioDialog.tsx:773`), a importação
+   rotula "Fechamento" (`importPedidosUtils.ts:17`), e é essa coluna que o Dashboard usa em
+   **todas as métricas de dinheiro**. Um plano inteiro foi desenhado sobre ela em 24/08/2026
+   acreditando no nome, e teve de ser refeito.
+   **Nunca a use como prazo de coisa nenhuma.** Para negócio aberto ela é uma previsão
+   herdada da planilha que ninguém atualiza — dos 193 abertos, **32 têm data de fechamento
+   anterior à data de criação**. Quem precisa de "há quanto tempo está parado" usa
+   `pedidos_historico_status` (confiável a partir de 08/2026) ou `data_pedido` (sempre).
+   O mapa completo de tela × banco está em
+   [`docs/arquitetura/modelo-de-dados.md`](docs/arquitetura/modelo-de-dados.md), junto com o
+   motivo de não renomearmos (o rename quebra 8 funções do banco em silêncio).
 
 ### Termos do ramo
 
@@ -492,6 +504,7 @@ Além disso, conforme o que mudou:
 - ❌ Converter fuso na data que veio do calendário (§7.12) — a conversão recua um dia
 - ❌ `<Calendar>` sem `defaultMonth` (§7.13) — abre no mês de hoje e ignora a data escolhida
 - ❌ Parâmetro que escolhe entre duas colunas de data dentro de uma RPC (§7.9)
+- ❌ Tratar `prazo_resposta` como prazo (§4.4) — é a data de fechamento, e o nome mente
 - ❌ Construir gráfico novo sem perguntar ao Lucas se ele conta por criação ou por fechamento
 - ❌ Limpar não-dígitos de identificador de WhatsApp
 - ❌ Painel que atribua culpa — ver o princípio "registra, não interpreta" (`SPEC.md` §3.5)

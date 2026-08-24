@@ -59,6 +59,89 @@ que é o nome da empresa **cliente**. São coisas diferentes com o mesmo nome.
 `usuarios.role` aceita quatro valores: `admin`, `empresa`, `gestor`, `vendedor`. O papel
 `empresa` é o titular que criou a conta. Ver [permissões](permissoes-e-rls.md) §3.
 
+### 🔴 O que a tela chama × o que o banco chama
+
+**Levantado em 24/08/2026, depois de um erro real:** um plano inteiro foi desenhado sobre a
+coluna `prazo_resposta` acreditando que ela fosse um prazo de resposta do cliente. Não é. O
+nome da coluna e o significado dela divergem, e isso não aparece em lugar nenhum até alguém
+tropeçar.
+
+Mapa completo da lista de Negócios — a tela mais usada do sistema:
+
+| O usuário lê | id na tela | Coluna no banco | Diverge? |
+|---|---|---|---|
+| Negócio | `negocio` | `pedidos.nome` — **nulo nos 11.911** | 🔴 o nome real mora em `campos_extras['Negócio']` |
+| Cliente | `cliente` | `pedidos.cliente_id` → `clientes` | — |
+| Contato | `contato` | **`campos_extras['Contato']`** | ⚠️ não é coluna, é campo extra |
+| **Obra/Endereço** | `endereco_entrega` | `pedidos.endereco_entrega` | ⚠️ diz "Obra", mas `pedidos.obra_id` é outra coisa e está **nulo nos 11.911** |
+| Fabricante | `fabricante` | `pedidos.fabricante_id` | — |
+| Valor | `valor` | `pedidos.valor_total` | leve |
+| Responsável/Vendedor | `vendedor` | `pedidos.usuario_id` | ⚠️ o id diz "vendedor", a coluna diz "usuario" |
+| **Etapa** | `etapa` | **`pedidos.status`** | ⚠️ e o valor guardado é o apelido (`enviado`), não o rótulo (`Orçamento Enviado`) |
+| Marcador | `marcador` | `pedidos.marcador_id` | — |
+| Criação | `data_pedido` | `pedidos.data_pedido` | — |
+| **Fechamento** | `prazo_resposta` | **`pedidos.prazo_resposta`** | 🔴 **o pior: o nome diz "prazo de resposta", o significado é "data de fechamento"** |
+| Observações | `observacoes` | `pedidos.observacoes` | — |
+| Anexo | `anexo` | `pedidos.pdf_url` | leve |
+
+#### `prazo_resposta` é a data de fechamento. Ponto.
+
+Três lugares do código provam, e não há nenhum que a use como prazo:
+
+```
+src/components/pedidos/NovoNegocioDialog.tsx:773        <Label>Data de Fechamento</Label>
+src/components/import-pedidos/importPedidosUtils.ts:17  { key: 'prazo_resposta', label: 'Fechamento' }
+src/components/import/MappingStep.tsx:79                "Data prevista de fechamento do negócio."
+```
+
+É a coluna que o Dashboard usa para **todas as métricas de dinheiro** (ver
+[`modulos/dashboard.md`](../modulos/dashboard.md)) e a que o gatilho
+`fn_set_pedido_fechado_em` mantém.
+
+**E ninguém a alimenta como previsão:** dos 193 negócios abertos, **32 têm data de fechamento
+ANTERIOR à data de criação**. O campo é opcional no cadastro, e só 4 negócios em 11.911
+nasceram dentro do CRM — o resto veio da planilha.
+
+> **Nunca use `prazo_resposta` como prazo de coisa nenhuma.** Para negócio aberto ela é uma
+> previsão herdada da importação que ninguém atualiza. Quem precisa de "há quanto tempo isso
+> está parado" usa `pedidos_historico_status` (real a partir de 08/2026) ou `data_pedido`
+> (real sempre). Ver [`operacao/plano-pauta-do-dia.md`](../operacao/plano-pauta-do-dia.md) §1.5.
+
+#### Por que NÃO renomeamos
+
+Medido em 24/08/2026. Renomear `prazo_resposta` alcança:
+
+| onde | quantos | o rename resolve sozinho? |
+|---|---|---|
+| Funções e RPCs do banco | **8** | ❌ **não** |
+| Índices | 2 | ✅ sim |
+| Visões (`vw_faturamento_mensal`) | 1 | ✅ sim |
+| Referências em `src/` | **100**, em 22 arquivos | ❌ à mão |
+| Migrations históricas | 12 arquivos | (não se edita) |
+| Funções de borda | 1 | ❌ à mão |
+
+O `ALTER TABLE ... RENAME COLUMN` **atualiza visão e índice sozinho, mas NÃO atualiza o corpo
+das funções** — testado neste banco, numa transação desfeita:
+
+```
+visão   -> acompanhou   ✅
+índice  -> acompanhou   ✅
+função  -> ficou com o nome velho   ❌
+```
+
+As 8 funções afetadas são `dashboard_stats`, `pedidos_stats`, `plano_vendas_progresso`,
+`plano_vendas_progresso_por_vendedor`, `dashboard_indicadores_vendedor`,
+`fn_set_pedido_fechado_em`, `fn_log_pedido_historico_status` e
+`criar_configuracoes_campos_padrao` — ou seja, **praticamente todo número que o CRM mostra**.
+
+O rename só é seguro se as 8 forem reescritas no MESMO arquivo de migration. É factível, mas
+é uma mudança grande e arriscada em produção **cujo benefício é só para quem lê o código**.
+Nada muda para quem usa o sistema.
+
+**A escolha registrada:** manter o nome, documentar aqui, e deixar um comentário na própria
+coluna do banco (`COMMENT ON COLUMN`), que aparece no painel do Supabase para quem for olhar
+a tabela. Se um dia o rename acontecer, este bloco é a lista do que precisa ir junto.
+
 ---
 
 ## 3. O núcleo comercial
