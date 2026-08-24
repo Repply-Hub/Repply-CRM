@@ -271,7 +271,9 @@ export function MapaObras({ obras, isLoading, searchTerm = '', selectedObraId }:
       <div
         ref={wrapperRef}
         className="relative z-0 isolate rounded-lg overflow-hidden border border-border shadow-card bg-background"
-        style={{ height: telaCheia ? '100dvh' : '70vh', minHeight: 480 }}
+        // Metade da tela: sobra espaço para rolar a página. Quem precisa de mapa grande usa
+        // o botão de tela cheia.
+        style={{ height: telaCheia ? '100dvh' : '50vh', minHeight: 380 }}
       >
         <MapContainer
           ref={mapRef}

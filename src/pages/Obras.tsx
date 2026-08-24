@@ -711,8 +711,11 @@ export default function Obras() {
           </TabsContent>
 
           <TabsContent value="mapa" className="mt-0">
-            <Card className="h-[calc(100vh-280px)] min-h-[500px]">
-              <MapaObras 
+            {/* Sem altura fixa no Card: o mapa define a própria altura (ver MapaObras). Com as
+                duas alturas fixas somadas, o conteúdo estourava a moldura e o bloco ficava
+                gigante, atrapalhando a rolagem da página. */}
+            <Card className="p-4">
+              <MapaObras
                 obras={obrasParaMapa} 
                 isLoading={isLoading} 
                 searchTerm={search}
