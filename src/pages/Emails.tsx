@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,9 @@ import {
   ChevronsRight,
   Tag,
   CornerUpLeft,
+  Move,
+  GripVertical,
+  X,
 } from "lucide-react";
 import {
   useQuery,
@@ -54,6 +57,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSearchParams } from "react-router-dom";
 import { useEmailEmpresa } from "@/hooks/use-email-empresa";
 import { erroLegivelDaFunction } from "@/lib/erro-edge-function";
@@ -74,7 +78,11 @@ import {
   PASTA_LIXEIRA,
   type PastaSelecionada,
 } from "@/components/email/BarraPastas";
-import { useEmailPastas, useContagemPorPasta } from "@/hooks/use-email-pastas";
+import {
+  useEmailPastas,
+  useContagemPorPasta,
+  useMoverParaMarcador,
+} from "@/hooks/use-email-pastas";
 import { MoverParaMarcadorDialog } from "@/components/email/MoverParaMarcadorDialog";
 
 /** Uma linha da caixa de entrada, no formato que a listagem devolve. */
@@ -92,6 +100,8 @@ interface MensagemRecebida {
   remetente: string;
   destinatarios: string[];
   assunto: string | null;
+  /** Ids de pasta/marcador do provedor — mistura pasta de sistema com marcador real. */
+  pastas: string[];
 }
 
 interface PaginaRecebidos {
@@ -115,12 +125,15 @@ const CabecalhoLista = ({
   rotuloData,
   rotuloAssunto,
   checkbox,
+  mostrarEspacoAlca,
 }: {
   rotuloPrincipal: string;
   rotuloData: string;
   rotuloAssunto: string;
   /** Omitido nas telas sem seleção em massa (ex.: Rascunhos). */
   checkbox?: { checked: boolean; onChange: () => void };
+  /** Reserva o mesmo espaço da alça de arrastar da linha, para o cabeçalho não desalinhar quando o modo liga. */
+  mostrarEspacoAlca?: boolean;
 }) => (
   <div className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background px-4 py-2">
     {/* bg SÓLIDO — de propósito. Um fundo translúcido aqui (bg-muted/5, como o
@@ -129,6 +142,7 @@ const CabecalhoLista = ({
         tem esse problema por não ficar em cima de nada. bg-background é a cor
         de fundo de toda a lista, então o resultado visual é o mesmo tom do
         rodapé — só que sem deixar nada vazar. */}
+    {mostrarEspacoAlca && <div className="h-4 w-4 shrink-0" />}
     {checkbox && (
       <Checkbox
         className="shrink-0"
@@ -165,6 +179,43 @@ const CabecalhoLista = ({
   </div>
 );
 
+/**
+ * Selo "esta mensagem já está num marcador" — ao lado do assunto/prévia da
+ * linha. Um marcador: ícone + nome. Dois ou mais: nome do primeiro + contagem,
+ * com o resto por extenso no tooltip.
+ */
+const SeloMarcadores = ({
+  marcadores,
+}: {
+  marcadores: { id: string; nome: string }[];
+}) => {
+  if (marcadores.length === 0) return null;
+
+  const rotulo =
+    marcadores.length === 1
+      ? marcadores[0].nome
+      : `${marcadores[0].nome} +${marcadores.length - 1}`;
+
+  const badge = (
+    <Badge
+      variant="secondary"
+      className="ml-1 h-5 shrink-0 gap-1 border-none bg-primary/10 px-1.5 text-[11px] font-normal text-primary"
+    >
+      <Tag className="h-3 w-3" />
+      {rotulo}
+    </Badge>
+  );
+
+  if (marcadores.length === 1) return badge;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{badge}</TooltipTrigger>
+      <TooltipContent>{marcadores.map((m) => m.nome).join(", ")}</TooltipContent>
+    </Tooltip>
+  );
+};
+
 const Emails = () => {
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
@@ -191,6 +242,8 @@ const Emails = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   /** Ids das mensagens em processo de "mover para marcador" — vazio = fechado. */
   const [mensagensParaMover, setMensagensParaMover] = useState<string[]>([]);
+  /** Arrastar-e-soltar linha -> marcador. Desligado por padrão: clique comum não pode virar arrasto sem querer. */
+  const [modoArrastar, setModoArrastar] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("received");
   /** `nylas_message_id` da mensagem sendo respondida; nulo num e-mail novo. */
   const [respondendoA, setRespondendoA] = useState<string | null>(null);
@@ -217,6 +270,28 @@ const Emails = () => {
     conta?.id,
   );
   const { data: contagens = new Map() } = useContagemPorPasta(conta?.id);
+  /** Mesma mutação que o diálogo de "mover para marcador" por clique já usa — o arrasto não duplica a lógica de mover. */
+  const moverParaMarcadorMut = useMoverParaMarcador();
+
+  /**
+   * Nome de cada MARCADOR REAL, por id de pasta do provedor — só os que não
+   * são pasta de sistema (Entrada, Enviados, Lixeira...). Alimenta o selo de
+   * "esta mensagem já tem marcador" nas duas listas (item 4).
+   */
+  const marcadorNomePorId = useMemo(
+    () =>
+      new Map(pastas.filter((p) => !p.ehSistema).map((p) => [p.pastaId, p.nome])),
+    [pastas],
+  );
+
+  /** Ids de pasta de uma mensagem -> só os que são marcador real, com nome. */
+  const marcadoresDaMensagem = (idsMensagem: string[]) =>
+    idsMensagem
+      .map((id) => {
+        const nome = marcadorNomePorId.get(id);
+        return nome ? { id, nome } : null;
+      })
+      .filter((m): m is { id: string; nome: string } => m !== null);
 
   /**
    * Espelha os marcadores sozinho quando eles ainda não existem.
@@ -473,7 +548,7 @@ const Emails = () => {
       let query = supabase
         .from("email_mensagens")
         .select(
-          "id, assunto, snippet, destinatarios, remetente_email, envio_status, data_mensagem, caixa_origem, nylas_thread_id, nylas_message_id",
+          "id, assunto, snippet, destinatarios, remetente_email, envio_status, data_mensagem, caixa_origem, nylas_thread_id, nylas_message_id, pastas",
           { count: "exact" },
         )
         .eq("direcao", "enviado")
@@ -510,6 +585,7 @@ const Emails = () => {
           updated_at: m.data_mensagem,
           threadId: m.nylas_thread_id ?? null,
           gmail_message_id: m.nylas_message_id,
+          pastas: (m.pastas ?? []) as string[],
         };
       });
 
@@ -538,7 +614,7 @@ const Emails = () => {
       let consulta = supabase
         .from("email_mensagens")
         .select(
-          "id, lido, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, assunto, caixa_origem",
+          "id, lido, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, assunto, caixa_origem, pastas",
           { count: "exact" },
         )
         .eq("direcao", "recebido")
@@ -614,6 +690,7 @@ const Emails = () => {
               .filter(Boolean)
           : [],
         assunto: m.assunto,
+        pastas: (m.pastas ?? []) as string[],
       }));
 
       return { emails, count: count || 0 };
@@ -954,6 +1031,19 @@ const Emails = () => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
+  };
+
+  /**
+   * Início do arrasto de uma linha (modo arrastar ligado). Se a linha tocada
+   * já fazia parte de uma seleção em massa com mais de um item, arrasta a
+   * SELEÇÃO inteira — senão, arrastar uma de cinco linhas marcadas moveria só
+   * aquela e abandonaria as outras quatro.
+   */
+  const iniciarArrastoLinha = (e: React.DragEvent, id: string) => {
+    const ids =
+      selectedIds.includes(id) && selectedIds.length > 1 ? selectedIds : [id];
+    e.dataTransfer.setData("application/x-email-ids", JSON.stringify(ids));
+    e.dataTransfer.effectAllowed = "move";
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1395,7 +1485,7 @@ const Emails = () => {
               : undefined
           }
           onMover={
-            selectedEmail.type === "received"
+            selectedEmail.type === "received" || selectedEmail.type === "sent"
               ? () => setMensagensParaMover([selectedEmail.id])
               : undefined
           }
@@ -1526,9 +1616,11 @@ const Emails = () => {
                     Lido
                   </Button>
                 )}
-                {/* Marcador é conceito de caixa de entrada — em Enviados a
-                    mensagem nem tem `pastas` do jeito que a Edge Function espera. */}
-                {activeTab === "received" && (
+                {/* Mensagem enviada também guarda `pastas` (a Edge Function de
+                    sincronização grava para as duas direções), então mover
+                    funciona igual nas duas abas. Só Rascunhos fica de fora —
+                    rascunho nunca existiu no provedor. */}
+                {(activeTab === "received" || activeTab === "sent") && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1609,6 +1701,28 @@ const Emails = () => {
             )}
 
             <div className="flex items-center gap-2 flex-1 min-w-[14rem] max-w-md hidden md:flex">
+              {/* Marcador só filtra Recebidos (ver `escolherPasta`) — o chip só
+                  existe onde há filtro de verdade para limpar. Clicar de novo
+                  no marcador ativo na barra lateral não desmarca (o clique
+                  sempre grava o id, sem comparar com o atual); este chip é o
+                  atalho que resolve isso sem mexer naquele clique. */}
+              {activeTab === "received" && pastaSelecionada && (
+                <Badge
+                  variant="secondary"
+                  className="h-8 shrink-0 gap-1.5 rounded-full border-none bg-primary/10 pl-3 pr-1.5 text-xs font-medium text-primary"
+                >
+                  {nomeDaPastaSelecionada}
+                  <button
+                    type="button"
+                    onClick={() => escolherPasta(null)}
+                    className="rounded-full p-0.5 hover:bg-primary/20"
+                    title="Limpar filtro de marcador"
+                    aria-label="Limpar filtro de marcador"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
               <div className="relative flex-1 min-w-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
                 <Input
@@ -1618,6 +1732,31 @@ const Emails = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+              {/* Arrastar-e-soltar: só nas caixas que representam mensagens
+                  reais no provedor (recebidos e enviados). Rascunho nunca
+                  chegou a existir no provedor, então não tem marcador para
+                  carregar. Desligado por padrão — ligado sempre, um clique
+                  comum na linha correria o risco de virar arrasto sem querer. */}
+              {isConnected && (activeTab === "received" || activeTab === "sent") && (
+                <Button
+                  variant={modoArrastar ? "default" : "ghost"}
+                  size="icon"
+                  className={cn(
+                    "rounded-full shrink-0",
+                    !modoArrastar && "hover:bg-muted",
+                  )}
+                  onClick={() => setModoArrastar((v) => !v)}
+                  aria-pressed={modoArrastar}
+                  title={
+                    modoArrastar
+                      ? "Desligar o modo de arrastar para marcador"
+                      : "Arrastar mensagens para um marcador"
+                  }
+                  aria-label="Arrastar mensagens para um marcador"
+                >
+                  <Move className="h-5 w-5" />
+                </Button>
+              )}
               {isConnected && (
                 <Button
                   variant="ghost"
@@ -1691,6 +1830,12 @@ const Emails = () => {
               contagens={contagens}
               contaId={conta?.id}
               podeCriarMarcador={podeGerenciarCaixa}
+              onMoverParaMarcador={
+                modoArrastar
+                  ? (ids, pastaId) =>
+                      moverParaMarcadorMut.mutate({ mensagemIds: ids, pastaId })
+                  : undefined
+              }
             />
           )}
 
@@ -1713,6 +1858,7 @@ const Emails = () => {
                         rotuloPrincipal="Destinatário"
                         rotuloData="Enviado em"
                         rotuloAssunto="Assunto e prévia"
+                        mostrarEspacoAlca={modoArrastar}
                         checkbox={{
                           checked:
                             emails.length > 0 &&
@@ -1731,7 +1877,12 @@ const Emails = () => {
                             onClick={() =>
                               void abrirComCorpo({ ...email, type: "sent" })
                             }
+                            draggable={modoArrastar}
+                            onDragStart={(e) => iniciarArrastoLinha(e, email.id)}
                           >
+                            {modoArrastar && (
+                              <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
+                            )}
                             <Checkbox
                               className="shrink-0"
                               checked={selectedIds.includes(email.id)}
@@ -1754,6 +1905,9 @@ const Emails = () => {
                                     {truncarTexto(email.corpo, LIMITE_PREVIA)}
                                   </span>
                                 )}
+                                <SeloMarcadores
+                                  marcadores={marcadoresDaMensagem(email.pastas)}
+                                />
                               </div>
                             </div>
                             <div
@@ -1967,6 +2121,7 @@ const Emails = () => {
                         rotuloPrincipal="Remetente"
                         rotuloData="Recebido em"
                         rotuloAssunto="Assunto e prévia"
+                        mostrarEspacoAlca={modoArrastar}
                         checkbox={{
                           checked:
                             receivedEmails.length > 0 &&
@@ -1983,7 +2138,12 @@ const Emails = () => {
                           )}
                           // Marca lido aqui E no provedor (ver `marcarLido`).
                           onClick={() => abrirRecebido(email)}
+                          draggable={modoArrastar}
+                          onDragStart={(e) => iniciarArrastoLinha(e, email.id)}
                         >
+                          {modoArrastar && (
+                            <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
+                          )}
                           <Checkbox
                             className="shrink-0"
                             checked={selectedIds.includes(email.id)}
@@ -2065,6 +2225,9 @@ const Emails = () => {
                                   {email.caixaOrigem}
                                 </Badge>
                               )}
+                              <SeloMarcadores
+                                marcadores={marcadoresDaMensagem(email.pastas)}
+                              />
                             </div>
                           </div>
                           <div

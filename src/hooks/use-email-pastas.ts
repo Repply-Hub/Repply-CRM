@@ -174,11 +174,18 @@ export function useCriarMarcador(contaId?: string | null) {
 /**
  * Move uma ou mais mensagens para um marcador — via `email-mover-marcador`.
  *
- * "Mover" aqui é o mesmo verbo do Gmail: a mensagem some da Entrada real (no
- * provedor) e passa a existir só no marcador de destino, não ganha um rótulo
- * a mais. As listas de mensagens e as contagens da barra lateral dependem da
- * coluna `pastas`, que a function já reescreve — por isso a invalidação cobre
- * as duas.
+ * "Mover" aqui é o mesmo verbo do Gmail: a mensagem some da pasta real onde
+ * estava no provedor e passa a existir só no marcador de destino, não ganha
+ * um rótulo a mais. Vale para as duas direções — `pastas` é gravada tanto em
+ * mensagem recebida quanto enviada (`_shared/nylas.ts`). Numa mensagem
+ * ENVIADA isso tem um efeito colateral fora do CRM: ela sai da pasta
+ * "Enviados" de verdade no Gmail/Outlook (a aba "Enviados" do sistema não
+ * muda, porque filtra por `direcao`, campo interno — só quem for procurar
+ * direto no provedor deixa de achar a mensagem lá).
+ *
+ * As listas de mensagens (recebidos e enviados) e as contagens da barra
+ * lateral dependem da coluna `pastas`, que a function já reescreve — por
+ * isso a invalidação cobre as três.
  */
 export function useMoverParaMarcador() {
   const queryClient = useQueryClient();
@@ -195,6 +202,10 @@ export function useMoverParaMarcador() {
       queryClient.invalidateQueries({ queryKey: ['received_emails'] });
       queryClient.invalidateQueries({ queryKey: ['received_emails_total'] });
       queryClient.invalidateQueries({ queryKey: ['email_contagem_por_pasta'] });
+      // Mensagem enviada também tem `pastas` (ver `_shared/nylas.ts`) e pode
+      // ser movida daqui — sem isto, o selo dela na aba Enviados ficaria
+      // desatualizado até um refresh manual.
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
       if (r.falhas) {
         toast.warning(`Movido aqui, mas o provedor não confirmou todas. A próxima sincronização acerta.`);
       } else {

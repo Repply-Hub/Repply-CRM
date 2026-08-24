@@ -29,6 +29,8 @@ interface Props {
   contaId?: string | null;
   /** Só quem administra a caixa pode escrever nela; ver `podeGerenciarCaixa`. */
   podeCriarMarcador?: boolean;
+  /** Soltar mensagens sobre um marcador REAL — move para ele (mesma ação do clique). */
+  onMoverParaMarcador?: (ids: string[], pastaId: string) => void;
 }
 /** Uma linha da barra — usada tanto pelas pastas de sistema quanto pelos marcadores. */
 
@@ -39,6 +41,7 @@ function Item({
   onClick,
   total,
   naoLidas,
+  onDropIds,
 }: {
   icone: React.ReactNode;
   rotulo: string;
@@ -46,7 +49,13 @@ function Item({
   onClick: () => void;
   total: number;
   naoLidas: number;
+  /** Só passada nos marcadores REAIS — é o que torna o item um alvo de soltura. */
+  onDropIds?: (ids: string[]) => void;
 }) {
+  // Local ao ITEM, não global: realça só enquanto o arrasto está literalmente
+  // sobre este marcador, não "algum arrasto em andamento em algum lugar".
+  const [arrastandoSobre, setArrastandoSobre] = useState(false);
+
   return (
     <button
       onClick={onClick}
@@ -56,7 +65,31 @@ function Item({
         ativo
           ? 'bg-primary/10 font-medium text-foreground'
           : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+        arrastandoSobre && 'bg-primary/15 ring-2 ring-primary ring-inset',
       )}
+      {...(onDropIds && {
+        onDragOver: (e: React.DragEvent) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        },
+        onDragEnter: (e: React.DragEvent) => {
+          e.preventDefault();
+          setArrastandoSobre(true);
+        },
+        onDragLeave: () => setArrastandoSobre(false),
+        onDrop: (e: React.DragEvent) => {
+          e.preventDefault();
+          setArrastandoSobre(false);
+          const bruto = e.dataTransfer.getData('application/x-email-ids');
+          if (!bruto) return;
+          try {
+            const ids = JSON.parse(bruto) as string[];
+            if (Array.isArray(ids) && ids.length) onDropIds(ids);
+          } catch {
+            // dado de arrasto que não veio de uma linha de e-mail — ignora.
+          }
+        },
+      })}
     >
       <span className="shrink-0">{icone}</span>
       <span className="min-w-0 flex-1 truncate">{rotulo}</span>
@@ -102,6 +135,7 @@ export function BarraPastas({
   contagens,
   contaId,
   podeCriarMarcador,
+  onMoverParaMarcador,
 }: Props) {
   const [buscaMarcador, setBuscaMarcador] = useState('');
   const [mostrarTodosMarcadores, setMostrarTodosMarcadores] = useState(false);
@@ -135,8 +169,10 @@ export function BarraPastas({
   }
 
   return (
-    <aside className="hidden w-72 shrink-0 flex-col overflow-y-auto border-r bg-muted/20 md:flex">
-      <div className="flex flex-col gap-0.5 p-2">
+    <aside className="hidden w-72 shrink-0 flex-col overflow-hidden border-r bg-muted/20 md:flex">
+      {/* Itens fixos do topo — fora de qualquer contêiner com rolagem, para
+          não sumirem quando a lista de marcadores, abaixo, rolar sozinha. */}
+      <div className="flex shrink-0 flex-col gap-0.5 p-2">
         <Item
           icone={<Inbox className="h-4 w-4" />}
           rotulo="Todas"
@@ -167,8 +203,8 @@ export function BarraPastas({
       </div>
 
       {(marcadores.length > 0 || carregando || podeCriarMarcador) && (
-        <div className="flex flex-col gap-0.5 border-t p-2">
-          <p className="px-1 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="flex min-h-0 flex-1 flex-col gap-0.5 border-t p-2">
+          <p className="shrink-0 px-1 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Marcadores
           </p>
 
@@ -176,7 +212,7 @@ export function BarraPastas({
               lista inteira já cabe na tela e um campo de busca só ocuparia
               espaço para filtrar 3 itens. */}
           {marcadores.length > 8 && (
-            <div className="relative px-1 pb-1">
+            <div className="relative shrink-0 px-1 pb-1">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={buscaMarcador}
@@ -195,7 +231,7 @@ export function BarraPastas({
               variant="ghost"
               size="sm"
               onClick={() => setCriarMarcadorAberto(true)}
-              className="justify-start gap-2 px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
+              className="shrink-0 justify-start gap-2 px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
             >
               <Plus className="h-3.5 w-3.5" />
               Novo marcador
@@ -203,51 +239,63 @@ export function BarraPastas({
           )}
 
           {carregando && (
-            <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+            <div className="flex shrink-0 items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
               Carregando…
             </div>
           )}
 
           {!carregando && buscaMarcador && marcadoresFiltrados.length === 0 && (
-            <p className="px-3 py-2 text-xs text-muted-foreground">
+            <p className="shrink-0 px-3 py-2 text-xs text-muted-foreground">
               Nenhum marcador encontrado para "{buscaMarcador}".
             </p>
           )}
 
-          {marcadoresVisiveis.map((p) => (
-            <Item
-              key={p.id}
-              icone={<Tag className="h-4 w-4" />}
-              rotulo={p.nome}
-              ativo={selecionada === p.pastaId}
-              onClick={() => onSelecionar(p.pastaId)}
-              {...contagem(p.pastaId)}
-            />
-          ))}
+          {/* Só ESTA lista rola — o resto da seção (título, busca, criar
+              marcador) fica fixo em cima dela. `min-h-0` é o que permite o
+              flex encolher de verdade em vez de só crescer, senão a coluna
+              inteira estouraria a altura do `<aside>` e a rolagem nunca
+              aconteceria aqui dentro. */}
+          <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+            {marcadoresVisiveis.map((p) => (
+              <Item
+                key={p.id}
+                icone={<Tag className="h-4 w-4" />}
+                rotulo={p.nome}
+                ativo={selecionada === p.pastaId}
+                onClick={() => onSelecionar(p.pastaId)}
+                {...contagem(p.pastaId)}
+                onDropIds={
+                  onMoverParaMarcador
+                    ? (ids) => onMoverParaMarcador(ids, p.pastaId)
+                    : undefined
+                }
+              />
+            ))}
 
-          {restantes > 0 && (
-            <button
-              onClick={() => setMostrarTodosMarcadores(true)}
-              className="flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
-            >
-              <ChevronDown className="h-4 w-4 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">Ver todos os marcadores</span>
-              <span className="shrink-0 tabular-nums opacity-70">+{restantes}</span>
-            </button>
-          )}
+            {restantes > 0 && (
+              <button
+                onClick={() => setMostrarTodosMarcadores(true)}
+                className="flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
+              >
+                <ChevronDown className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">Ver todos os marcadores</span>
+                <span className="shrink-0 tabular-nums opacity-70">+{restantes}</span>
+              </button>
+            )}
 
-          {/* Só some se a lista TODA continuar cabendo depois de recolher —
-              senão sumiria o próprio caminho de volta ao estado compacto. */}
-          {mostrarTodosMarcadores && marcadoresFiltrados.length > LIMITE_MARCADORES_VISIVEIS && (
-            <button
-              onClick={() => setMostrarTodosMarcadores(false)}
-              className="flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-            >
-              <ChevronUp className="h-4 w-4 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">Ver menos</span>
-            </button>
-          )}
+            {/* Só some se a lista TODA continuar cabendo depois de recolher —
+                senão sumiria o próprio caminho de volta ao estado compacto. */}
+            {mostrarTodosMarcadores && marcadoresFiltrados.length > LIMITE_MARCADORES_VISIVEIS && (
+              <button
+                onClick={() => setMostrarTodosMarcadores(false)}
+                className="flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              >
+                <ChevronUp className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">Ver menos</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
