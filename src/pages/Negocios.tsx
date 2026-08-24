@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { parse, isValid, startOfMonth, endOfMonth } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
+import { useMinhaPermissao } from '@/hooks/use-minha-permissao';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useDelayedLoading } from '@/hooks/use-delayed-loading';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
@@ -760,6 +761,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [selectAllDialogOpen, setSelectAllDialogOpen] = useState(false);
   const [desmarcarDialogOpen, setDesmarcarDialogOpen] = useState(false);
   const bulkDeleteMutation = useBulkDeletePedidos();
+  // Espelho da política de DELETE do banco (gestor OU `pode_excluir` nas Configurações).
+  // Não protege nada — quem recusa é o Postgres. Serve para não oferecer um caminho que
+  // termina em nada: sem isto, quem não pode apagar digita APAGAR e a tela fica igual.
+  const { permitido: podeExcluir } = useMinhaPermissao('pedidos', 'excluir');
   const isDeleting = bulkDeleteMutation.isPending;
 
   // Ação em massa (etapa + marcador num só bloco): o alvo é somente o que o usuário marcar no
@@ -1380,6 +1385,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
       if (removed > 0) {
         toast.success(`${removed} negócio(s) removido(s) com sucesso!`);
+      } else {
+        // Recusa de RLS em DELETE **não levanta erro**: o Postgres simplesmente não enxerga
+        // as linhas, e o `count` volta zero. Sem este ramo, a pessoa digitava APAGAR,
+        // confirmava, e a tela ficava exatamente igual — sem sucesso, sem erro, sem nada.
+        toast.error(
+          podeExcluir
+            ? 'Nenhum negócio foi removido. Eles podem já ter sido apagados por outra pessoa — atualize a lista.'
+            : 'Você não tem permissão para excluir negócios. Peça a um gestor para habilitar em Configurações → Usuários.',
+        );
+        return;
       }
 
       setSelected(new Set());
@@ -1756,14 +1771,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             }}
           />
 
-          <ColumnSettingsItem
-            label="Excluir Selecionados"
-            icon={Trash2}
-            variant="destructive"
-            disabled={!someSelected}
-            onClick={() => setConfirmDeleteOpen(true)}
-            badge={someSelected ? selectedCount : undefined}
-          />
+          {/* Some para quem o banco vai recusar de qualquer jeito. Esconder não é a
+              proteção (CLAUDE.md §6.1) — a proteção é a política de RLS; isto só evita
+              oferecer um botão que não faz nada. */}
+          {podeExcluir && (
+            <ColumnSettingsItem
+              label="Excluir Selecionados"
+              icon={Trash2}
+              variant="destructive"
+              disabled={!someSelected}
+              onClick={() => setConfirmDeleteOpen(true)}
+              badge={someSelected ? selectedCount : undefined}
+            />
+          )}
         </ColumnSettingsPopover>
       </div>
     </ColumnSettings>
@@ -2505,10 +2525,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               <div className="mb-4 shrink-0">
                 {someSelected && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="destructive" size="sm" className="gap-2" onClick={() => setConfirmDeleteOpen(true)}>
-                      <Trash2 className="h-4 w-4" />
-                      Excluir {selectedCount}
-                    </Button>
+                    {podeExcluir && (
+                      <Button variant="destructive" size="sm" className="gap-2" onClick={() => setConfirmDeleteOpen(true)}>
+                        <Trash2 className="h-4 w-4" />
+                        Excluir {selectedCount}
+                      </Button>
+                    )}
                     {/* Sem este botão, a única saída era a caixa do cabeçalho — e ela
                         trabalha por página. Mesmo padrão da tela de Clientes
                         (Clientes.tsx), para as duas listas se comportarem igual. */}
