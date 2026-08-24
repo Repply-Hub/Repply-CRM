@@ -144,6 +144,66 @@ export function useDashboardStats(
   });
 }
 
+export interface DashboardNegociosRisco {
+  qtd_parados: number;
+  valor_parados: number;
+  qtd_sem_proxima_acao: number;
+  valor_sem_proxima_acao: number;
+  // Valor ÚNICO dos negócios em qualquer uma das duas condições acima — não é
+  // valor_parados + valor_sem_proxima_acao, que contaria duas vezes o negócio
+  // que é os dois problemas ao mesmo tempo. Ver comentário da RPC.
+  valor_risco_total: number;
+  // Vem vazio ([]) para quem não é gestor — a RPC já filtra por is_gestor(),
+  // não é uma omissão do front. Não use este array pra decidir se o usuário É
+  // gestor (ele também fica vazio quando não há nenhum negócio em risco).
+  risco_por_vendedor: { vendedor: string; valor: number }[];
+  risco_por_fabricante: { fabrica: string; valor: number }[];
+}
+
+// "Radar de Risco": negócios ABERTOS (nem ganhos nem perdidos) parados há
+// p_dias_parado dias (sem mudança de status registrada em
+// pedidos_historico_status) ou sem nenhuma tarefa em aberto apontando pra
+// eles. Ver supabase/migrations/20260824220000_dashboard_negocios_risco.sql.
+//
+// Sem parâmetro de período de propósito: um negócio aberto criado há meses
+// continua sendo risco hoje mesmo que o filtro "Período" do topo do Dashboard
+// não alcance a data em que ele nasceu — filtrar por data de criação/fechamento
+// escondia justamente os negócios mais antigos parados, que são os que mais
+// importa achar aqui. Só Fabricante/Responsável (e o corte de dias parado, via
+// diasParado) afetam este painel.
+export function useDashboardNegociosRisco(
+  empresaId?: string,
+  filters?: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number },
+) {
+  const { usuarioIds, fabricanteIds, funilId, diasParado = 7 } = filters ?? {};
+
+  return useQuery({
+    queryKey: ['dashboard_negocios_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('dashboard_negocios_risco', {
+        p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
+        p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
+        p_funil_id: funilId ?? null,
+        p_dias_parado: diasParado,
+      });
+      if (error) throw error;
+      const row = (data as DashboardNegociosRisco[] | null)?.[0];
+      return (row ?? {
+        qtd_parados: 0,
+        valor_parados: 0,
+        qtd_sem_proxima_acao: 0,
+        valor_sem_proxima_acao: 0,
+        valor_risco_total: 0,
+        risco_por_vendedor: [],
+        risco_por_fabricante: [],
+      }) as DashboardNegociosRisco;
+    },
+    enabled: !!empresaId,
+    placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTS,
+  });
+}
+
 export interface DashboardWhatsappStats {
   conversas_abertas: number;
   conversas_fechadas: number;

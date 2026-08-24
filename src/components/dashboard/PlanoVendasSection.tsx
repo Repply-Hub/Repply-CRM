@@ -49,6 +49,7 @@ import {
   useFabricantesOrdemPlanoVendas,
   useReorderFabricantesPlanoVendas,
 } from '@/hooks/use-plano-vendas';
+import { usePodeFazer } from '@/hooks/use-permissoes';
 
 const MESES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -102,7 +103,6 @@ interface Fabricante {
 
 interface PlanoVendasSectionProps {
   empresaId: string;
-  isGestor: boolean;
   currentUsuarioId?: string;
   // Segue o filtro "Responsável" do topo da página (array vazio = "Todos", vê o
   // progresso agregado/por vendedor da empresa) — antes esta seção tinha um
@@ -140,7 +140,16 @@ function progressoCor(pct: number) {
   return 'text-muted-foreground';
 }
 
-export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vendedorIds, fabricanteIds, vendedores, fabricantes, dateFrom, dateTo, onPeriodoChange }: PlanoVendasSectionProps) {
+export function PlanoVendasSection({ empresaId, currentUsuarioId, vendedorIds, fabricanteIds, vendedores, fabricantes, dateFrom, dateTo, onPeriodoChange }: PlanoVendasSectionProps) {
+  // Controle de acesso granular (módulo `plano_vendas` em `permissoes_usuario`)
+  // — `isGestor` era usado nos quatro pontos abaixo e saiu por completo desta
+  // seção; quem renderiza (Dashboard.tsx) continua com seu próprio `isGestor`
+  // pra decidir OUTRAS coisas da página, sem relação com este componente.
+  const podeVerMetasFabrica = usePodeFazer('plano_vendas', 'ver', 'ver_metas_fabrica');
+  const podeVerMetasVendedor = usePodeFazer('plano_vendas', 'ver', 'ver_metas_vendedor');
+  const podeCriarMeta = usePodeFazer('plano_vendas', 'criar');
+  const podeEditarMeta = usePodeFazer('plano_vendas', 'editar');
+
   const [editOpen, setEditOpen] = useState(false);
   const [mostrarDetalhado, setMostrarDetalhado] = useState(
     () => localStorage.getItem(MOSTRAR_DETALHADO_KEY) === '1',
@@ -161,6 +170,18 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
   useEffect(() => {
     localStorage.setItem(VISUALIZACAO_KEY, visualizacao);
   }, [visualizacao]);
+
+  // Quem tem `ver_metas_vendedor` mas não `ver_metas_fabrica` (configuração
+  // incomum, mas possível desde que o gestor pode restringir as duas
+  // funcionalidades de forma independente) nunca deveria ficar preso em
+  // "fabricante" — a visão padrão/guardada no localStorage pode ter sido
+  // escolhida antes da permissão mudar, e sem este ajuste o switch "Mostrar
+  // vendas detalhado" abriria uma seção vazia.
+  useEffect(() => {
+    if (!podeVerMetasFabrica && podeVerMetasVendedor && visualizacao === 'fabricante') {
+      setVisualizacao('vendedor');
+    }
+  }, [podeVerMetasFabrica, podeVerMetasVendedor, visualizacao]);
 
   // "Editar metas" e o resumo "Meta x realizado — Fulano" só existem quando dá
   // pra apontar pra UMA pessoa específica — com 0 (Todos) ou 2+ selecionados,
@@ -234,10 +255,11 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
   const { data: fabricantesOrdemMap } = useFabricantesOrdemPlanoVendas(empresaId);
 
   // Detalhamento por vendedor — busca/mostra sempre que não há exatamente um
-  // vendedor selecionado (0 = Todos, 2+ = um subconjunto) pro gestor: antes só
-  // existia a soma da empresa aqui, e tinha que trocar o filtro "Responsável"
-  // um vendedor de cada vez pra inspecionar o plano de cada um.
-  const mostrarPorVendedor = isGestor && vendedorIds.length !== 1;
+  // vendedor selecionado (0 = Todos, 2+ = um subconjunto) pra quem tem a
+  // funcionalidade `ver_metas_vendedor`: antes só existia a soma da empresa
+  // aqui, e tinha que trocar o filtro "Responsável" um vendedor de cada vez
+  // pra inspecionar o plano de cada um.
+  const mostrarPorVendedor = podeVerMetasVendedor && vendedorIds.length !== 1;
   const { data: progressoPorVendedorRaw } = usePlanoVendasProgressoPorVendedor(
     dateFrom,
     dateTo,
@@ -331,7 +353,7 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
                 </Button>
               )}
             </div>
-            {isGestor && (
+            {(temMetas ? podeEditarMeta : podeCriarMeta) && (
               <Button
                 size="sm"
                 variant={temMetas ? 'outline' : 'default'}
@@ -355,7 +377,7 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
           </div>
         ) : !progresso || progresso.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">
-            {isGestor
+            {podeCriarMeta
               ? 'Nenhuma meta definida para este período. Use "Criar nova meta" para começar.'
               : 'Nenhuma meta definida para este período.'}
           </p>
@@ -382,31 +404,36 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <Label htmlFor="mostrar-detalhado" className="text-xs font-medium text-muted-foreground cursor-pointer">
-                Mostrar vendas detalhado
-              </Label>
-              <div className="flex items-center gap-2">
-                {mostrarDetalhado && mostrarPorVendedor && (
-                  <ToggleGroup
-                    type="single"
-                    value={visualizacao}
-                    onValueChange={(v) => v && setVisualizacao(v as 'fabricante' | 'vendedor')}
-                    className={TOGGLE_LIST_CLASS}
-                  >
-                    <ToggleGroupItem value="fabricante" className={`${TOGGLE_ITEM_CLASS} gap-1.5`}>
-                      <Factory className="h-3.5 w-3.5" /> Fabricante
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="vendedor" className={`${TOGGLE_ITEM_CLASS} gap-1.5`}>
-                      <Users className="h-3.5 w-3.5" /> Vendedor
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                )}
-                <Switch id="mostrar-detalhado" checked={mostrarDetalhado} onCheckedChange={setMostrarDetalhado} />
+            {/* Sem nenhuma das duas funcionalidades (fabricante/vendedor), não há nada
+                pra revelar por trás do switch — some a linha inteira em vez de deixar
+                um controle que abre uma seção vazia. */}
+            {(podeVerMetasFabrica || mostrarPorVendedor) && (
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <Label htmlFor="mostrar-detalhado" className="text-xs font-medium text-muted-foreground cursor-pointer">
+                  Mostrar vendas detalhado
+                </Label>
+                <div className="flex items-center gap-2">
+                  {mostrarDetalhado && podeVerMetasFabrica && mostrarPorVendedor && (
+                    <ToggleGroup
+                      type="single"
+                      value={visualizacao}
+                      onValueChange={(v) => v && setVisualizacao(v as 'fabricante' | 'vendedor')}
+                      className={TOGGLE_LIST_CLASS}
+                    >
+                      <ToggleGroupItem value="fabricante" className={`${TOGGLE_ITEM_CLASS} gap-1.5`}>
+                        <Factory className="h-3.5 w-3.5" /> Fabricante
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="vendedor" className={`${TOGGLE_ITEM_CLASS} gap-1.5`}>
+                        <Users className="h-3.5 w-3.5" /> Vendedor
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  )}
+                  <Switch id="mostrar-detalhado" checked={mostrarDetalhado} onCheckedChange={setMostrarDetalhado} />
+                </div>
               </div>
-            </div>
+            )}
 
-            {mostrarDetalhado && (!mostrarPorVendedor || visualizacao === 'fabricante') && (
+            {mostrarDetalhado && podeVerMetasFabrica && (!mostrarPorVendedor || visualizacao === 'fabricante') && (
               <div className="space-y-4">
                 {progresso.map(p => {
                   const temMeta = p.meta_valor > 0;
@@ -522,7 +549,7 @@ export function PlanoVendasSection({ empresaId, isGestor, currentUsuarioId, vend
         )}
       </CardContent>
 
-      {isGestor && (
+      {(podeCriarMeta || podeEditarMeta) && (
         <EditarMetasDialog
           open={editOpen}
           onOpenChange={setEditOpen}

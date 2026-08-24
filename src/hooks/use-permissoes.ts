@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
 
 export interface Permissao {
   id: string;
@@ -44,6 +46,20 @@ const MODULOS: ModuloDescricao[] = [
     funcionalidades: [
       { key: 'filtrar_vendedor', label: 'Filtrar por Vendedor', descricao: 'Filtrar dados do dashboard por vendedor específico', icon: 'filter' },
       { key: 'exportar_relatorio', label: 'Exportar Relatório', descricao: 'Exportar dados e gráficos do dashboard', icon: 'export' },
+    ],
+  },
+  {
+    key: 'plano_vendas',
+    label: 'Plano de Vendas',
+    descricoes: {
+      ver: 'Visualizar a visão geral do Plano de Vendas (meta x realizado do período) no Dashboard',
+      criar: 'Criar novas metas de vendas',
+      editar: 'Editar ou remover metas de vendas existentes',
+      excluir: 'Não aplicável ao Plano de Vendas — remover uma meta é feito dentro de editar',
+    },
+    funcionalidades: [
+      { key: 'ver_metas_fabrica', label: 'Metas por Fabricante', descricao: 'Ver o detalhamento de metas por fabricante', icon: 'filter' },
+      { key: 'ver_metas_vendedor', label: 'Metas por Vendedor', descricao: 'Ver o detalhamento nominal de metas por vendedor', icon: 'users' },
     ],
   },
   {
@@ -269,4 +285,63 @@ export function useUpsertPermissao() {
       qc.invalidateQueries({ queryKey: ['permissoes_usuario', vars.usuario_id] });
     },
   });
+}
+
+/**
+ * "EU posso fazer isto?" pontual — mesmo espelho de `has_permission`/
+ * `has_funcionalidade` do banco que `useMinhaPermissao` já faz para
+ * ver/criar/editar/excluir, mas aceitando também uma `funcionalidade`
+ * (sub-chave de `permissoes_usuario.funcionalidades`) na mesma chamada, para
+ * telas com controle granular abaixo do nível de módulo (ex.: Plano de
+ * Vendas — ver a visão geral é uma coisa, ver a quebra nominal por vendedor
+ * é outra).
+ *
+ * Com `funcionalidade` informada, a checagem é só dela (equivalente a
+ * `has_funcionalidade`) — `acao` continua sendo passada só para o call site
+ * ler natural ("posso VER a funcionalidade X"), sem entrar na conta.
+ *
+ * 🔴 ISTO NÃO PROTEGE NADA sozinho — quem protege é a RLS do Postgres
+ * (CLAUDE.md §6.1). Serve para esconder/mostrar UI de forma coerente com o
+ * que o banco decidiria.
+ */
+export function usePodeFazer(
+  modulo: string,
+  acao: 'ver' | 'criar' | 'editar' | 'excluir',
+  funcionalidade?: string,
+): boolean {
+  const { profile, loading } = useAuth();
+
+  const ehGestor =
+    profile?.role === 'gestor' || profile?.role === 'admin' || profile?.role === 'empresa';
+
+  const { data: permissoes, isLoading: carregandoPermissoes } = usePermissoes(
+    !ehGestor ? profile?.id : undefined,
+  );
+
+  return useMemo(() => {
+    if (ehGestor) return true;
+
+    // Enquanto não se sabe, a resposta é "não pode" — mesmo raciocínio de
+    // useMinhaPermissao: liberar por padrão enquanto carrega faria um botão
+    // sensível piscar habilitado no instante em que alguém clica.
+    if (loading || carregandoPermissoes || !permissoes) return false;
+
+    const doModulo = permissoes.find(p => p.modulo === modulo);
+
+    if (funcionalidade) {
+      return doModulo?.funcionalidades?.[funcionalidade] === true;
+    }
+
+    // Sem linha para o módulo: 'ver' é liberado, o resto é negado — igual ao
+    // COALESCE do banco em has_permission.
+    if (!doModulo) return acao === 'ver';
+
+    const valor =
+      acao === 'ver' ? doModulo.pode_ver
+      : acao === 'criar' ? doModulo.pode_criar
+      : acao === 'editar' ? doModulo.pode_editar
+      : doModulo.pode_excluir;
+
+    return valor === true;
+  }, [ehGestor, loading, carregandoPermissoes, permissoes, modulo, acao, funcionalidade]);
 }

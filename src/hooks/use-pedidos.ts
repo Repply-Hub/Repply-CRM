@@ -329,6 +329,7 @@ export function invalidarPaineisDeNegocios(qc: QueryClient) {
     'vw_faturamento_mensal',
     'dashboard_indicadores_vendedor',
     'dashboard_stats',
+    'dashboard_negocios_risco',
     'plano_vendas_progresso',
     // Chave própria de propósito: `invalidateQueries` casa elemento a elemento do array,
     // não por prefixo de texto — ['plano_vendas_progresso'] NÃO alcança

@@ -4,7 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, DollarSign, Target, Clock, Loader2, FileDown, X } from 'lucide-react';
-import { useFaturamentoMensal, useIndicadoresVendedor, useDashboardStats, useDashboardWhatsappStats } from '@/hooks/use-dashboard';
+import { useFaturamentoMensal, useIndicadoresVendedor, useDashboardStats, useDashboardWhatsappStats, useDashboardNegociosRisco } from '@/hooks/use-dashboard';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -13,6 +13,7 @@ import { DateRangePicker, type DateRange } from '@/components/shared/DateRangePi
 import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
 import { MultiSelectSearch } from '@/components/shared/MultiSelectSearch';
 import { PlanoVendasSection } from '@/components/dashboard/PlanoVendasSection';
+import { usePodeFazer } from '@/hooks/use-permissoes';
 import { formatarMoedaBRL } from '@/lib/moeda';
 
 // recharts (e os módulos d3-* que ele traz) é de longe o maior pedaço de código
@@ -61,6 +62,11 @@ const Dashboard = () => {
   // dashboard, todas dependentes de empresaId via `enabled`.
   const empresaId = profile?.empresa_id;
 
+  // Controle de acesso do Plano de Vendas migrou de `isGestor` hardcoded para
+  // `permissoes_usuario` (módulo `plano_vendas`) — `isGestor` continua valendo
+  // para o resto da página (WhatsApp, indicadores por vendedor etc).
+  const podeVerPlanoVendas = usePodeFazer('plano_vendas', 'ver');
+
   // Empresa que não contratou o WhatsApp não pode ver sobra nenhuma dele aqui. `=== true`
   // (e não `!== false`) de propósito: enquanto a resposta do banco não chega, esconder é
   // melhor do que mostrar a faixa e arrancá-la da frente de quem já começou a ler.
@@ -101,6 +107,13 @@ const Dashboard = () => {
     fabricanteIds,
     dateFrom: format(dateRange.from, 'yyyy-MM-dd'),
     dateTo: format(dateRange.to, 'yyyy-MM-dd'),
+  });
+
+  // Radar de Risco: negócios abertos parados ou sem próxima ação. Sem dateFrom/dateTo
+  // de propósito — ver comentário de useDashboardNegociosRisco em use-dashboard.ts.
+  const { data: negociosRiscoRaw } = useDashboardNegociosRisco(empresaId, {
+    usuarioIds: vendedorIds,
+    fabricanteIds,
   });
 
   // Métricas de atendimento WhatsApp (conversas abertas/fechadas, tempo médio de
@@ -240,6 +253,17 @@ const Dashboard = () => {
     if (isGestor) return raw;
     return raw.filter(v => v.vendedor === profile?.nome);
   }, [stats, isGestor, profile?.nome]);
+
+  const negociosRisco = useMemo(() => ({
+    qtdParados: negociosRiscoRaw?.qtd_parados ?? 0,
+    valorParados: negociosRiscoRaw?.valor_parados ?? 0,
+    qtdSemProximaAcao: negociosRiscoRaw?.qtd_sem_proxima_acao ?? 0,
+    valorSemProximaAcao: negociosRiscoRaw?.valor_sem_proxima_acao ?? 0,
+    valorRiscoTotal: negociosRiscoRaw?.valor_risco_total ?? 0,
+    // A RPC já devolve [] pra quem não é gestor — nada a filtrar aqui.
+    riscoPorVendedor: negociosRiscoRaw?.risco_por_vendedor ?? [],
+    riscoPorFabricante: negociosRiscoRaw?.risco_por_fabricante ?? [],
+  }), [negociosRiscoRaw]);
 
   const segmentacao = [
     { name: 'Alto (>100k)', value: stats?.segmentacao_alto ?? 0, color: 'hsl(24, 100%, 47%)' },
@@ -384,11 +408,14 @@ const Dashboard = () => {
           ))}
         </div>
 
-        {/* Plano de Vendas */}
-        {empresaId && (
+        {/* Plano de Vendas — gate de nível 1 (visão geral) é `podeVerPlanoVendas`,
+            módulo `plano_vendas` em `permissoes_usuario`; sem linha na tabela, o
+            padrão libera 'ver' (mesmo COALESCE de `has_permission` no banco), então
+            isto não regride ninguém que já usava o sistema antes deste controle
+            existir. */}
+        {empresaId && podeVerPlanoVendas && (
           <PlanoVendasSection
             empresaId={empresaId}
-            isGestor={isGestor}
             currentUsuarioId={profile?.id}
             // Gestor e vendedor comum seguem o MESMO filtro "Responsável" do
             // topo (array vazio = "Todos"). Antes o vendedor comum era travado
@@ -401,8 +428,10 @@ const Dashboard = () => {
             // alguém em "Responsável" recorta esta seção como já recortava os
             // KPIs e os gráficos da página. O que mudou é só o PADRÃO.
             //
-            // A quebra "Por vendedor" (a lista de baixo) segue gestor-only —
-            // ela é controlada dentro da seção por `isGestor`, não por aqui.
+            // A quebra "Por vendedor" (a lista de baixo) segue controlada por
+            // permissão — ela é decidida dentro da seção por
+            // `usePodeFazer('plano_vendas', 'ver', 'ver_metas_vendedor')`, não por
+            // aqui.
             vendedorIds={vendedorIds}
             fabricanteIds={fabricanteIds}
             vendedores={(vendedores ?? []).map(v => ({ usuario_id: v.usuario_id ?? '', usuario_nome: v.usuario_nome ?? '' }))}
@@ -428,6 +457,7 @@ const Dashboard = () => {
             conversaoVendedor={conversaoVendedor}
             rendimentoFabrica={rendimentoFabrica}
             rendimentoVendedor={rendimentoVendedor}
+            negociosRisco={negociosRisco}
             // A seção entra nas duas condições além do papel: quem mexer amanhã no `enabled`
             // da consulta acima não teria como adivinhar que a faixa dependia dele.
             whatsappConversas={isGestor && temWhatsapp === true && whatsappStats ? { abertas: whatsappStats.conversas_abertas, fechadas: whatsappStats.conversas_fechadas } : null}

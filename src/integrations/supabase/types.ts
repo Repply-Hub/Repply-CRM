@@ -3809,6 +3809,7 @@ export type Database = {
           nome_contato: string | null
           nome_contato_editado_manualmente: boolean
           participantes: Json
+          precisa_atribuicao: boolean
           telefone: string
           ultima_mensagem: string | null
           ultima_mensagem_at: string | null
@@ -3831,6 +3832,7 @@ export type Database = {
           nome_contato?: string | null
           nome_contato_editado_manualmente?: boolean
           participantes?: Json
+          precisa_atribuicao?: boolean
           telefone: string
           ultima_mensagem?: string | null
           ultima_mensagem_at?: string | null
@@ -3853,6 +3855,7 @@ export type Database = {
           nome_contato?: string | null
           nome_contato_editado_manualmente?: boolean
           participantes?: Json
+          precisa_atribuicao?: boolean
           telefone?: string
           ultima_mensagem?: string | null
           ultima_mensagem_at?: string | null
@@ -4172,6 +4175,23 @@ export type Database = {
           total_pedidos: number
           usuario_id: string
           usuario_nome: string
+        }[]
+      }
+      dashboard_negocios_risco: {
+        Args: {
+          p_dias_parado?: number
+          p_fabricante_ids?: string[]
+          p_funil_id?: string
+          p_usuario_ids?: string[]
+        }
+        Returns: {
+          qtd_parados: number
+          qtd_sem_proxima_acao: number
+          risco_por_fabricante: Json
+          risco_por_vendedor: Json
+          valor_parados: number
+          valor_risco_total: number
+          valor_sem_proxima_acao: number
         }[]
       }
       dashboard_stats: {

@@ -5,7 +5,7 @@ import {
   Tooltip, Area, AreaChart,
 } from 'recharts';
 import type { TooltipProps } from 'recharts';
-import { TrendingUp, Factory, MessageCircle, Clock } from 'lucide-react';
+import { TrendingUp, Factory, MessageCircle, Clock, AlertTriangle, CalendarX, ShieldAlert } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/DashboardChartTooltip';
@@ -122,6 +122,18 @@ interface DashboardChartsProps {
   conversaoVendedor: { nome: string; conversao: number; id: string | null }[];
   rendimentoFabrica: { fabrica: string; valor: number }[];
   rendimentoVendedor: { vendedor: string; valor: number }[];
+  // Radar de Risco — negócios ABERTOS parados ou sem próxima ação (ver
+  // useDashboardNegociosRisco). riscoPorVendedor vem vazio para quem não é
+  // gestor: a própria RPC já filtra por is_gestor(), não esconda de novo aqui.
+  negociosRisco: {
+    qtdParados: number;
+    valorParados: number;
+    qtdSemProximaAcao: number;
+    valorSemProximaAcao: number;
+    valorRiscoTotal: number;
+    riscoPorVendedor: { vendedor: string; valor: number }[];
+    riscoPorFabricante: { fabrica: string; valor: number }[];
+  };
   // null = não-gestor: seção de atendimento WhatsApp inteira fica oculta (métrica
   // pensada pra gestor/admin acompanhar a equipe, não o desempenho individual).
   // Também vem null quando a empresa não contratou a seção WhatsApp. Essa decisão mora
@@ -140,6 +152,7 @@ export function DashboardCharts({
   conversaoVendedor,
   rendimentoFabrica,
   rendimentoVendedor,
+  negociosRisco,
   whatsappConversas,
   whatsappTempoResposta,
   whatsappError,
@@ -172,6 +185,15 @@ export function DashboardCharts({
     );
     return Math.max(80, Math.ceil(maxWidth) + 12);
   }, [whatsappTempoResposta]);
+
+  // Mesma técnica de vendedorAxisWidth, aplicada aos nomes do gráfico "Risco por Vendedor".
+  const riscoVendedorAxisWidth = useMemo(() => {
+    const maxWidth = negociosRisco.riscoPorVendedor.reduce(
+      (max, v) => Math.max(max, getVendedorNameWidth(v.vendedor ?? '')),
+      0,
+    );
+    return Math.max(80, Math.ceil(maxWidth) + 12);
+  }, [negociosRisco.riscoPorVendedor]);
 
   // Mostra todas as fábricas na pizza — sem cortar as menores, só agrupa o
   // excedente em "Outros" (com o detalhe de cada uma disponível no hover via
@@ -389,6 +411,140 @@ export function DashboardCharts({
             </ResponsiveContainer>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Radar de Risco — negócios ABERTOS (nem ganhos nem perdidos) parados ou sem
+          próxima ação agendada. Ver useDashboardNegociosRisco e a migration
+          20260824220000_dashboard_negocios_risco.sql para a definição exata de cada
+          condição. Sem filtro de Período de propósito: um negócio antigo parado
+          continua sendo risco hoje mesmo fora da janela de data escolhida no topo. */}
+      <div className="mt-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+          <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Negócios Parados</p>
+                  <p className="text-2xl font-extrabold text-card-foreground tracking-tight">{negociosRisco.qtdParados}</p>
+                  <span className="text-xs font-semibold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.1)]">
+                    {formatCurrency(negociosRisco.valorParados)}
+                  </span>
+                </div>
+                <div className="h-11 w-11 rounded-xl bg-[hsl(var(--warning)/0.1)] flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-[hsl(var(--warning))]" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Sem Próxima Ação</p>
+                  <p className="text-2xl font-extrabold text-card-foreground tracking-tight">{negociosRisco.qtdSemProximaAcao}</p>
+                  <span className="text-xs font-semibold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.1)]">
+                    {formatCurrency(negociosRisco.valorSemProximaAcao)}
+                  </span>
+                </div>
+                <div className="h-11 w-11 rounded-xl bg-[hsl(var(--warning)/0.1)] flex items-center justify-center">
+                  <CalendarX className="h-5 w-5 text-[hsl(var(--warning))]" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1.5">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Valor em Risco</p>
+                  <p className="text-2xl font-extrabold text-card-foreground tracking-tight">{formatCurrency(negociosRisco.valorRiscoTotal)}</p>
+                  <span className="text-xs text-muted-foreground">Parado ou sem próxima ação</span>
+                </div>
+                <div className="h-11 w-11 rounded-xl bg-destructive/10 flex items-center justify-center">
+                  <ShieldAlert className="h-5 w-5 text-destructive" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* Risco por Vendedor — só aparece pra gestor/admin: a RPC já devolve o array
+              vazio pra quem não é (ver comentário de negociosRisco.riscoPorVendedor). */}
+          {negociosRisco.riscoPorVendedor.length > 0 && (
+            <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+              <CardHeader className="pb-1">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-[hsl(var(--warning))]" /> Risco por Vendedor
+                </CardTitle>
+                <CardDescription className="text-xs">Valor em risco entre os negócios de cada responsável</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-2">
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={negociosRisco.riscoPorVendedor} layout="vertical" barCategoryGap="20%">
+                    <defs>
+                      <linearGradient id="gradientRiscoVendedor" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor={chartColors.warning} stopOpacity={0.7} />
+                        <stop offset="100%" stopColor={chartColors.warning} stopOpacity={1} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid {...commonGridProps} vertical horizontal={false} />
+                    <XAxis type="number" {...commonAxisProps} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                    <YAxis dataKey="vendedor" type="category" {...commonAxisProps} width={riscoVendedorAxisWidth} tick={renderVendedorTick} interval={0} />
+                    <Tooltip content={<ChartTooltip formatValue={formatCurrency} />} />
+                    <Bar
+                      dataKey="valor"
+                      name="Valor em risco"
+                      fill="url(#gradientRiscoVendedor)"
+                      radius={[0, 8, 8, 0]}
+                      animationDuration={1000}
+                      animationEasing="ease-out"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className={`shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300 ${negociosRisco.riscoPorVendedor.length > 0 ? '' : 'lg:col-span-2'}`}>
+            <CardHeader className="pb-1">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
+                <Factory className="h-4 w-4 text-[hsl(var(--warning))]" /> Risco por Fábrica
+              </CardTitle>
+              <CardDescription className="text-xs">Valor em risco entre os negócios de cada fabricante</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={negociosRisco.riscoPorFabricante}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={65}
+                    outerRadius={100}
+                    dataKey="valor"
+                    nameKey="fabrica"
+                    label={renderCustomLabel}
+                    paddingAngle={3}
+                    cornerRadius={4}
+                    animationDuration={1000}
+                    animationEasing="ease-out"
+                  >
+                    {negociosRisco.riscoPorFabricante.map((_, idx) => (
+                      <Cell
+                        key={`cell-risco-${idx}`}
+                        fill={[chartColors.warning, 'hsl(24, 100%, 47%)', chartColors.muted, 'hsl(280, 65%, 60%)', chartColors.primary][idx % 5]}
+                        stroke="hsl(var(--card))"
+                        strokeWidth={2}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip formatValue={formatCurrency} />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Atendimento WhatsApp — só renderizado pra gestor/admin de empresa que tem a seção
