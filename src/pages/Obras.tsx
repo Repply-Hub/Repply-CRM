@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useObras } from '@/hooks/use-obras';
@@ -44,6 +44,7 @@ import { ColumnSettings, type ColumnDefinition } from '@/components/shared/Colum
 import { ListPagination } from '@/components/shared/ListPagination';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { MapaObras } from '@/components/obras/MapaObras';
+import { MapaObrasPainel } from '@/components/obras/MapaObrasPainel';
 import { MarcadoresObrasDialog } from '@/components/obras/MarcadoresObrasDialog';
 import { VendasDaObra } from '@/components/obras/VendasDaObra';
 import { cn, hasTextSelection } from '@/lib/utils';
@@ -184,6 +185,16 @@ export default function Obras() {
   const [page, setPage] = useState(1);
   const [selectedObra, setSelectedObra] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('lista');
+  // Obra selecionada NA ABA MAPA (cartão flutuante + destaque do pino). Independente do
+  // `selectedObra` acima, que abre o Sheet lateral de detalhes. O `focoTick` cresce a cada
+  // clique de seleção para o mapa refocar até quando o id clicado é o mesmo (reclicar a
+  // obra selecionada depois de arrastar o mapa volta a câmera até ela).
+  const [obraSelecionadaMapa, setObraSelecionadaMapa] = useState<string | null>(null);
+  const [focoTick, setFocoTick] = useState(0);
+  const selecionarObraMapa = useCallback((id: string | null) => {
+    setObraSelecionadaMapa(id);
+    if (id) setFocoTick((t) => t + 1);
+  }, []);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -238,11 +249,18 @@ export default function Obras() {
       if (obra) {
         if (state.activeTab === 'mapa') {
           setActiveTab('mapa');
+          // Filtros ativos podem esconder a obra pedida — e seleção de obra fora do
+          // conjunto filtrado é apagada pelo efeito de limpeza logo abaixo. Selecionar
+          // vindo de fora zera busca e chip para a obra estar garantidamente visível.
+          setSearch('');
+          setMarcadorFilter('todos');
+          selecionarObraMapa(obra.id);
         } else {
           setSelectedObra(obra);
-          // Limpa o estado apenas se não for mapa, pois o mapa precisa dele para centralizar
-          navigate(location.pathname, { replace: true, state: {} });
         }
+        // Quem centraliza o mapa agora é o estado `obraSelecionadaMapa`, então o state da
+        // navegação pode (e deve) ser limpo sempre — recarregar a página não re-foca.
+        navigate(location.pathname, { replace: true, state: {} });
       }
     }
   }, [location.state, obras, navigate, location.pathname]);
@@ -306,22 +324,32 @@ export default function Obras() {
     return () => window.removeEventListener('select-address-map', handleSelectAddress);
   }, []);
 
-  const filtered = useMemo(() => {
+  // Separado do `filtered` para os contadores dos chips do mapa: eles devem refletir a
+  // BUSCA, mas não o chip ativo — senão escolher um marcador zeraria os números dos outros.
+  const filtradasPorBusca = useMemo(() => {
     if (!obras) return [];
-    let list = [...obras];
+    if (!search) return obras;
+    const q = search.toLowerCase();
+    return obras.filter(
+      (o) =>
+        (o.nome_obra || '').toLowerCase().includes(q) ||
+        (o.endereco_entrega || '').toLowerCase().includes(q) ||
+        ((o.clientes as any)?.empresa || '').toLowerCase().includes(q) ||
+        ((o as ObraNaLista).marcador?.nome || '').toLowerCase().includes(q)
+    );
+  }, [obras, search]);
 
-    const pageSizeNumber = Number(pageSize);
-
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (o) =>
-          (o.nome_obra || '').toLowerCase().includes(q) ||
-          (o.endereco_entrega || '').toLowerCase().includes(q) ||
-          ((o.clientes as any)?.empresa || '').toLowerCase().includes(q) ||
-          ((o as ObraNaLista).marcador?.nome || '').toLowerCase().includes(q)
-      );
+  const contagemPorMarcador = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const o of filtradasPorBusca) {
+      const id = (o as ObraNaLista).marcador_id;
+      if (id) m.set(id, (m.get(id) ?? 0) + 1);
     }
+    return m;
+  }, [filtradasPorBusca]);
+
+  const filtered = useMemo(() => {
+    let list = [...filtradasPorBusca];
 
     if (marcadorFilter !== 'todos') {
       list = list.filter((o) => (o as ObraNaLista).marcador_id === marcadorFilter);
@@ -364,7 +392,7 @@ export default function Obras() {
     });
 
     return list;
-  }, [obras, search, marcadorFilter, sortColumn, sortDirection, columns]);
+  }, [filtradasPorBusca, marcadorFilter, sortColumn, sortDirection, columns]);
 
   const obrasParaMapa = useMemo(
     () =>
@@ -386,6 +414,22 @@ export default function Obras() {
       })),
     [filtered]
   );
+
+  // Se a busca ou o chip tirou a obra selecionada do conjunto visível, a seleção morre
+  // junto — senão o cartão flutuante mostraria uma obra que não está mais no mapa.
+  // (Quem seleciona vindo de fora — Sheet, navegação de outra tela — zera os filtros
+  // ANTES de selecionar, justamente para não cair aqui.)
+  useEffect(() => {
+    if (obraSelecionadaMapa && !filtered.some((o: any) => o.id === obraSelecionadaMapa)) {
+      setObraSelecionadaMapa(null);
+    }
+  }, [filtered, obraSelecionadaMapa]);
+
+  // Filtro/busca novos invalidam a página atual da lista: sem o reset, filtrar para um
+  // conjunto menor estando na página 4 deixava a tabela em branco ("página 4 de 1").
+  useEffect(() => {
+    setPage(1);
+  }, [search, marcadorFilter]);
 
   const isDefaultSort = sortColumn === 'created_at' && sortDirection === 'desc';
   const hasFilters = marcadorFilter !== 'todos' || !isDefaultSort;
@@ -711,18 +755,36 @@ export default function Obras() {
             )}
           </TabsContent>
 
-          <TabsContent value="mapa" className="mt-0">
-            {/* Sem altura fixa no Card: o mapa define a própria altura (ver MapaObras). Com as
-                duas alturas fixas somadas, o conteúdo estourava a moldura e o bloco ficava
-                gigante, atrapalhando a rolagem da página. */}
-            <Card className="p-4">
-              <MapaObras
-                obras={obrasParaMapa} 
-                isLoading={isLoading} 
-                searchTerm={search}
-                selectedObraId={(location.state as any)?.selectedObraId}
-              />
-            </Card>
+          {/* Layout dividido: painel (chips por marcador + lista) à esquerda, mapa à direita
+              ocupando a altura restante da aba. Em tela estreita empilha, com o painel
+              limitado em altura e rolagem interna. */}
+          <TabsContent value="mapa" className="mt-0 flex-1 min-h-0">
+            <div className="h-full min-h-0 flex flex-col gap-4 lg:grid lg:grid-cols-[360px_1fr]">
+              <Card className="flex flex-col min-h-0 overflow-hidden max-h-[40dvh] lg:max-h-none p-0">
+                <MapaObrasPainel
+                  obras={obrasParaMapa}
+                  isLoading={isLoading}
+                  marcadores={marcadores}
+                  marcadorFilter={marcadorFilter}
+                  onMarcadorFilter={setMarcadorFilter}
+                  contagemPorMarcador={contagemPorMarcador}
+                  totalBusca={filtradasPorBusca.length}
+                  selectedObraId={obraSelecionadaMapa}
+                  onSelectObra={selecionarObraMapa}
+                />
+              </Card>
+              <div className="flex-1 min-h-[320px] lg:min-h-0 lg:h-full">
+                <MapaObras
+                  obras={obrasParaMapa}
+                  isLoading={isLoading}
+                  searchTerm={search}
+                  selectedObraId={obraSelecionadaMapa}
+                  focoTick={focoTick}
+                  onSelectObra={selecionarObraMapa}
+                  onVerDetalhes={(id) => setSelectedObra(obras?.find(o => o.id === id) ?? null)}
+                />
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
 
@@ -773,20 +835,23 @@ export default function Obras() {
                         size="sm" 
                         className="h-8 gap-2 text-xs"
                         onClick={() => {
-                          const address = selectedObra.endereco_entrega || selectedObra.nome_obra;
-                          if (address) {
-                            setSearch(address);
-                            setActiveTab('mapa');
-                            setSelectedObra(null); // Fecha o painel lateral
-                          }
+                          // Seleciona a obra direto no mapa (foco + cartão), sem o hack antigo
+                          // de jogar o endereço no campo de busca. Busca e chip são zerados
+                          // porque um filtro ativo que esconda a obra apagaria a seleção.
+                          setSearch('');
+                          setMarcadorFilter('todos');
+                          selecionarObraMapa(selectedObra.id);
+                          setActiveTab('mapa');
+                          setSelectedObra(null); // Fecha o painel lateral
                         }}
-                        disabled={!selectedObra.endereco_entrega && !selectedObra.nome_obra}
                       >
                         <MapIcon className="h-3.5 w-3.5 text-primary" />
                         Visualizar no mapa
                       </Button>
-                      {!selectedObra.endereco_entrega && !selectedObra.nome_obra && (
-                        <p className="text-[10px] text-muted-foreground mt-1 italic">Endereço não informado</p>
+                      {!selectedObra.endereco_entrega && (
+                        <p className="text-[10px] text-muted-foreground mt-1 italic">
+                          Sem endereço de entrega — o mapa tenta posicionar pelo nome da obra
+                        </p>
                       )}
                     </div>
                       {selectedObra.marcador && (

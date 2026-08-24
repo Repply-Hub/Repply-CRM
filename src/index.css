@@ -307,3 +307,38 @@ input[type="week"]::-webkit-calendar-picker-indicator:hover {
   opacity: 0.85;
 }
 
+
+/* ─── Mapa de Obras (MapaObras.tsx): pinos-bolinha e rótulos ───
+   As cores entram por token (`hsl(var(--…))`) para acompanharem o tema claro/escuro.
+   A classe `obra-rotulo` escopa o override do tooltip do Leaflet (branco fixo de fábrica)
+   só para os rótulos do mapa de obras, sem afetar outros tooltips. */
+.obra-dot-inner {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--background));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  transition: transform 0.15s ease;
+}
+.obra-dot-selecionada {
+  transform: scale(1.4);
+}
+.leaflet-tooltip.obra-rotulo {
+  background: hsl(var(--card) / 0.92);
+  color: hsl(var(--card-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Sem a setinha branca de fábrica, que não acompanha o tema. */
+.leaflet-tooltip.obra-rotulo::before {
+  display: none;
+}

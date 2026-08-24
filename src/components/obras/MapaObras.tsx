@@ -1,13 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Loader2, MapPin, Building2, Maximize2, Minimize2, WifiOff } from 'lucide-react';
+import { Loader2, MapPin, Maximize2, Minimize2, WifiOff, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { formatarMoedaBRL } from '@/lib/moeda';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
-import { geocodificar, useGeocodeObras, type ObraComCoordenada } from '@/hooks/use-geocode-obras';
+import { useObraVendas } from '@/hooks/use-obra-vendas';
+import {
+  geocodificar,
+  obraSemPontoNoMapa,
+  useGeocodeObras,
+  type ObraComCoordenada,
+} from '@/hooks/use-geocode-obras';
 
 // O `STATUS_LABEL` que existia aqui traduzia quatro apelidos fixos (em_andamento, ativa,
 // concluida, parada) que nunca bateram com lista nenhuma: `status_obras` está vazia nas 8
@@ -15,32 +24,29 @@ import { geocodificar, useGeocodeObras, type ObraComCoordenada } from '@/hooks/u
 // MARCADOR, que vem com nome e cor próprios pela junção — e quando a obra não tem marcador o
 // balão simplesmente não mostra etiqueta, em vez de inventar uma.
 
-// Ícone dos pinos: divIcon com SVG inline em vez do marker-icon.png padrão do Leaflet — a URL
-// do PNG é montada em tempo de execução e o Vite não a resolve (o pino sumiria). De quebra, o
-// SVG aceita a cor do marcador da obra, os mesmos tokens do Badge e do kanban.
+// Ícone dos pinos: divIcon em vez do marker-icon.png padrão do Leaflet — a URL do PNG é
+// montada em tempo de execução e o Vite não a resolve (o pino sumiria). O visual é uma
+// bolinha na cor do marcador da obra (mesmos tokens do Badge e do kanban), com o rótulo do
+// nome ao lado via <Tooltip permanent>.
 const iconCache = new Map<string, L.DivIcon>();
 
-function pinIcon(cor?: string | null): L.DivIcon {
+function dotIcon(cor?: string | null, selecionada = false): L.DivIcon {
   // `cor` vem de coluna de texto livre e entra num trecho de HTML: só passa adiante o que
   // tem cara de token CSS (`kanban-new`, `destructive`…). Qualquer outra coisa cai no padrão.
   const token = cor && /^[a-z0-9-]{1,40}$/.test(cor) ? cor : null;
-  const key = token ?? 'default';
+  // A seleção PRECISA estar na chave do cache: o divIcon é compartilhado entre todos os
+  // marcadores da mesma cor, e sem isso selecionar uma obra cresceria as bolinhas de todas.
+  const key = `${token ?? 'default'}${selecionada ? ':sel' : ''}`;
   const cached = iconCache.get(key);
   if (cached) return cached;
   const fill = token ? `hsl(var(--${token}))` : 'hsl(var(--primary))';
   const icon = L.divIcon({
     // Sem className próprio o Leaflet aplica .leaflet-div-icon (caixa branca com borda).
-    className: 'obra-pin',
-    // var() não funciona em atributo fill de SVG: a cor entra pelo style e o path usa currentColor.
-    html: `<div style="color:${fill}; line-height:0; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.4));">
-      <svg xmlns="http://www.w3.org/2000/svg" width="30" height="40" viewBox="0 0 30 40">
-        <path fill="currentColor" stroke="white" stroke-width="1.5"
-          d="M15 1C7.3 1 1 7.3 1 15c0 10 14 24 14 24s14-14 14-24C29 7.3 22.7 1 15 1z"/>
-        <circle cx="15" cy="15" r="5" fill="white"/>
-      </svg></div>`,
-    iconSize: [30, 40],
-    iconAnchor: [15, 40],
-    popupAnchor: [0, -36],
+    className: 'obra-dot',
+    html: `<span class="obra-dot-inner${selecionada ? ' obra-dot-selecionada' : ''}" style="background:${fill}"></span>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+    tooltipAnchor: [9, 0],
   });
   iconCache.set(key, icon);
   return icon;
@@ -49,9 +55,12 @@ function pinIcon(cor?: string | null): L.DivIcon {
 interface MapControllerProps {
   /** Termo de busca JÁ com debounce — o pai segura 800ms antes de propagar. */
   termoBusca: string;
-  selectedObraId?: string;
+  selectedObraId?: string | null;
+  /** Cresce a cada CLIQUE de seleção — reaplica o foco mesmo quando o id repetido é o
+   *  mesmo (reclicar a obra selecionada depois de arrastar o mapa volta até ela). */
+  focoTick: number;
   obrasComCoord: ObraComCoordenada[];
-  markerRefs: React.MutableRefObject<Map<string, L.Marker>>;
+  onSelectObra: (id: string | null) => void;
 }
 
 // No react-leaflet, center/zoom do MapContainer valem só na montagem. Todo movimento
@@ -65,11 +74,18 @@ interface MapControllerProps {
 //    `usuarioMexeu` (depois que a pessoa arrasta ou dá zoom, o enquadre automático para).
 // 2. Movimento que o código dispara não pode contar como "o usuário mexeu" — daí o
 //    `movendoProgramatico` em volta de cada setView/fitBounds.
-function MapController({ termoBusca, selectedObraId, obrasComCoord, markerRefs }: MapControllerProps) {
+function MapController({
+  termoBusca,
+  selectedObraId,
+  focoTick,
+  obrasComCoord,
+  onSelectObra,
+}: MapControllerProps) {
   const map = useMap();
   const usuarioMexeu = useRef(false);
   const movendoProgramatico = useRef(false);
   const ultimoFoco = useRef('');
+  const ultimaBuscaFocada = useRef('');
   const totalEnquadrado = useRef(0);
 
   const moverProgramaticamente = (mover: () => void) => {
@@ -112,31 +128,34 @@ function MapController({ termoBusca, selectedObraId, obrasComCoord, markerRefs }
 
   useEffect(() => {
     const termo = termoBusca.trim().toLowerCase();
-    const alvo = selectedObraId
-      ? `obra:${selectedObraId}`
-      : termo.length >= 3
-        ? `busca:${termo}`
-        : '';
-
-    if (!alvo) {
-      // Busca limpa: libera o alvo para, se a pessoa digitar o mesmo termo de novo, focar de novo.
-      ultimoFoco.current = '';
-      return;
-    }
-    if (alvo === ultimoFoco.current) return;
-
-    const focar = (lat: number, lng: number, zoom: number, markerId?: string) => {
-      ultimoFoco.current = alvo;
-      moverProgramaticamente(() => map.setView([lat, lng], zoom));
-      if (markerId) markerRefs.current.get(markerId)?.openPopup();
-    };
 
     if (selectedObraId) {
+      // O tick entra no alvo: reclicar a mesma obra gera alvo novo e refoca.
+      const alvo = `obra:${selectedObraId}:${focoTick}`;
+      if (alvo === ultimoFoco.current) return;
       const obra = obrasComCoord.find((o) => o.id === selectedObraId);
-      if (obra) focar(obra.latitude!, obra.longitude!, 17, obra.id);
+      if (obra) {
+        ultimoFoco.current = alvo;
+        // Sem salto brusco: aproxima até zoom de rua, mas não afasta quem já está mais perto.
+        moverProgramaticamente(() =>
+          map.setView([obra.latitude!, obra.longitude!], Math.max(map.getZoom(), 15))
+        );
+      }
       // Sem coordenada ainda: o efeito roda de novo quando a geocodificação dela chegar.
       return;
     }
+
+    // Sem seleção: libera o foco de seleção para reaplicar depois.
+    ultimoFoco.current = '';
+
+    if (termo.length < 3) {
+      ultimaBuscaFocada.current = '';
+      return;
+    }
+    // Cada termo de busca é focado UMA vez. Sem esta trava, fechar o cartão de uma obra
+    // com a busca ainda digitada devolvia a câmera ao alvo velho da busca — um teleporte
+    // que o usuário não pediu.
+    if (termo === ultimaBuscaFocada.current) return;
 
     const match = obrasComCoord.find(
       (o) =>
@@ -144,14 +163,18 @@ function MapController({ termoBusca, selectedObraId, obrasComCoord, markerRefs }
         (o.endereco_entrega || '').toLowerCase().includes(termo)
     );
     if (match) {
-      focar(match.latitude!, match.longitude!, 17, match.id);
+      ultimaBuscaFocada.current = termo;
+      // Seleciona de verdade, em vez de só mover a câmera: destaca a bolinha, marca a
+      // linha na lista e abre o cartão — senão a busca parava num aglomerado de pontos
+      // sem dizer qual deles era o resultado.
+      onSelectObra(match.id);
       return;
     }
 
     // Sem match local: geocodifica a busca livre no Nominatim (a fila do módulo garante o
-    // limite de 1 req/s). O alvo é marcado ANTES da resposta, para os re-renders da
+    // limite de 1 req/s). O termo é marcado ANTES da resposta, para os re-renders da
     // geocodificação em segundo plano não repetirem a mesma consulta.
-    ultimoFoco.current = alvo;
+    ultimaBuscaFocada.current = termo;
     let cancelado = false;
     geocodificar(`${termoBusca.trim()}, Brasil`)
       .then((coord) => {
@@ -164,22 +187,130 @@ function MapController({ termoBusca, selectedObraId, obrasComCoord, markerRefs }
     return () => {
       cancelado = true;
     };
-  }, [map, termoBusca, selectedObraId, obrasComCoord, markerRefs]);
+  }, [map, termoBusca, selectedObraId, focoTick, obrasComCoord, onSelectObra]);
 
   return null;
+}
+
+interface CartaoObraSelecionadaProps {
+  obra: ObraComCoordenada;
+  onFechar: () => void;
+  onVerDetalhes: (id: string) => void;
+}
+
+// Cartão flutuante da obra selecionada, sobre o canto do mapa. Substitui o Popup do
+// Leaflet. Montado só quando há seleção — é isso que faz a busca dos negócios da obra
+// disparar apenas na hora certa.
+function CartaoObraSelecionada({ obra, onFechar, onVerDetalhes }: CartaoObraSelecionadaProps) {
+  const navigate = useNavigate();
+  // Mesma fonte da ficha da obra: soma feita NO BANCO pela RPC `obra_vendas`, com a decisão
+  // de produto de 24/08/2026 — "Ganho" e "Em aberto" lado a lado, nunca um número só (somar
+  // tudo faria orçamento parecer venda; só o ganho esconderia a oportunidade de pé).
+  const { data: vendas, isLoading: carregandoVendas, isError: erroVendas } = useObraVendas(obra.id);
+
+  return (
+    <div className="absolute bottom-3 left-3 z-[1001] w-[min(360px,calc(100%-1.5rem))] rounded-lg border border-border bg-card text-card-foreground shadow-lg p-4 space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {obra.marcador_nome && (
+            <Badge className={cn('text-white border-none text-[11px] shrink-0', `bg-${obra.marcador_cor}`)}>
+              {obra.marcador_nome}
+            </Badge>
+          )}
+          {obra.spe_cnpj && (
+            <span className="text-xs text-muted-foreground font-mono truncate">SPE {obra.spe_cnpj}</span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onFechar}
+          title="Fechar"
+          className="text-muted-foreground hover:text-foreground shrink-0"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <p className="font-semibold leading-tight">{obra.nome_obra}</p>
+      <p className="text-sm text-muted-foreground">
+        {[obra.cliente_empresa, obra.endereco_entrega].filter(Boolean).join(' • ')}
+      </p>
+
+      {obraSemPontoNoMapa(obra) && (
+        <p className="text-xs text-muted-foreground">
+          Endereço não encontrado no mapa — edite o endereço da obra para posicionar o pino.
+        </p>
+      )}
+
+      <div className="pt-1">
+        {carregandoVendas ? (
+          <Skeleton className="h-9 w-40" />
+        ) : erroVendas ? (
+          <p className="text-sm text-muted-foreground">Não foi possível carregar os negócios da obra.</p>
+        ) : vendas && vendas.total_qtd > 0 ? (
+          <div className="flex gap-5">
+            <div>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Ganho</p>
+              <p className="font-semibold tabular-nums">
+                {formatarMoedaBRL(vendas.ganho_valor)}
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                  {vendas.ganho_qtd} negócio(s)
+                </span>
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Em aberto</p>
+              <p className="font-semibold tabular-nums">
+                {formatarMoedaBRL(vendas.aberto_valor)}
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                  {vendas.aberto_qtd} negócio(s)
+                </span>
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Nenhum negócio vinculado a esta obra</p>
+        )}
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <Button size="sm" onClick={() => onVerDetalhes(obra.id)}>
+          Ver detalhes
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!obra.cliente_id}
+          onClick={() => obra.cliente_id && navigate(`/clientes/${obra.cliente_id}`)}
+        >
+          Ver cliente
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 interface MapaObrasProps {
   obras: ObraComCoordenada[] | undefined;
   isLoading: boolean;
   searchTerm?: string;
-  selectedObraId?: string;
+  selectedObraId?: string | null;
+  /** Cresce a cada clique de seleção — reclicar a obra já selecionada refoca a câmera. */
+  focoTick: number;
+  onSelectObra: (id: string | null) => void;
+  onVerDetalhes: (id: string) => void;
 }
 
-export function MapaObras({ obras, isLoading, searchTerm = '', selectedObraId }: MapaObrasProps) {
-  const navigate = useNavigate();
+export function MapaObras({
+  obras,
+  isLoading,
+  searchTerm = '',
+  selectedObraId,
+  focoTick,
+  onSelectObra,
+  onVerDetalhes,
+}: MapaObrasProps) {
   const { items, carregando, progresso } = useGeocodeObras(obras);
-  const markerRefs = useRef(new Map<string, L.Marker>());
   const wrapperRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const [telaCheia, setTelaCheia] = useState(false);
@@ -196,9 +327,11 @@ export function MapaObras({ obras, isLoading, searchTerm = '', selectedObraId }:
 
   // Obras que já passaram pela geocodificação e ficaram sem ponto: o endereço não foi
   // encontrado. Corrigir o endereço na edição zera o carimbo e tenta de novo.
-  const obrasSemLocalizacao = useMemo(
-    () => items.filter((o) => (o.latitude === null || o.longitude === null) && !!o.geocoded_at),
-    [items]
+  const obrasSemLocalizacao = useMemo(() => items.filter(obraSemPontoNoMapa), [items]);
+
+  const obraSelecionada = useMemo(
+    () => (selectedObraId ? items.find((o) => o.id === selectedObraId) ?? null : null),
+    [items, selectedObraId]
   );
 
   const centro = useMemo(() => {
@@ -230,139 +363,112 @@ export function MapaObras({ obras, isLoading, searchTerm = '', selectedObraId }:
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="flex items-center justify-center h-full py-20">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700">
-          <MapPin className="h-4 w-4 text-primary" />
-          <span className="font-semibold text-slate-900 dark:text-slate-100">{obrasComCoord.length}</span>
-          <span className="text-slate-600 dark:text-slate-400">obra(s) no mapa</span>
-        </div>
+    /* relative z-0 isolate confina os z-index internos do Leaflet (vão até 1000) dentro do
+       wrapper — sem isso o mapa desenha por cima do Sheet de detalhes e dos diálogos (z-50).
+       Tudo que flutua sobre o mapa (cartão, avisos, tela cheia) fica DENTRO deste wrapper,
+       em z-[1001] — assim também aparece em tela cheia, que é pedida no próprio wrapper. */
+    <div
+      ref={wrapperRef}
+      className="relative z-0 isolate rounded-lg overflow-hidden border border-border shadow-card bg-background"
+      style={{ height: telaCheia ? '100dvh' : '100%', minHeight: 320 }}
+    >
+      <MapContainer
+        ref={mapRef}
+        center={[centro.lat, centro.lng]}
+        zoom={obrasComCoord.length > 0 ? 11 : 6}
+        scrollWheelZoom
+        style={{ width: '100%', height: '100%' }}
+      >
+        <TileLayer
+          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          eventHandlers={{
+            tileerror: () => setTilesFalharam(true),
+            tileload: () => setTilesFalharam(false),
+          }}
+        />
+
+        {obrasComCoord.map((obra) => (
+          <Marker
+            key={obra.id}
+            position={[obra.latitude!, obra.longitude!]}
+            icon={dotIcon(obra.marcador_cor, obra.id === selectedObraId)}
+            eventHandlers={{ click: () => onSelectObra(obra.id) }}
+          >
+            <Tooltip permanent direction="right" offset={[2, 0]} opacity={1} className="obra-rotulo">
+              {obra.nome_obra}
+            </Tooltip>
+          </Marker>
+        ))}
+
+        <MapController
+          termoBusca={termoBusca}
+          selectedObraId={selectedObraId}
+          focoTick={focoTick}
+          obrasComCoord={obrasComCoord}
+          onSelectObra={onSelectObra}
+        />
+      </MapContainer>
+
+      {/* Avisos compactos sobre o mapa (abaixo do controle de zoom, que fica no topo-esquerda) */}
+      <div className="absolute top-2 left-12 z-[1001] flex flex-col items-start gap-1.5">
+        <span className="flex items-center gap-1.5 text-xs font-medium rounded-md border border-border bg-card/90 text-card-foreground px-2 py-1 shadow-sm">
+          <MapPin className="h-3.5 w-3.5 text-primary" />
+          {obrasComCoord.length} no mapa
+        </span>
+        {carregando && (
+          <span className="flex items-center gap-1.5 text-xs font-medium rounded-md border border-border bg-card/90 text-card-foreground px-2 py-1 shadow-sm">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Mapeando obras ({progresso.atual}/{progresso.total})…
+          </span>
+        )}
         {obrasSemLocalizacao.length > 0 && (
-          <div
-            className="text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-1 rounded-md border border-amber-100 dark:border-amber-800"
+          <span
+            className="flex items-center gap-1.5 text-xs rounded-md border border-border bg-card/90 text-muted-foreground px-2 py-1 shadow-sm"
             title="O endereço dessas obras não foi encontrado no mapa. Edite o endereço para tentar de novo."
           >
             {obrasSemLocalizacao.length} com endereço não encontrado
-          </div>
-        )}
-        {carregando && (
-          <div className="flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-800 animate-pulse shadow-sm">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span>Mapeando obras ({progresso.atual}/{progresso.total})…</span>
-          </div>
+          </span>
         )}
         {tilesFalharam && (
-          <div className="flex items-center gap-1.5 text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-1 rounded-md border border-amber-100 dark:border-amber-800">
+          <span className="flex items-center gap-1.5 text-xs rounded-md border border-border bg-card/90 text-muted-foreground px-2 py-1 shadow-sm">
             <WifiOff className="h-3.5 w-3.5" />
-            <span>Falha ao carregar o fundo do mapa — verifique a conexão.</span>
-          </div>
+            Falha ao carregar o fundo do mapa — verifique a conexão.
+          </span>
         )}
       </div>
 
-      {/* relative z-0 isolate confina os z-index internos do Leaflet (vão até 1000) dentro do
-          wrapper — sem isso o mapa desenha por cima do Sheet de detalhes e dos diálogos (z-50). */}
-      <div
-        ref={wrapperRef}
-        className="relative z-0 isolate rounded-lg overflow-hidden border border-border shadow-card bg-background"
-        // Metade da tela: sobra espaço para rolar a página. Quem precisa de mapa grande usa
-        // o botão de tela cheia.
-        style={{ height: telaCheia ? '100dvh' : '50vh', minHeight: 380 }}
+      {/* O mapa do Google tinha botão de tela cheia; o Leaflet não traz um. Este usa a
+          tela cheia do próprio navegador sobre o wrapper. */}
+      <button
+        type="button"
+        onClick={alternarTelaCheia}
+        title={telaCheia ? 'Sair da tela cheia' : 'Tela cheia'}
+        className="absolute top-2 right-2 z-[1001] rounded-md border border-border bg-background/90 p-2 shadow-sm hover:bg-accent transition-colors"
       >
-        <MapContainer
-          ref={mapRef}
-          center={[centro.lat, centro.lng]}
-          zoom={obrasComCoord.length > 0 ? 11 : 6}
-          scrollWheelZoom
-          style={{ width: '100%', height: '100%' }}
-        >
-          <TileLayer
-            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            eventHandlers={{
-              tileerror: () => setTilesFalharam(true),
-              tileload: () => setTilesFalharam(false),
-            }}
-          />
+        {telaCheia ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+      </button>
 
-          {obrasComCoord.map((obra) => (
-            <Marker
-              key={obra.id}
-              position={[obra.latitude!, obra.longitude!]}
-              icon={pinIcon(obra.marcador_cor)}
-              ref={(m) => {
-                if (m) markerRefs.current.set(obra.id, m);
-                else markerRefs.current.delete(obra.id);
-              }}
-            >
-              <Popup maxWidth={280}>
-                <div className="p-2 space-y-2 min-w-[200px] max-w-[280px]">
-                  <p className="font-bold text-base leading-tight text-slate-900">{obra.nome_obra}</p>
-
-                  {obra.cliente_empresa && (
-                    <div
-                      className="flex items-center gap-1.5 text-sm text-slate-700 font-medium bg-slate-50 p-1.5 rounded border border-slate-100 cursor-pointer hover:bg-slate-100 hover:text-blue-600 transition-colors"
-                      onClick={() => {
-                        if (obra.cliente_id) {
-                          navigate(`/clientes/${obra.cliente_id}`);
-                        }
-                      }}
-                    >
-                      <Building2 className="h-4 w-4 shrink-0 text-slate-500" />
-                      <span>{obra.cliente_empresa}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-start gap-1.5 text-sm text-slate-600 leading-snug">
-                    <MapPin className="h-4 w-4 shrink-0 mt-0.5 text-slate-400" />
-                    <span className="break-words">{obra.endereco_entrega || obra.nome_obra}</span>
-                  </div>
-
-                  <div className="pt-1 flex items-center justify-between gap-2">
-                    {/* A cor vem do token do marcador (`bg-kanban-new`, `bg-destructive`…), que é
-                        exatamente o conjunto coberto pelo safelist do Tailwind. Obra sem marcador
-                        não mostra etiqueta nenhuma. */}
-                    {obra.marcador_nome && (
-                      <Badge className={cn('text-white border-none text-[11px] px-2 py-0.5', `bg-${obra.marcador_cor}`)}>
-                        {obra.marcador_nome}
-                      </Badge>
-                    )}
-                    <span className="text-[10px] text-slate-400 italic ml-auto">ID: {obra.id.split('-')[0]}</span>
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
-
-          <MapController
-            termoBusca={termoBusca}
-            selectedObraId={selectedObraId}
-            obrasComCoord={obrasComCoord}
-            markerRefs={markerRefs}
-          />
-        </MapContainer>
-
-        {/* O mapa do Google tinha botão de tela cheia; o Leaflet não traz um. Este usa a
-            tela cheia do próprio navegador sobre o wrapper. */}
-        <button
-          type="button"
-          onClick={alternarTelaCheia}
-          title={telaCheia ? 'Sair da tela cheia' : 'Tela cheia'}
-          className="absolute top-2 right-2 z-[1001] rounded-md border border-border bg-background/90 p-2 shadow-sm hover:bg-accent transition-colors"
-        >
-          {telaCheia ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-        </button>
-      </div>
+      {obraSelecionada && (
+        <CartaoObraSelecionada
+          obra={obraSelecionada}
+          onFechar={() => onSelectObra(null)}
+          onVerDetalhes={onVerDetalhes}
+        />
+      )}
 
       {obrasComCoord.length === 0 && !carregando && (
-        <div className="text-center py-6 text-sm text-muted-foreground">
-          Nenhuma obra com endereço geocodificado ainda. Cadastre endereços nas obras para vê-las no mapa.
+        <div className="absolute inset-x-0 bottom-3 z-[1001] text-center pointer-events-none">
+          <span className="inline-block rounded-md border border-border bg-card/90 text-muted-foreground text-sm px-3 py-1.5 shadow-sm">
+            Nenhuma obra com endereço geocodificado ainda. Cadastre endereços nas obras para vê-las no mapa.
+          </span>
         </div>
       )}
     </div>

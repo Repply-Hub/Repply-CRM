@@ -334,6 +334,10 @@ export function invalidarPaineisDeNegocios(qc: QueryClient) {
     // não por prefixo de texto — ['plano_vendas_progresso'] NÃO alcança
     // ['plano_vendas_progresso_por_vendedor'], e a quebra "Por vendedor" ficaria velha.
     'plano_vendas_progresso_por_vendedor',
+    // Painéis de vendas por obra (ficha da obra e cartão do mapa) — use-obra-vendas.ts.
+    'obra_vendas',
+    'obra_fabricantes',
+    'obra_negocios',
   ];
   chaves.forEach(chave => qc.invalidateQueries({ queryKey: [chave] }));
 }
