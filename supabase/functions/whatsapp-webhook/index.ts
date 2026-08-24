@@ -8,6 +8,108 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-webhook-secret",
 };
 
+type ClienteDeBanco = ReturnType<typeof createClient>;
+
+/**
+ * Comparação de tempo constante: sair no primeiro byte diferente vaza o segredo,
+ * um byte por tentativa, para quem consegue medir o tempo de resposta.
+ *
+ * Cópia deliberada de `email-webhook/index.ts:86`. As duas fazem a mesma coisa e
+ * precisam continuar fazendo — divergir aqui é como o telefone do WhatsApp acabou
+ * com duas regras diferentes (CLAUDE.md §7.1).
+ */
+function iguaisEmTempoConstante(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/**
+ * MODO OBSERVAÇÃO da conferência de origem — ANOTA e DEIXA PASSAR.
+ *
+ * ⚠️ ESTA FUNÇÃO NÃO RECUSA NINGUÉM, E ISSO É O PONTO DELA. Não acrescente `return`
+ * de erro aqui sem antes fechar a medição descrita abaixo.
+ *
+ * POR QUE NÃO RECUSA AINDA: esta função de borda roda com `verify_jwt = false` e
+ * escreve com `service_role`, que ignora a RLS — ou seja, hoje qualquer pessoa que
+ * saiba o `instance_name` escreve nas tabelas de WhatsApp da empresa. O caminho mais
+ * caro é forjar evento de conexão: ele grava `status` em `configuracoes_wapi`, e
+ * `whatsapp-send/index.ts:212-215` recusa TODO envio quando `status != 'connected'`.
+ * Um evento forjado derruba o WhatsApp de saída da empresa inteira.
+ *
+ * O conserto óbvio (um `if` que recusa) quebra o cliente hoje: medido em 2026-08-24,
+ * as 3 instâncias estão com `webhook_secret` VAZIO e a operadora não manda cabeçalho
+ * nenhum. Recusar agora recusaria 100% do tráfego real — a caixa da MD pararia de
+ * receber EM SILÊNCIO, com 736 conversas em uso e a instância ainda aparecendo
+ * "conectada" na tela. Já aconteceu neste sistema (0715119).
+ *
+ * A ordem correta, em `docs/operacao/plano-blindagem-whatsapp-execucao.md`:
+ *   Tarefa 4 — gerar o segredo e RE-CADASTRAR o endereço na uazapi já com ele;
+ *   Tarefa 5 — ISTO AQUI: conferir e anotar, sem recusar;
+ *   Tarefa 6 — só depois de 3 dias com 100% dos eventos reais trazendo o segredo,
+ *              passar a recusar.
+ *
+ * O VALOR DO SEGREDO NUNCA É GRAVADO: só três booleanos e a via.
+ */
+async function registraConferenciaDeOrigem(
+  supabase: ClienteDeBanco,
+  req: Request,
+  url: URL,
+  config: { id: string; empresa_id: string; webhook_secret: string | null },
+  instanceName: string,
+  eventType: string,
+): Promise<void> {
+  try {
+    // `via` responde "por onde veio", medindo PRESENÇA e não conteúdo. É o que separa
+    // "a operadora não mandou nada" de "mandou `&s=` com nada depois" — o segundo caso
+    // é a Tarefa 4 aplicada pela metade, e sumiria se olhássemos só o valor.
+    const via = url.searchParams.has("s")
+      ? "url"
+      : (req.headers.has("x-webhook-secret") ? "cabecalho" : "nenhuma");
+
+    const recebido =
+      (url.searchParams.get("s") ?? req.headers.get("x-webhook-secret") ?? "").trim();
+    const esperado = (config.webhook_secret ?? "").trim();
+
+    const temSegredoConfigurado = esperado.length > 0;
+    const veioComSegredo = recebido.length > 0;
+    const confere = temSegredoConfigurado && veioComSegredo &&
+      iguaisEmTempoConstante(recebido, esperado);
+
+    const { error } = await supabase.from("whatsapp_webhook_origem").insert({
+      instancia_id: config.id,
+      empresa_id: config.empresa_id,
+      instance_name: instanceName,
+      evento: eventType || null,
+      tem_segredo_configurado: temSegredoConfigurado,
+      veio_com_segredo: veioComSegredo,
+      confere,
+      via,
+    });
+
+    // O supabase-js NÃO lança em erro do banco: devolve `{ error }`. Sem esta linha, a
+    // tabela faltando (mudança do banco ainda não aplicada) seria silêncio total — e a
+    // medição pareceria "nenhum evento chegou" em vez de "nada foi anotado", que é a
+    // diferença entre "pode ligar a recusa" e "não pode".
+    if (error) {
+      console.error(
+        "[webhook] conferência de origem NÃO foi anotada:",
+        error.message,
+      );
+    }
+  } catch (e) {
+    // NUNCA propaga, por dois motivos:
+    //
+    // 1. Enquanto isto é só medição, derrubar o recebimento de uma mensagem da MD por
+    //    causa da anotação seria trocar um problema pequeno por um grande.
+    // 2. Vale também para a janela entre publicar esta função e aplicar a mudança do
+    //    banco: sem a tabela `whatsapp_webhook_origem`, o insert falha, cai aqui, e o
+    //    webhook segue funcionando exatamente como antes. A ordem preferida é banco
+    //    primeiro, mas nenhuma das duas ordens derruba o cliente.
+    console.error("[webhook] falha ao anotar conferência de origem (ignorada):", e);
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -72,6 +174,21 @@ serve(async (req) => {
       payload.type ??
       ""
     ).toLowerCase();
+
+    // --- Conferência de origem, em MODO OBSERVAÇÃO ---
+    // Anota o resultado e SEGUE EM FRENTE. Nenhuma recusa, de propósito: ver o
+    // comentário de `registraConferenciaDeOrigem`. Fica ANTES do roteamento para não
+    // perder a linha de um evento que estoure no tratamento — evento que quebra ainda
+    // é evento que chegou, e ele contar ou não muda o percentual que autoriza a
+    // Tarefa 6. Não pode lançar: a função inteira é um try/catch mudo.
+    await registraConferenciaDeOrigem(
+      supabase,
+      req,
+      url,
+      config,
+      instanceName,
+      eventType,
+    );
 
     if (eventType === "messages_update") {
       await handleStatusUpdate(supabase, empresaId, payload);
