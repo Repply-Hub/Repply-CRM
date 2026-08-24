@@ -27,11 +27,12 @@ import { useSecaoLigada } from '@/hooks/use-secoes';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeFileName } from '@/lib/file-validation';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText, Upload, History } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText, Upload, History, MessageSquare } from 'lucide-react';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { FabricanteSelector } from '@/components/pedidos/FabricanteSelector';
 import { NomeNegocioField } from '@/components/pedidos/NomeNegocioField';
 import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
+import { ComentariosNegocio } from '@/components/pedidos/ComentariosNegocio';
 import { getNomeNegocioAutomatico } from '@/lib/nome-negocio';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -1073,6 +1074,17 @@ const EditarPedido = () => {
             </div>
 
             <HistoricoMovimentacaoNegocio historico={historicoStatus} stageLabel={getStatusLabel} />
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold">Comentários</h2>
+            </div>
+
+            <ComentariosNegocio pedidoId={id ?? null} />
           </CardContent>
         </Card>
       </div>

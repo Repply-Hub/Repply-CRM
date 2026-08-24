@@ -14,6 +14,7 @@ import { KanbanColunasDialog } from '@/components/pedidos/kanban/KanbanColunasDi
 import { useMarcadores } from '@/hooks/use-marcadores';
 import { MarcadoresDialog } from '@/components/pedidos/MarcadoresDialog';
 import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
+import { ComentariosNegocio } from '@/components/pedidos/ComentariosNegocio';
 import { useFunis } from '@/hooks/use-funis';
 import { useConfiguracoesCampos, isCampoObrigatorioNaEtapa, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
 import { usePedidos, usePedidosStats, useSearchMatches, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, buscarNegociosDoRecorte, PEDIDOS_EXPORTACAO_AVISO, PEDIDOS_LOTE_EXPORTACAO, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField, type PedidosSort, type PedidosSortColumn } from '@/hooks/use-pedidos';
@@ -2330,6 +2331,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 <History className="h-3 w-3" /> Histórico de Movimentação
               </p>
               <HistoricoMovimentacaoNegocio historico={historicoStatusNegocio} stageLabel={stageLabel} />
+            </div>
+
+            {/* Comentários manuais — separado do log automático acima */}
+            <div className="space-y-4">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <MessageSquare className="h-3 w-3" /> Comentários
+              </p>
+              <ComentariosNegocio pedidoId={viewOrderId} />
             </div>
           </div>
         ) : (

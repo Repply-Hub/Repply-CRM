@@ -2804,6 +2804,48 @@ export type Database = {
           },
         ]
       }
+      pedidos_comentarios: {
+        Row: {
+          created_at: string
+          id: string
+          pedido_id: string
+          texto: string
+          updated_at: string | null
+          usuario_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pedido_id: string
+          texto: string
+          updated_at?: string | null
+          usuario_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pedido_id?: string
+          texto?: string
+          updated_at?: string | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_comentarios_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_comentarios_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedidos_historico_status: {
         Row: {
           campo: string | null
