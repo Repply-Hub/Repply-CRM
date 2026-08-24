@@ -45,6 +45,7 @@ import { ListPagination } from '@/components/shared/ListPagination';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { MapaObras } from '@/components/obras/MapaObras';
 import { MarcadoresObrasDialog } from '@/components/obras/MarcadoresObrasDialog';
+import { VendasDaObra } from '@/components/obras/VendasDaObra';
 import { cn, hasTextSelection } from '@/lib/utils';
 import { FilterButton } from '@/components/shared/FilterButton';
 import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
@@ -806,7 +807,12 @@ export default function Obras() {
                   </div>
                 </div>
 
-                {/* Você pode adicionar mais seções aqui futuramente, como histórico ou pedidos vinculados */}
+                {/* O que foi vendido para esta obra. Era o "futuramente" que estava escrito
+                    aqui desde a criação da tela. */}
+                <div className="border-t pt-6">
+                  <h3 className="mb-3 text-sm font-semibold">Vendas desta obra</h3>
+                  <VendasDaObra obraId={selectedObra.id} />
+                </div>
               </div>
 
               <SheetFooter className="border-t pt-6 gap-3 sm:gap-0 mt-8">

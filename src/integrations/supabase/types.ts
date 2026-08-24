@@ -4236,6 +4236,43 @@ export type Database = {
           vendido_valor: number
         }[]
       }
+      obra_fabricantes: {
+        Args: { p_obra_id: string }
+        Returns: {
+          fabricante_id: string
+          fabricante_nome: string
+          ganho_qtd: number
+          ganho_valor: number
+          total_qtd: number
+        }[]
+      }
+      obra_negocios: {
+        Args: { p_limit?: number; p_obra_id: string; p_offset?: number }
+        Returns: {
+          cliente_nome: string
+          data_pedido: string
+          etapa_nome: string
+          fabricante_nome: string
+          id: string
+          negocio_nome: string
+          responsavel: string
+          status: string
+          total_count: number
+          valor_total: number
+        }[]
+      }
+      obra_vendas: {
+        Args: { p_obra_id: string }
+        Returns: {
+          aberto_qtd: number
+          aberto_valor: number
+          ganho_qtd: number
+          ganho_valor: number
+          perdido_qtd: number
+          perdido_valor: number
+          total_qtd: number
+        }[]
+      }
       pedidos_stats: {
         Args: {
           p_date_field?: string
