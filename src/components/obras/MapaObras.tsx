@@ -52,6 +52,34 @@ function dotIcon(cor?: string | null, selecionada = false): L.DivIcon {
   return icon;
 }
 
+/** Coordenada de um ENDEREÇO buscado (não é obra). `termo` é o texto normalizado da busca
+ *  que gerou o ponto — quando o termo atual bate com ele, a coordenada já existe e não se
+ *  consulta o Nominatim de novo. */
+export interface PontoBusca {
+  lat: number;
+  lng: number;
+  termo: string;
+}
+
+// Pino do endereço buscado: gota na cor primária, diferente das bolinhas das obras.
+let buscaIconCache: L.DivIcon | null = null;
+function buscaIcon(): L.DivIcon {
+  if (buscaIconCache) return buscaIconCache;
+  buscaIconCache = L.divIcon({
+    className: 'obra-dot',
+    html: `<div style="color:hsl(var(--primary)); line-height:0; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.4));">
+      <svg xmlns="http://www.w3.org/2000/svg" width="26" height="34" viewBox="0 0 30 40">
+        <path fill="currentColor" stroke="white" stroke-width="1.5"
+          d="M15 1C7.3 1 1 7.3 1 15c0 10 14 24 14 24s14-14 14-24C29 7.3 22.7 1 15 1z"/>
+        <circle cx="15" cy="15" r="5" fill="white"/>
+      </svg></div>`,
+    iconSize: [26, 34],
+    iconAnchor: [13, 34],
+    tooltipAnchor: [8, -20],
+  });
+  return buscaIconCache;
+}
+
 interface MapControllerProps {
   /** Termo de busca JÁ com debounce — o pai segura 800ms antes de propagar. */
   termoBusca: string;
@@ -60,6 +88,8 @@ interface MapControllerProps {
    *  mesmo (reclicar a obra selecionada depois de arrastar o mapa volta até ela). */
   focoTick: number;
   obrasComCoord: ObraComCoordenada[];
+  pontoBusca: PontoBusca | null;
+  onPontoBusca: (p: PontoBusca | null) => void;
   onSelectObra: (id: string | null) => void;
 }
 
@@ -79,6 +109,8 @@ function MapController({
   selectedObraId,
   focoTick,
   obrasComCoord,
+  pontoBusca,
+  onPontoBusca,
   onSelectObra,
 }: MapControllerProps) {
   const map = useMap();
@@ -150,6 +182,8 @@ function MapController({
 
     if (termo.length < 3) {
       ultimaBuscaFocada.current = '';
+      // Busca limpa: o pino do endereço buscado sai junto.
+      if (pontoBusca) onPontoBusca(null);
       return;
     }
     // Cada termo de busca é focado UMA vez. Sem esta trava, fechar o cartão de uma obra
@@ -166,8 +200,17 @@ function MapController({
       ultimaBuscaFocada.current = termo;
       // Seleciona de verdade, em vez de só mover a câmera: destaca a bolinha, marca a
       // linha na lista e abre o cartão — senão a busca parava num aglomerado de pontos
-      // sem dizer qual deles era o resultado.
+      // sem dizer qual deles era o resultado. O pino de endereço de busca anterior sai.
+      if (pontoBusca) onPontoBusca(null);
       onSelectObra(match.id);
+      return;
+    }
+
+    // A sugestão de endereço clicada já entregou a coordenada (pontoBusca vem pronto do
+    // pai): centraliza direto, sem repetir a consulta ao Nominatim.
+    if (pontoBusca && pontoBusca.termo === termo) {
+      ultimaBuscaFocada.current = termo;
+      moverProgramaticamente(() => map.setView([pontoBusca.lat, pontoBusca.lng], 16));
       return;
     }
 
@@ -178,8 +221,14 @@ function MapController({
     let cancelado = false;
     geocodificar(`${termoBusca.trim()}, Brasil`)
       .then((coord) => {
-        if (!cancelado && coord) {
+        if (cancelado) return;
+        if (coord) {
+          // O pino marca o lugar encontrado — antes a câmera ia até lá e nada indicava o ponto.
+          onPontoBusca({ lat: coord.lat, lng: coord.lng, termo });
           moverProgramaticamente(() => map.setView([coord.lat, coord.lng], 16));
+        } else {
+          // Endereço não encontrado: some o pino da busca anterior, que ficou sem sentido.
+          onPontoBusca(null);
         }
       })
       // Serviço indisponível: a busca simplesmente não move o mapa. Sem erro na tela.
@@ -187,7 +236,7 @@ function MapController({
     return () => {
       cancelado = true;
     };
-  }, [map, termoBusca, selectedObraId, focoTick, obrasComCoord, onSelectObra]);
+  }, [map, termoBusca, selectedObraId, focoTick, obrasComCoord, pontoBusca, onPontoBusca, onSelectObra]);
 
   return null;
 }
@@ -297,6 +346,8 @@ interface MapaObrasProps {
   selectedObraId?: string | null;
   /** Cresce a cada clique de seleção — reclicar a obra já selecionada refoca a câmera. */
   focoTick: number;
+  pontoBusca: PontoBusca | null;
+  onPontoBusca: (p: PontoBusca | null) => void;
   onSelectObra: (id: string | null) => void;
   onVerDetalhes: (id: string) => void;
 }
@@ -307,6 +358,8 @@ export function MapaObras({
   searchTerm = '',
   selectedObraId,
   focoTick,
+  pontoBusca,
+  onPontoBusca,
   onSelectObra,
   onVerDetalhes,
 }: MapaObrasProps) {
@@ -408,11 +461,22 @@ export function MapaObras({
           </Marker>
         ))}
 
+        {/* Pino do endereço buscado: gota na cor primária, distinta das bolinhas das obras. */}
+        {pontoBusca && (
+          <Marker position={[pontoBusca.lat, pontoBusca.lng]} icon={buscaIcon()}>
+            <Tooltip permanent direction="right" offset={[2, -14]} opacity={1} className="obra-rotulo">
+              Endereço buscado
+            </Tooltip>
+          </Marker>
+        )}
+
         <MapController
           termoBusca={termoBusca}
           selectedObraId={selectedObraId}
           focoTick={focoTick}
           obrasComCoord={obrasComCoord}
+          pontoBusca={pontoBusca}
+          onPontoBusca={onPontoBusca}
           onSelectObra={onSelectObra}
         />
       </MapContainer>

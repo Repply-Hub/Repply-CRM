@@ -191,6 +191,14 @@ export default function Obras() {
   // obra selecionada depois de arrastar o mapa volta a câmera até ela).
   const [obraSelecionadaMapa, setObraSelecionadaMapa] = useState<string | null>(null);
   const [focoTick, setFocoTick] = useState(0);
+  // Pino do ENDEREÇO BUSCADO (não é obra): marca no mapa o lugar que a pessoa procurou.
+  // `termo` guarda o texto normalizado da busca que gerou o ponto, para o mapa saber que
+  // aquele termo já tem coordenada e não repetir a consulta ao Nominatim.
+  const [pontoBusca, setPontoBusca] = useState<{
+    lat: number;
+    lng: number;
+    termo: string;
+  } | null>(null);
   const selecionarObraMapa = useCallback((id: string | null) => {
     setObraSelecionadaMapa(id);
     if (id) setFocoTick((t) => t + 1);
@@ -317,7 +325,15 @@ export default function Obras() {
   }, [viewMode]);
 
   useEffect(() => {
-    const handleSelectAddress = () => {
+    const handleSelectAddress = (e: Event) => {
+      // A sugestão de endereço já vem com a coordenada do Nominatim — o pino é cravado
+      // direto, sem gastar outra consulta no serviço.
+      const s = (e as CustomEvent<{ display_name?: string; lat?: string; lon?: string }>).detail;
+      const lat = parseFloat(s?.lat ?? '');
+      const lng = parseFloat(s?.lon ?? '');
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        setPontoBusca({ lat, lng, termo: (s?.display_name ?? '').trim().toLowerCase() });
+      }
       setActiveTab('mapa');
     };
     window.addEventListener('select-address-map', handleSelectAddress);
@@ -780,6 +796,8 @@ export default function Obras() {
                   searchTerm={search}
                   selectedObraId={obraSelecionadaMapa}
                   focoTick={focoTick}
+                  pontoBusca={pontoBusca}
+                  onPontoBusca={setPontoBusca}
                   onSelectObra={selecionarObraMapa}
                   onVerDetalhes={(id) => setSelectedObra(obras?.find(o => o.id === id) ?? null)}
                 />
