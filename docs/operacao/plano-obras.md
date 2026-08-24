@@ -304,11 +304,14 @@ automático, ou a listinha abre do nada.
 
 1. **A tela de importação mente.** Ela diz que a coluna "Obra" vai para `pedidos.obra_id`; vai
    para `endereco_entrega`. → `src/components/import/MappingStep.tsx:67`
-2. **A chave do Google Maps cobra por consulta e dispara sozinha.** Abrir a aba do mapa com N
-   obras sem coordenada faz N chamadas cobradas. O único freio é o carimbo `geocoded_at`,
-   gravado **inclusive quando falha** — quem mexer nesse trecho não pode tirar isso.
-   A chave anterior **vazou no histórico do git e foi rotacionada**.
-   → `use-geocode-obras.ts:122-190`, `docs/arquitetura/integracoes-externas.md:20`
+2. **~~A chave do Google Maps cobra por consulta e dispara sozinha.~~ Resolvido em 08/2026:**
+   o ramo Google da geocodificação foi removido e tudo passou a usar o Nominatim (gratuito) —
+   custo zero. O freio continua necessário por outro motivo: o carimbo `geocoded_at`,
+   gravado **inclusive quando falha**, é o que impede re-geocodificar as mesmas obras em
+   loop a cada abertura da aba (o Nominatim limita a 1 req/s e bloqueia IP abusador) —
+   quem mexer nesse trecho não pode tirar isso.
+   A chave anterior do Google **vazou no histórico do git e foi rotacionada**.
+   → `use-geocode-obras.ts`, `docs/arquitetura/integracoes-externas.md`
 3. **Defeito na busca de CNPJ:** `return res.json()` sem `await` faz o `clearTimeout` do
    `finally` rodar antes de o corpo ser lido — o prazo de 10s cobre só até o cabeçalho, e
    falha de leitura escapa do `catch`. Além disso, a mensagem de "consulta expirou" **nunca

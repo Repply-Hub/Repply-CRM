@@ -32,7 +32,7 @@ repositório**, não aqui:
 | [`arquitetura/modelo-de-dados.md`](arquitetura/modelo-de-dados.md) | As 74 tabelas por domínio, como se ligam, e as ambiguidades herdadas que já causaram bug |
 | [`arquitetura/permissoes-e-rls.md`](arquitetura/permissoes-e-rls.md) | Os quatro papéis, as permissões por módulo, o portão de plano e a segurança por linha do Postgres |
 | [`arquitetura/integracoes-externas.md`](arquitetura/integracoes-externas.md) | Todos os serviços externos, o que trocar ao montar um ambiente novo, e por que o `vercel.json` é do jeito que é |
-| [`arquitetura/integracoes-google-e-automacao.md`](arquitetura/integracoes-google-e-automacao.md) | Google Maps, o Gmail legado, e a tabela `configuracoes_automacao` depois da consolidação multi-empresa |
+| [`arquitetura/integracoes-google-e-automacao.md`](arquitetura/integracoes-google-e-automacao.md) | Google Maps (removido em 08/2026) e Gmail (legado) — registro histórico — e a tabela `configuracoes_automacao` depois da consolidação multi-empresa |
 
 ## Módulos
 

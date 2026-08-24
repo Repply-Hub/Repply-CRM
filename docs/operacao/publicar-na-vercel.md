@@ -105,9 +105,9 @@ alguma coisa antes de commitar, ou se a publicação automática cair.
 > git clone --local . /tmp/publicar && cd /tmp/publicar && npm ci
 > ```
 >
-> E **apague o `.env` antes de mandar**: o `.env` das máquinas de desenvolvimento não tem
-> `VITE_GOOGLE_MAPS_API_KEY`, e o site iria ao ar sem mapa e sem posicionamento das obras,
-> sem nenhum erro aparecer.
+> E **apague o `.env` antes de mandar**: o `vercel --prod` sobe o disco, e um `.env` local
+> entra no build da Vercel por cima das variáveis do projeto — valor velho ou de teste iria
+> para produção sem nenhum erro aparecer.
 
 ### O comando
 
@@ -122,15 +122,17 @@ npx vercel --prod
 Existe um jeito de construir aqui e mandar pronto (`vercel build` + `vercel deploy
 --prebuilt`). **Não use.**
 
-O `.env` desta máquina tem 4 variáveis; a construção de produção precisa de mais. Falta
-`VITE_GOOGLE_MAPS_API_KEY`, usada em `src/components/obras/MapaObras.tsx:33` e
-`src/hooks/use-geocode-obras.ts:29`. Construir aqui publicaria um site **sem o mapa e sem o
-posicionamento das obras**, sem nenhum erro aparecer no caminho.
+O `.env` desta máquina não é igual ao da Vercel. Um build local embute as variáveis que
+existem **aqui** — se alguma estiver ausente ou desatualizada, o site sobe quebrado sem
+nenhum erro aparecer no caminho. (O caso concreto que originou esta regra era a
+`VITE_GOOGLE_MAPS_API_KEY`, que deixou de existir em 08/2026 quando o mapa de obras passou
+a ser Leaflet + OpenStreetMap, sem chave. A regra continua valendo para as variáveis do
+Supabase e qualquer outra que venha a existir.)
 
 Deixando a Vercel construir, ela usa as variáveis configuradas no projeto dela, que estão
 completas.
 
-> Se um dia alguém quiser mesmo construir localmente, o pré-requisito é ter as **cinco**
+> Se um dia alguém quiser mesmo construir localmente, o pré-requisito é ter todas as
 > variáveis `VITE_` do [`.env.example`](../../.env.example) preenchidas nesta máquina — e
 > `SUPABASE_SERVICE_ROLE_KEY` **nunca** entra num arquivo que vira build.
 

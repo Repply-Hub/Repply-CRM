@@ -1,15 +1,19 @@
 # Integrações Google e configuração de automação
 
-Cobre três assuntos que nasceram juntos nesta investigação: o **Google Maps** (em uso), o
-**Gmail OAuth** (hoje legado) e a tabela **`configuracoes_automacao`** depois da
-consolidação multi-empresa.
+Cobre três assuntos que nasceram juntos nesta investigação: o **Google Maps** (removido em
+08/2026 — hoje o mapa é Leaflet + OpenStreetMap), o **Gmail OAuth** (hoje legado) e a tabela
+**`configuracoes_automacao`** depois da consolidação multi-empresa.
 
 > ⚠️ **Atualização de 19/08/2026 — o Gmail não é mais o provedor de e-mail.** O sistema
 > migrou para o **Nylas** em agosto de 2026. Tudo que este documento diz sobre `gmail_*`
 > descreve **código legado que ainda está no repositório**, não o caminho ativo. O provedor
 > atual está em [`docs/modulos/email.md`](../modulos/email.md).
 >
-> O que continua válido: a seção de **Google Maps**, a seção de **`configuracoes_automacao`**
+> ⚠️ **Atualização de 24/08/2026 — o Google Maps também saiu.** O mapa de obras e a
+> geocodificação passaram a usar **Leaflet + OpenStreetMap / Nominatim**, sem chave de API.
+> Tudo que este documento diz sobre Maps é registro histórico.
+>
+> O que continua válido: a seção de **`configuracoes_automacao`**
 > e as três divergências apontadas na seção 8 — que já foram corrigidas em
 > [`integracoes-externas.md`](integracoes-externas.md).
 
@@ -18,11 +22,11 @@ consolidação multi-empresa.
 > extraídas. Não reutiliza conteúdo de `INTEGRATION_AUDIT.md` ou de documentos anteriores sem
 > reconfirmação — divergências encontradas em relação a esse documento estão sinalizadas na seção 8.
 
-> ⚠️ **Alerta de segurança (reconfirmado nesta investigação)**: `INTEGRATION_AUDIT.md:55` (versionado no
-> git) ainda contém o valor real de `VITE_GOOGLE_MAPS_API_KEY` em texto plano
-> (`AIzaSyD-EE-YsoPG_ssquPOzmcfMTGyFP4Li92Q`). Essa chave deve ser considerada comprometida — rotacione-a
-> no Google Cloud Console e remova o valor literal desse arquivo (o histórico do git também expõe a
-> chave nos commits antigos).
+> ⚠️ **Alerta de segurança (atualizado em 24/08/2026)**: uma chave real de
+> `VITE_GOOGLE_MAPS_API_KEY` circulou em texto plano no `INTEGRATION_AUDIT.md` (arquivo que já
+> saiu do repositório) e nos commits antigos do histórico do git. A chave foi rotacionada e o
+> valor literal foi removido também deste documento — mas o histórico do git continua expondo
+> a antiga, que deve seguir tratada como comprometida.
 
 ## 1. Visão geral
 
@@ -61,11 +65,11 @@ Não houve mudança de código nesta área — segue o que já era necessário:
 
 Não há `GOOGLE_MAPS_API_KEY` (server-side) em nenhuma Edge Function — Maps é 100% client-side.
 
-### Variáveis `VITE_` (frontend), confirmadas por `grep -rn "VITE_GOOGLE" src/`:
+### Variáveis `VITE_` (frontend)
 
 | Variável | Onde é consumida |
 |---|---|
-| `VITE_GOOGLE_MAPS_API_KEY` | `src/components/obras/MapaObras.tsx:33` (renderização do mapa via `@react-google-maps/api`) e `src/hooks/use-geocode-obras.ts:29` (chamadas à Geocoding API). Se ausente, `MapaObras.tsx` cai em "modo de demonstração" (linha 119) em vez de falhar. |
+| `VITE_GOOGLE_MAPS_API_KEY` | **Não existe mais (08/2026).** Era consumida por `MapaObras.tsx` e `use-geocode-obras.ts`; os dois passaram a usar Leaflet + OpenStreetMap/Nominatim, sem chave. |
 
 ## 4. Estrutura de `gmail_tokens` (estado atual)
 
@@ -204,11 +208,8 @@ multi-tenant por empresa; `gmail_tokens` continua puramente por usuário individ
   todos os vendedores de uma empresa), isso **precisa ser desenvolvido do zero** — não existe hoje nem
   como schema, nem como Edge Function, nem como opção de UI.
 
-**Google Maps:**
-- [ ] Gerar API Key de Maps no Google Cloud Console do novo cliente, com restrição de domínio.
-- [ ] Definir `VITE_GOOGLE_MAPS_API_KEY` no `.env` (build time) do novo deploy.
-- [ ] Sem key configurada, `MapaObras.tsx` degrada para modo de demonstração em vez de quebrar — não é
-  bloqueante para o restante do app, mas os recursos de mapa/geocodificação de obras ficam inoperantes.
+**Google Maps:** nada a fazer desde 08/2026 — o mapa é Leaflet + OpenStreetMap, sem chave e
+sem configuração por cliente.
 
 **`configuracoes_automacao` (multi-tenant):**
 - [ ] Nenhuma ação manual necessária num ambiente novo — a tabela já nasce com `empresa_id NOT NULL` e as

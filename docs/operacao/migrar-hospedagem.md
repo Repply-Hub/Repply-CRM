@@ -146,12 +146,10 @@ lista = **recuperação de senha e confirmação de e-mail param**, sem erro cla
 
 **Ação:** acrescentar o domínio novo **antes** da virada, mantendo o antigo até desligar.
 
-### 3.3 Restrição de origem da chave do Google Maps
+### 3.3 ~~Restrição de origem da chave do Google Maps~~ — não existe mais
 
-Se a chave (`VITE_GOOGLE_MAPS_API_KEY`) tiver restrição por endereço de origem, o mapa some
-no domínio novo.
-
-**Ação:** acrescentar o domínio novo à lista de origens permitidas no Google Cloud.
+Desde 08/2026 o mapa de obras usa Leaflet + OpenStreetMap, sem chave de API. Não há
+restrição de origem a atualizar em migração de domínio.
 
 ### 3.4 Nylas e Stripe, do lado deles
 
@@ -162,14 +160,15 @@ Confirme os dois nos painéis.
 
 ## 4. As variáveis do build
 
-Só quatro chegam ao navegador. Elas são **embutidas no arquivo publicado** — tudo que tem
-prefixo `VITE_` é público por definição.
+São as `VITE_` do [`.env.example`](../../.env.example) — elas são **embutidas no arquivo
+publicado**, tudo que tem esse prefixo é público por definição. (A `VITE_GOOGLE_MAPS_API_KEY`
+deixou de existir em 08/2026, quando o mapa passou a ser Leaflet + OpenStreetMap.)
 
 | Variável | Para quê |
 |---|---|
 | `VITE_SUPABASE_URL` | endereço do projeto Supabase |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | chave pública (a que respeita as regras de segurança por linha) |
-| `VITE_GOOGLE_MAPS_API_KEY` | mapas |
+| `VITE_SUPABASE_PROJECT_ID` | identificador do projeto Supabase |
 | `VITE_PAYWALL_ATIVO` | liga/desliga o portão de assinatura |
 
 > 🔴 **`SUPABASE_SERVICE_ROLE_KEY` NÃO entra aqui.** Ela ignora todas as regras de segurança

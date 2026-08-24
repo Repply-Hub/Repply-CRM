@@ -215,6 +215,11 @@ export function useUpdateObra() {
       marcador_id?: string | null;
       spe_cnpj?: string;
       campos_extras?: Record<string, string>;
+      // Enviados como null quando o endereço muda: zerar o carimbo é o que faz o mapa
+      // re-geocodificar a obra (ver useGeocodeObras). Nunca são enviados com valor.
+      latitude?: null;
+      longitude?: null;
+      geocoded_at?: null;
     }) => {
       const { error } = await supabase.from('obras').update(data).eq('id', id);
       if (error) throw error;

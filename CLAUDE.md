@@ -38,7 +38,7 @@ empresas de fora usando — **este sistema está em produção com cliente pagan
 - **UI:** shadcn-ui sobre Radix + Tailwind CSS 3
 - **Dados:** TanStack Query (React Query) — um hook por domínio em `src/hooks/`
 - **Formulários:** React Hook Form + Zod
-- **Gráficos:** Recharts · **Mapas:** Google Maps + Leaflet
+- **Gráficos:** Recharts · **Mapas:** Leaflet + OpenStreetMap (sem chave de API)
 - **Backend:** Supabase (Postgres + Auth + Storage + Edge Functions em Deno)
 - **Testes:** Vitest + Testing Library, ambiente jsdom
 - **Deploy:** Vercel — **publica sozinha** desde 24/08/2026: commit no `main` vai ao ar em
@@ -725,8 +725,11 @@ audiência — ou seja, CONFERIR uma publicação, que hoje é feito no escuro. 
 
 **Deixe a Vercel construir.** Existe o caminho de construir aqui e mandar pronto
 (`vercel build` + `vercel deploy --prebuilt`): **não use.** O `.env` das máquinas de
-desenvolvimento não tem `VITE_GOOGLE_MAPS_API_KEY`, então isso publicaria o site sem o mapa
-e sem o posicionamento das obras, **sem nenhum erro aparecer**.
+desenvolvimento não é igual ao da Vercel, então um build local pode embutir variável ausente
+ou desatualizada e publicar um site quebrado **sem nenhum erro aparecer**. (O caso concreto
+que originou esta regra — a chave do Google Maps — deixou de existir em 08/2026, quando o
+mapa passou a ser Leaflet + OpenStreetMap sem chave; a regra continua valendo para as
+variáveis do Supabase e qualquer outra que venha a existir.)
 
 **Função de servidor é outro caminho.** `npx vercel --prod` publica o site. As funções em
 `supabase/functions/` são publicadas no Supabase, à parte. Mexeu numa delas e só publicou o

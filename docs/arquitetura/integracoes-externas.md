@@ -19,7 +19,7 @@ novo.
 | Integração | Arquivo/Local | O que trocar | Escopo |
 |---|---|---|---|
 | **Supabase** | `src/integrations/supabase/client.ts`, `.env` | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`, `SUPABASE_SERVICE_ROLE_KEY` (Edge Functions) | Por deploy |
-| **Google Maps** | `src/hooks/use-geocode-obras.ts`, `src/components/obras/MapaObras.tsx`, `.env` | `VITE_GOOGLE_MAPS_API_KEY` | Por deploy |
+| **Google Maps** *(removido)* | — | Nada — substituído por Leaflet + OpenStreetMap em 08/2026, sem credencial | Nenhum |
 | **Nylas (e-mail)** | `supabase/functions/email-*`, `supabase/functions/_shared/nylas.ts` | `NYLAS_API_KEY`, `NYLAS_CLIENT_ID`, `NYLAS_API_BASE` (região, **imutável**), `NYLAS_WEBHOOK_SECRET`, `APP_URL` | Credencial por deploy; caixa por empresa |
 | **Gmail OAuth** *(legado)* | `supabase/functions/gmail-*`, tabela `gmail_tokens` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | **Substituído pelo Nylas em ago/2026.** Código ainda no repositório |
 | **Stripe** | `supabase/functions/stripe-checkout`, `stripe-portal`, `stripe-webhook` | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Por deploy |
@@ -56,21 +56,15 @@ novo.
 
 ---
 
-### 2. Google Maps
+### 2. Google Maps — REMOVIDO em 08/2026
 
-**Tipo:** Geocodificação e renderização de mapas  
-**Escopo:** Por deploy (uma API Key compartilhada por todos os usuários do cliente)
-
-**Credenciais:**
-- `.env`: `VITE_GOOGLE_MAPS_API_KEY` = `[ROTACIONADA — ver Google Cloud Console]` (valor real removido deste arquivo; a chave anterior foi exposta em texto plano no histórico do git e deve ser tratada como comprometida)
-
-**Arquivos:**
-- `src/components/obras/MapaObras.tsx` — usa `@react-google-maps/api`
-- `src/hooks/use-geocode-obras.ts` — chama `https://maps.googleapis.com/maps/api/geocode/json`
-
-**Observação:** Existe fallback para Nominatim (OpenStreetMap) quando o Google atinge rate limit — não requer credencial.
-
-**O que fazer:** Criar nova API Key no Google Cloud Console com restrições de domínio para o novo cliente. Atualizar `VITE_GOOGLE_MAPS_API_KEY`.
+> O mapa de obras e a geocodificação passaram a usar **Leaflet + OpenStreetMap / Nominatim**
+> (ver seção Nominatim), sem chave de API e sem custo. A dependência
+> `@react-google-maps/api` saiu do `package.json` e `VITE_GOOGLE_MAPS_API_KEY` deixou de
+> existir. Nada a configurar em novo deploy.
+>
+> Registro histórico: a chave anterior foi exposta em texto plano no histórico do git e
+> tratada como comprometida (rotacionada à época) — ver `docs/divida-tecnica.md`.
 
 ---
 
@@ -222,13 +216,19 @@ não entrega nada. Foi um bug real, silencioso por meses (corrigido em 05/08/202
 
 ### 7. Nominatim (OpenStreetMap)
 
-**Tipo:** Geocodificação (fallback do Google Maps)  
+**Tipo:** Geocodificação — mecanismo **único** desde 08/2026 (era fallback do Google Maps)  
 **Escopo:** Nenhum — serviço público, sem credencial, sem configuração necessária
 
 **URL:** `https://nominatim.openstreetmap.org/search`  
-**Arquivo:** `src/hooks/use-geocode-obras.ts`
+**Arquivos:** `src/hooks/use-geocode-obras.ts` (geocodificação das obras e da busca livre do
+mapa — toda consulta deste módulo passa por uma fila que garante o limite de 1 req/s),
+`src/components/obras/EnderecoAutocomplete.tsx`, `src/components/shared/SearchWithRecent.tsx`
+e `src/components/clientes/EnderecoForm.tsx` (sugestão de endereço, cada um com debounce
+próprio). Os tiles do mapa vêm de `tile.openstreetmap.org` (`MapaObras.tsx`, Leaflet).
 
-**O que fazer:** Nada. Mas atentar para o rate limit de 1 req/segundo implementado no hook.
+**O que fazer:** Nada. Mas atentar para o limite de 1 req/segundo do serviço: em
+`use-geocode-obras.ts` a fila do módulo garante o espaçamento; os campos de sugestão de
+endereço dependem só do debounce de cada um.
 
 ---
 
@@ -253,7 +253,6 @@ não entrega nada. Foi um bug real, silencioso por meses (corrigido em 05/08/202
 - [ ] `VITE_SUPABASE_URL`
 - [ ] `VITE_SUPABASE_PUBLISHABLE_KEY`
 - [ ] `VITE_SUPABASE_PROJECT_ID`
-- [ ] `VITE_GOOGLE_MAPS_API_KEY`
 
 ### Secrets das Edge Functions (Supabase Dashboard → Settings → Edge Functions)
 - [ ] `SUPABASE_SERVICE_ROLE_KEY`

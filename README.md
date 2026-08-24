@@ -67,7 +67,7 @@ Leia nesta ordem antes de tocar no código:
 | **UI** | shadcn-ui (Radix) + Tailwind CSS 3 |
 | **Dados** | TanStack Query 5 |
 | **Formulários** | React Hook Form + Zod |
-| **Gráficos** | Recharts · **Mapas** Google Maps + Leaflet |
+| **Gráficos** | Recharts · **Mapas** Leaflet + OpenStreetMap (sem chave de API) |
 | **Backend** | Supabase — Postgres, Auth, Storage, Edge Functions (Deno) |
 | **Cobrança** | Stripe |
 | **E-mail** | Nylas · **WhatsApp** uazapi |
@@ -138,7 +138,6 @@ errado.
 | `VITE_SUPABASE_URL` | Endereço do projeto Supabase | sim |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Chave pública do Supabase (vai no navegador, é pública por natureza) | sim |
 | `VITE_SUPABASE_PROJECT_ID` | Identificador do projeto | sim |
-| `VITE_GOOGLE_MAPS_API_KEY` | Mapa e geocodificação das obras | não — sem ela o mapa entra em modo de demonstração |
 | `VITE_PAYWALL_ATIVO` | Liga o portão de assinatura | não |
 | `SUPABASE_SERVICE_ROLE_KEY` | Usada só por scripts locais de manutenção. **Nunca vai para o navegador** | não |
 

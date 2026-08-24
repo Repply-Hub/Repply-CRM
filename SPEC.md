@@ -251,7 +251,7 @@ conhecida) · **Quebrado** (não faz o que promete) · **Não existe**.
 |---|---|---|---|---|
 | 1 | Negócios (pipeline) | `/app` | Sólido | Tela mais complexa do sistema |
 | 2 | Clientes e Contatos | `/clientes` | Sólido | — |
-| 3 | Obras | `/obras` | Sólido | Depende de chave do Google Maps |
+| 3 | Obras | `/obras` | Sólido | Mapa em Leaflet + OpenStreetMap desde 08/2026, sem chave |
 | 4 | Fabricantes e Catálogo | `/fabricantes` | Sólido | Virou por empresa só em 19/08/2026 |
 | 5 | Portal de Consultas | `/portal` | Com ressalva | Só serve o RN. Vira exclusivo da MD |
 | 6 | Dashboard | `/dashboard` | Sólido | — |
@@ -307,9 +307,10 @@ O diferencial que motivou o produto a existir. Obra vinculada ao cliente, com en
 CNPJ da SPE e status configurável por empresa (`status_obras`, semeado por
 `seed_default_status_obras`).
 
-O endereço vira ponto no mapa por geocodificação: Google Maps primeiro, **Nominatim
-(OpenStreetMap) como reserva** quando o Google recusa por limite. O reserva não custa nada
-mas aceita só uma consulta por segundo — o limitador está em `use-geocode-obras.ts`.
+O endereço vira ponto no mapa por geocodificação via **Nominatim (OpenStreetMap)** — e o
+próprio mapa é **Leaflet + OpenStreetMap** desde 08/2026, quando o Google Maps (que exigia
+chave paga) foi removido. Não custa nada, mas o Nominatim aceita só uma consulta por
+segundo — o limitador está em `use-geocode-obras.ts`.
 
 Também existe `parse_endereco_livre` no banco, para transformar endereço escrito solto em
 campos separados.
@@ -595,8 +596,7 @@ Isso é fase própria no roadmap — ver §9.
 | **Stripe** | Cobrança da assinatura | Por ambiente |
 | **Nylas** | E-mail (conectar, sincronizar, enviar) | Credencial por ambiente; caixa por usuário |
 | **uazapi** | WhatsApp | Servidor por ambiente; instância por empresa |
-| **Google Maps** | Mapa e geocodificação das obras | Chave por ambiente |
-| **Nominatim (OpenStreetMap)** | Geocodificação reserva | Sem credencial |
+| **OpenStreetMap (Leaflet + Nominatim)** | Mapa e geocodificação das obras — substituiu o Google Maps em 08/2026 | Sem credencial |
 | **Portais públicos do RN** | Licenças de construção | Exclusivo MD |
 | **Lovable AI** | Leitura de PDF de licença | Por ambiente |
 | **Gmail API** | *Legado* — substituído pelo Nylas | A aposentar |

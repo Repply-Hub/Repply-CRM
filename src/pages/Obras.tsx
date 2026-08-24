@@ -865,12 +865,24 @@ export default function Obras() {
                 setEditObraCnpjError(erroCnpjEdit);
                 return;
               }
+              // Mudou o endereço (ou o nome, quando é o nome que posiciona a obra no mapa por
+              // falta de endereço)? Zera coordenada e carimbo de geocodificação — é isso que
+              // faz o mapa buscar o ponto novo. Sem zerar, o pino ficava no lugar antigo para
+              // sempre, porque a geocodificação só roda em obra sem carimbo.
+              const original = obras?.find(o => o.id === editObra.id);
+              const localizacaoMudou = original
+                ? (original.endereco_entrega || '') !== editObra.endereco_entrega ||
+                  (!editObra.endereco_entrega && original.nome_obra !== editObra.nome_obra)
+                : false;
               const payload = {
                 ...editObra,
                 spe_cnpj: editObra.spe_cnpj.replace(/\D/g, ""),
                 // String vazia NÃO serve: a coluna é uuid, e `marcador_id = ''` faz o banco
                 // recusar a gravação inteira. "Sem marcador" é `null`.
                 marcador_id: editObra.marcador_id || null,
+                ...(localizacaoMudou
+                  ? { latitude: null, longitude: null, geocoded_at: null }
+                  : {}),
               };
               updateObra.mutate(payload, {
                 onSuccess: () => {
