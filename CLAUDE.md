@@ -41,8 +41,8 @@ empresas de fora usando — **este sistema está em produção com cliente pagan
 - **Gráficos:** Recharts · **Mapas:** Google Maps + Leaflet
 - **Backend:** Supabase (Postgres + Auth + Storage + Edge Functions em Deno)
 - **Testes:** Vitest + Testing Library, ambiente jsdom
-- **Deploy:** Vercel — 🔴 **NÃO publica sozinha.** Desde 22/08/2026 a publicação é manual,
-  por `npx vercel --prod`. Ver §16
+- **Deploy:** Vercel — **não publica sozinha.** A publicação é por `npx vercel --prod`, e
+  desde 24/08/2026 **o assistente publica** sem pedir a cada vez. Ver §16
 
 **TypeScript está frouxo de propósito** (`strictNullChecks: false`, `noImplicitAny: false`).
 Não conte com garantia de tipo ao ler nem ao escrever: o compilador não vai te avisar.
@@ -583,7 +583,8 @@ git push origin main
 Mensagem no padrão convencional, em português. Prefixos: `feat`, `fix`, `refactor`,
 `docs`, `chore`, `style`.
 
-**5. Publicar.** Enviar para o `main` **não** coloca nada no ar. Ver §16.
+**5. Publicar.** Enviar para o `main` **não** coloca nada no ar — publicar é um comando
+à parte, e o assistente pode rodá-lo sozinho desde 24/08/2026. Ver §16.
 
 > **Histórico da regra:** o projeto experimentou branch + Pull Request em 19/08/2026
 > (PR #1, o único do repositório). A decisão foi revertida no mesmo dia, para não conviver
@@ -632,31 +633,78 @@ engordar mais o arquivo.
 
 ---
 
-## 16. 🔴 Publicar é um passo MANUAL
+## 16. Publicar: quem faz, e como
 
-**Enviar para o `main` não coloca nada no ar.** Isto mudou em 22/08/2026 e contraria o que
-todo mundo assumia até então.
-
-O repositório saiu da conta pessoal do desenvolvedor anterior e virou `Repply-Hub/Repply-CRM`.
-A ligação da Vercel apontava para o endereço antigo e se perdeu — e o plano gratuito da
-Vercel **não conecta repositório de organização**, só de conta pessoal. Enquanto não houver
-plano pago, a publicação é por linha de comando.
+**Enviar para o `main` não coloca nada no ar.** A Vercel parou de publicar sozinha em
+22/08/2026: o repositório saiu da conta pessoal do desenvolvedor anterior e virou
+`Repply-Hub/Repply-CRM`, a ligação apontava para o endereço antigo e se perdeu — e o plano
+gratuito da Vercel **não conecta repositório de organização**, só de conta pessoal. Enquanto
+não houver plano pago, a publicação é por linha de comando.
 
 ```sh
 npx vercel --prod
 ```
+
+### Quem publica
+
+**Desde 24/08/2026, o assistente publica.** O Lucas autorizou expressamente que o Claude rode
+esse comando sem pedir a cada vez.
+
+> **A autorização por commit (§13) NÃO mudou.** O que caiu foi só a etapa de publicar. Subir
+> código para o `main` continua exigindo o "pode" do Lucas, por commit. São duas travas
+> diferentes e só uma foi removida.
+
+> ⚠️ **Na prática isso depende da permissão da sessão.** Com a trava automática ligada, o
+> `vercel --prod` é recusado antes de rodar. Quando acontecer: **diga ao Lucas e passe o
+> comando para ele**, nunca tente contornar por outro caminho.
+
+### O conector da Vercel NÃO substitui o CLI
+
+Um conector da Vercel foi ligado em 24/08/2026. Testado no mesmo dia, ele **não serve para
+publicar este projeto**:
+
+| Teste | Resultado |
+|---|---|
+| `list_teams` | vê o time `repply1` (plano gratuito) |
+| `list_projects` | **0 projetos** — não enxerga o `repply-crm` |
+| `get_project` no id real | **404** |
+| `list_deployments` | **403** |
+
+E a ferramenta de publicar dele pede **o código inteiro, arquivo por arquivo, dentro da
+chamada** — foi desenhada para projeto pequeno gerado na hora. Além disso, ela **cria um
+projeto novo** quando o nome não corresponde a um que ela enxergue: é exatamente a armadilha
+que perde domínio, variáveis e histórico.
+
+**Para que ele serve, se um dia ganhar acesso:** ler registro de build, erro em produção e
+audiência — ou seja, CONFERIR uma publicação, que hoje é feito no escuro. Nunca fazê-la.
+
+### Duas armadilhas que continuam valendo
 
 **Deixe a Vercel construir.** Existe o caminho de construir aqui e mandar pronto
 (`vercel build` + `vercel deploy --prebuilt`): **não use.** O `.env` das máquinas de
 desenvolvimento não tem `VITE_GOOGLE_MAPS_API_KEY`, então isso publicaria o site sem o mapa
 e sem o posicionamento das obras, **sem nenhum erro aparecer**.
 
-Primeira vez numa máquina: `npx vercel login` e `npx vercel link` — escolhendo o projeto
-que já existe, **nunca criando um novo** (criar outro perde domínio, variáveis e histórico).
-
 **Função de servidor é outro caminho.** `npx vercel --prod` publica o site. As funções em
 `supabase/functions/` são publicadas no Supabase, à parte. Mexeu numa delas e só publicou o
 site? A versão antiga continua rodando.
+
+### Primeira vez numa máquina
+
+`npx vercel login` e depois o vínculo — **apontando para o projeto que já existe**:
+
+```sh
+npx vercel link --yes --project repply-crm
+```
+
+Nunca `vercel link --yes` sozinho: sem `--project` ele deduz pelo nome da pasta
+(`mdrepresentacoes`) e **cria um projeto novo**. Hoje existe **um só** projeto na conta,
+`repply-crm`, servindo `crm.repplyhub.com.br`.
+
+Depois de vincular, **confira o `.gitignore`**: o `vercel link` acrescenta `.vercel` e
+`.env*` no fim do arquivo sozinho, e o `.env*` entra DEPOIS do `!.env.example` — o que volta
+a ignorar o arquivo de exemplo em silêncio. Já aconteceu em 23/08/2026. O arquivo tem um
+comentário explicando; se as linhas reaparecerem, remova-as.
 
 Guia completo, com o que conferir depois e os erros comuns:
 [`docs/operacao/publicar-na-vercel.md`](docs/operacao/publicar-na-vercel.md).
