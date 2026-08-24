@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SidebarItem } from '@/hooks/use-sidebar-preferences';
-import { getIconComponent, AVAILABLE_ICONS, isExternalUrl } from '@/lib/sidebar-icons';
+import { getIconComponent, AVAILABLE_ICONS, isExternalUrl, looksLikeDomain } from '@/lib/sidebar-icons';
 import { SidebarFavicon } from '@/components/layout/SidebarFavicon';
 import { toast } from 'sonner';
 
@@ -31,7 +31,16 @@ export function SidebarAddItemDialog({ open, onOpenChange, onSave, initialItem }
   }, [open, initialItem]);
 
   const trimmedPath = path.trim();
-  const isExternal = isExternalUrl(trimmedPath);
+  const explicitExternal = isExternalUrl(trimmedPath);
+  // Domínio sem protocolo (ex.: "google.com") também vira externo — em vez de
+  // cair silenciosamente como rota interna quebrada. Ver `looksLikeDomain`.
+  const domainSemProtocolo = !explicitExternal && looksLikeDomain(trimmedPath);
+  const isExternal = explicitExternal || domainSemProtocolo;
+  const resolvedPath = explicitExternal
+    ? trimmedPath
+    : domainSemProtocolo
+      ? `https://${trimmedPath}`
+      : (trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`);
 
   const handleSave = () => {
     if (!label.trim() || !trimmedPath) {
@@ -40,7 +49,7 @@ export function SidebarAddItemDialog({ open, onOpenChange, onSave, initialItem }
     }
     onSave({
       id: initialItem?.id ?? `custom-${Date.now()}`,
-      path: isExternal ? trimmedPath : (trimmedPath.startsWith('/') ? trimmedPath : `/${trimmedPath}`),
+      path: resolvedPath,
       label,
       icon,
       visible: initialItem?.visible ?? true,
@@ -61,7 +70,7 @@ export function SidebarAddItemDialog({ open, onOpenChange, onSave, initialItem }
           <div className="flex items-center gap-2">
             {isExternal && (
               <div className="h-9 w-9 shrink-0 rounded-md border flex items-center justify-center overflow-hidden bg-muted">
-                <SidebarFavicon url={trimmedPath} icon={Globe} className="h-4 w-4 text-muted-foreground" />
+                <SidebarFavicon url={resolvedPath} icon={Globe} className="h-4 w-4 text-muted-foreground" />
               </div>
             )}
             <Input
@@ -74,6 +83,7 @@ export function SidebarAddItemDialog({ open, onOpenChange, onSave, initialItem }
           {isExternal && (
             <p className="text-xs text-muted-foreground">
               Link externo detectado — vai abrir em uma nova aba e mostrar o favicon do site na sidebar.
+              {domainSemProtocolo && ` Vamos salvar como ${resolvedPath}.`}
             </p>
           )}
           {!isExternal && (

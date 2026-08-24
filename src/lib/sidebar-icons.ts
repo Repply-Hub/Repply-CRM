@@ -45,12 +45,30 @@ const ICON_MAP: Record<string, LucideIcon> = {
 
 export const AVAILABLE_ICONS = Object.keys(ICON_MAP);
 
-export function getIconComponent(name: string): LucideIcon | undefined {
-  return ICON_MAP[name];
+// Sempre devolve um ícone válido. Um nome salvo que saia do ICON_MAP (ex.:
+// ícone removido do catálogo numa limpeza futura) antes deixava o atalho sem
+// nenhum ícone renderizado — nem erro, nem fallback, só espaço em branco.
+export function getIconComponent(name: string): LucideIcon {
+  return ICON_MAP[name] ?? Link;
 }
 
 export function isExternalUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim());
+}
+
+// Domínio digitado sem protocolo (ex.: "google.com", "www.receita.rn.gov.br",
+// "wa.me/5584999999999") não é reconhecido por `isExternalUrl`. Sem essa
+// detecção, o item era salvo como rota interna quebrada (`/google.com`), sem
+// favicon e sem link funcional — bug documentado em respostas.md §4. Rotas
+// internas de verdade não têm ponto no nome, então exigir pelo menos um
+// "algo.algo" no início evita falso positivo em caminho interno digitado sem
+// barra (ex.: "relatorios").
+const DOMAIN_LIKE_RE = /^(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[/:?#].*)?$/i;
+
+export function looksLikeDomain(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.startsWith('/') || isExternalUrl(trimmed)) return false;
+  return DOMAIN_LIKE_RE.test(trimmed);
 }
 
 // DuckDuckGo como fonte PRINCIPAL, não o Google: testado contra sites reais

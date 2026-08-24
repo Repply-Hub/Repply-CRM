@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
+import { looksLikeDomain, isExternalUrl } from '@/lib/sidebar-icons';
 
 export interface SidebarItem {
   id: string;
@@ -63,6 +64,30 @@ export function normalizarPipeline(list: SidebarItem[]): SidebarItem[] {
   });
 }
 
+// Corrige, na leitura, atalhos externos gravados ANTES do fix de detecção de
+// domínio sem protocolo (ex.: alguém digitou "consultarcnpj.com.br" e o item
+// ficou salvo como rota interna quebrada `/consultarcnpj.com.br`, isExternal:
+// false — sem favicon, sem link funcional). Mesmo mecanismo de
+// `normalizarPipeline`: recalcula em toda leitura, sem precisar de migração
+// de dados. Da próxima vez que o usuário salvar a sidebar (editar qualquer
+// item), o path corrigido é persistido de volta.
+export function normalizarLinksExternos(list: SidebarItem[]): SidebarItem[] {
+  return list.map(i => {
+    if (i.isExternal) return i;
+    // O path já é uma URL completa (http/https) — só a flag `isExternal` está
+    // errada ou ausente (item nasceu fora do fluxo do Dialog, ex.: inserido
+    // direto por migration/admin antes do campo existir). Sem essa correção,
+    // AppSidebar trata como rota interna e nunca chama `SidebarFavicon`,
+    // mesmo quando o site tem favicon perfeitamente disponível.
+    if (isExternalUrl(i.path)) return { ...i, isExternal: true };
+    const semBarra = i.path.startsWith('/') ? i.path.slice(1) : i.path;
+    if (looksLikeDomain(semBarra)) {
+      return { ...i, path: `https://${semBarra}`, isExternal: true };
+    }
+    return i;
+  });
+}
+
 export function useSidebarPreferences() {
   const { user, profile } = useAuth();
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
@@ -85,9 +110,11 @@ export function useSidebarPreferences() {
             .eq('empresa_id', empresaId)
             .maybeSingle();
           if (empresaPadrao && Array.isArray(empresaPadrao.items) && empresaPadrao.items.length > 0) {
-            return normalizarPipeline(
-              fixChatWhatsappIcons(
-                (empresaPadrao.items as unknown as SidebarItem[]).filter(i => !REMOVED_IDS.has(i.id))
+            return normalizarLinksExternos(
+              normalizarPipeline(
+                fixChatWhatsappIcons(
+                  (empresaPadrao.items as unknown as SidebarItem[]).filter(i => !REMOVED_IDS.has(i.id))
+                )
               )
             );
           }
@@ -99,8 +126,10 @@ export function useSidebarPreferences() {
       // Remove o antigo item 'pedidos' (Lista de Negócios) — funcionalidade unificada em 'pipeline'.
       const rawSaved = data.items as unknown as SidebarItem[];
       const needsCleanup = rawSaved.some(i => REMOVED_IDS.has(i.id));
-      const saved = normalizarPipeline(
-        fixChatWhatsappIcons(rawSaved.filter(i => !REMOVED_IDS.has(i.id)))
+      const saved = normalizarLinksExternos(
+        normalizarPipeline(
+          fixChatWhatsappIcons(rawSaved.filter(i => !REMOVED_IDS.has(i.id)))
+        )
       );
       const savedIds = new Set(saved.map(i => i.id));
 
@@ -117,8 +146,10 @@ export function useSidebarPreferences() {
         if (empresaPadrao && Array.isArray(empresaPadrao.items) && empresaPadrao.items.length > 0) {
           // Também normaliza: itens do padrão da empresa entram no merge abaixo
           // e trariam o path antigo para quem ainda não tem esse id salvo.
-          empresaPadraoItems = normalizarPipeline(
-            (empresaPadrao.items as unknown as SidebarItem[]).filter(i => !REMOVED_IDS.has(i.id))
+          empresaPadraoItems = normalizarLinksExternos(
+            normalizarPipeline(
+              (empresaPadrao.items as unknown as SidebarItem[]).filter(i => !REMOVED_IDS.has(i.id))
+            )
           );
         }
       }
