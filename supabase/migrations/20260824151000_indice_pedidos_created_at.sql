@@ -1,0 +1,98 @@
+-- ============================================================================
+-- Listar negócios levava 2,1 s porque a ordenação padrão da tela não tinha índice
+-- ============================================================================
+--
+-- 🔴 ESTE ARQUIVO NÃO PODE RODAR DENTRO DE UMA TRANSAÇÃO.
+--
+-- `CREATE INDEX CONCURRENTLY` é recusado pelo Postgres dentro de um bloco de transação
+-- (ERROR 25001: CREATE INDEX CONCURRENTLY cannot run inside a transaction block). E o
+-- `supabase db push` embrulha cada arquivo de migration numa transação — então rodar este
+-- arquivo pelo caminho normal FALHA.
+--
+-- COMO APLICAR: cole os comandos no editor de SQL do painel do Supabase e rode **um de cada
+-- vez** (o editor não abre transação explícita para um comando só), ou por `psql` SEM o
+-- `-1`/`--single-transaction`. Só depois registre o arquivo como aplicado
+-- (`supabase migration repair --status applied 20260824151000`).
+--
+-- POR QUE CONCURRENTLY, e não o `CREATE INDEX` seco: o comando comum tranca a tabela contra
+-- escrita enquanto constrói. São 11.911 linhas e o cliente está usando o sistema — durante a
+-- construção, salvar negócio, arrastar card no Kanban e importar planilha ficariam esperando.
+-- `CONCURRENTLY` custa duas varreduras em vez de uma e demora mais, mas não tranca ninguém.
+--
+-- ----------------------------------------------------------------------------
+-- O QUE ESTAVA ERRADO
+-- ----------------------------------------------------------------------------
+--
+-- A lista de Negócios ordena por `created_at DESC, id DESC` (é o padrão de
+-- `PEDIDOS_SORT_PADRAO` em `src/hooks/use-pedidos.ts`, e o desempate por `id` está explicado
+-- lá: `created_at` repete MUITO — 11.911 negócios para apenas 1.155 instantes distintos,
+-- porque a importação em massa carimbou o mesmo momento em centenas de linhas).
+--
+-- `pedidos` tinha índice em `data_pedido`, `prazo_resposta`, `status`, `usuario_id`,
+-- `cliente_id`, `fabricante_id`, `marcador_id`, `obra_id`, `funil_id`, `fechado_em` e
+-- `import_hash` — em tudo, MENOS na coluna pela qual a tela ordena por padrão.
+--
+-- Sem índice na ordenação, para entregar 10 linhas o banco tem que ler as 11.911, ordenar em
+-- memória e jogar 11.901 fora. E é aí que dói: a política de segurança de `pedidos` é cobrada
+-- **uma vez por linha lida**, não uma vez por linha entregue. As 11.911 chamadas da regra são
+-- o grosso do tempo, não a ordenação.
+--
+-- MEDIDO EM 24/08/2026, logado como o vendedor Alex, na consulta que o PostgREST monta de
+-- verdade (com os cinco vínculos que a lista lê: cliente, fabricante, responsável, obra e
+-- marcador), primeira página de 10:
+--
+--   antes deste índice ....... 41.109 buffers ..... 730 ms
+--   depois deste índice ......    144 buffers ......  5 ms
+--
+-- Buffers é a medida que não mente: é quantos blocos de 8 KB o banco tocou. Milissegundo
+-- oscila com a máquina compartilhada; 41.109 → 144 é a mesma conta feita 285 vezes menos.
+--
+-- ----------------------------------------------------------------------------
+-- POR QUE AS DUAS COLUNAS, NESSA ORDEM E NESSE SENTIDO
+-- ----------------------------------------------------------------------------
+--
+-- `(created_at DESC, id DESC)` é literalmente o `ORDER BY` da tela. Um índice só em
+-- `created_at` não serviria para pular direto para a página funda: com 1.155 valores
+-- distintos em 11.911 linhas, cada instante empata em média 10 negócios, e sem o `id` no
+-- índice o banco teria que ordenar cada empate à parte.
+--
+-- (O Postgres consegue ler um índice de trás para frente, então `DESC, DESC` também atende
+-- `ASC, ASC` — o "mais antigo primeiro" do cabeçalho da Lista continua atendido pelo mesmo
+-- índice. O que ele NÃO atende é uma mistura, tipo `created_at DESC, id ASC`; a tela não pede
+-- isso em lugar nenhum.)
+--
+-- ----------------------------------------------------------------------------
+-- E O ANALYZE?
+-- ----------------------------------------------------------------------------
+--
+-- As estatísticas estavam velhas: em 24/08/2026 o planejador achava que `usuarios` tinha 15
+-- linhas (tem 26) — a última coleta automática dessa tabela foi em 20/07/2026. Estatística
+-- velha faz o planejador escolher plano errado com índice novo na mão, e é exatamente o tipo
+-- de coisa que faz alguém concluir que "o índice não adiantou".
+--
+-- ANALYZE é leitura por amostragem: não tranca escrita e não muda nenhum dado.
+--
+-- ----------------------------------------------------------------------------
+-- COMO VOLTAR ATRÁS
+-- ----------------------------------------------------------------------------
+--
+--   DROP INDEX CONCURRENTLY IF EXISTS public.idx_pedidos_created_at_id;
+--
+-- Nenhuma linha de dado é tocada por este arquivo — nem na ida, nem na volta.
+--
+-- 🔴 SE O `CREATE INDEX CONCURRENTLY` FALHAR NO MEIO (queda de conexão, tempo esgotado), ele
+-- deixa um índice **inválido** para trás, que ocupa espaço e não é usado por ninguém. Confira
+-- e limpe antes de tentar de novo:
+--
+--   SELECT c.relname, i.indisvalid
+--     FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+--    WHERE c.relname = 'idx_pedidos_created_at_id';
+--   -- indisvalid = false  →  DROP INDEX CONCURRENTLY public.idx_pedidos_created_at_id;
+-- ============================================================================
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_pedidos_created_at_id
+    ON public.pedidos (created_at DESC, id DESC);
+
+ANALYZE public.pedidos;
+
+ANALYZE public.usuarios;
