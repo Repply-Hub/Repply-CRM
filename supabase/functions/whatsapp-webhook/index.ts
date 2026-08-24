@@ -871,7 +871,7 @@ async function handleIncomingMessage(
 
   let { data: existente } = await supabase
     .from("whatsapp_conversas")
-    .select("id, nao_lidas, nome_contato, nome_contato_editado_manualmente")
+    .select("id, nao_lidas, nome_contato, nome_contato_editado_manualmente, arquivada")
     .eq("empresa_id", empresaId)
     .eq("telefone", telefone)
     .maybeSingle();
@@ -894,7 +894,7 @@ async function handleIncomingMessage(
     const chaveLegada = telefone.slice(0, 4) + "9" + telefone.slice(4);
     const { data: legada } = await supabase
       .from("whatsapp_conversas")
-      .select("id, nao_lidas, nome_contato, nome_contato_editado_manualmente")
+      .select("id, nao_lidas, nome_contato, nome_contato_editado_manualmente, arquivada")
       .eq("empresa_id", empresaId)
       .eq("telefone", chaveLegada)
       .maybeSingle();
@@ -923,6 +923,14 @@ async function handleIncomingMessage(
     nomeContatoResolvido = existente.nome_contato_editado_manualmente
       ? existente.nome_contato
       : (pushName || existente.nome_contato);
+    // Reabertura (arquivada true -> false) por QUALQUER mensagem que passa por aqui —
+    // entrada real do cliente ou saída refletida do celular físico/WhatsApp Web
+    // (sentByOtherChannel) — acende o alarme de "precisa alguém assumir", porque
+    // nenhum dos dois casos passou pelo whatsapp-send (que já garante um responsável
+    // via ensureResponsavel). Mensagem enviada PELO CRM nunca cai neste arquivo: o
+    // whatsapp-send insere de forma síncrona e o webhook correspondente é descartado
+    // logo no início por `wasSentByApi === true`. Ver `precisaAssumir` no frontend.
+    const reabreConversaFechada = existente.arquivada === true;
     const { data, error } = await supabase
       .from("whatsapp_conversas")
       .update({
@@ -937,6 +945,7 @@ async function handleIncomingMessage(
         arquivada: false,
         is_group: isGroup,
         instancia_id: config.id,
+        ...(reabreConversaFechada ? { precisa_atribuicao: true } : {}),
       })
       .eq("id", existente.id)
       .select("id, nao_lidas")
@@ -961,6 +970,12 @@ async function handleIncomingMessage(
         arquivada: false,
         is_group: isGroup,
         instancia_id: config.id,
+        // Conversa nova (primeira mensagem já cria sem responsável — o trigger
+        // trg_wa_conversa_auto_responsavel só auto-atribui inserts feitos pelo
+        // client autenticado, não os deste webhook via service role). Precisa de
+        // alarme quando quem abriu foi o cliente; se veio do celular físico da
+        // empresa iniciando um contato novo, ninguém está "esperando resposta".
+        precisa_atribuicao: !sentByOtherChannel,
       })
       .select("id, nao_lidas")
       .single();

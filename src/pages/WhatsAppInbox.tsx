@@ -564,16 +564,17 @@ function conversaNaoLida(
 }
 
 // Uma conversa sem responsável só entra na fila "Não atribuídos" quando
-// ninguém ainda respondeu — se a última mensagem já saiu (mesmo mandada
-// direto do celular/WhatsApp Web, fora do CRM, onde não dá pra saber quem
-// respondeu pra atribuir automaticamente), ela não é mais um alarme de
-// "cliente esperando sem ninguém olhar". Ver ultima_mensagem_direcao em
-// use-whatsapp-inbox.ts.
+// `precisa_atribuicao` está marcada. Não usar ultima_mensagem_direcao aqui: o
+// webhook seta "saida" tanto pra mensagem enviada pelo CRM (aí sim resolvido,
+// mas nesse caso whatsapp-send já garante um responsável) quanto pra mensagem
+// refletida do celular físico/WhatsApp Web reabrindo uma conversa fechada —
+// tratar as duas como a mesma coisa era o bug: a segunda nunca passou por
+// ninguém do time e ficava escondida da fila mesmo precisando de alguém.
+// `precisa_atribuicao` distingue os dois casos no banco (ver bloco de update
+// em supabase/functions/whatsapp-webhook/index.ts) e volta a false assim que
+// alguém assume (useWaSetResponsaveis).
 function precisaAssumir(conv: WaConversa): boolean {
-  return (
-    (conv.responsaveis ?? []).length === 0 &&
-    conv.ultima_mensagem_direcao !== "saida"
-  );
+  return (conv.responsaveis ?? []).length === 0 && conv.precisa_atribuicao === true;
 }
 
 // Badge de não lidas. Quando a conversa está aberta (`ativa`) o contador não

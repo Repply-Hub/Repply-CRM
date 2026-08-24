@@ -53,10 +53,17 @@ export interface WaConversa {
   foto_perfil_expires_at: string | null;
   ultima_mensagem: string | null;
   ultima_mensagem_at: string | null;
-  // Direção ('entrada'/'saida') da última mensagem — usado só pra saber se
-  // uma conversa sem responsável já foi respondida por alguém fora do CRM
-  // (celular/WhatsApp Web), ver `precisaAssumir` em WhatsAppInbox.tsx.
+  // Direção ('entrada'/'saida') da última mensagem — só para exibição na lista.
+  // NÃO usar para decidir se a conversa precisa de responsável: ver
+  // `precisa_atribuicao` e o comentário de `precisaAssumir` em WhatsAppInbox.tsx.
   ultima_mensagem_direcao: string | null;
+  // true quando a conversa foi reaberta (arquivada true -> false) por algo que
+  // não passou por um responsável de verdade — mensagem do cliente ou mensagem
+  // de saída refletida do celular físico/WhatsApp Web, ambas via
+  // whatsapp-webhook. Fica false de novo assim que alguém é atribuído
+  // (useWaSetResponsaveis). Nunca setado por mensagem enviada pelo CRM
+  // (whatsapp-send já garante um responsável via ensureResponsavel).
+  precisa_atribuicao: boolean;
   nao_lidas: number;
   // Marcação manual de "não lida" via menu "..." — sobrepõe a supressão automática
   // do estado "não lida" em conversas já atribuídas (ver `conversaNaoLida` em
@@ -1266,6 +1273,15 @@ export function useWaSetResponsaveis() {
           .from('whatsapp_conversa_responsaveis')
           .insert(paraAdicionar.map(uid => ({ conversa_id: conversaId, usuario_id: uid })));
         if (insErr) throw insErr;
+
+        // Alguém sendo atribuído desarma o alarme de "precisa assumir" — único
+        // ponto de escrita desta coluna no sentido inverso do webhook. Ver
+        // `precisa_atribuicao` em WaConversa.
+        const { error: flagErr } = await supabase
+          .from('whatsapp_conversas')
+          .update({ precisa_atribuicao: false })
+          .eq('id', conversaId);
+        if (flagErr) throw flagErr;
       }
     },
     onSuccess: () => {
