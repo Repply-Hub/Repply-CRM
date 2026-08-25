@@ -6,7 +6,7 @@ import { SECOES, type SecaoId } from '@/lib/secoes';
 /**
  * Quais seções a empresa do usuário logado tem.
  *
- * Uma chamada só para as 12 seções (RPC `minhas_secoes`), em vez de uma por seção: a
+ * Uma chamada só para todas as seções (RPC `minhas_secoes`), em vez de uma por seção: a
  * cascata pergunta em dezenas de pontos de tela, e uma consulta por ponto multiplicaria a
  * conta por nada.
  *

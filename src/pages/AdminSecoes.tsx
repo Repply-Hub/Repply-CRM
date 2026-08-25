@@ -64,7 +64,7 @@ function RotuloNucleo() {
 
 // ================================================================ aba: empresas
 
-/** As 12 seções de UMA empresa, na ordem de SECOES (que é a verdade da ordem). */
+/** As seções de UMA empresa, na ordem de SECOES (que é a verdade da ordem). */
 function SecoesDaEmpresa({
   linhas,
   presets,

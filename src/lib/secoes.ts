@@ -10,6 +10,16 @@
  * Esta passa a ser a verdade. As outras duas continuam existindo por ora, mas cada seção
  * declara aqui a que chaves delas corresponde.
  *
+ * 🔴 ACRESCENTAR SEÇÃO AQUI NÃO BASTA. Ela precisa de uma linha em `secao_preset_itens`
+ * para CADA preset, criada por migration. Sem isso, `minhas_secoes()` não a devolve — e a
+ * tela só esconde o item de menu quando a resposta é literalmente `false`
+ * (`AppSidebar.tsx`: `secoesDaEmpresa.get(id) === false`). "Não sei" NÃO esconde, então a
+ * seção aparece para todas as empresas, inclusive as que não deveriam tê-la.
+ *
+ * Aconteceu em 24/08/2026 com a seção "hoje". Duas funções do banco carregavam a lista
+ * cravada no texto; hoje elas derivam do dado (`secoes_conhecidas()`), então basta a linha
+ * no preset. Ver `supabase/migrations/20260824300000_secoes_deixam_de_ter_lista_cravada.sql`.
+ *
  * NÃO confundir com o eixo de permissão POR USUÁRIO (`permissoes_usuario`,
  * `permissao_presets`, `has_funcionalidade`). Aqui é POR EMPRESA: o que EXISTE para aquele
  * assinante. Lá é quem VÊ, dentro do que existe.
