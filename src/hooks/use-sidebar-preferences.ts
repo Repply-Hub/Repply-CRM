@@ -17,6 +17,10 @@ export interface SidebarItem {
 export const ROTA_APP = '/app';
 
 export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
+  // Primeiro da lista para quem entra agora. Quem JÁ tem menu salvo recebe o item pela
+  // mesclagem lá embaixo, que acrescenta no FIM — é o preço de não reordenar o menu que a
+  // pessoa arrumou. Ela pode arrastar para onde quiser.
+  { id: 'hoje', path: '/hoje', label: 'Hoje', icon: 'Sun', visible: true },
   { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard', visible: true },
   { id: 'pipeline', path: ROTA_APP, label: 'Negócios', icon: 'Kanban', visible: true },
   { id: 'clientes', path: '/clientes', label: 'Clientes', icon: 'Users', visible: true },

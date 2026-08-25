@@ -25,6 +25,7 @@ const ClienteDetalhe = lazyComRetry(() => import("./pages/ClienteDetalhe"));
 const ContatoDetalhe = lazyComRetry(() => import("./pages/ContatoDetalhe"));
 const NovoPedido = lazyComRetry(() => import("./pages/NovoPedido"));
 const Dashboard = lazyComRetry(() => import("./pages/Dashboard"));
+const Hoje = lazyComRetry(() => import("./pages/Hoje"));
 const AdminDashboard = lazyComRetry(() => import("./pages/AdminDashboard"));
 const Configuracoes = lazyComRetry(() => import("./pages/Configuracoes"));
 const Obras = lazyComRetry(() => import("./pages/Obras"));
@@ -547,6 +548,14 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <DashboardWrapper />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/hoje"
+      element={
+        <ProtectedRoute>
+          <Hoje />
         </ProtectedRoute>
       }
     />
