@@ -10,12 +10,8 @@ import { formatarMoedaBRL } from '@/lib/moeda';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { usePauta, type ItemDaPauta } from '@/hooks/use-pauta';
-import {
-  useConfiguracoesAutomacao,
-  PADROES_DA_PAUTA,
-} from '@/hooks/use-configuracoes-automacao';
 import { DialogoRetorno } from '@/components/pauta/DialogoRetorno';
-import { NoGeral } from '@/components/pauta/NoGeral';
+import { RadarDeRisco } from '@/components/pauta/RadarDeRisco';
 
 /**
  * A tela "Hoje" — a pauta do dia.
@@ -119,7 +115,6 @@ const Hoje = () => {
   const { profile } = useAuth();
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const { data: pauta, isLoading } = usePauta();
-  const { data: config } = useConfiguracoesAutomacao(empresaId);
   const [alvo, setAlvo] = useState<ItemDaPauta | null>(null);
 
   const { total, valorEmJogo } = useMemo(() => {
@@ -131,7 +126,6 @@ const Hoje = () => {
   }, [pauta]);
 
   const hoje = new Date();
-  const diasParado = config?.pauta_dias_parado ?? PADROES_DA_PAUTA.pauta_dias_parado;
 
   return (
     <AppLayout title="Hoje" subtitle={format(hoje, "EEEE, d 'de' MMMM", { locale: ptBR })}>
@@ -197,9 +191,9 @@ const Hoje = () => {
         )}
 
         {/* Depois da pauta, de propósito: primeiro o que dá para resolver hoje, depois o
-            tamanho do problema. Recebe o MESMO corte de dias, para os dois números da tela
-            não se contradizerem. */}
-        <NoGeral empresaId={empresaId} diasParado={diasParado} />
+            tamanho do problema. Veio do Dashboard em 25/08/2026, inteiro e sem alteração
+            de fórmula — lá ele não existe mais. */}
+        <RadarDeRisco empresaId={empresaId} />
       </div>
 
       <DialogoRetorno
