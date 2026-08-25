@@ -8,8 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatarMoedaBRL } from '@/lib/moeda';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth';
 import { usePauta, type ItemDaPauta } from '@/hooks/use-pauta';
+import {
+  useConfiguracoesAutomacao,
+  PADROES_DA_PAUTA,
+} from '@/hooks/use-configuracoes-automacao';
 import { DialogoRetorno } from '@/components/pauta/DialogoRetorno';
+import { NoGeral } from '@/components/pauta/NoGeral';
 
 /**
  * A tela "Hoje" — a pauta do dia.
@@ -23,22 +29,31 @@ import { DialogoRetorno } from '@/components/pauta/DialogoRetorno';
  *
  * Nenhuma regra mora aqui. Quantos itens, quais negócios, o corte de dias parados e o fato
  * de a seção desligada devolver vazio — tudo isso é a função `pauta_do_dia()` no banco, que
- * é a MESMA que vai alimentar o e-mail de resumo. Ver docs/operacao/plano-pauta-do-dia.md.
+ * é a MESMA que alimenta o e-mail de resumo. Ver docs/operacao/plano-pauta-do-dia.md.
  */
 
 function ItemPauta({
   item,
+  larguraInteira,
   aoAgir,
   aoAdiar,
 }: {
   item: ItemDaPauta;
+  larguraInteira: boolean;
   aoAgir: () => void;
   aoAdiar: () => void;
 }) {
   const ehCompromisso = item.tipo === 'compromisso';
 
   return (
-    <li className="flex flex-col gap-4 border-b border-border py-5 sm:flex-row sm:items-start sm:gap-6">
+    <li
+      className={cn(
+        'flex flex-col gap-4 rounded-xl border border-border bg-card p-5',
+        // O item que sobrou (número ímpar) ocupa a linha toda e volta ao arranjo original:
+        // conteúdo à esquerda, botões à direita. Em meia largura isso apertaria o texto.
+        larguraInteira && 'sm:col-span-2 sm:flex-row sm:items-start sm:gap-6',
+      )}
+    >
       <div className="min-w-0 flex-1">
         <div className="mb-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <span
@@ -72,7 +87,12 @@ function ItemPauta({
         </p>
       </div>
 
-      <div className="flex shrink-0 flex-row gap-2 sm:w-[168px] sm:flex-col">
+      <div
+        className={cn(
+          'flex shrink-0 flex-row gap-2',
+          larguraInteira && 'sm:w-[168px] sm:flex-col',
+        )}
+      >
         <Button size="sm" className="flex-1 sm:flex-none" onClick={aoAgir}>
           {ehCompromisso ? 'Ver na agenda' : 'Abrir negócio'}
         </Button>
@@ -96,7 +116,10 @@ function ItemPauta({
 
 const Hoje = () => {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const { data: pauta, isLoading } = usePauta();
+  const { data: config } = useConfiguracoesAutomacao(empresaId);
   const [alvo, setAlvo] = useState<ItemDaPauta | null>(null);
 
   const { total, valorEmJogo } = useMemo(() => {
@@ -108,19 +131,19 @@ const Hoje = () => {
   }, [pauta]);
 
   const hoje = new Date();
+  const diasParado = config?.pauta_dias_parado ?? PADROES_DA_PAUTA.pauta_dias_parado;
 
   return (
-    <AppLayout
-      title="Hoje"
-      subtitle={format(hoje, "EEEE, d 'de' MMMM", { locale: ptBR })}
-    >
-      <div className="mx-auto w-full max-w-4xl p-3 sm:p-4 md:p-6">
+    <AppLayout title="Hoje" subtitle={format(hoje, "EEEE, d 'de' MMMM", { locale: ptBR })}>
+      <div className="mx-auto w-full max-w-5xl p-3 sm:p-4 md:p-6">
         {isLoading ? (
           <div className="space-y-6">
             <Skeleton className="h-10 w-2/3" />
-            {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-24 w-full" />
-            ))}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-40 w-full" />
+              ))}
+            </div>
           </div>
         ) : total === 0 ? (
           // O vazio COMEMORA. É o dia em que a pessoa terminou — e é exatamente o momento
@@ -149,16 +172,21 @@ const Hoje = () => {
               )}
             </header>
 
-            <ol className="list-none border-t border-border p-0">
-              {pauta!.map((item) => (
+            {/* Duas colunas, em duplas. Com número ímpar, o ÚLTIMO ocupa a linha toda —
+                senão sobra um buraco do lado dele e a tela fica torta. */}
+            <ol className="grid list-none gap-4 p-0 sm:grid-cols-2">
+              {pauta!.map((item, i) => (
                 <ItemPauta
                   key={`${item.tipo}-${item.referencia_id}`}
                   item={item}
+                  larguraInteira={total % 2 === 1 && i === total - 1}
                   aoAgir={() =>
                     navigate(
                       item.tipo === 'compromisso'
                         ? '/calendario'
-                        : `/pedidos/${item.referencia_id}/editar`,
+                        // Painel de visualização, não o formulário de edição: quem clica
+                        // aqui quer ENTENDER o negócio antes de decidir o que fazer.
+                        : `/app?negocio=${item.referencia_id}`,
                     )
                   }
                   aoAdiar={() => setAlvo(item)}
@@ -167,6 +195,11 @@ const Hoje = () => {
             </ol>
           </>
         )}
+
+        {/* Depois da pauta, de propósito: primeiro o que dá para resolver hoje, depois o
+            tamanho do problema. Recebe o MESMO corte de dias, para os dois números da tela
+            não se contradizerem. */}
+        <NoGeral empresaId={empresaId} diasParado={diasParado} />
       </div>
 
       <DialogoRetorno

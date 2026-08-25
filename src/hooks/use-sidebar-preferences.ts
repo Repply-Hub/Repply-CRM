@@ -164,13 +164,20 @@ export function useSidebarPreferences() {
             .eq('empresa_id', empresaId)
             .maybeSingle();
           if (empresaPadrao && Array.isArray(empresaPadrao.items) && empresaPadrao.items.length > 0) {
-            return normalizarLinksExternos(
+            const doPadrao = normalizarLinksExternos(
               normalizarPipeline(
                 fixChatWhatsappIcons(
                   (empresaPadrao.items as unknown as SidebarItem[]).filter(i => !REMOVED_IDS.has(i.id))
                 )
               )
             );
+            // 🔴 Este ramo NÃO mesclava os itens novos do app, e o de baixo (quem tem menu
+            // próprio) mesclava. Resultado: empresa que salvou um padrão antes de uma seção
+            // existir NUNCA a recebia — ela simplesmente não aparecia no menu de ninguém que
+            // usasse o padrão. Descoberto em 25/08/2026 com a seção "Hoje".
+            const idsDoPadrao = new Set(doPadrao.map(i => i.id));
+            const faltando = DEFAULT_SIDEBAR_ITEMS.filter(d => !idsDoPadrao.has(d.id));
+            return inserirNaPosicaoDoPadrao(doPadrao, faltando);
           }
         }
         return DEFAULT_SIDEBAR_ITEMS;

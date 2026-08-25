@@ -660,7 +660,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [importAiOpen, setImportAiOpen] = useState(false);
   const [selectedStages, setSelectedStages] = useState<string[]>(() => parseListParam(searchParams.get('stages')));
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
-  const [viewOrderId, setViewOrderId] = useState<string | null>(null);
+  // `?negocio=<id>` abre o painel de visualização já na chegada. É como a tela "Hoje"
+  // manda a pessoa para um negócio: ela quer VER o negócio, não editá-lo — mandar para
+  // /pedidos/:id/editar abre um formulário para quem só queria olhar.
+  const [viewOrderId, setViewOrderId] = useState<string | null>(() => searchParams.get('negocio'));
   const { data: contatos } = useHistoricoContatos(selectedOrder || viewOrderId);
   const { data: tarefasNegocio } = useTarefasPorPedido(viewOrderId);
   const { ligada: temTarefas } = useSecaoLigada('tarefas');
@@ -2060,7 +2063,22 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   );
 
   const viewOrderSheet = (
-    <Sheet open={!!viewOrderId} onOpenChange={(open) => !open && setViewOrderId(null)}>
+    <Sheet
+      open={!!viewOrderId}
+      onOpenChange={(open) => {
+        if (open) return;
+        setViewOrderId(null);
+        // Sem tirar o parâmetro, recarregar a página reabre o painel que a pessoa acabou
+        // de fechar — e o botão "voltar" do navegador vira um laço.
+        if (searchParams.get('negocio')) {
+          setSearchParams(prev => {
+            const p = new URLSearchParams(prev);
+            p.delete('negocio');
+            return p;
+          }, { replace: true });
+        }
+      }}
+    >
       <SheetContent className="sm:max-w-xl overflow-y-auto">
         <SheetHeader className="pb-6 border-b">
           <div className="flex items-center justify-between gap-4">

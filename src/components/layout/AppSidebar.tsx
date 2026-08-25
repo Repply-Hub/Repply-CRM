@@ -595,6 +595,13 @@ export function AppSidebar() {
               <div>
                 <p className="text-sm font-medium">Padrão da empresa</p>
                 <p className="text-xs text-muted-foreground">Todos os funcionários da empresa vão iniciar com esta sidebar.</p>
+                {/* Sem este aviso, o gestor arrasta, salva como padrão, e o próprio menu dele
+                    não muda — porque personalização pessoal ganha do padrão. Ele conclui que
+                    o salvar não funcionou. Aconteceu em 25/08/2026. */}
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
+                  Quem já personalizou o próprio menu — inclusive você — continua com o dele.
+                  Para mudar o SEU, escolha "Somente para mim".
+                </p>
               </div>
             </button>
           </div>
