@@ -1,0 +1,116 @@
+<!--
+  Resumo diário da pauta — NÃO vai para painel nenhum.
+
+  Este é o único dos quatro que o Supabase Auth não conhece. Ele é montado pela função de
+  servidor do resumo diário, que chama `pauta_do_dia_de(usuario)` — a MESMA função que a tela
+  "Hoje" usa — e substitui os marcadores abaixo.
+
+  Marcadores (maiúsculas, sem ponto — não confundir com `{{ .Algo }}` do Supabase):
+
+    {{PAUTA_NOME}}       primeiro nome de quem recebe
+    {{PAUTA_MANCHETE}}   "5 coisas esperam você"
+    {{PAUTA_VALOR}}      "R$ 2.104.300 em jogo"  (ou vazio, quando não há valor)
+    {{PAUTA_ITENS}}      os blocos de item, montados em laço (ver o gabarito no fim)
+    {{PAUTA_LINK}}       endereço da tela "Hoje"
+
+  🔴 QUEM ESTIVER COM A PAUTA VAZIA NÃO RECEBE NADA. Mandar "você não tem nada hoje" todo dia
+  é o caminho mais rápido para a pessoa criar uma regra de filtro e nunca mais ver o e-mail.
+  A decisão de não enviar mora na função, não aqui.
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;background:#f5f5f4;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#ffffff;border-radius:14px;border:1px solid #e7e5e4;">
+
+        <tr>
+          <td style="padding:32px 32px 0;">
+            <span style="display:inline-block;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;letter-spacing:-0.01em;color:#0a0a0a;">Repply<span style="color:#FF5A1F;">.</span></span>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:24px 32px 0;">
+            <p style="margin:0 0 6px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;color:#78716c;">
+              Bom dia, {{PAUTA_NOME}}.
+            </p>
+            <h1 style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:25px;font-weight:600;line-height:1.25;letter-spacing:-0.02em;color:#0a0a0a;">
+              {{PAUTA_MANCHETE}}<span style="color:#FF5A1F;">.</span>
+            </h1>
+            <p style="margin:6px 0 0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;color:#78716c;">
+              {{PAUTA_VALOR}}
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:24px 32px 0;">
+            {{PAUTA_ITENS}}
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:8px 32px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="background:#FF5A1F;border-radius:9px;">
+                  <a href="{{PAUTA_LINK}}" style="display:inline-block;padding:13px 26px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+                    Abrir minha pauta
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:24px 32px 32px;">
+            <div style="height:1px;background:#e7e5e4;margin-bottom:16px;"></div>
+            <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#a8a29e;">
+              Este resumo sai nos dias escolhidos pelo gestor da sua empresa, em Configurações →
+              Automação. É a mesma pauta que aparece na tela "Hoje".
+            </p>
+          </td>
+        </tr>
+
+      </table>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+        <tr>
+          <td align="center" style="padding:18px 16px 0;">
+            <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;line-height:1.6;color:#a8a29e;">
+              Repply CRM · mensagem automática, não responda
+            </p>
+          </td>
+        </tr>
+      </table>
+
+    </td>
+  </tr>
+</table>
+
+<!--
+  ══════════════════════════════════════════════════════════════════════════════
+  GABARITO DE UM ITEM — a função repete este bloco para cada item da pauta e
+  junta tudo em {{PAUTA_ITENS}}. Fica aqui, em comentário, para o HTML do item
+  viver ao lado do HTML do e-mail: separados, um dia divergem no estilo.
+
+  Substituir: ITEM_SELO, ITEM_VALOR, ITEM_TITULO, ITEM_DETALHE
+  ══════════════════════════════════════════════════════════════════════════════
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;border:1px solid #e7e5e4;border-radius:10px;">
+    <tr>
+      <td style="padding:16px 18px;">
+        <p style="margin:0 0 6px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:#dc2626;">
+          ITEM_SELO
+          <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:400;text-transform:none;letter-spacing:0;color:#78716c;">&nbsp;&nbsp;ITEM_VALOR</span>
+        </p>
+        <p style="margin:0 0 4px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;line-height:1.35;color:#0a0a0a;">
+          ITEM_TITULO
+        </p>
+        <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.55;color:#57534e;">
+          ITEM_DETALHE
+        </p>
+      </td>
+    </tr>
+  </table>
+-->
