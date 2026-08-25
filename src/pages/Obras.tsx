@@ -774,8 +774,12 @@ export default function Obras() {
           {/* Layout dividido: painel (chips por marcador + lista) à esquerda, mapa à direita
               ocupando a altura restante da aba. Em tela estreita empilha, com o painel
               limitado em altura e rolagem interna. */}
-          <TabsContent value="mapa" className="mt-0 flex-1 min-h-0">
-            <div className="h-full min-h-0 flex flex-col gap-4 lg:grid lg:grid-cols-[360px_1fr]">
+          {/* Mesma corrente de altura da aba Lista: TabsContent vira coluna flex e o miolo
+              cresce com flex-1 — nada de h-full percentual, que dentro de item flex sem
+              altura explícita resolve para "auto" e deixava o conjunto encolhido no rodapé.
+              O lg:grid-rows-1 (linha de 1fr) é o que estica painel e mapa na vertical. */}
+          <TabsContent value="mapa" className="mt-0 flex-1 min-h-0 flex flex-col">
+            <div className="flex-1 min-h-0 flex flex-col gap-4 lg:grid lg:grid-cols-[360px_1fr] lg:grid-rows-1">
               <Card className="flex flex-col min-h-0 overflow-hidden max-h-[40dvh] lg:max-h-none p-0">
                 <MapaObrasPainel
                   obras={obrasParaMapa}
@@ -789,7 +793,7 @@ export default function Obras() {
                   onSelectObra={selecionarObraMapa}
                 />
               </Card>
-              <div className="flex-1 min-h-[320px] lg:min-h-0 lg:h-full">
+              <div className="flex-1 min-h-[320px] lg:min-h-0 flex flex-col">
                 <MapaObras
                   obras={obrasParaMapa}
                   isLoading={isLoading}

@@ -416,7 +416,7 @@ export function MapaObras({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full py-20">
+      <div className="flex flex-1 items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -427,17 +427,21 @@ export function MapaObras({
        wrapper — sem isso o mapa desenha por cima do Sheet de detalhes e dos diálogos (z-50).
        Tudo que flutua sobre o mapa (cartão, avisos, tela cheia) fica DENTRO deste wrapper,
        em z-[1001] — assim também aparece em tela cheia, que é pedida no próprio wrapper. */
+    /* `flex-1` em vez de height:100%: o pai é sempre uma coluna flex (ver o TabsContent do
+       mapa em Obras.tsx), e altura percentual dentro de item flex sem altura explícita
+       resolve para "auto" — foi o que deixou o mapa encolhido no rodapé da aba. Em tela
+       cheia a altura vira explícita, porque o elemento fullscreen sai do fluxo do pai. */
     <div
       ref={wrapperRef}
-      className="relative z-0 isolate rounded-lg overflow-hidden border border-border shadow-card bg-background"
-      style={{ height: telaCheia ? '100dvh' : '100%', minHeight: 320 }}
+      className="relative z-0 isolate flex-1 flex flex-col rounded-lg overflow-hidden border border-border shadow-card bg-background"
+      style={{ height: telaCheia ? '100dvh' : undefined, minHeight: 320 }}
     >
       <MapContainer
         ref={mapRef}
         center={[centro.lat, centro.lng]}
         zoom={obrasComCoord.length > 0 ? 11 : 6}
         scrollWheelZoom
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: '100%', flex: '1 1 0%', minHeight: 0 }}
       >
         <TileLayer
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
