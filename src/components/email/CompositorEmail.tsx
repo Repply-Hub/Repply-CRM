@@ -27,6 +27,15 @@ interface Props {
   isEnviando: boolean;
   /** "Nova mensagem" na caixa; "Responder" quando sai de dentro de um e-mail. */
   titulo?: string;
+  /**
+   * HTML do rodapé (nome + assinatura + logo/empresa, conforme as
+   * preferências salvas em Configurações) exatamente como vai sair no
+   * e-mail — mostrado como prévia fixa abaixo da caixa de texto, não
+   * editável aqui. O corpo continua sendo só o que a pessoa digita; o
+   * rodapé é colado nele automaticamente no envio, como já era antes desta
+   * prévia existir.
+   */
+  assinaturaPreviewHtml: string;
 }
 
 /**
@@ -59,6 +68,7 @@ export function CompositorEmail({
   isConnected,
   isEnviando,
   titulo = 'Nova mensagem',
+  assinaturaPreviewHtml,
 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -118,7 +128,7 @@ export function CompositorEmail({
           </div>
 
           <div className="border-b px-6">
-            <div className="flex items-center gap-2 py-2">
+            <div className="flex items-center gap-2 py-3">
               <label htmlFor="subject" className="min-w-[60px] text-sm text-muted-foreground">
                 Assunto
               </label>
@@ -142,6 +152,33 @@ export function CompositorEmail({
             />
           </div>
 
+          {/* Prévia fixa do rodapé — não é campo do formulário, só mostra o
+              que `sendEmailMutation` vai colar embaixo do corpo no envio.
+              `bg-white`/`colorScheme: light` fixos: o HTML do rodapé usa
+              cores hex pensadas pra fundo branco (é o mesmo que sai no
+              e-mail de verdade), então no tema escuro do app ficaria
+              ilegível sem isso — mesma solução já usada na prévia de
+              Configurações. `pointer-events-none` fica só no CONTEÚDO (o
+              `dangerouslySetInnerHTML` de dentro), não neste wrapper: um
+              link ou imagem da assinatura não deve ser clicável nesta tela,
+              mas o wrapper precisa continuar recebendo roda do mouse/arraste
+              pra rolar — `pointer-events-none` aqui fora desativava a régua
+              de rolagem inteira (aparecia a barrinha, mas nada respondia). */}
+          <div className="border-t px-6 py-3">
+            <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Assinatura (adicionada automaticamente ao enviar)
+            </p>
+            <div
+              className="max-h-40 overflow-y-auto rounded-md border bg-white p-3 text-sm"
+              style={{ colorScheme: 'light' }}
+            >
+              <div
+                className="pointer-events-none"
+                dangerouslySetInnerHTML={{ __html: assinaturaPreviewHtml }}
+              />
+            </div>
+          </div>
+
           {/* Rodapé no padrão do app (NovoNegocioDialog/EventDialog): `border-t` e
               nada de fundo. O `bg-muted/10` de antes era 10% de um token que no
               tema claro já é 96% — compunha para #FEFEFE sobre branco (1,01:1),
@@ -149,54 +186,12 @@ export function CompositorEmail({
               linha, não uma faixa diluída.
 
               <div> em vez de DialogFooter: o primitivo nasce `flex-col-reverse
-              sm:flex-row sm:justify-end`, e o `sm:justify-end` sobrevive ao merge
-              (variante diferente de `justify-between`), então no desktop ele
-              empurraria enviar e lixeira para a direita, contra a intenção. O
-              DialogFooter não carrega semântica de acessibilidade — é só um div
-              com classes. */}
-          <div className="flex flex-row items-center gap-2 border-t px-6 py-4">
-            {!isConnected ? (
-              // Sem caixa conectada não há de onde enviar. O caminho para
-              // conectar fica na própria aba de e-mails, atrás deste diálogo —
-              // daí fechar em vez de navegar para fora.
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="flex items-center gap-2"
-              >
-                <Mail className="h-4 w-4" />
-                Conectar uma caixa para enviar
-              </Button>
-            ) : (
-              /* ÚNICO hex que sobrou no arquivo, e de propósito.
-                 Trocá-lo por `bg-primary` deixaria o compositor coerente com o
-                 resto do app, mas cairia num limite MAIS importante: o rótulo
-                 branco sobre o laranja da marca (#FF5A1F) dá 3,12:1, abaixo dos
-                 4,5:1 que a WCAG 1.4.3 exige de TEXTO. Sobre este azul dá 6,39:1.
-                 O 3:1 que o laranja cumpre é o da 1.4.11, que vale para o CONTORNO
-                 do componente — não serve de licença para o texto dentro dele.
-                 Entre "combinar com a marca" e "dá para ler", numa tela em que o
-                 usuário está justamente reclamando de não conseguir ler, ler ganha.
-                 (O laranja a 3,12:1 é uma questão de marca que existe no app
-                 inteiro — botão "Escrever" incluído — e se resolve lá, não aqui.)
-                 Hex fixo aqui não repete o erro do cabeçalho: aquele PRECISAVA
-                 acompanhar o tema e não acompanhava; este é auto-contido, branco
-                 sobre azul saturado, e lê igual nos dois temas. */
-              <Button
-                type="submit"
-                disabled={isEnviando}
-                className="gap-2 bg-[#0b57d0] text-white hover:bg-[#0842a0]"
-              >
-                {isEnviando ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-                Enviar
-              </Button>
-            )}
-
+              sm:flex-row sm:justify-end`, que empurraria os DOIS botões pro
+              canto direito juntos. Aqui é `justify-between` de propósito —
+              Descartar fica ancorado à esquerda e Enviar/Conectar à direita,
+              não colados um no outro. DialogFooter não carrega semântica de
+              acessibilidade — é só um div com classes. */}
+          <div className="flex flex-row items-center justify-between gap-2 border-t px-6 py-4">
             {/* Ghost puro: sem `hover:text-destructive`. O tailwind-merge derrubava
                 só a cor do texto da variante e mantinha o `hover:bg-accent`, então
                 no tema escuro o hover pintava vermelho-escuro (--destructive 40%)
@@ -214,6 +209,39 @@ export function CompositorEmail({
             >
               <Trash2 className="h-5 w-5" />
             </Button>
+
+            {!isConnected ? (
+              // Sem caixa conectada não há de onde enviar. O caminho para
+              // conectar fica na própria aba de e-mails, atrás deste diálogo —
+              // daí fechar em vez de navegar para fora.
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="flex items-center gap-2"
+              >
+                <Mail className="h-4 w-4" />
+                Conectar uma caixa para enviar
+              </Button>
+            ) : (
+              /* Voltou a ser `bg-primary` (o laranja da marca, variante padrão
+                 do Button) a pedido — antes era um azul (#0b57d0) hex fixo,
+                 justamente para fugir do laranja: rótulo branco sobre
+                 #FF5A1F mede 3,12:1, abaixo dos 4,5:1 que a WCAG 1.4.3 exige
+                 de texto (o azul dava 6,39:1). Essa é a MESMA combinação já
+                 usada em botão "default" no app inteiro — inclusive o
+                 "Escrever" que abre este compositor —, então este botão só
+                 volta a carregar o mesmo débito de contraste que o resto do
+                 app já carrega, não um novo. */
+              <Button type="submit" disabled={isEnviando} className="gap-2">
+                {isEnviando ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                Enviar
+              </Button>
+            )}
           </div>
         </form>
       </DialogContent>

@@ -354,12 +354,43 @@ const Emails = () => {
       if (!user) return null;
       const { data } = await supabase
         .from("usuarios")
-        .select("id, nome, assinatura_email, empresa_id")
+        .select("id, nome, assinatura_email, assinatura_imagem_mostrar_nome, assinatura_imagem_mostrar_empresa, empresa_id")
         .eq("user_id", user.id)
         .single();
       return data;
     },
   });
+
+  /**
+   * Prévia da assinatura mostrada no compositor enquanto a pessoa escreve —
+   * MESMA regra do rodapé que `sendEmailMutation` monta no envio (nome/logo/
+   * imagem, com as preferências de mostrar-nome/mostrar-empresa), só que aqui
+   * não é gravado em lugar nenhum. `logoUrl` sem cache-bust por `Date.now()`
+   * (diferente do envio): ali o bust importa pra não mandar uma logo velha
+   * cacheada; aqui recalcular a cada re-render (a cada tecla digitada no
+   * corpo) recarregaria a imagem sem parar.
+   */
+  const assinaturaPreviewHtml = useMemo(() => {
+    const assinaturaNormalizada = normalizarAssinaturaAntiga(perfil?.assinatura_email);
+    return montarRodapeEmailHtml({
+      nome: perfil?.nome ?? "",
+      assinaturaHtml: assinaturaNormalizada,
+      logoUrl: LOGO_EMAIL_URL,
+      mostrarLogo: !ehAssinaturaImagem(assinaturaNormalizada),
+      mostrarNome:
+        !ehAssinaturaImagem(assinaturaNormalizada) ||
+        (perfil?.assinatura_imagem_mostrar_nome ?? true),
+      mostrarNomeEmpresa:
+        !ehAssinaturaImagem(assinaturaNormalizada) ||
+        (perfil?.assinatura_imagem_mostrar_empresa ?? true),
+      isolado: true,
+    });
+  }, [
+    perfil?.nome,
+    perfil?.assinatura_email,
+    perfil?.assinatura_imagem_mostrar_nome,
+    perfil?.assinatura_imagem_mostrar_empresa,
+  ]);
 
   /**
    * Rascunhos do usuário logado, mais recente primeiro. Alimenta a aba
@@ -866,6 +897,14 @@ const Emails = () => {
           // Assinatura em modo imagem já é autossuficiente — mostrar a logo
           // da empresa em cima dela seria redundante/poluído.
           mostrarLogo: !ehAssinaturaImagem(assinaturaNormalizada),
+          // Só vale no modo imagem — no modo texto o nome e a empresa sempre
+          // aparecem, como sempre apareceram.
+          mostrarNome:
+            !ehAssinaturaImagem(assinaturaNormalizada) ||
+            (perfil?.assinatura_imagem_mostrar_nome ?? true),
+          mostrarNomeEmpresa:
+            !ehAssinaturaImagem(assinaturaNormalizada) ||
+            (perfil?.assinatura_imagem_mostrar_empresa ?? true),
         })}
       `;
 
@@ -1449,6 +1488,7 @@ const Emails = () => {
       isConnected={isConnected}
       isEnviando={sendEmailMutation.isPending}
       titulo={respondendo ? "Responder" : "Nova mensagem"}
+      assinaturaPreviewHtml={assinaturaPreviewHtml}
     />
   );
 
