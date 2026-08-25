@@ -135,6 +135,8 @@ function ProfileTab() {
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [assinaturaHtml, setAssinaturaHtml] = useState('');
   const [assinaturaModo, setAssinaturaModo] = useState<'texto' | 'imagem'>('texto');
+  const [mostrarNomeImagem, setMostrarNomeImagem] = useState(true);
+  const [mostrarEmpresaImagem, setMostrarEmpresaImagem] = useState(true);
   // Começa em Date.now() (não 0): o path no Storage é fixo, então um "?v=0"
   // reaproveitado em toda visita faria o navegador servir do cache HTTP a
   // logo de uma sessão anterior em vez de buscar a atual após um F5.
@@ -147,7 +149,7 @@ function ProfileTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, email, telefone, role, avatar_url, assinatura_email')
+        .select('id, nome, email, telefone, role, avatar_url, assinatura_email, assinatura_imagem_mostrar_nome, assinatura_imagem_mostrar_empresa')
         .eq('user_id', user!.id)
         .single();
       if (error) throw error;
@@ -164,11 +166,22 @@ function ProfileTab() {
   // cada `invalidateQueries` de `updatePerfil`.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (perfil) setAssinaturaHtml(normalizarAssinaturaAntiga(perfil.assinatura_email));
+    if (perfil) {
+      setAssinaturaHtml(normalizarAssinaturaAntiga(perfil.assinatura_email));
+      setMostrarNomeImagem(perfil.assinatura_imagem_mostrar_nome ?? true);
+      setMostrarEmpresaImagem(perfil.assinatura_imagem_mostrar_empresa ?? true);
+    }
   }, [perfil?.id]);
 
   const updatePerfil = useMutation({
-    mutationFn: async (dados: { nome?: string; telefone?: string; avatar_url?: string | null; assinatura_email?: string }) => {
+    mutationFn: async (dados: {
+      nome?: string;
+      telefone?: string;
+      avatar_url?: string | null;
+      assinatura_email?: string;
+      assinatura_imagem_mostrar_nome?: boolean;
+      assinatura_imagem_mostrar_empresa?: boolean;
+    }) => {
       const { error } = await supabase.from('usuarios').update(dados).eq('user_id', user!.id);
       if (error) throw error;
     },
@@ -281,6 +294,12 @@ function ProfileTab() {
             // todo consumidor futuro desse campo (só o envio de e-mail sanitiza de
             // novo hoje) vá lembrar de tratar como HTML não confiável.
             assinatura_email: sanitizarAssinaturaEmail(form.get('assinatura_email') as string),
+            // Mesmos hidden inputs de `AssinaturaEmailEditor` — presentes mesmo
+            // quando os checkboxes não estão visíveis na tela (sem imagem
+            // enviada ainda), por isso omitidos junto com `assinatura_email`
+            // quando a seção de E-mails está desligada, e nunca por conta própria.
+            assinatura_imagem_mostrar_nome: form.get('assinatura_imagem_mostrar_nome') === 'true',
+            assinatura_imagem_mostrar_empresa: form.get('assinatura_imagem_mostrar_empresa') === 'true',
           }
         : {}),
     });
@@ -414,65 +433,69 @@ function ProfileTab() {
                   <input type="file" accept="image/*" onChange={selectAvatarFile} disabled={isUploading} className="hidden" />
                 </label>
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 {/* Badge de cargo junto do nome (é identidade, não ação) —
-                    separado da linha de baixo, que fica só com as ações
-                    sobre a foto (trocar/editar/remover), em vez de misturar
-                    os dois tipos de coisa na mesma linha. */}
-                <p className="font-semibold flex items-center gap-2">
+                    separado das ações (trocar/editar/remover foto), que agora
+                    ficam num bloco à parte, alinhado à direita do card. */}
+                <p className="font-semibold flex flex-nowrap items-center gap-2 whitespace-nowrap">
                   {perfil.nome}
-                  <Badge variant={perfil.role === 'admin' ? 'destructive' : perfil.role === 'gestor' || perfil.role === 'empresa' ? 'default' : 'secondary'} className="text-[10px]">
+                  <Badge variant={perfil.role === 'admin' ? 'destructive' : perfil.role === 'gestor' || perfil.role === 'empresa' ? 'default' : 'secondary'} className="shrink-0 text-[10px]">
                     {{ admin: 'Admin', empresa: 'Empresa', gestor: 'Gestor', vendedor: 'Vendedor' }[perfil.role] || perfil.role}
                   </Badge>
                 </p>
-                <p className="text-sm text-muted-foreground">{perfil.email}</p>
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    asChild
-                    className="h-7 gap-1.5 text-xs"
-                    disabled={isUploading}
-                  >
-                    <label className="cursor-pointer">
-                      {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
-                      {perfil.avatar_url ? 'Alterar foto' : 'Adicionar foto'}
-                      <input type="file" accept="image/*" onChange={selectAvatarFile} disabled={isUploading} className="hidden" />
-                    </label>
-                  </Button>
-                  {perfil.avatar_url && (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 gap-1.5 text-xs"
-                        disabled={isUploading}
-                        onClick={editCurrentAvatar}
-                      >
-                        <Crop className="h-3.5 w-3.5" />
-                        Editar
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => updatePerfil.mutate({ avatar_url: null })}
-                        disabled={updatePerfil.isPending}
-                        title="Remover imagem"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </>
-                  )}
-                </div>
+                <p className="whitespace-nowrap text-sm text-muted-foreground">{perfil.email}</p>
+              </div>
+              {/* `ml-auto` empurra este bloco para o espaço à direita do card
+                  — o pai é `items-center`, então fica na mesma linha da foto
+                  e do nome/e-mail, em vez de embaixo deles. */}
+              <div className="ml-auto flex flex-nowrap items-center gap-1.5 shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  asChild
+                  className="h-7 gap-1.5 text-xs"
+                  disabled={isUploading}
+                >
+                  <label className="cursor-pointer">
+                    {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+                    {perfil.avatar_url ? 'Alterar foto' : 'Adicionar foto'}
+                    <input type="file" accept="image/*" onChange={selectAvatarFile} disabled={isUploading} className="hidden" />
+                  </label>
+                </Button>
+                {perfil.avatar_url && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1.5 text-xs"
+                      disabled={isUploading}
+                      onClick={editCurrentAvatar}
+                    >
+                      <Crop className="h-3.5 w-3.5" />
+                      Editar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => updatePerfil.mutate({ avatar_url: null })}
+                      disabled={updatePerfil.isPending}
+                      title="Remover imagem"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
             <form onSubmit={handleSalvarPerfil} className="space-y-3">
-              <div className="space-y-1.5"><Label>Nome</Label><Input name="nome" defaultValue={perfil.nome} placeholder="Seu nome completo" className="h-10" /></div>
-              <div className="space-y-1.5"><Label>Telefone</Label><Input name="telefone" defaultValue={perfil.telefone ?? ''} placeholder="(00) 00000-0000" className="h-10" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label>Nome</Label><Input name="nome" defaultValue={perfil.nome} placeholder="Seu nome completo" className="h-10" /></div>
+                <div className="space-y-1.5"><Label>Telefone</Label><Input name="telefone" defaultValue={perfil.telefone ?? ''} placeholder="(00) 00000-0000" className="h-10" /></div>
+              </div>
               {/* `=== true` (e não `!== false`) porque enquanto a resposta não
                   chega o certo é esconder: um editor que aparece e some no meio
                   do formulário é pior de usar que um que demora a aparecer. */}
@@ -486,6 +509,10 @@ function ProfileTab() {
                       onChange={setAssinaturaHtml}
                       userId={user!.id}
                       onModoChange={setAssinaturaModo}
+                      mostrarNomeImagem={mostrarNomeImagem}
+                      onMostrarNomeImagemChange={setMostrarNomeImagem}
+                      mostrarEmpresaImagem={mostrarEmpresaImagem}
+                      onMostrarEmpresaImagemChange={setMostrarEmpresaImagem}
                     />
                   </div>
                   {(assinaturaHtml || perfil.nome) && (
@@ -519,6 +546,8 @@ function ProfileTab() {
                               mostrarLogo: assinaturaModo === 'texto',
                               logoCarregou: logoExiste,
                               isolado: true,
+                              mostrarNome: assinaturaModo === 'texto' || mostrarNomeImagem,
+                              mostrarNomeEmpresa: assinaturaModo === 'texto' || mostrarEmpresaImagem,
                             }),
                           }}
                         />

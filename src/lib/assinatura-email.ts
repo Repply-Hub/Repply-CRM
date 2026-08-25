@@ -108,6 +108,15 @@ function escapeHtml(valor: string): string {
  * e-mail real (`Emails.tsx`). No preview de Configurações o rodapé é
  * mostrado sozinho, sem corpo nenhum acima — sem `isolado`, sobrava um vão
  * em branco com uma linha solta no topo, sem servir pra separar nada.
+ *
+ * `mostrarNome` e `mostrarNomeEmpresa` (default `true` os dois) existem pra
+ * quem está no modo imagem e já desenhou seu nome e/ou o nome da empresa
+ * DENTRO da imagem: sem eles, o rodapé duplicava essa informação embaixo da
+ * imagem. Cada usuário escolhe os dois de forma independente
+ * (`usuarios.assinatura_imagem_mostrar_nome` /
+ * `assinatura_imagem_mostrar_empresa`) — a imagem pode trazer só um dos
+ * dois. No modo texto os dois continuam sempre `true`, o comportamento de
+ * antes: quem chama esta função no modo texto nunca passa `false` aqui.
  */
 export function montarRodapeEmailHtml(opts: {
   nome: string;
@@ -116,9 +125,13 @@ export function montarRodapeEmailHtml(opts: {
   mostrarLogo?: boolean;
   logoCarregou?: boolean;
   isolado?: boolean;
+  mostrarNome?: boolean;
+  mostrarNomeEmpresa?: boolean;
 }): string {
   const assinaturaSegura = sanitizarAssinaturaEmail(opts.assinaturaHtml);
   const mostrarLogo = opts.mostrarLogo ?? true;
+  const mostrarNome = opts.mostrarNome ?? true;
+  const mostrarNomeEmpresa = opts.mostrarNomeEmpresa ?? true;
   let logoHtml = '';
   if (mostrarLogo) {
     logoHtml = (opts.logoCarregou ?? true)
@@ -126,14 +139,18 @@ export function montarRodapeEmailHtml(opts: {
       : `<div style="font-size: 12px; color: #94a3b8; margin-bottom: 10px;">Nenhum logotipo enviado</div>`;
   }
   const estiloContainer = opts.isolado ? '' : 'margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;';
+  const nomeHtml = mostrarNome
+    ? `<div style="color: #333; font-weight: bold; font-size: 16px;">${escapeHtml(opts.nome) || 'Equipe MD'}</div>`
+    : '';
+  const empresaHtml = mostrarNomeEmpresa
+    ? `<div style="color: #94a3b8; font-size: 12px; margin-top: 15px;">MD Representações</div>`
+    : '';
   return `
     <div style="${estiloContainer}">
       ${logoHtml}
-      <div style="color: #333; font-weight: bold; font-size: 16px;">${escapeHtml(opts.nome) || 'Equipe MD'}</div>
+      ${nomeHtml}
       ${assinaturaSegura ? `<div style="color: #666; font-size: 14px; margin-top: 4px;">${assinaturaSegura}</div>` : ''}
-      <div style="color: #94a3b8; font-size: 12px; margin-top: 15px;">
-        MD Representações
-      </div>
+      ${empresaHtml}
     </div>
   `;
 }

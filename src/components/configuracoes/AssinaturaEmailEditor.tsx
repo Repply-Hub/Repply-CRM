@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bold, Italic, Underline, Link as LinkIcon, Type, Image as ImageIcon, Loader2, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -29,6 +30,17 @@ interface Props {
    * de subir uma imagem.
    */
   onModoChange?: (modo: 'texto' | 'imagem') => void;
+  /**
+   * Só valem no modo "imagem" — quem já desenhou o próprio nome e/ou o nome
+   * da empresa dentro da imagem pode desligar a repetição deles no rodapé
+   * do e-mail. Controlados pelo pai (como `onModoChange`) porque a
+   * pré-visualização do rodapé em `Configuracoes.tsx` precisa reagir ao
+   * clique na hora.
+   */
+  mostrarNomeImagem: boolean;
+  onMostrarNomeImagemChange: (mostrar: boolean) => void;
+  mostrarEmpresaImagem: boolean;
+  onMostrarEmpresaImagemChange: (mostrar: boolean) => void;
 }
 
 /**
@@ -46,7 +58,17 @@ interface Props {
  * é não controlado (lê tudo via `FormData` no submit) — isto deixa este campo
  * ser a única exceção controlada sem mudar o resto do form.
  */
-export function AssinaturaEmailEditor({ name, value, onChange, userId, onModoChange }: Props) {
+export function AssinaturaEmailEditor({
+  name,
+  value,
+  onChange,
+  userId,
+  onModoChange,
+  mostrarNomeImagem,
+  onMostrarNomeImagemChange,
+  mostrarEmpresaImagem,
+  onMostrarEmpresaImagemChange,
+}: Props) {
   const editorRef = useRef<HTMLDivElement>(null);
   const ultimoValorEmitidoRef = useRef(value);
   const savedRangeRef = useRef<Range | null>(null);
@@ -271,6 +293,7 @@ export function AssinaturaEmailEditor({ name, value, onChange, userId, onModoCha
           onPaste={bloquearImagemNoTexto}
         />
       ) : (
+        <>
         <div
           tabIndex={0}
           onDragOver={arrastarImagem(true)}
@@ -319,12 +342,40 @@ export function AssinaturaEmailEditor({ name, value, onChange, userId, onModoCha
             </>
           )}
         </div>
+        {temImagem && (
+          <div className="space-y-1.5 border-t px-3 py-2.5">
+            <p className="text-[10px] text-muted-foreground">
+              Se a imagem já traz esses dados desenhados nela, desligue a repetição no rodapé:
+            </p>
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox
+                checked={mostrarNomeImagem}
+                onCheckedChange={(checked) => onMostrarNomeImagemChange(checked === true)}
+              />
+              Mostrar meu nome no rodapé
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox
+                checked={mostrarEmpresaImagem}
+                onCheckedChange={(checked) => onMostrarEmpresaImagemChange(checked === true)}
+              />
+              Mostrar nome da empresa no rodapé
+            </label>
+          </div>
+        )}
+        </>
       )}
 
       {/* `readOnly` porque quem escreve aqui é o `useEffect`/`onInput`/upload
           acima, não digitação direta — React reclamaria de um controlado sem
           `onChange` próprio. */}
       <input type="hidden" name={name} value={value} readOnly />
+      {/* Sempre presentes (não só quando os checkboxes aparecem na tela): o
+          pai lê estes dois campos via FormData no submit, e o estado que
+          eles carregam é o mesmo que veio do banco mesmo antes de qualquer
+          imagem ser enviada nesta sessão. */}
+      <input type="hidden" name="assinatura_imagem_mostrar_nome" value={String(mostrarNomeImagem)} readOnly />
+      <input type="hidden" name="assinatura_imagem_mostrar_empresa" value={String(mostrarEmpresaImagem)} readOnly />
 
       <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
         <DialogContent className="sm:max-w-sm">
