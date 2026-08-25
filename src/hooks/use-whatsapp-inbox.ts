@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
 import { erroLegivelDaFunction } from '@/lib/erro-edge-function';
+import { infoPreviewMensagem } from '@/lib/wa-mensagem-preview';
 
 const MENSAGEM_TOAST_MAX_CHARS = 100;
 
@@ -40,6 +41,10 @@ export interface WaResponsavel {
   id: string;
   nome: string;
   avatar_url: string | null;
+}
+
+export interface WaVisualizador extends WaResponsavel {
+  visualizado_em: string;
 }
 
 export interface WaConversa {
@@ -80,7 +85,7 @@ export interface WaConversa {
   // só populado/exibido pra conversas "Não atribuídas" (ver
   // whatsapp_conversa_visualizacoes). Não tem relação com o estado de
   // lida/não lida.
-  visualizadores?: WaResponsavel[];
+  visualizadores?: WaVisualizador[];
 }
 
 function compareConversas(a: WaConversa, b: WaConversa): number {
@@ -151,6 +156,7 @@ export interface WaConfig {
   api_key: string;
   instance_name: string;
   apelido: string | null;
+  cor: string | null;
   status: 'connected' | 'disconnected' | 'connecting';
   webhook_secret: string | null;
   provisionada: boolean;
@@ -160,6 +166,7 @@ export interface WaInstanciaOption {
   id: string;
   instance_name: string;
   apelido: string | null;
+  cor: string | null;
 }
 
 async function getEmpresaId(): Promise<string | null> {
@@ -186,14 +193,21 @@ export function useWaConversas() {
       if (!empresaId) return [];
       const { data, error } = await supabase
         .from('whatsapp_conversas')
-        .select('*, responsaveis:whatsapp_conversa_responsaveis(usuario:usuarios(id, nome, avatar_url)), visualizadores:whatsapp_conversa_visualizacoes(usuario:usuarios(id, nome, avatar_url))')
+        .select('*, responsaveis:whatsapp_conversa_responsaveis(usuario:usuarios(id, nome, avatar_url)), visualizadores:whatsapp_conversa_visualizacoes(visualizado_em, usuario:usuarios(id, nome, avatar_url))')
         .eq('empresa_id', empresaId);
       if (error) throw error;
       return ((data ?? []) as any[])
         .map(c => ({
           ...c,
           responsaveis: (c.responsaveis ?? []).map((r: any) => r.usuario).filter(Boolean),
-          visualizadores: (c.visualizadores ?? []).map((v: { usuario: WaResponsavel | null }) => v.usuario).filter(Boolean),
+          // `visualizado_em` vem da linha de junção (não do usuário), então
+          // não dá pra só extrair `v.usuario` como o campo de responsáveis
+          // faz — precisa juntar os dois na mesma hora que filtra usuário nulo.
+          visualizadores: (c.visualizadores ?? [])
+            .map((v: { usuario: WaResponsavel | null; visualizado_em: string }) =>
+              v.usuario ? { ...v.usuario, visualizado_em: v.visualizado_em } : null,
+            )
+            .filter(Boolean),
         }) as WaConversa)
         .sort(compareConversas);
     },
@@ -259,7 +273,7 @@ export function useWaInstancias() {
       if (!empresaId) return [];
       const { data, error } = await supabase
         .from('configuracoes_wapi')
-        .select('id, instance_name, apelido')
+        .select('id, instance_name, apelido, cor')
         .eq('empresa_id', empresaId)
         .eq('provisionada', true)
         .order('instance_name');
@@ -1102,11 +1116,23 @@ export function useUnreadWaMessages() {
           if (currentCount > prevCount) {
             const nomeConversa = row.nome_contato || row.telefone;
             const ultimaMensagem = row.ultima_mensagem?.trim();
-            const descricao = ultimaMensagem
-              ? ultimaMensagem.length > MENSAGEM_TOAST_MAX_CHARS
-                ? `${ultimaMensagem.slice(0, MENSAGEM_TOAST_MAX_CHARS)}...`
-                : ultimaMensagem
-              : 'Nova mensagem';
+            // `ultima_mensagem` vem como placeholder cru ("[Áudio]", "[Imagem]"...)
+            // quando não é texto — `infoPreviewMensagem` troca isso por ícone +
+            // rótulo (mesma tradução usada no preview da lista de conversas em
+            // WhatsAppInbox.tsx). Sem isto o toast mostrava o texto cru mesmo.
+            const infoTipo = infoPreviewMensagem(ultimaMensagem);
+            const descricao = infoTipo
+              ? createElement(
+                  'span',
+                  { className: 'inline-flex items-center gap-1' },
+                  createElement(infoTipo.icon, { size: 14, className: 'shrink-0' }),
+                  infoTipo.label,
+                )
+              : ultimaMensagem
+                ? ultimaMensagem.length > MENSAGEM_TOAST_MAX_CHARS
+                  ? `${ultimaMensagem.slice(0, MENSAGEM_TOAST_MAX_CHARS)}...`
+                  : ultimaMensagem
+                : 'Nova mensagem';
             toast(() => createElement('span', null, createElement('b', null, nomeConversa), ' enviou uma mensagem'), {
               description: descricao,
               style: { background: '#f97316', color: '#fff', border: 'none' },
@@ -1324,7 +1350,12 @@ export function useWaRegistrarVisualizacao() {
             ...c,
             visualizadores: [
               ...(c.visualizadores ?? []),
-              { id: profile.id, nome: profile.nome, avatar_url: profile.avatar_url ?? null },
+              {
+                id: profile.id,
+                nome: profile.nome,
+                avatar_url: profile.avatar_url ?? null,
+                visualizado_em: new Date().toISOString(),
+              },
             ],
           };
         }),

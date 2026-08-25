@@ -214,6 +214,16 @@ import { cn, autoResizeTextarea, slugify } from "@/lib/utils";
 import { downloadFile } from "@/lib/download-file";
 import { linkifyText } from "@/lib/linkify";
 import {
+  CLASSE_BADGE_INSTANCIA_SEM_COR,
+  CLASSES_BADGE_INSTANCIA,
+  infoCorInstancia,
+  type InfoCorInstancia,
+} from "@/lib/wa-instancia-cores";
+import {
+  MENSAGEM_PLACEHOLDERS,
+  infoPreviewMensagem,
+} from "@/lib/wa-mensagem-preview";
+import {
   DateRangePicker,
   type DateRange,
 } from "@/components/shared/DateRangePicker";
@@ -700,8 +710,17 @@ function ConversaParticipantesStack({
 // aviso "Conversa sem responsável!" no painel da conversa (não na sidebar):
 // só existe uma vez que a conversa está aberta, então faz mais sentido perto
 // do "Assumir"/"Direcionar" do que competindo por espaço na linha da lista.
-// Anel laranja pontilhado ecoa o badge "Não atribuído" da sidebar.
-function ConversaVisualizadoresStack({ conv }: { conv: WaConversa }) {
+// Anel laranja pontilhado ecoa o badge "Não atribuído" da sidebar. Clicável:
+// abre o painel lateral (`VisualizadoresSheet`) com a lista completa — a
+// pilha aqui só mostra até 3 avatares + "+N", igual ao "Visualizado por" do
+// chat interno (Chat.tsx) resolve o mesmo limite de espaço.
+function ConversaVisualizadoresStack({
+  conv,
+  onClick,
+}: {
+  conv: WaConversa;
+  onClick: () => void;
+}) {
   const membros = (conv.visualizadores ?? []).map((v) => ({
     nome: v.nome,
     chave: v.id,
@@ -714,8 +733,10 @@ function ConversaVisualizadoresStack({ conv }: { conv: WaConversa }) {
   const nomesTitle = membros.map((m) => m.nome).join(", ");
 
   return (
-    <div
-      className="flex -space-x-2 overflow-hidden shrink-0"
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex -space-x-2 overflow-hidden shrink-0 rounded-full transition-opacity hover:opacity-80"
       title={`Visualizaram sem assumir: ${nomesTitle}`}
     >
       {visiveis.map((m, i) => (
@@ -738,7 +759,74 @@ function ConversaVisualizadoresStack({ conv }: { conv: WaConversa }) {
           </AvatarFallback>
         </Avatar>
       )}
-    </div>
+    </button>
+  );
+}
+
+// Painel lateral com a lista completa de quem visualizou a conversa sem
+// assumir — aberto ao clicar em `ConversaVisualizadoresStack`, que só cabe
+// 3 avatares. Mesmo padrão visual do "Visualizado por" do chat interno
+// (Chat.tsx: Sheet + ScrollArea + linha avatar/nome/quando), adaptado pro
+// dado que existe aqui: não há um "ainda não visualizou" pra mostrar, porque
+// não existe uma lista fechada de "quem deveria ter visto" — qualquer
+// pessoa da empresa pode abrir uma conversa não atribuída.
+function VisualizadoresSheet({
+  conv,
+  open,
+  onOpenChange,
+}: {
+  conv: WaConversa | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const visualizadores = [...(conv?.visualizadores ?? [])].sort(
+    (a, b) => new Date(b.visualizado_em).getTime() - new Date(a.visualizado_em).getTime(),
+  );
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-sm flex flex-col p-0">
+        <SheetHeader className="p-4 border-b">
+          <SheetTitle>Visualizado por</SheetTitle>
+          {conv && (
+            <SheetDescription className="truncate">
+              {conv.nome_contato ?? formatPhone(conv.telefone)}
+            </SheetDescription>
+          )}
+        </SheetHeader>
+        <ScrollArea className="flex-1">
+          <div className="py-2">
+            {visualizadores.length === 0 ? (
+              <p className="px-4 py-6 text-sm text-muted-foreground text-center">
+                Ninguém visualizou esta conversa ainda.
+              </p>
+            ) : (
+              <>
+                <p className="px-4 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  Visualizaram sem assumir {visualizadores.length}
+                </p>
+                {visualizadores.map((v) => (
+                  <div key={v.id} className="flex items-center gap-3 px-4 py-2">
+                    <Avatar className="h-9 w-9 shrink-0 border border-dashed border-orange-400 dark:border-orange-500/60">
+                      {v.avatar_url && <AvatarImage src={v.avatar_url} alt="" />}
+                      <AvatarFallback className={cn(colorForPhone(v.id), "text-white font-semibold text-xs")}>
+                        {initials(v.nome, v.id)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="text-sm truncate">{v.nome}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {format(new Date(v.visualizado_em), "d 'de' MMM 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </ScrollArea>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -991,7 +1079,7 @@ function MeusChatsList({
                   <TableHead className="sticky top-0 z-10 bg-muted w-[140px] whitespace-nowrap px-4 py-3 text-xs font-semibold">
                     Responsáveis
                   </TableHead>
-                  <TableHead className="sticky top-0 z-10 bg-muted w-[120px] whitespace-nowrap px-4 py-3 text-xs font-semibold">
+                  <TableHead className="sticky top-0 z-10 bg-muted w-[220px] whitespace-nowrap px-4 py-3 text-xs font-semibold">
                     Instância
                   </TableHead>
                   <TableHead className="sticky top-0 z-10 bg-muted w-[90px] whitespace-nowrap px-4 py-3 text-right text-xs font-semibold">
@@ -1059,7 +1147,7 @@ function MeusChatsList({
                         {apelidoInstancia ? (
                           <Badge
                             variant="outline"
-                            className="max-w-[100px] truncate px-1.5 py-0 text-[10px] font-medium text-muted-foreground"
+                            className="max-w-[200px] truncate px-1.5 py-0 text-[10px] font-medium text-muted-foreground"
                           >
                             <span className="truncate">{apelidoInstancia}</span>
                           </Badge>
@@ -1330,30 +1418,17 @@ function WaAudioPlayer({
   );
 }
 
-const PLACEHOLDERS = [
-  "[Imagem]",
-  "[Áudio]",
-  "[Vídeo]",
-  "[Documento]",
-  "[Sticker]",
-];
-
-const MENSAGEM_PREVIEW_ICONS: Record<string, { icon: LucideIcon; label: string }> = {
-  "[Imagem]": { icon: ImageIcon, label: "Foto" },
-  "[Áudio]": { icon: Mic, label: "Áudio" },
-  "[Vídeo]": { icon: Video, label: "Vídeo" },
-  "[Documento]": { icon: FileText, label: "Documento" },
-  "[Sticker]": { icon: Sticker, label: "Figurinha" },
-};
-
 // Preview compacto da última mensagem nos cards de conversa: troca o texto cru
-// "[Tipo]" salvo pelo webhook por um ícone + rótulo legível.
+// "[Tipo]" salvo pelo webhook por um ícone + rótulo legível. Mapa e lista de
+// placeholders vêm de wa-mensagem-preview.ts — compartilhados com o toast de
+// "nova mensagem" em use-whatsapp-inbox.ts, pro mesmo ícone/rótulo valer nos
+// dois lugares.
 function UltimaMensagemPreview({
   mensagem,
 }: {
   mensagem: string | null | undefined;
 }) {
-  const info = mensagem ? MENSAGEM_PREVIEW_ICONS[mensagem] : undefined;
+  const info = infoPreviewMensagem(mensagem);
   if (!info) return <>{mensagem ?? "Nenhuma mensagem"}</>;
   const Icon = info.icon;
   return (
@@ -1383,7 +1458,7 @@ function QuotedPreview({
 }) {
   const label = remetenteNome || "Você";
   const texto =
-    conteudo && !PLACEHOLDERS.includes(conteudo) ? conteudo : conteudo || "";
+    conteudo && !MENSAGEM_PLACEHOLDERS.includes(conteudo) ? conteudo : conteudo || "";
   return (
     <div
       data-no-drag={onClick ? true : undefined}
@@ -1700,7 +1775,7 @@ function MessageContent({
             }
           }}
         />
-        {msg.conteudo && !PLACEHOLDERS.includes(msg.conteudo) && (
+        {msg.conteudo && !MENSAGEM_PLACEHOLDERS.includes(msg.conteudo) && (
           <p className={cn("text-sm mt-1.5 px-2 pb-0.5", textCls)}>
             {linkifyText(msg.conteudo)}
           </p>
@@ -1747,7 +1822,7 @@ function MessageContent({
           src={msg.media_url}
           className="w-full rounded-[14px] shadow-sm bg-black/10"
         />
-        {msg.conteudo && !PLACEHOLDERS.includes(msg.conteudo) && (
+        {msg.conteudo && !MENSAGEM_PLACEHOLDERS.includes(msg.conteudo) && (
           <p className={cn("text-sm mt-1.5 px-2 pb-0.5", textCls)}>
             {linkifyText(msg.conteudo)}
           </p>
@@ -1812,7 +1887,7 @@ function MessageContent({
   };
 
   if (msg.tipo === "documento" && msg.media_url) {
-    const label = !PLACEHOLDERS.includes(msg.conteudo)
+    const label = !MENSAGEM_PLACEHOLDERS.includes(msg.conteudo)
       ? msg.conteudo
       : "Documento anexado";
     return renderFileChip(label, msg.media_url, msg.media_mime);
@@ -1822,7 +1897,7 @@ function MessageContent({
   // desalinhado com o mimetype real) — mostra um chip de download genérico em vez
   // de deixar o anexo invisível.
   if (msg.media_url) {
-    const label = !PLACEHOLDERS.includes(msg.conteudo)
+    const label = !MENSAGEM_PLACEHOLDERS.includes(msg.conteudo)
       ? msg.conteudo
       : "Arquivo anexado";
     return renderFileChip(label, msg.media_url, msg.media_mime);
@@ -2626,7 +2701,7 @@ function LeadSheet({
   const renderDocumentos = (items: typeof midia.documentos) => (
     <ul className="space-y-1.5">
       {items.map((m) => {
-        const label = !PLACEHOLDERS.includes(m.conteudo)
+        const label = !MENSAGEM_PLACEHOLDERS.includes(m.conteudo)
           ? m.conteudo
           : "Documento anexado";
         const previewable = isPreviewable(label, m.media_mime);
@@ -4027,6 +4102,7 @@ export default function WhatsAppInbox() {
     useState(false);
   const [confirmDeletarMassa, setConfirmDeletarMassa] = useState(false);
   const [leadSheetOpen, setLeadSheetOpen] = useState(false);
+  const [visualizadoresSheetOpen, setVisualizadoresSheetOpen] = useState(false);
   // Busca por texto entre as mensagens já carregadas da conversa ativa
   // (equivalente à busca dentro de uma conversa no WhatsApp mobile) — abre
   // como um dropdown ancorado no botão do header, não confundir com `busca`,
@@ -5156,6 +5232,18 @@ export default function WhatsAppInbox() {
     return map;
   }, [instancias]);
 
+  // Info de cor do badge de instância — preset (classe pronta, com par claro/
+  // escuro), hex livre (sem par calculado, tratado à parte no render) ou
+  // nenhuma (cinza neutro). Mesmo raciocínio do mapa acima: existe pra
+  // funcionar independente do agrupamento ativo na sidebar.
+  const infoCorPorInstanciaId = useMemo(() => {
+    const map = new Map<string, InfoCorInstancia>();
+    for (const inst of instancias) {
+      map.set(inst.id, infoCorInstancia(inst.cor));
+    }
+    return map;
+  }, [instancias]);
+
   function addFiles(files: File[]) {
     if (files.length === 0) return;
     const toAdd: { file: File; previewUrl: string | null }[] = [];
@@ -5543,12 +5631,23 @@ export default function WhatsAppInbox() {
   // Dialog de conversas (mobile) — só o onClick muda entre os dois.
   function renderConvButton(conv: WaConversa, onSelect: () => void) {
     const naoAtribuida = (conv.responsaveis ?? []).length === 0;
+    // Só quando a empresa tem mais de uma instância cadastrada — com uma só,
+    // todo badge diria a mesma coisa em toda conversa, e seria só ruído.
+    // Mesma condição já usada pra decidir se a sidebar agrupa por instância
+    // (`conversasAgrupadasPorInstancia`) e pra mostrar o filtro "Instância".
+    const apelidoInstancia =
+      temMultiplasInstancias && conv.instancia_id
+        ? apelidoPorInstanciaId.get(conv.instancia_id)
+        : undefined;
+    const infoCorInstanciaAtual: InfoCorInstancia = conv.instancia_id
+      ? (infoCorPorInstanciaId.get(conv.instancia_id) ?? { tipo: "nenhuma" })
+      : { tipo: "nenhuma" };
     return (
       <button
         key={conv.id}
         onClick={onSelect}
         className={cn(
-          "flex items-center gap-2.5 rounded-lg px-3 py-2.5 transition-colors w-full text-left",
+          "flex flex-col gap-1.5 rounded-lg px-3 py-2.5 transition-colors w-full text-left",
           modoSelecao && selecionadas.has(conv.id)
             ? "bg-primary/10 ring-1 ring-primary/20"
             : conversaAtiva?.id === conv.id && !modoSelecao
@@ -5556,64 +5655,106 @@ export default function WhatsAppInbox() {
               : "hover:bg-muted/50",
         )}
       >
-        {modoSelecao ? (
-          <div
-            className={cn(
-              "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
-              selecionadas.has(conv.id)
-                ? "bg-primary border-primary"
-                : "border-border bg-background",
-            )}
-          >
-            {selecionadas.has(conv.id) && (
-              <Check className="h-2.5 w-2.5 text-primary-foreground" />
-            )}
-          </div>
-        ) : (
-          <ConversaAvatar conv={conv} />
-        )}
-        <div className="min-w-0 flex-1">
-          <p
-            className={cn(
-              "text-sm font-medium text-foreground truncate",
-              conversaNaoLida(conv, profile?.id) && !modoSelecao && "font-bold",
-            )}
-          >
-            {conv.nome_contato ?? formatPhone(conv.telefone)}
-          </p>
-          <p className="text-xs text-muted-foreground truncate mt-0.5">
-            <UltimaMensagemPreview mensagem={conv.ultima_mensagem} />
-          </p>
-        </div>
-        {!modoSelecao &&
-          (conv.ultima_mensagem_at ||
-            conversaNaoLida(conv, profile?.id) ||
-            naoAtribuida ||
-            (conv.responsaveis ?? []).length > 0) && (
-            <div className="flex flex-col items-end gap-1 shrink-0">
-              <div className="flex items-center gap-1.5">
-                <ConversaParticipantesStack conv={conv} />
-                <NaoLidasBadge
-                  conv={conv}
-                  ativa={conversaAtiva?.id === conv.id}
-                  currentUserId={profile?.id}
-                />
-              </div>
-              {conv.ultima_mensagem_at && (
-                <span className="text-xs text-muted-foreground font-medium">
-                  {formatTime(conv.ultima_mensagem_at)}
-                </span>
+        <div className="flex items-center gap-2.5">
+          {modoSelecao ? (
+            <div
+              className={cn(
+                "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                selecionadas.has(conv.id)
+                  ? "bg-primary border-primary"
+                  : "border-border bg-background",
               )}
-              {naoAtribuida && (
-                <Badge
-                  variant="outline"
-                  className="h-4 max-w-[88px] truncate border-dashed border-orange-400 px-1.5 py-0 text-[9px] font-medium leading-none text-orange-600 dark:border-orange-500/60 dark:text-orange-400"
-                >
-                  <span className="truncate">Não atribuído</span>
-                </Badge>
+            >
+              {selecionadas.has(conv.id) && (
+                <Check className="h-2.5 w-2.5 text-primary-foreground" />
               )}
             </div>
+          ) : (
+            <ConversaAvatar conv={conv} />
           )}
+          <div className="min-w-0 flex-1">
+            <p
+              className={cn(
+                "text-sm font-medium text-foreground truncate",
+                conversaNaoLida(conv, profile?.id) && !modoSelecao && "font-bold",
+              )}
+            >
+              {conv.nome_contato ?? formatPhone(conv.telefone)}
+            </p>
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
+              <UltimaMensagemPreview mensagem={conv.ultima_mensagem} />
+            </p>
+          </div>
+          {!modoSelecao &&
+            (conv.ultima_mensagem_at ||
+              conversaNaoLida(conv, profile?.id) ||
+              (conv.responsaveis ?? []).length > 0) && (
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <ConversaParticipantesStack conv={conv} />
+                  <NaoLidasBadge
+                    conv={conv}
+                    ativa={conversaAtiva?.id === conv.id}
+                    currentUserId={profile?.id}
+                  />
+                </div>
+                {conv.ultima_mensagem_at && (
+                  <span className="text-xs text-muted-foreground font-medium">
+                    {formatTime(conv.ultima_mensagem_at)}
+                  </span>
+                )}
+              </div>
+            )}
+        </div>
+        {/* Rodapé da conversa: instância à esquerda, "Não atribuído" à
+            direita (`ml-auto` no segundo em vez de `justify-between` no
+            container — assim cada badge continua na ponta certa mesmo
+            quando só um dos dois existe). */}
+        {!modoSelecao && (naoAtribuida || apelidoInstancia) && (
+          // 50px = avatar de 40px (`ConversaAvatar` tamanho "sm") + 10px do
+          // `gap-2.5` ao lado dele — alinha com o nome/prévia da conversa em
+          // vez de começar embaixo do avatar.
+          <div className="flex items-center gap-2 pl-[50px]">
+            {apelidoInstancia && infoCorInstanciaAtual.tipo === "hex" ? (
+              // Hex livre não tem par claro/escuro calculado (ver
+              // wa-instancia-cores.ts), então em vez de colorir borda/texto
+              // (que pode não ler bem num dos dois temas), a cor vira só um
+              // pontinho — o texto fica na cor neutra de sempre, já validada.
+              <Badge
+                variant="outline"
+                className="h-4 max-w-[180px] gap-1 truncate px-1.5 py-0 text-[9px] font-medium leading-none text-muted-foreground"
+              >
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: infoCorInstanciaAtual.hex }}
+                />
+                <span className="truncate">{apelidoInstancia}</span>
+              </Badge>
+            ) : (
+              apelidoInstancia && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "h-4 max-w-[180px] truncate px-1.5 py-0 text-[9px] font-medium leading-none",
+                    infoCorInstanciaAtual.tipo === "preset"
+                      ? CLASSES_BADGE_INSTANCIA[infoCorInstanciaAtual.cor]
+                      : CLASSE_BADGE_INSTANCIA_SEM_COR,
+                  )}
+                >
+                  <span className="truncate">{apelidoInstancia}</span>
+                </Badge>
+              )
+            )}
+            {naoAtribuida && (
+              <Badge
+                variant="outline"
+                className="ml-auto h-4 max-w-[88px] truncate border-dashed border-orange-400 px-1.5 py-0 text-[9px] font-medium leading-none text-orange-600 dark:border-orange-500/60 dark:text-orange-400"
+              >
+                <span className="truncate">Não atribuído</span>
+              </Badge>
+            )}
+          </div>
+        )}
       </button>
     );
   }
@@ -6843,7 +6984,10 @@ export default function WhatsAppInbox() {
                           </PopoverContent>
                         </Popover>
                       </div>
-                      <ConversaVisualizadoresStack conv={conversaAtiva} />
+                      <ConversaVisualizadoresStack
+                        conv={conversaAtiva}
+                        onClick={() => setVisualizadoresSheetOpen(true)}
+                      />
                     </div>
                   </div>
                 )}
@@ -8145,6 +8289,12 @@ export default function WhatsAppInbox() {
           de 20 s. Toda conversa aberta custava o dobro de consulta, o dobro de
           canal e o dobro de polling, para um painel que quase sempre está
           fechado. */}
+      <VisualizadoresSheet
+        conv={conversaAtiva}
+        open={visualizadoresSheetOpen}
+        onOpenChange={setVisualizadoresSheetOpen}
+      />
+
       {conversaAtiva && leadSheetOpen && (
         <LeadSheet
           conversa={conversaAtiva}

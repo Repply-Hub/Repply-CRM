@@ -870,6 +870,7 @@ export type Database = {
       configuracoes_wapi: {
         Row: {
           apelido: string | null
+          cor: string | null
           api_instance_name: string | null
           api_key: string
           created_at: string
@@ -884,6 +885,7 @@ export type Database = {
         }
         Insert: {
           apelido?: string | null
+          cor?: string | null
           api_instance_name?: string | null
           api_key: string
           created_at?: string
@@ -898,6 +900,7 @@ export type Database = {
         }
         Update: {
           apelido?: string | null
+          cor?: string | null
           api_instance_name?: string | null
           api_key?: string
           created_at?: string
@@ -3572,6 +3575,8 @@ export type Database = {
       usuarios: {
         Row: {
           assinatura_email: string | null
+          assinatura_imagem_mostrar_empresa: boolean
+          assinatura_imagem_mostrar_nome: boolean
           avatar_url: string | null
           created_at: string
           deleted_at: string | null
@@ -3585,6 +3590,8 @@ export type Database = {
         }
         Insert: {
           assinatura_email?: string | null
+          assinatura_imagem_mostrar_empresa?: boolean
+          assinatura_imagem_mostrar_nome?: boolean
           avatar_url?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -3598,6 +3605,8 @@ export type Database = {
         }
         Update: {
           assinatura_email?: string | null
+          assinatura_imagem_mostrar_empresa?: boolean
+          assinatura_imagem_mostrar_nome?: boolean
           avatar_url?: string | null
           created_at?: string
           deleted_at?: string | null

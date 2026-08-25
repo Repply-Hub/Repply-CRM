@@ -238,6 +238,31 @@ export function useAdminSetApelido() {
   });
 }
 
+// --- Definir cor de identificação da instância (badge na caixa de entrada) ---
+
+export function useAdminSetCor() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { instanceId: string; cor: string | null }) => {
+      const { error } = await supabase
+        .from('configuracoes_wapi')
+        .update({ cor: params.cor })
+        .eq('id', params.instanceId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin_wa_instancias'] });
+      qc.invalidateQueries({ queryKey: ['wa_instancias'] });
+      qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
+      toast.success('Cor da instância atualizada');
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : 'Erro ao salvar cor da instância');
+    },
+  });
+}
+
 // Mantido por compatibilidade com código legado que ainda usa useAdminProvision
 /** @deprecated Use useAdminCreateInstance */
 export const useAdminProvision = useAdminCreateInstance;

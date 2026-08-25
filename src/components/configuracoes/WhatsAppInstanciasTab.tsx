@@ -11,7 +11,14 @@ import {
   useAdminLinkInstance,
   useAdminUnlinkInstance,
   useAdminSetApelido,
+  useAdminSetCor,
 } from '@/hooks/use-admin-whatsapp';
+import {
+  CORES_INSTANCIA,
+  CLASSES_PASTILHA_INSTANCIA,
+  NOME_COR_INSTANCIA,
+  infoCorInstancia,
+} from '@/lib/wa-instancia-cores';
 import { Input } from '@/components/ui/input';
 import type { WaConfig } from '@/hooks/use-whatsapp-inbox';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -28,13 +35,6 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   AlertDialog,
@@ -66,10 +66,7 @@ import {
   RefreshCw,
   QrCode,
   PlugZap,
-  Link2,
-  X,
   Pencil,
-  MoreVertical,
   ChevronsUpDown,
   Check,
 } from 'lucide-react';
@@ -276,96 +273,6 @@ function QrDialog({ open, config, onClose }: { open: boolean; config: WaConfig; 
   );
 }
 
-// ─── Dialog Vincular Usuário ──────────────────────────────────────────────────
-
-function VincularDialog({
-  open,
-  instancia,
-  todosUsuarios,
-  onClose,
-}: {
-  open: boolean;
-  instancia: InstanciaRow;
-  todosUsuarios: UsuarioOpcao[];
-  onClose: () => void;
-}) {
-  const [selectedUsuarioIds, setSelectedUsuarioIds] = useState<string[]>([]);
-  const [vincularTodos, setVincularTodos] = useState(false);
-  const linkMutation = useAdminLinkInstance();
-
-  useEffect(() => { if (!open) { setSelectedUsuarioIds([]); setVincularTodos(false); } }, [open]);
-
-  // Usuários ainda não vinculados a ESTA instância
-  const jaVinculados = new Set(instancia.usuarios.map(u => u.usuario_id));
-  const disponiveis = todosUsuarios.filter(u => !jaVinculados.has(u.usuario_id));
-
-  function handleVincular() {
-    if (vincularTodos) {
-      linkMutation.mutate({ instanceId: instancia.id, targetUsuarioIds: disponiveis.map(u => u.usuario_id) }, { onSuccess: onClose });
-      return;
-    }
-    if (selectedUsuarioIds.length === 0) return;
-    linkMutation.mutate({ instanceId: instancia.id, targetUsuarioIds: selectedUsuarioIds }, { onSuccess: onClose });
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base">
-            <Link2 className="h-4 w-4 text-primary" /> Vincular Usuário
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 py-1">
-          <p className="text-xs text-muted-foreground">
-            Instância: <span className="font-mono">{instancia.instance_name}</span>
-          </p>
-          {disponiveis.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              Todos os usuários já estão vinculados a esta instância.
-            </p>
-          ) : (
-            <>
-              <div className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-border/40 bg-muted/20">
-                <div>
-                  <Label htmlFor="vincular-todos-existente" className="text-xs font-medium">
-                    Vincular a todos os usuários da empresa
-                  </Label>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {disponiveis.length} usuário{disponiveis.length === 1 ? '' : 's'} ainda não vinculado{disponiveis.length === 1 ? '' : 's'}
-                  </p>
-                </div>
-                <Switch
-                  id="vincular-todos-existente"
-                  checked={vincularTodos}
-                  onCheckedChange={setVincularTodos}
-                />
-              </div>
-              {!vincularTodos && (
-                <UsuarioMultiCombobox
-                  usuarios={disponiveis}
-                  value={selectedUsuarioIds}
-                  onChange={setSelectedUsuarioIds}
-                />
-              )}
-            </>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button
-            onClick={handleVincular}
-            disabled={(!vincularTodos && selectedUsuarioIds.length === 0) || linkMutation.isPending || disponiveis.length === 0}
-          >
-            {linkMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-            Vincular
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // ─── Dialog Nova Instância ────────────────────────────────────────────────────
 
 function NovaInstanciaDialog({
@@ -453,84 +360,447 @@ function NovaInstanciaDialog({
   );
 }
 
-// ─── Apelido da instância (edição inline) ──────────────────────────────────────
+// ─── Título + cor da instância (só exibição — editar é tudo via o lápis) ──────
+//
+// Antes eram dois controles interativos (clique no nome pra editar inline,
+// pastilha clicável com popover de cor). Os dois viraram só display: editar
+// qualquer um dos dois agora é só pelo ícone de lápis (`EditarInstanciaDialog`,
+// que edita título, cor e usuários vinculados juntos) — dois caminhos pra
+// mudar a mesma coisa é confuso, não redundância útil.
 
-function InstanciaApelido({ instancia }: { instancia: InstanciaRow }) {
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(instancia.apelido ?? '');
-  const setApelido = useAdminSetApelido();
-
-  function startEdit() {
-    setValue(instancia.apelido ?? '');
-    setEditing(true);
-  }
-
-  function save() {
-    const trimmed = value.trim();
-    if (trimmed === (instancia.apelido ?? '')) {
-      setEditing(false);
-      return;
-    }
-    setApelido.mutate(
-      { instanceId: instancia.id, apelido: trimmed || null },
-      { onSuccess: () => setEditing(false) },
-    );
-  }
-
-  if (editing) {
-    return (
-      <div className="flex items-center gap-1">
-        <Input
-          autoFocus
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') save();
-            if (e.key === 'Escape') setEditing(false);
-          }}
-          onBlur={save}
-          placeholder="Ex: WhatsApp Vendas"
-          className="h-7 text-xs px-2 max-w-[180px]"
-          disabled={setApelido.isPending}
-        />
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 shrink-0"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={save}
-          disabled={setApelido.isPending}
-        >
-          {setApelido.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 w-7 p-0 text-muted-foreground shrink-0"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => setEditing(false)}
-          disabled={setApelido.isPending}
-        >
-          <X className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    );
-  }
-
+function InstanciaTituloECor({ instancia }: { instancia: InstanciaRow }) {
+  const info = infoCorInstancia(instancia.cor);
   return (
-    <button
-      type="button"
-      onClick={startEdit}
-      className="group flex items-center gap-1.5 min-w-0 text-left"
-      title="Editar apelido da instância"
-    >
+    <div className="flex items-center gap-1.5 min-w-0">
+      <span
+        title={
+          info.tipo === 'preset' ? `Cor: ${NOME_COR_INSTANCIA[info.cor]}`
+          : info.tipo === 'hex' ? `Cor: ${info.hex}`
+          : 'Sem cor definida'
+        }
+        className={cn(
+          'h-3.5 w-3.5 shrink-0 rounded-full border',
+          info.tipo === 'nenhuma' && 'border-dashed border-muted-foreground/40 bg-transparent',
+          info.tipo === 'preset' && CLASSES_PASTILHA_INSTANCIA[info.cor],
+        )}
+        style={info.tipo === 'hex' ? { backgroundColor: info.hex, borderColor: info.hex } : undefined}
+      />
       {instancia.apelido ? (
         <span className="text-sm font-medium truncate">{instancia.apelido}</span>
       ) : (
-        <span className="text-xs text-muted-foreground/70 italic truncate">Sem apelido — clique para nomear</span>
+        <span className="text-xs text-muted-foreground/70 italic truncate">Sem título definido</span>
       )}
-      <Pencil className="h-3 w-3 text-muted-foreground/0 group-hover:text-muted-foreground/70 transition-colors shrink-0" />
-    </button>
+    </div>
+  );
+}
+
+// ─── Seletor de cor livre — popover no design system do app ──────────────────
+//
+// Antes disparava o `<input type="color">` nativo: tecnicamente já era "o
+// seletor do sistema", só que cada navegador desenha essa janela do seu
+// jeito (no Chrome/Linux sai um popup escuro estilo Google Material, sem
+// nada a ver com o resto do app) — e isso o site não tem como estilizar, é UI
+// do navegador, fora do DOM da página. A primeira versão desta troca virou só
+// um campo de hex — mas nem todo usuário sabe de cabeça o código da cor que
+// quer. Esta versão tem a área de saturação/brilho + barra de matiz
+// arrastáveis, do mesmo jeito que o seletor nativo (ver print do pedido), só
+// que desenhado com as cores/bordas do próprio app. O campo de hex continua
+// embaixo, mas como atalho OPCIONAL pra quem já sabe o código — não como
+// única forma de escolher.
+
+const HEX_REGEX = /^#[0-9a-f]{6}$/i;
+
+function hexParaHsv(hex: string): { h: number; s: number; v: number } {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = (((g - b) / d) % 6) * 60;
+    else if (max === g) h = ((b - r) / d + 2) * 60;
+    else h = ((r - g) / d + 4) * 60;
+    if (h < 0) h += 360;
+  }
+  const v = max;
+  const s = max === 0 ? 0 : d / max;
+  return { h, s, v };
+}
+
+function hsvParaHex(h: number, s: number, v: number): string {
+  const c = v * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v - c;
+  let [r, g, b] = [0, 0, 0];
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const paraHex = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, '0');
+  return `#${paraHex(r)}${paraHex(g)}${paraHex(b)}`;
+}
+
+const HSV_PADRAO = hexParaHsv('#888888');
+
+function SeletorCorLivre({
+  hexAtual,
+  onEscolher,
+  disabled,
+}: {
+  hexAtual: string | null;
+  onEscolher: (hex: string) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [{ h, s, v }, setHsv] = useState(() => (hexAtual ? hexParaHsv(hexAtual) : HSV_PADRAO));
+  const [textoHex, setTextoHex] = useState(hexAtual ?? '#888888');
+  const areaRef = useRef<HTMLDivElement>(null);
+  const hueRef = useRef<HTMLDivElement>(null);
+  const arrastando = useRef<'area' | 'hue' | null>(null);
+
+  // Sincroniza a cor de trabalho com a cor de verdade toda vez que o popover
+  // abre — sem isto, reabrir mostraria o rascunho da última vez em vez do
+  // valor salvo.
+  useEffect(() => {
+    if (!open) return;
+    setHsv(hexAtual ? hexParaHsv(hexAtual) : HSV_PADRAO);
+    setTextoHex(hexAtual ?? '#888888');
+  }, [open, hexAtual]);
+
+  function aplicar(novo: { h: number; s: number; v: number }) {
+    setHsv(novo);
+    const hex = hsvParaHex(novo.h, novo.s, novo.v);
+    setTextoHex(hex);
+    onEscolher(hex);
+  }
+
+  function moverArea(clientX: number, clientY: number) {
+    const rect = areaRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
+    const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
+    aplicar({ h, s: x / rect.width, v: 1 - y / rect.height });
+  }
+
+  function moverHue(clientX: number) {
+    const rect = hueRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
+    aplicar({ h: (x / rect.width) * 360, s, v });
+  }
+
+  // Um único listener no window, ligado enquanto o popover está aberto —
+  // arrastar o dedo/mouse pra fora da área pequena do popover não pode
+  // interromper o gesto, senão soltar fora do quadrado "trava" a cor no meio
+  // do arraste.
+  useEffect(() => {
+    if (!open) return;
+    function onMove(e: PointerEvent) {
+      if (arrastando.current === 'area') moverArea(e.clientX, e.clientY);
+      else if (arrastando.current === 'hue') moverHue(e.clientX);
+    }
+    function onUp() { arrastando.current = null; }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, h, s, v]);
+
+  function mudarTextoHex(valor: string) {
+    setTextoHex(valor);
+    if (HEX_REGEX.test(valor)) {
+      const novo = hexParaHsv(valor);
+      setHsv(novo);
+      onEscolher(valor.toLowerCase());
+    }
+  }
+
+  const hexPrevia = hsvParaHex(h, s, v);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title={hexAtual ? `Cor livre: ${hexAtual}` : 'Escolher outra cor'}
+          disabled={disabled}
+          className={cn(
+            'flex h-6 w-6 items-center justify-center rounded-full border-2 text-muted-foreground transition-transform hover:scale-110 hover:text-foreground',
+            hexAtual ? 'border-foreground' : 'border-dashed border-muted-foreground/40',
+          )}
+          style={hexAtual ? { backgroundColor: hexAtual } : undefined}
+        >
+          {!hexAtual && <Plus className="h-3 w-3" />}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-3" align="start">
+        <p className="mb-2 text-[11px] font-medium text-muted-foreground">Cor livre</p>
+
+        {/* Saturação (horizontal) × brilho (vertical). Duas camadas de
+            gradiente sobre a cor cheia do matiz atual — branco→transparente
+            da esquerda, preto→transparente de baixo — é o truque padrão pra
+            desenhar um seletor HSV sem canvas. */}
+        <div
+          ref={areaRef}
+          className="relative h-32 w-full touch-none rounded-md"
+          style={{
+            backgroundColor: `hsl(${h}, 100%, 50%)`,
+            backgroundImage:
+              'linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent)',
+          }}
+          onPointerDown={(e) => {
+            if (disabled) return;
+            arrastando.current = 'area';
+            moverArea(e.clientX, e.clientY);
+          }}
+        >
+          <div
+            className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.3)]"
+            style={{ left: `${s * 100}%`, top: `${(1 - v) * 100}%`, backgroundColor: hexPrevia }}
+          />
+        </div>
+
+        {/* Barra de matiz (0–360°). */}
+        <div
+          ref={hueRef}
+          className="relative mt-2 h-3 w-full touch-none rounded-full"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)',
+          }}
+          onPointerDown={(e) => {
+            if (disabled) return;
+            arrastando.current = 'hue';
+            moverHue(e.clientX);
+          }}
+        >
+          <div
+            className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.3)]"
+            style={{ left: `${(h / 360) * 100}%`, backgroundColor: `hsl(${h}, 100%, 50%)` }}
+          />
+        </div>
+
+        {/* Hex como atalho opcional — quem já sabe o código digita direto;
+            quem não sabe usa só a área acima. */}
+        <div className="mt-3 flex items-center gap-2">
+          <span
+            className="h-8 w-8 shrink-0 rounded-md border border-border"
+            style={{ backgroundColor: hexPrevia }}
+          />
+          <Input
+            value={textoHex}
+            onChange={(e) => mudarTextoHex(e.target.value)}
+            placeholder="#3b82f6"
+            maxLength={7}
+            disabled={disabled}
+            className="h-8 font-mono text-xs"
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ─── Dialog Editar Instância (título + cor + usuários vinculados) ─────────────
+
+function EditarInstanciaDialog({
+  open,
+  instancia,
+  todosUsuarios,
+  onClose,
+}: {
+  open: boolean;
+  instancia: InstanciaRow;
+  todosUsuarios: UsuarioOpcao[];
+  onClose: () => void;
+}) {
+  const [apelido, setApelido] = useState(instancia.apelido ?? '');
+  // Guarda o valor CRU (chave da paleta OU hex `#rrggbb`) — `infoCorInstancia`
+  // é quem decide o que cada valor representa, na hora de exibir.
+  const [cor, setCor] = useState<string | null>(instancia.cor ?? null);
+  const [usuarioIds, setUsuarioIds] = useState<string[]>(instancia.usuarios.map(u => u.usuario_id));
+  const [salvando, setSalvando] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const setApelidoMutation = useAdminSetApelido();
+  const setCorMutation = useAdminSetCor();
+  const linkMutation = useAdminLinkInstance();
+  const unlinkMutation = useAdminUnlinkInstance();
+  const deleteInstance = useAdminDeleteInstance();
+
+  const infoCorSelecionada = infoCorInstancia(cor);
+
+  // Reseta pro estado atual da instância toda vez que o dialog abre — sem
+  // isto, reabrir depois de cancelar (ou depois de outra instância ter sido
+  // editada) mostraria o rascunho da vez anterior em vez do dado de verdade.
+  useEffect(() => {
+    if (!open) return;
+    setApelido(instancia.apelido ?? '');
+    setCor(instancia.cor ?? null);
+    setUsuarioIds(instancia.usuarios.map(u => u.usuario_id));
+    setConfirmDelete(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, instancia.id]);
+
+  async function handleDelete() {
+    await deleteInstance.mutateAsync(instancia.id);
+    setConfirmDelete(false);
+    onClose();
+  }
+
+  async function handleSalvar() {
+    setSalvando(true);
+    try {
+      const tarefas: Promise<unknown>[] = [];
+
+      const apelidoTrimmed = apelido.trim();
+      if (apelidoTrimmed !== (instancia.apelido ?? '')) {
+        tarefas.push(setApelidoMutation.mutateAsync({ instanceId: instancia.id, apelido: apelidoTrimmed || null }));
+      }
+      if (cor !== (instancia.cor ?? null)) {
+        tarefas.push(setCorMutation.mutateAsync({ instanceId: instancia.id, cor }));
+      }
+
+      const vinculadosAntes = new Set(instancia.usuarios.map(u => u.usuario_id));
+      const vinculadosDepois = new Set(usuarioIds);
+      const paraVincular = usuarioIds.filter(id => !vinculadosAntes.has(id));
+      const paraDesvincular = [...vinculadosAntes].filter(id => !vinculadosDepois.has(id));
+
+      if (paraVincular.length > 0) {
+        tarefas.push(linkMutation.mutateAsync({ instanceId: instancia.id, targetUsuarioIds: paraVincular }));
+      }
+      for (const id of paraDesvincular) {
+        tarefas.push(unlinkMutation.mutateAsync({ instanceId: instancia.id, targetUsuarioId: id }));
+      }
+
+      if (tarefas.length === 0) { onClose(); return; }
+      await Promise.all(tarefas);
+      onClose();
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Pencil className="h-4 w-4 text-primary" /> Editar Instância
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-1">
+          <div className="space-y-1.5">
+            <Label htmlFor="editar-instancia-titulo" className="text-xs font-medium">
+              Título
+            </Label>
+            <Input
+              id="editar-instancia-titulo"
+              value={apelido}
+              onChange={(e) => setApelido(e.target.value)}
+              placeholder="Ex: WhatsApp Vendas"
+              disabled={salvando}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Cor de identificação</Label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {CORES_INSTANCIA.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  title={NOME_COR_INSTANCIA[c]}
+                  onClick={() => setCor(c === cor ? null : c)}
+                  disabled={salvando}
+                  className={cn(
+                    'h-6 w-6 rounded-full border-2 transition-transform hover:scale-110',
+                    CLASSES_PASTILHA_INSTANCIA[c],
+                    c === cor ? 'border-foreground' : 'border-transparent',
+                  )}
+                />
+              ))}
+              {/* Cor livre pra quem não quer nenhuma das 8 da paleta — popover
+                  próprio do app, não o color picker nativo do navegador. */}
+              <SeletorCorLivre
+                hexAtual={infoCorSelecionada.tipo === 'hex' ? infoCorSelecionada.hex : null}
+                onEscolher={setCor}
+                disabled={salvando}
+              />
+            </div>
+            {cor && (
+              <button
+                type="button"
+                onClick={() => setCor(null)}
+                disabled={salvando}
+                className="text-[11px] text-muted-foreground hover:text-destructive"
+              >
+                Remover cor
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Usuários vinculados</Label>
+            <UsuarioMultiCombobox
+              usuarios={todosUsuarios}
+              value={usuarioIds}
+              onChange={setUsuarioIds}
+              placeholder="Nenhum usuário vinculado"
+            />
+          </div>
+        </div>
+        <DialogFooter className="sm:justify-between">
+          <Button
+            type="button"
+            variant="ghost"
+            className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setConfirmDelete(true)}
+            disabled={salvando}
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Remover instância
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose} disabled={salvando}>Cancelar</Button>
+            <Button onClick={handleSalvar} disabled={salvando}>
+              {salvando && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+              Salvar
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remover instância?</AlertDialogTitle>
+          <AlertDialogDescription>
+            A instância <span className="font-mono font-semibold">{instancia.instance_name}</span> e todos os seus vínculos serão removidos permanentemente.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={deleteInstance.isPending}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive hover:bg-destructive/90"
+            onClick={handleDelete}
+            disabled={deleteInstance.isPending}
+          >
+            {deleteInstance.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            Remover
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 
@@ -543,15 +813,12 @@ function InstanciaCard({
   instancia: InstanciaRow;
   todosUsuarios: UsuarioOpcao[];
 }) {
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [showQr, setShowQr] = useState(false);
-  const [showVincular, setShowVincular] = useState(false);
+  const [showEditar, setShowEditar] = useState(false);
   const qc = useQueryClient();
 
-  const deleteInstance = useAdminDeleteInstance();
   const syncStatus = useAdminSyncStatus();
   const disconnect = useAdminDisconnect();
-  const unlink = useAdminUnlinkInstance();
 
   const isConnected = instancia.status === 'connected';
 
@@ -562,12 +829,7 @@ function InstanciaCard({
     if (result) { toast.success(result.isConnected ? 'Conectada' : 'Desconectada'); invalidate(); }
   }
 
-  async function handleDelete() {
-    await deleteInstance.mutateAsync(instancia.id, { onSuccess: invalidate });
-    setConfirmDelete(false); invalidate();
-  }
-
-  const isBusy = deleteInstance.isPending || syncStatus.isPending || disconnect.isPending || unlink.isPending;
+  const isBusy = syncStatus.isPending || disconnect.isPending;
 
   return (
     <>
@@ -579,7 +841,7 @@ function InstanciaCard({
           </div>
 
           <div className="flex-1 min-w-0">
-            <InstanciaApelido instancia={instancia} />
+            <InstanciaTituloECor instancia={instancia} />
             <span className="text-[11px] font-mono text-muted-foreground/70 truncate block mt-0.5">
               {instancia.instance_name}
             </span>
@@ -602,90 +864,54 @@ function InstanciaCard({
 
             <Tooltip>
               <TooltipTrigger asChild>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => setShowEditar(true)} disabled={isBusy}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Editar título, cor e usuários</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" onClick={handleSync} disabled={isBusy}>
                   {syncStatus.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Sincronizar status</TooltipContent>
             </Tooltip>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground" disabled={isBusy}>
-                  <MoreVertical className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuItem onClick={() => setShowVincular(true)} className="gap-2 text-sm">
-                  <Link2 className="h-3.5 w-3.5" /> Vincular usuário
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setConfirmDelete(true)} className="gap-2 text-sm text-destructive focus:text-destructive">
-                  <Trash2 className="h-3.5 w-3.5" /> Remover instância
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
 
-        {/* Chips de usuários vinculados */}
-        <div className="flex flex-wrap items-center gap-1.5 pl-12">
-          {instancia.usuarios.map(u => (
-            <span
-              key={u.usuario_id}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary border border-primary/20"
-            >
-              <User className="h-2.5 w-2.5 shrink-0" />
-              {u.nome}
-              <button
-                className="ml-0.5 hover:text-destructive transition-colors"
-                onClick={() => unlink.mutate({ instanceId: instancia.id, targetUsuarioId: u.usuario_id }, { onSuccess: invalidate })}
-                disabled={isBusy}
-                title={`Desvincular ${u.nome}`}
+        {/* Chips de usuários vinculados — só exibição, sem "x" nem "+ Vincular"
+            aqui: quem está vinculado a esta instância se edita pelo lápis
+            (`EditarInstanciaDialog`), junto com título e cor. */}
+        {instancia.usuarios.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-1.5 pl-12">
+            {instancia.usuarios.map(u => (
+              <span
+                key={u.usuario_id}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary border border-primary/20"
               >
-                <X className="h-2.5 w-2.5" />
-              </button>
-            </span>
-          ))}
-          <button
-            type="button"
-            onClick={() => setShowVincular(true)}
-            disabled={isBusy}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
-          >
-            <Link2 className="h-2.5 w-2.5" /> Vincular
-          </button>
-        </div>
+                <User className="h-2.5 w-2.5 shrink-0" />
+                {u.nome}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="pl-12 text-xs text-muted-foreground/70 italic">Nenhum usuário vinculado</p>
+        )}
       </div>
 
       {showQr && <QrDialog open={showQr} config={instancia} onClose={() => setShowQr(false)} />}
 
-      {showVincular && (
-        <VincularDialog
-          open={showVincular}
+      {showEditar && (
+        <EditarInstanciaDialog
+          open={showEditar}
           instancia={instancia}
           todosUsuarios={todosUsuarios}
-          onClose={() => setShowVincular(false)}
+          onClose={() => setShowEditar(false)}
         />
       )}
-
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remover instância?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A instância <span className="font-mono font-semibold">{instancia.instance_name}</span> e todos os seus vínculos serão removidos permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={handleDelete}>
-              {deleteInstance.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Remover
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }
