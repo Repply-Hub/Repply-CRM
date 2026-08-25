@@ -4253,6 +4253,20 @@ export type Database = {
         Returns: Json
       }
       normalize_whatsapp_phone: { Args: { raw: string }; Returns: string }
+      pauta_do_dia: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          tipo: string
+          referencia_id: string
+          selo: string
+          titulo: string
+          detalhe: string
+          valor: number | null
+          quando: string | null
+          dias_parado: number | null
+          ordem: number
+        }[]
+      }
       parse_endereco_livre: {
         Args: { p_endereco: string }
         Returns: {

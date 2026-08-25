@@ -131,6 +131,17 @@ Todas do dono do produto, em 24/08/2026:
    negócio** — não é bilhete privado.
 6. **Remetente de e-mail:** próprio da Repply, com DNS.
 7. **A aba Automação:** vira o painel de ajuste da pauta, salvando de verdade.
+8. **A seção nasce só para a MD.** No preset "Padrão" (o das outras 7 empresas) a seção
+   "Hoje" fica **desligada**; no "Preset MD Representações", ligada. Valida na MD antes de
+   abrir para o resto. Mesmo caminho que o Portal já seguia.
+9. **O e-mail é REFÉM da seção.** Seção desligada = sem pauta e sem e-mail. A regra mora
+   dentro da função de banco, não na tela — a tela some sozinha, mas o robô do e-mail
+   continuaria mandando.
+10. **O e-mail só sai em dia útil**, e quais dias é escolha do gestor na aba Automação. Os
+    dias controlam **só o e-mail**: a tela é consulta ao vivo e mostra a pauta de hoje
+    inclusive num sábado, para quem escolher trabalhar.
+11. **Ao adiar, a pessoa informa MOTIVO e DATA DE RETORNO** — e outro item entra no lugar.
+    Ver §5, que foi refeita por causa disto.
 
 ---
 
@@ -153,8 +164,19 @@ Manchete, lista ordenada, e cada item com selo, valor, a frase do porquê, um bo
 Item novo na barra lateral, no topo. **Não muda a tela que abre depois do login** — trocar a
 porta de entrada de 26 pessoas é decisão à parte, não efeito colateral desta entrega.
 
-Nasce registrada no sistema de seções por empresa (`secoes_por_empresa` / `useSecaoLigada`),
-então cada empresa liga ou desliga como já faz com Portal e Obras.
+Nasce registrada no sistema de seções por empresa, então cada empresa liga ou desliga como já
+faz com Portal e Obras. O registro é `src/lib/secoes.ts` (`id: 'hoje'`, rota `/hoje`), e a
+permissão exigida é a de Negócios — quem não pode ver negócio não pode ver a pauta deles.
+
+**Ela nasce desligada para quase todo mundo**, por decisão do dono do produto:
+
+| preset | seção "Hoje" | quem usa |
+|---|---|---|
+| `Padrão` | **desligada** | Climb, MD, TESTE, Teste Empresa, Teste, JHS, House Design |
+| `Preset MD Representações` | ligada | MD Representações |
+
+Qualquer preset criado depois entra desligado — o lado seguro. É exatamente o caminho que o
+Portal já seguia; não é exceção nova.
 
 ### 3.3 A banda de 3 a 7, e por que não é sorteio
 
@@ -215,99 +237,88 @@ filtro já aplicado. A pauta nunca esconde o tamanho do problema; ela só não c
 
 ---
 
-## 5. O adiamento
+## 5. O adiamento — que virou "registrar retorno"
 
-### 5.1 Por que precisa existir
+> **Este capítulo foi refeito em 24/08/2026.** A primeira versão criava uma tabela nova
+> (`pauta_adiamentos`) e um tipo novo no histórico de movimentação. Ela chegou a ser aplicada
+> e foi **desfeita no mesmo dia**, quando o dono do produto pediu que o adiamento registrasse
+> o MOTIVO e uma DATA DE RETORNO — e a busca por onde guardar isso encontrou a tabela certa
+> já pronta e vazia.
 
-A pauta **não é uma lista guardada** — é calculada na hora, toda vez que a tela abre. A pergunta
-é sempre a mesma: *"quais negócios meus estão abertos e parados há mais de N dias?"*
+### 5.1 O que a pessoa faz
 
-Se o ✓ não gravar nada, amanhã a mesma pergunta devolve o mesmo negócio. O ✓ não teria efeito
-nenhum além de sumir com o item até recarregar a página.
+Clica no ✓ de um item e preenche duas coisas:
 
-### 5.2 A tabela
+- **Motivo** — obrigatório. "O cliente vai decidir depois que a obra começar."
+- **Data de retorno** — quando vale a pena procurar de novo. Tem cotação de hoje para compra
+  do mês que vem; tem cliente que pediu uma semana para olhar.
 
-```sql
-create table public.pauta_adiamentos (
-  id            uuid primary key default gen_random_uuid(),
-  usuario_id    uuid not null references public.usuarios(id),
-  empresa_id    uuid not null references public.empresas(id),
-  tipo          text not null check (tipo in ('negocio','compromisso')),
-  referencia_id uuid not null,           -- pedidos.id ou eventos.id
-  adiado_ate    date not null,
-  created_at    timestamptz not null default now()
-);
-```
+O item sai da pauta até essa data.
 
-RLS: cada pessoa só lê e escreve as próprias linhas. Índice por
-`(usuario_id, tipo, adiado_ate)` — é como a pauta consulta.
-
-**O adiamento não toca no negócio.** Não move etapa, não mexe em data, não altera valor.
-Empurrar o `prazo_resposta` seria mais barato e faria a coluna mudar de significado — de "data
-de fechamento" para "quando eu vou cobrar" — e todo relatório que a lê passaria a mentir. É o
-mesmo tipo de estrago do `fechado_em`.
-
-**Padrão: 3 dias.**
-
-### 5.3 🔴 O registro no Histórico de Movimentação, e a trava que ele encontra
-
-**Decisão do dono do produto:** o adiamento aparece no Histórico de Movimentação do negócio
-(`pedidos_historico_status`, o painel de `EditarPedido.tsx:1072`), sincronizado com a tabela
-acima. Deixa de ser bilhete privado e vira registro — quem abre o negócio vê que alguém adiou,
-quando e por quanto tempo.
-
-A tabela já é uma linha do tempo genérica: tem `tipo`, `campo`, `valor_anterior_txt`,
-`valor_novo_txt`. Hoje usa dois tipos: `status` e `campo`.
-
-**Duas travas, medidas, que mudam a implementação:**
-
-1. **Existe uma restrição que só aceita os dois tipos atuais:**
-
-   ```sql
-   CHECK ((tipo = 'status' AND status_novo IS NOT NULL)
-       OR (tipo = 'campo'  AND campo       IS NOT NULL))
-   ```
-
-   Um `tipo = 'adiamento'` é recusado pelo banco. Precisa de migration nova que derrube e
-   recrie a restrição incluindo o terceiro caso. **Não edite a migration antiga** (`CLAUDE.md`
-   §6.3).
-
-2. **A tabela não tem política de INSERT.** Só existe política de SELECT. Hoje ninguém escreve
-   nela direto — só o gatilho, que é `SECURITY DEFINER` e por isso passa por cima da RLS. Um
-   insert vindo do navegador **é recusado**.
-
-**Portanto o ✓ passa por uma função de servidor**, não por duas chamadas do navegador:
+### 5.2 Onde isso é gravado: `historico_contatos`, que já existia
 
 ```
-pauta_adiar(p_tipo, p_referencia_id, p_dias)   -- SECURITY DEFINER
-  1. confere que o negócio é meu e é da minha empresa
-  2. grava em pauta_adiamentos
-  3. grava a linha no pedidos_historico_status (tipo 'adiamento')
+pedido_id           o negócio
+usuario_id          quem registrou
+tipo                'retorno'
+descricao           ← o motivo
+data_contato        hoje
+proximo_contato_em  ← a data de retorno
 ```
 
-As três coisas na mesma transação. **Se forem duas chamadas separadas do navegador, uma pode
-acontecer e a outra não** — e aí o item some da pauta sem registro nenhum, ou fica registrado
-um adiamento que não adiou nada. É o tipo de divergência que só aparece meses depois, quando
-alguém pergunta "por que esse negócio sumiu da minha lista?".
+**Zero tabela nova.** É o campo "próximo contato agendado" removido da tela do negócio em
+08/2026 por nunca ter sido preenchido — e ele nunca foi preenchido porque o MOMENTO de
+perguntar estava errado. No cadastro de um negócio novo ninguém sabe quando vai voltar a
+falar; na hora de tirar da pauta, sabe. É a informação que a pessoa acabou de receber.
 
-A política de SELECT do histórico já libera qualquer pessoa da empresa, então o vendedor vê o
-próprio adiamento e o gestor também. Nenhuma mudança de permissão é necessária.
+### 5.3 Três coisas passam a funcionar sem código novo
 
-> **Não confundir com `historico_alteracoes`**, que é outra tabela, para auditoria, e cuja
-> política de SELECT é **só de gestor**. Se o adiamento fosse para lá, quem adiou não
-> conseguiria ver o próprio registro.
+1. **O painel do negócio mostra** — `Negocios.tsx:2684` já desenha `historico_contatos`, com
+   ícone, texto, data e autor. E `contactIcons[tipo] ?? MessageSquare` cai num ícone padrão
+   quando o tipo é desconhecido: um tipo novo não quebra a tela.
+2. **O Calendário mostra** — `use-eventos.ts:114-117` já transforma `proximo_contato_em` em
+   compromisso na agenda.
+3. **A tela grava direto, sem função de servidor** — a política de INSERT é "o negócio é meu,
+   ou sou gestor da empresa". Sumiu a `SECURITY DEFINER` e a transação atômica que a versão
+   anterior deste plano exigia. **Uma fase inteira deixou de existir.**
 
-### 5.4 Os dois botões, e a diferença entre eles
+E a política de SELECT é por empresa, então o motivo fica visível para a equipe — que era o
+pedido de "registrar no histórico do negócio".
+
+### 5.4 O que o adiamento NÃO faz
+
+Não toca no negócio: não move etapa, não mexe em valor, não escreve em `prazo_resposta`.
+Empurrar aquela coluna seria mais barato e faria ela mudar de significado — de "data de
+fechamento" para "quando eu vou cobrar" — e todo relatório que a lê passaria a mentir. É o
+mesmo estrago do `fechado_em` (§1.5).
+
+### 5.5 O item volta com reposição — decisão consciente do dono do produto
+
+Ao adiar, **outro item entra no lugar**: a pauta é calculada na hora, o adiado sai dos
+candidatos e o próximo por valor sobe.
+
+> ⚠️ **A ressalva, registrada porque foi levantada e decidida contra.** Com 193 negócios
+> candidatos e teto de 7, repor sempre significa que **a pauta nunca zera**: adia 7, aparecem
+> outros 7. Isso contraria o princípio de §3.1 — "a pauta precisa poder zerar hoje" —, que é o
+> que a separa das 33 notificações não lidas.
+>
+> **O que compensa é o atrito do motivo.** Adiar deixou de ser um clique e passou a exigir
+> justificar e marcar data. Reposição sem custo vira esteira; reposição que cobra uma frase e
+> uma decisão, não. Foi essa a razão de aceitar.
+>
+> Se na prática a MD passar a adiar em massa, o conserto conhecido é descontar do teto do dia
+> o que foi adiado — uma linha na função. Medir antes de mexer.
+
+### 5.6 Os dois botões
 
 | botão | o que faz |
 |---|---|
 | **"Montar follow-up"** (laranja) | abre o negócio para resolver de verdade |
-| **✓** | "hoje não" — some por 3 dias, com registro no histórico |
+| **✓** | pede motivo e data de retorno, e tira da pauta até lá |
 
-Resolver de verdade — mudar a etapa, marcar como perdido — tira o item da pauta sem precisar do
-✓, porque a condição "está numa etapa aberta" deixa de valer.
+Resolver de verdade — mudar a etapa, marcar como perdido — tira o item da pauta sem precisar
+do ✓, porque a condição "está numa etapa aberta" deixa de valer.
 
----
 
 ## 6. A aba Automação vira de verdade
 
@@ -412,18 +423,34 @@ notar. Chamando a mesma função, é impossível divergirem.
 
 Cada fase é commitável e reversível sozinha.
 
-| # | fase | por que nesta ordem |
-|---|---|---|
-| 1 | Migration: `pauta_adiamentos`, restrição do histórico, chaves de configuração | o resto depende do banco existir |
-| 2 | A função de banco que monta a pauta (`SECURITY DEFINER`) | é o coração; dá para conferir por consulta antes de existir tela |
-| 3 | `pauta_adiar` (RPC), com adiamento + histórico na mesma transação | precisa existir antes do ✓ aparecer |
-| 4 | A tela "Hoje" + item na barra lateral + registro na seção | primeira coisa que o Lucas vê funcionando |
-| 5 | A aba Automação de verdade | depois que a pauta existe, ajustar faz sentido |
-| 6 | Remetente próprio (DNS + painel) — **passo do Lucas** | independente das outras; pode andar em paralelo |
-| 7 | Os três modelos de e-mail de autenticação | depois do remetente, senão testa no lugar errado |
-| 8 | Resumo diário: modelo + agendamento | por último; é o único que depende de tudo |
+| # | fase | estado | por que nesta ordem |
+|---|---|---|---|
+| 1 | Banco: seção "Hoje" nos presets (desligada no padrão, ligada na MD) e índice de retorno | ✅ **aplicado em 24/08** | o resto depende do terreno existir |
+| 2 | `pauta_do_dia_de()` + o invólucro `pauta_do_dia()` | ✅ **aplicado em 24/08** | é o coração; dá para conferir por consulta antes de existir tela |
+| 3 | A tela "Hoje" — pauta, item na barra lateral, e o diálogo de motivo + data de retorno | ⬜ | primeira coisa que o Lucas vê funcionando |
+| 4 | A aba Automação de verdade, incluindo os dias de envio | ⬜ | depois que a pauta existe, ajustar faz sentido |
+| 5 | Remetente próprio (DNS + painel) — **passo do Lucas** | ⬜ | independente das outras; pode andar em paralelo |
+| 6 | Os três modelos de e-mail de autenticação | ⬜ | depois do remetente, senão testa no lugar errado |
+| 7 | Resumo diário: modelo + agendamento | ⬜ | por último; é o único que depende de tudo |
 
-**As fases 6 e 7 são as únicas que dependem de ação fora do código.**
+**A antiga fase 3 (`pauta_adiar`, uma RPC com escrita atômica) deixou de existir** quando o
+adiamento passou a viver em `historico_contatos`, cuja política de INSERT já permite a tela
+gravar. Ver §5.
+
+**As fases 5 e 6 são as únicas que dependem de ação fora do código.**
+
+### O que já está no banco (aplicado e conferido em 24/08/2026)
+
+```
+pauta_do_dia()                    -> a pauta de quem chama, sem parâmetro
+pauta_do_dia_de(usuario)          -> o núcleo; só service_role executa
+idx_historico_contatos_pedido_retorno
+secao_preset_itens                -> 'hoje' false no Padrão, true no da MD
+```
+
+Testado: a pauta da Érika devolve 7 itens (1 compromisso + 6 negócios, R$ 3.670.382); um
+vendedor comum lê a própria pela `pauta_do_dia()` e **recebe `permission denied`** ao tentar
+`pauta_do_dia_de` com o id de outra pessoa; empresa com a seção desligada devolve **zero**.
 
 ---
 

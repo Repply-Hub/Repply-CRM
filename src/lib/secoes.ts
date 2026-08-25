@@ -16,6 +16,7 @@
  */
 
 export type SecaoId =
+  | 'hoje'
   | 'dashboard'
   | 'pipeline'
   | 'clientes'
@@ -47,6 +48,11 @@ export interface Secao {
 }
 
 export const SECOES: Secao[] = [
+  // A pauta do dia. Nasce DESLIGADA no preset padrão e ligada só no da MD Representações
+  // (decisão do dono do produto em 24/08/2026: validar na MD antes de abrir para o resto).
+  // Mesmo caminho que o Portal já seguia. Usa a permissão de Negócios porque é a lista de
+  // negócios da pessoa, recortada — quem não pode ver negócio não pode ver a pauta deles.
+  { id: 'hoje',          label: 'Hoje',          rota: '/hoje',          desligavel: true,  modulosPermissao: ['pipeline', 'pedidos'] },
   { id: 'dashboard',     label: 'Dashboard',     rota: '/dashboard',     desligavel: true,  modulosPermissao: ['dashboard'] },
   { id: 'pipeline',      label: 'Negócios',      rota: '/app',           rotasExtras: ['/pedidos'], desligavel: false, modulosPermissao: ['pipeline', 'pedidos'] },
   { id: 'clientes',      label: 'Clientes',      rota: '/clientes',      rotasExtras: ['/contatos'], desligavel: false, modulosPermissao: ['clientes', 'contatos'] },
