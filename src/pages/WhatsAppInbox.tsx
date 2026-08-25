@@ -5730,17 +5730,25 @@ export default function WhatsAppInbox() {
               // (que pode não ler bem num dos dois temas), a cor vira só um
               // pontinho — o texto fica na cor neutra de sempre, já validada.
               <Tooltip>
+                {/* asChild precisa de um elemento que aceite `ref` de verdade
+                    para o Radix medir a posição do tooltip — `Badge` é
+                    função simples, sem `forwardRef` (não editamos a
+                    primitiva, ver CLAUDE.md §5.4), então o alvo do asChild é
+                    este `span` nativo. O `ml-auto` migrou do Badge pro span,
+                    que é quem agora é o filho direto do flex. */}
                 <TooltipTrigger asChild>
-                  <Badge
-                    variant="outline"
-                    className="ml-auto h-4 max-w-[100px] gap-1 truncate px-1.5 py-0 text-[9px] font-medium leading-none text-muted-foreground"
-                  >
-                    <span
-                      className="h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: infoCorInstanciaAtual.hex }}
-                    />
-                    <span className="truncate">{apelidoInstancia}</span>
-                  </Badge>
+                  <span className="ml-auto min-w-0">
+                    <Badge
+                      variant="outline"
+                      className="h-4 max-w-[100px] gap-1 truncate px-1.5 py-0 text-[9px] font-medium leading-none text-muted-foreground"
+                    >
+                      <span
+                        className="h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: infoCorInstanciaAtual.hex }}
+                      />
+                      <span className="truncate">{apelidoInstancia}</span>
+                    </Badge>
+                  </span>
                 </TooltipTrigger>
                 <TooltipContent side="top">{apelidoInstancia}</TooltipContent>
               </Tooltip>
@@ -5748,17 +5756,19 @@ export default function WhatsAppInbox() {
               apelidoInstancia && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "ml-auto h-4 max-w-[100px] truncate px-1.5 py-0 text-[9px] font-medium leading-none",
-                        infoCorInstanciaAtual.tipo === "preset"
-                          ? CLASSES_BADGE_INSTANCIA[infoCorInstanciaAtual.cor]
-                          : CLASSE_BADGE_INSTANCIA_SEM_COR,
-                      )}
-                    >
-                      <span className="truncate">{apelidoInstancia}</span>
-                    </Badge>
+                    <span className="ml-auto min-w-0">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "h-4 max-w-[100px] truncate px-1.5 py-0 text-[9px] font-medium leading-none",
+                          infoCorInstanciaAtual.tipo === "preset"
+                            ? CLASSES_BADGE_INSTANCIA[infoCorInstanciaAtual.cor]
+                            : CLASSE_BADGE_INSTANCIA_SEM_COR,
+                        )}
+                      >
+                        <span className="truncate">{apelidoInstancia}</span>
+                      </Badge>
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent side="top">{apelidoInstancia}</TooltipContent>
                 </Tooltip>
