@@ -102,6 +102,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -5715,43 +5716,53 @@ export default function WhatsAppInbox() {
           // `gap-2.5` ao lado dele — alinha com o nome/prévia da conversa em
           // vez de começar embaixo do avatar.
           <div className="flex items-center gap-2 pl-[50px]">
+            {naoAtribuida && (
+              <Badge
+                variant="outline"
+                className="h-4 max-w-[88px] truncate border-dashed border-orange-400 px-1.5 py-0 text-[9px] font-medium leading-none text-orange-600 dark:border-orange-500/60 dark:text-orange-400"
+              >
+                <span className="truncate">Não atribuído</span>
+              </Badge>
+            )}
             {apelidoInstancia && infoCorInstanciaAtual.tipo === "hex" ? (
               // Hex livre não tem par claro/escuro calculado (ver
               // wa-instancia-cores.ts), então em vez de colorir borda/texto
               // (que pode não ler bem num dos dois temas), a cor vira só um
               // pontinho — o texto fica na cor neutra de sempre, já validada.
-              <Badge
-                variant="outline"
-                className="h-4 max-w-[180px] gap-1 truncate px-1.5 py-0 text-[9px] font-medium leading-none text-muted-foreground"
-              >
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: infoCorInstanciaAtual.hex }}
-                />
-                <span className="truncate">{apelidoInstancia}</span>
-              </Badge>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="outline"
+                    className="ml-auto h-4 max-w-[100px] gap-1 truncate px-1.5 py-0 text-[9px] font-medium leading-none text-muted-foreground"
+                  >
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: infoCorInstanciaAtual.hex }}
+                    />
+                    <span className="truncate">{apelidoInstancia}</span>
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent side="top">{apelidoInstancia}</TooltipContent>
+              </Tooltip>
             ) : (
               apelidoInstancia && (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "h-4 max-w-[180px] truncate px-1.5 py-0 text-[9px] font-medium leading-none",
-                    infoCorInstanciaAtual.tipo === "preset"
-                      ? CLASSES_BADGE_INSTANCIA[infoCorInstanciaAtual.cor]
-                      : CLASSE_BADGE_INSTANCIA_SEM_COR,
-                  )}
-                >
-                  <span className="truncate">{apelidoInstancia}</span>
-                </Badge>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "ml-auto h-4 max-w-[100px] truncate px-1.5 py-0 text-[9px] font-medium leading-none",
+                        infoCorInstanciaAtual.tipo === "preset"
+                          ? CLASSES_BADGE_INSTANCIA[infoCorInstanciaAtual.cor]
+                          : CLASSE_BADGE_INSTANCIA_SEM_COR,
+                      )}
+                    >
+                      <span className="truncate">{apelidoInstancia}</span>
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">{apelidoInstancia}</TooltipContent>
+                </Tooltip>
               )
-            )}
-            {naoAtribuida && (
-              <Badge
-                variant="outline"
-                className="ml-auto h-4 max-w-[88px] truncate border-dashed border-orange-400 px-1.5 py-0 text-[9px] font-medium leading-none text-orange-600 dark:border-orange-500/60 dark:text-orange-400"
-              >
-                <span className="truncate">Não atribuído</span>
-              </Badge>
             )}
           </div>
         )}
