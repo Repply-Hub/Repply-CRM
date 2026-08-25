@@ -1,23 +1,17 @@
-<!--
-  Resumo diário da pauta — NÃO vai para painel nenhum.
+/**
+ * O HTML do resumo diário — a ÚNICA cópia.
+ *
+ * Ficava em `supabase/templates/resumo-diario.html` e veio para dentro da função em
+ * 25/08/2026, quando a função passou a existir. Manter os dois seria contrariar o que o
+ * próprio README daquela pasta diz: separados, um dia divergem no estilo. Os três de
+ * autenticação continuam lá, porque quem os consome é o painel do Supabase, não este código.
+ *
+ * As restrições de e-mail que moldaram este HTML estão explicadas naquele README: fonte de
+ * sistema (a da marca vem de servidor externo e os clientes removem) e estilo inline em
+ * tabela (bloco `<style>` é descartado, e flex quebra no Outlook).
+ */
 
-  Este é o único dos quatro que o Supabase Auth não conhece. Ele é montado pela função de
-  servidor do resumo diário, que chama `pauta_do_dia_de(usuario)` — a MESMA função que a tela
-  "Hoje" usa — e substitui os marcadores abaixo.
-
-  Marcadores (maiúsculas, sem ponto — não confundir com `{{ .Algo }}` do Supabase):
-
-    {{PAUTA_NOME}}       primeiro nome de quem recebe
-    {{PAUTA_MANCHETE}}   "5 coisas esperam você"
-    {{PAUTA_VALOR}}      "R$ 2.104.300 em jogo"  (ou vazio, quando não há valor)
-    {{PAUTA_ITENS}}      os blocos de item, montados em laço (ver o gabarito no fim)
-    {{PAUTA_LINK}}       endereço da tela "Hoje"
-
-  🔴 QUEM ESTIVER COM A PAUTA VAZIA NÃO RECEBE NADA. Mandar "você não tem nada hoje" todo dia
-  é o caminho mais rápido para a pessoa criar uma regra de filtro e nunca mais ver o e-mail.
-  A decisão de não enviar mora na função, não aqui.
--->
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;background:#f5f5f4;">
+export const MODELO_RESUMO = String.raw`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;background:#f5f5f4;">
   <tr>
     <td align="center" style="padding:32px 16px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#ffffff;border-radius:14px;border:1px solid #e7e5e4;">
@@ -86,18 +80,10 @@
 
     </td>
   </tr>
-</table>
+</table>`;
 
-<!--
-  ══════════════════════════════════════════════════════════════════════════════
-  GABARITO DE UM ITEM — a função repete este bloco para cada item da pauta e
-  junta tudo em {{PAUTA_ITENS}}. Fica aqui, em comentário, para o HTML do item
-  viver ao lado do HTML do e-mail: separados, um dia divergem no estilo.
-
-  Substituir: ITEM_SELO, ITEM_VALOR, ITEM_TITULO, ITEM_DETALHE
-  ══════════════════════════════════════════════════════════════════════════════
-
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;border:1px solid #e7e5e4;border-radius:10px;">
+/** Um item da pauta. A função repete isto e junta em `{{PAUTA_ITENS}}`. */
+export const MODELO_ITEM = String.raw`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;border:1px solid #e7e5e4;border-radius:10px;">
     <tr>
       <td style="padding:16px 18px;">
         <p style="margin:0 0 6px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:#dc2626;">
@@ -112,5 +98,4 @@
         </p>
       </td>
     </tr>
-  </table>
--->
+  </table>`;
