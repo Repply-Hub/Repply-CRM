@@ -612,7 +612,11 @@ export default function Obras() {
             </div>
           </div>
 
-          <TabsContent value="lista" className="space-y-6 mt-0 flex-1 flex flex-col min-h-0">
+          {/* 🔴 `data-[state=active]:flex`, NUNCA `flex` cru, nas duas abas: a aba inativa
+              fica no documento com o atributo `hidden`, e uma classe de display crua vence o
+              `hidden` na cascata — a aba escondida vira uma caixa vazia esticável que rouba
+              metade da altura da aba visível (era o vão gigante acima do mapa). */}
+          <TabsContent value="lista" className="space-y-6 mt-0 flex-1 data-[state=active]:flex flex-col min-h-0">
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -778,7 +782,7 @@ export default function Obras() {
               cresce com flex-1 — nada de h-full percentual, que dentro de item flex sem
               altura explícita resolve para "auto" e deixava o conjunto encolhido no rodapé.
               O lg:grid-rows-1 (linha de 1fr) é o que estica painel e mapa na vertical. */}
-          <TabsContent value="mapa" className="mt-0 flex-1 min-h-0 flex flex-col">
+          <TabsContent value="mapa" className="mt-0 flex-1 min-h-0 data-[state=active]:flex flex-col">
             <div className="flex-1 min-h-0 flex flex-col gap-4 lg:grid lg:grid-cols-[360px_1fr] lg:grid-rows-1">
               <Card className="flex flex-col min-h-0 overflow-hidden max-h-[40dvh] lg:max-h-none p-0">
                 <MapaObrasPainel
