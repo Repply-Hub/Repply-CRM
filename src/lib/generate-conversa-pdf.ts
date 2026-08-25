@@ -9,6 +9,11 @@ export interface ConversaExportRow {
   mensagem: string;
 }
 
+export interface ConversaParaExportar {
+  nomeContato: string;
+  linhas: ConversaExportRow[];
+}
+
 const BRAND_ORANGE: [number, number, number] = [240, 106, 0];
 const BRAND_ORANGE_LIGHT: [number, number, number] = [255, 237, 222];
 
@@ -48,23 +53,29 @@ function sanitizeForPdf(texto: string): string {
   return resultado;
 }
 
-export async function generateConversaPdf(linhas: ConversaExportRow[], contato: string, periodo: string) {
-  const doc = new jsPDF('portrait', 'mm', 'a4');
-  const pageWidth = doc.internal.pageSize.getWidth();
-
+// Cabeçalho de marca (faixa laranja + logo/nome) e título da seção — usado
+// tanto na conversa única quanto em cada conversa dentro da exportação "todas
+// as conversas", onde cada uma começa em página nova com o próprio título no
+// topo, pra dar pra saber de cara, rolando o PDF, onde uma conversa termina e
+// a próxima começa.
+function desenharCabecalho(
+  doc: jsPDF,
+  pageWidth: number,
+  img: HTMLImageElement | null,
+  titulo: string,
+  periodo: string,
+) {
   doc.setFillColor(...BRAND_ORANGE);
   doc.rect(0, 0, pageWidth, 3, 'F');
 
-  try {
-    const img = await loadImage(logoUrl);
+  if (img) {
     const maxWidth = 26;
     const maxHeight = 10;
     const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
     const imgWidth = img.width * ratio;
     const imgHeight = img.height * ratio;
-
     doc.addImage(img, 'WEBP', 14, 8, imgWidth, imgHeight);
-  } catch {
+  } else {
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...BRAND_ORANGE);
@@ -74,7 +85,7 @@ export async function generateConversaPdf(linhas: ConversaExportRow[], contato: 
   doc.setFontSize(15);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(50, 50, 50);
-  doc.text(`Conversa — ${sanitizeForPdf(contato)}`, 46, 13);
+  doc.text(sanitizeForPdf(titulo), 46, 13);
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
@@ -83,7 +94,14 @@ export async function generateConversaPdf(linhas: ConversaExportRow[], contato: 
   doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 46, 22.5);
 
   doc.setTextColor(0);
+}
 
+function desenharTabelaMensagens(
+  doc: jsPDF,
+  pageWidth: number,
+  rodapeLabel: string,
+  linhas: ConversaExportRow[],
+) {
   autoTable(doc, {
     startY: 28,
     head: [['Data/Hora', 'Remetente', 'Tipo', 'Mensagem']],
@@ -104,11 +122,37 @@ export async function generateConversaPdf(linhas: ConversaExportRow[], contato: 
       const pageHeight = doc.internal.pageSize.getHeight();
       doc.setFontSize(7);
       doc.setTextColor(160);
-      doc.text('MD Representações', 14, pageHeight - 6);
+      doc.text(rodapeLabel, 14, pageHeight - 6);
       doc.text(`Página ${doc.getCurrentPageInfo().pageNumber}`, pageWidth - 14, pageHeight - 6, { align: 'right' });
     },
   });
+}
+
+export async function generateConversaPdf(linhas: ConversaExportRow[], contato: string, periodo: string) {
+  const doc = new jsPDF('portrait', 'mm', 'a4');
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const img = await loadImage(logoUrl).catch(() => null);
+
+  desenharCabecalho(doc, pageWidth, img, `Conversa — ${contato}`, periodo);
+  desenharTabelaMensagens(doc, pageWidth, 'MD Representações', linhas);
 
   const nomeArquivo = contato.replace(/[^a-zA-Z0-9À-ÿ -]/g, '').trim() || 'conversa';
   doc.save(`conversa-${nomeArquivo}-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+// Exportação consolidada: um único PDF com todas as conversas, cada uma
+// começando em página nova e com o próprio nome como título no topo da
+// seção — ver comentário de `desenharCabecalho`.
+export async function generateConversasPdf(conversas: ConversaParaExportar[], periodo: string) {
+  const doc = new jsPDF('portrait', 'mm', 'a4');
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const img = await loadImage(logoUrl).catch(() => null);
+
+  conversas.forEach((conversa, i) => {
+    if (i > 0) doc.addPage();
+    desenharCabecalho(doc, pageWidth, img, `Conversa — ${conversa.nomeContato}`, periodo);
+    desenharTabelaMensagens(doc, pageWidth, conversa.nomeContato, conversa.linhas);
+  });
+
+  doc.save(`todas-as-conversas-${new Date().toISOString().slice(0, 10)}.pdf`);
 }

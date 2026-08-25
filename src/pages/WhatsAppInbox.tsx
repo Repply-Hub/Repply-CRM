@@ -91,6 +91,12 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import {
+  ConteudoDialogo,
+  CabecalhoDialogo,
+  CorpoDialogo,
+  RodapeDialogo,
+} from "@/components/shared/DialogoResponsivo";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -165,7 +171,6 @@ import {
   Eraser,
   Archive,
   ArchiveRestore,
-  CheckSquare,
   UserPlus,
   Users,
   User,
@@ -212,7 +217,7 @@ import {
   DateRangePicker,
   type DateRange,
 } from "@/components/shared/DateRangePicker";
-import type { ConversaExportRow } from "@/lib/generate-conversa-pdf";
+import type { ConversaExportRow, ConversaParaExportar } from "@/lib/generate-conversa-pdf";
 import {
   TOGGLE_LIST_CLASS,
   TOGGLE_BUTTON_CLASS,
@@ -2419,8 +2424,8 @@ function LeadSheet({
     from: new Date(2000, 0, 1),
     to: new Date(),
   }));
-  const [exportando, setExportando] = useState<"pdf" | "xlsx" | null>(null);
-  async function handleExportarConversa(formato: "pdf" | "xlsx") {
+  const [exportando, setExportando] = useState<"pdf" | "xlsx" | "md" | null>(null);
+  async function handleExportarConversa(formato: "pdf" | "xlsx" | "md") {
     setExportando(formato);
     try {
       const nomeContato = conversa.nome_contato ?? formatPhone(conversa.telefone);
@@ -2438,9 +2443,12 @@ function LeadSheet({
       if (formato === "pdf") {
         const { generateConversaPdf } = await import("@/lib/generate-conversa-pdf");
         await generateConversaPdf(linhas, nomeContato, periodoLabel);
-      } else {
+      } else if (formato === "xlsx") {
         const { generateConversaExcel } = await import("@/lib/generate-conversa-excel");
         generateConversaExcel(linhas, nomeContato);
+      } else {
+        const { generateConversaMarkdown } = await import("@/lib/generate-conversa-markdown");
+        generateConversaMarkdown(linhas, nomeContato, periodoLabel);
       }
       setExportDialogOpen(false);
     } catch (err) {
@@ -3458,7 +3466,7 @@ function LeadSheet({
                   </Label>
                   <DateRangePicker value={exportRange} onChange={setExportRange} />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <button
                     type="button"
                     disabled={!!exportando}
@@ -3484,6 +3492,19 @@ function LeadSheet({
                       <FileSpreadsheet className="h-6 w-6 text-muted-foreground" />
                     )}
                     Excel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!!exportando}
+                    onClick={() => handleExportarConversa("md")}
+                    className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-sm font-medium hover:bg-muted/80 hover:border-primary/50 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    {exportando === "md" ? (
+                      <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+                    ) : (
+                      <FileText className="h-6 w-6 text-muted-foreground" />
+                    )}
+                    Markdown
                   </button>
                 </div>
               </div>
@@ -3523,6 +3544,7 @@ export default function WhatsAppInbox() {
   const { data: vendedores = [] } = useVendedores();
   const setResponsaveis = useWaSetResponsaveis();
   const addNota = useWaAddNota();
+
   const [direcionarOpen, setDirecionarOpen] = useState(false);
   const [buscaDirecionar, setBuscaDirecionar] = useState("");
   const vendedoresDirecionar = useMemo(() => {
@@ -3990,7 +4012,19 @@ export default function WhatsAppInbox() {
   const [confirmLimpar, setConfirmLimpar] = useState(false);
   const [confirmDeletar, setConfirmDeletar] = useState(false);
   const [modoSelecao, setModoSelecao] = useState(false);
+  // O modo de seleção da sidebar serve duas ações diferentes (excluir em
+  // massa e exportar) — este campo decide qual botão de ação aparece no
+  // rodapé, sem duplicar todo o mecanismo de seleção (toggleSelecao,
+  // toggleTodas, a lista com checkbox etc) para cada uma.
+  const [finalidadeSelecao, setFinalidadeSelecao] = useState<
+    "excluir" | "exportar" | null
+  >(null);
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+  // "Selecionar todas" só enxerga a aba (Em aberto/Fechado) visível no
+  // momento — pergunta antes de incluir a outra, em vez de silenciosamente
+  // exportar/excluir só metade das conversas.
+  const [confirmSelecionarTodasOpen, setConfirmSelecionarTodasOpen] =
+    useState(false);
   const [confirmDeletarMassa, setConfirmDeletarMassa] = useState(false);
   const [leadSheetOpen, setLeadSheetOpen] = useState(false);
   // Busca por texto entre as mensagens já carregadas da conversa ativa
@@ -4265,7 +4299,7 @@ export default function WhatsAppInbox() {
   // agora usa exatamente os mesmos filtros em vez de ser restrita a "atribuído
   // a mim".
   const filtrosDropdownContent = (
-    <div className="flex flex-col gap-0.5 w-44">
+    <div className="flex flex-col gap-0.5 w-60">
       {/* Conversas fechadas não têm responsável/atribuição, então "Conversa"
           (Todos/Não atribuído/Meus/Outros atendentes) não se aplica — só o
           filtro de Instância faz sentido. */}
@@ -4408,7 +4442,12 @@ export default function WhatsAppInbox() {
                 )}
               </button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-56 p-0">
+            <PopoverContent
+              side="right"
+              align="end"
+              sideOffset={8}
+              className="w-56 p-0"
+            >
               <Command shouldFilter={false}>
                 <CommandInput
                   placeholder="Buscar responsável..."
@@ -4426,7 +4465,11 @@ export default function WhatsAppInbox() {
                         setFiltroResponsavel([]);
                         setFiltroResponsavelOpenDesktop(false);
                       }}
-                      className="gap-2.5"
+                      className={cn(
+                        "gap-2.5",
+                        filtroResponsavel.length === 0 &&
+                          "bg-primary/10 text-primary",
+                      )}
                     >
                       <span className="flex-1">Todos</span>
                       {filtroResponsavel.length === 0 && (
@@ -4438,7 +4481,11 @@ export default function WhatsAppInbox() {
                         key={v.id}
                         value={v.id}
                         onSelect={() => toggleFiltroResponsavel(v.id)}
-                        className="gap-2.5"
+                        className={cn(
+                          "gap-2.5",
+                          filtroResponsavel.includes(v.id) &&
+                            "bg-primary/10 text-primary",
+                        )}
                       >
                         <Avatar className="h-6 w-6 shrink-0">
                           {v.avatar_url ? (
@@ -4723,8 +4770,7 @@ export default function WhatsAppInbox() {
         } else if (confirmDeletar) {
           setConfirmDeletar(false);
         } else if (modoSelecao) {
-          setModoSelecao(false);
-          setSelecionadas(new Set());
+          sairModoSelecao();
         } else if (conversaAtiva) {
           setConversaAtivaId(null);
         }
@@ -4755,16 +4801,107 @@ export default function WhatsAppInbox() {
   }
 
   function toggleTodas() {
-    if (selecionadas.size === conversasFiltradas.length) {
-      setSelecionadas(new Set());
-    } else {
-      setSelecionadas(new Set(conversasFiltradas.map((c) => c.id)));
+    const idsAbaAtual = conversasFiltradas.map((c) => c.id);
+    if (idsAbaAtual.length === 0) return;
+    const todasDaAbaAtualMarcadas = idsAbaAtual.every((id) =>
+      selecionadas.has(id),
+    );
+    if (todasDaAbaAtualMarcadas) {
+      // Desmarca só a aba visível agora — preserva o que estiver marcado na
+      // outra aba, senão trocar de aba e clicar de novo apaga a seleção de
+      // quem não está mais visível.
+      setSelecionadas((prev) => {
+        const next = new Set(prev);
+        idsAbaAtual.forEach((id) => next.delete(id));
+        return next;
+      });
+      return;
     }
+    if (conversasOutraAba.some((c) => !selecionadas.has(c.id))) {
+      setConfirmSelecionarTodasOpen(true);
+      return;
+    }
+    setSelecionadas((prev) => new Set([...prev, ...idsAbaAtual]));
+  }
+
+  // Resolve o AlertDialog de "Selecionar todas": `incluirOutraAba` decide se
+  // a aba oposta (fechadas/abertas) entra na seleção também — sempre somando
+  // ao que já estava marcado, nunca substituindo.
+  function confirmarSelecionarTodas(incluirOutraAba: boolean) {
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      conversasFiltradas.forEach((c) => next.add(c.id));
+      if (incluirOutraAba) {
+        conversasOutraAba.forEach((c) => next.add(c.id));
+      }
+      return next;
+    });
+    setConfirmSelecionarTodasOpen(false);
   }
 
   function sairModoSelecao() {
     setModoSelecao(false);
+    setFinalidadeSelecao(null);
     setSelecionadas(new Set());
+  }
+
+  // Exportação das conversas marcadas no modo de seleção (PDF/Excel
+  // consolidado, uma seção/aba por conversa) — mesma mecânica da exportação
+  // de uma conversa (ConversaDetalhesSheet), repetida por conversa e
+  // concatenada num arquivo só.
+  const [exportSelecionadasOpen, setExportSelecionadasOpen] = useState(false);
+  const [exportSelecionadasRange, setExportSelecionadasRange] = useState<DateRange>(() => ({
+    from: new Date(2000, 0, 1),
+    to: new Date(),
+  }));
+  const [exportandoSelecionadas, setExportandoSelecionadas] = useState<"pdf" | "xlsx" | "md" | null>(null);
+  const [progressoExportSelecionadas, setProgressoExportSelecionadas] = useState<{ atual: number; total: number } | null>(null);
+  async function handleExportarSelecionadas(formato: "pdf" | "xlsx" | "md") {
+    const alvo = conversas.filter((c) => selecionadas.has(c.id));
+    setExportandoSelecionadas(formato);
+    setProgressoExportSelecionadas({ atual: 0, total: alvo.length });
+    try {
+      const conversasComMensagens: ConversaParaExportar[] = [];
+      for (let i = 0; i < alvo.length; i++) {
+        const conv = alvo[i];
+        const nomeContato = conv.nome_contato ?? formatPhone(conv.telefone);
+        const mensagensPeriodo = await fetchMensagensParaExportar(
+          conv.id,
+          exportSelecionadasRange.from,
+          exportSelecionadasRange.to,
+        );
+        if (mensagensPeriodo.length > 0) {
+          conversasComMensagens.push({
+            nomeContato,
+            linhas: buildConversaExportRows(mensagensPeriodo, nomeContato),
+          });
+        }
+        setProgressoExportSelecionadas({ atual: i + 1, total: alvo.length });
+      }
+      if (conversasComMensagens.length === 0) {
+        toast.info("Nenhuma mensagem encontrada no período selecionado.");
+        return;
+      }
+      const periodoLabel = `${format(exportSelecionadasRange.from, "dd/MM/yyyy", { locale: ptBR })} a ${format(exportSelecionadasRange.to, "dd/MM/yyyy", { locale: ptBR })}`;
+      if (formato === "pdf") {
+        const { generateConversasPdf } = await import("@/lib/generate-conversa-pdf");
+        await generateConversasPdf(conversasComMensagens, periodoLabel);
+      } else if (formato === "xlsx") {
+        const { generateConversasExcel } = await import("@/lib/generate-conversa-excel");
+        generateConversasExcel(conversasComMensagens);
+      } else {
+        const { generateConversasMarkdown } = await import("@/lib/generate-conversa-markdown");
+        generateConversasMarkdown(conversasComMensagens, periodoLabel);
+      }
+      setExportSelecionadasOpen(false);
+      sairModoSelecao();
+    } catch (err) {
+      console.error("[wa] erro ao exportar conversas selecionadas:", err);
+      toast.error("Não foi possível exportar as conversas.");
+    } finally {
+      setExportandoSelecionadas(null);
+      setProgressoExportSelecionadas(null);
+    }
   }
 
   async function handleDeletarMassa() {
@@ -4851,6 +4988,18 @@ export default function WhatsAppInbox() {
     if (filtroStatus === "fechado" && !c.arquivada) return false;
     return true;
   });
+  // Base do texto/checkbox de "Selecionar todas": só considera a aba (Em
+  // aberto/Fechado) visível agora — `selecionadas.size` sozinho não serve
+  // porque pode incluir marcações da outra aba (ver `toggleTodas`).
+  const todasDaAbaAtualSelecionadas =
+    conversasFiltradas.length > 0 &&
+    conversasFiltradas.every((c) => selecionadas.has(c.id));
+  // Conversas da aba oposta à visível agora (Fechado quando se está vendo Em
+  // aberto, e vice-versa) — sob os mesmos filtros de tipo/busca/instância já
+  // aplicados, só sem o corte por `filtroStatus`.
+  const conversasOutraAba = conversasPorTipoEBusca.filter((c) =>
+    filtroStatus === "aberto" ? c.arquivada : !c.arquivada,
+  );
 
   // Só agrupa/rotula a sidebar por instância quando a empresa realmente tem mais
   // de uma instância — caso contrário mantém a lista simples de sempre. Com o
@@ -5798,10 +5947,25 @@ export default function WhatsAppInbox() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
-                      onClick={() => setModoSelecao(true)}
-                      title="Selecionar conversas"
+                      onClick={() => {
+                        setModoSelecao(true);
+                        setFinalidadeSelecao("exportar");
+                      }}
+                      title="Exportar conversas"
                     >
-                      <CheckSquare className="h-4 w-4" />
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setModoSelecao(true);
+                        setFinalidadeSelecao("excluir");
+                      }}
+                      title="Excluir conversas"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -5920,16 +6084,16 @@ export default function WhatsAppInbox() {
                     <div
                       className={cn(
                         "h-4 w-4 rounded border flex items-center justify-center transition-colors",
-                        selecionadas.size === conversasFiltradas.length
+                        todasDaAbaAtualSelecionadas
                           ? "bg-primary border-primary"
                           : "border-border bg-background",
                       )}
                     >
-                      {selecionadas.size === conversasFiltradas.length && (
+                      {todasDaAbaAtualSelecionadas && (
                         <Check className="h-2.5 w-2.5 text-primary-foreground" />
                       )}
                     </div>
-                    {selecionadas.size === conversasFiltradas.length
+                    {todasDaAbaAtualSelecionadas
                       ? "Desmarcar todas"
                       : "Selecionar todas"}
                   </button>
@@ -5967,7 +6131,21 @@ export default function WhatsAppInbox() {
                 </div>
               </ScrollArea>
               <div className="border-t border-border px-3 py-2 mt-auto bg-muted/30 h-[4rem] flex items-center">
-                {modoSelecao ? (
+                {modoSelecao && finalidadeSelecao === "exportar" ? (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="w-full gap-2"
+                    disabled={selecionadas.size === 0}
+                    onClick={() => setExportSelecionadasOpen(true)}
+                  >
+                    <Download className="h-4 w-4" />
+                    Exportar{" "}
+                    {selecionadas.size > 0
+                      ? `(${selecionadas.size})`
+                      : "selecionadas"}
+                  </Button>
+                ) : modoSelecao ? (
                   <Button
                     variant="destructive"
                     size="sm"
@@ -6035,15 +6213,32 @@ export default function WhatsAppInbox() {
                     Conversas
                   </h2>
                   {!modoSelecao ? (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                      onClick={() => setModoSelecao(true)}
-                      title="Selecionar conversas"
-                    >
-                      <CheckSquare className="h-4 w-4" />
-                    </Button>
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          setModoSelecao(true);
+                          setFinalidadeSelecao("exportar");
+                        }}
+                        title="Exportar conversas"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          setModoSelecao(true);
+                          setFinalidadeSelecao("excluir");
+                        }}
+                        title="Excluir conversas"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
                   ) : (
                     <button
                       onClick={sairModoSelecao}
@@ -6434,16 +6629,16 @@ export default function WhatsAppInbox() {
                       <div
                         className={cn(
                           "h-4 w-4 rounded border flex items-center justify-center transition-colors",
-                          selecionadas.size === conversasFiltradas.length
+                          todasDaAbaAtualSelecionadas
                             ? "bg-primary border-primary"
                             : "border-border bg-background",
                         )}
                       >
-                        {selecionadas.size === conversasFiltradas.length && (
+                        {todasDaAbaAtualSelecionadas && (
                           <Check className="h-2.5 w-2.5 text-primary-foreground" />
                         )}
                       </div>
-                      {selecionadas.size === conversasFiltradas.length
+                      {todasDaAbaAtualSelecionadas
                         ? "Desmarcar todas"
                         : "Selecionar todas"}
                     </button>
@@ -6484,7 +6679,23 @@ export default function WhatsAppInbox() {
                   </div>
                 </ScrollArea>
 
-                {modoSelecao && (
+                {modoSelecao && finalidadeSelecao === "exportar" ? (
+                  <div className="border-t border-border px-3 py-2 bg-muted/30">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="w-full gap-2"
+                      disabled={selecionadas.size === 0}
+                      onClick={() => setExportSelecionadasOpen(true)}
+                    >
+                      <Download className="h-4 w-4" />
+                      Exportar{" "}
+                      {selecionadas.size > 0
+                        ? `(${selecionadas.size})`
+                        : "selecionadas"}
+                    </Button>
+                  </div>
+                ) : modoSelecao ? (
                   <div className="border-t border-border px-3 py-2 bg-muted/30">
                     <Button
                       variant="destructive"
@@ -6506,7 +6717,7 @@ export default function WhatsAppInbox() {
                         : "selecionadas"}
                     </Button>
                   </div>
-                )}
+                ) : null}
               </div>
             </DialogContent>
           </Dialog>
@@ -7886,6 +8097,44 @@ export default function WhatsAppInbox() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* "Selecionar todas" só enxerga a aba visível (Em aberto/Fechado) —
+          pergunta antes de deixar a outra de fora da seleção. */}
+      <AlertDialog
+        open={confirmSelecionarTodasOpen}
+        onOpenChange={setConfirmSelecionarTodasOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Incluir as conversas{" "}
+              {filtroStatus === "aberto" ? "fechadas" : "em aberto"} também?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está vendo só as conversas{" "}
+              {filtroStatus === "aberto" ? "em aberto" : "fechadas"}. Existem{" "}
+              {conversasOutraAba.length}{" "}
+              {filtroStatus === "aberto"
+                ? conversasOutraAba.length === 1
+                  ? "conversa fechada"
+                  : "conversas fechadas"
+                : "conversas em aberto"}{" "}
+              que não aparecem nesta lista.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => confirmarSelecionarTodas(false)}>
+              Só as {filtroStatus === "aberto" ? "em aberto" : "fechadas"}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmarSelecionarTodas(true)}
+            >
+              Incluir as{" "}
+              {filtroStatus === "aberto" ? "fechadas" : "em aberto"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* `leadSheetOpen` na condição, e não só `conversaAtiva`.
 
           Montado sempre que havia conversa aberta, o painel rodava os próprios
@@ -8126,6 +8375,87 @@ export default function WhatsAppInbox() {
             </Button>
           </DialogFooter>
         </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={exportSelecionadasOpen}
+        onOpenChange={setExportSelecionadasOpen}
+      >
+        <ConteudoDialogo className="sm:max-w-sm">
+          <CabecalhoDialogo>
+            <DialogTitle>
+              Exportar {selecionadas.size}{" "}
+              {selecionadas.size === 1
+                ? "conversa selecionada"
+                : "conversas selecionadas"}
+            </DialogTitle>
+            <DialogDescription>
+              Escolha o período e o formato do arquivo. Cada conversa aparece com
+              o nome do contato ou grupo no topo, para separar uma da outra.
+            </DialogDescription>
+          </CabecalhoDialogo>
+          <CorpoDialogo>
+            <div className="space-y-4 pt-1">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Período
+                </Label>
+                <DateRangePicker
+                  value={exportSelecionadasRange}
+                  onChange={setExportSelecionadasRange}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  disabled={!!exportandoSelecionadas}
+                  onClick={() => handleExportarSelecionadas("pdf")}
+                  className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-sm font-medium hover:bg-muted/80 hover:border-primary/50 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {exportandoSelecionadas === "pdf" ? (
+                    <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+                  ) : (
+                    <FileDown className="h-6 w-6 text-muted-foreground" />
+                  )}
+                  PDF
+                </button>
+                <button
+                  type="button"
+                  disabled={!!exportandoSelecionadas}
+                  onClick={() => handleExportarSelecionadas("xlsx")}
+                  className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-sm font-medium hover:bg-muted/80 hover:border-primary/50 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {exportandoSelecionadas === "xlsx" ? (
+                    <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="h-6 w-6 text-muted-foreground" />
+                  )}
+                  Excel
+                </button>
+                <button
+                  type="button"
+                  disabled={!!exportandoSelecionadas}
+                  onClick={() => handleExportarSelecionadas("md")}
+                  className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-sm font-medium hover:bg-muted/80 hover:border-primary/50 transition-all disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {exportandoSelecionadas === "md" ? (
+                    <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
+                  ) : (
+                    <FileText className="h-6 w-6 text-muted-foreground" />
+                  )}
+                  Markdown
+                </button>
+              </div>
+              {progressoExportSelecionadas && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Buscando mensagens: conversa{" "}
+                  {progressoExportSelecionadas.atual} de{" "}
+                  {progressoExportSelecionadas.total}…
+                </p>
+              )}
+            </div>
+          </CorpoDialogo>
+        </ConteudoDialogo>
       </Dialog>
     </AppLayout>
   );
