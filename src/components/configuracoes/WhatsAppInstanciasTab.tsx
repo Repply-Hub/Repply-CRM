@@ -89,23 +89,27 @@ interface InstanciaRow extends WaConfig {
   usuarios: UsuarioOpcao[];
 }
 
-// ─── Combobox de usuários com busca ──────────────────────────────────────────
+// ─── Combobox de usuários com busca (seleção múltipla) ───────────────────────
 
-function UsuarioCombobox({
+function UsuarioMultiCombobox({
   usuarios,
   value,
   onChange,
-  placeholder = 'Selecione um usuário...',
+  placeholder = 'Selecione usuários...',
   emptyText = 'Nenhum usuário encontrado.',
 }: {
   usuarios: UsuarioOpcao[];
-  value: string;
-  onChange: (v: string) => void;
+  value: string[];
+  onChange: (v: string[]) => void;
   placeholder?: string;
   emptyText?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const selected = usuarios.find(u => u.usuario_id === value);
+  const selected = usuarios.filter(u => value.includes(u.usuario_id));
+
+  function toggle(id: string) {
+    onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id]);
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -114,16 +118,23 @@ function UsuarioCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between font-normal"
+          className="w-full h-auto min-h-9 justify-between font-normal"
         >
-          {selected ? (
-            <span className="flex items-center gap-2 truncate">
-              {selected.nome}
-              <span className="text-xs text-muted-foreground capitalize">({selected.role})</span>
-            </span>
-          ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
-          )}
+          <div className="flex flex-1 flex-wrap items-center gap-1 py-0.5 text-left">
+            {selected.length === 0 ? (
+              <span className="text-muted-foreground font-normal">{placeholder}</span>
+            ) : selected.length <= 2 ? (
+              selected.map(u => (
+                <Badge key={u.usuario_id} variant="secondary" className="font-normal">
+                  {u.nome}
+                </Badge>
+              ))
+            ) : (
+              <Badge variant="secondary" className="font-normal">
+                {selected.length} usuários selecionados
+              </Badge>
+            )}
+          </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -133,20 +144,20 @@ function UsuarioCombobox({
           <CommandList>
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
-              {usuarios.map(u => (
-                <CommandItem
-                  key={u.usuario_id}
-                  value={u.nome}
-                  onSelect={() => {
-                    onChange(u.usuario_id === value ? '' : u.usuario_id);
-                    setOpen(false);
-                  }}
-                >
-                  <Check className={cn('mr-2 h-4 w-4 shrink-0', value === u.usuario_id ? 'opacity-100' : 'opacity-0')} />
-                  <span className="flex-1 truncate">{u.nome}</span>
-                  <span className="ml-2 text-xs text-muted-foreground capitalize">({u.role})</span>
-                </CommandItem>
-              ))}
+              {usuarios.map(u => {
+                const isSelected = value.includes(u.usuario_id);
+                return (
+                  <CommandItem
+                    key={u.usuario_id}
+                    value={u.nome}
+                    onSelect={() => toggle(u.usuario_id)}
+                  >
+                    <Check className={cn('mr-2 h-4 w-4 shrink-0', isSelected ? 'opacity-100' : 'opacity-0')} />
+                    <span className="flex-1 truncate">{u.nome}</span>
+                    <span className="ml-2 text-xs text-muted-foreground capitalize">({u.role})</span>
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           </CommandList>
         </Command>
@@ -278,11 +289,11 @@ function VincularDialog({
   todosUsuarios: UsuarioOpcao[];
   onClose: () => void;
 }) {
-  const [selectedUsuarioId, setSelectedUsuarioId] = useState('');
+  const [selectedUsuarioIds, setSelectedUsuarioIds] = useState<string[]>([]);
   const [vincularTodos, setVincularTodos] = useState(false);
   const linkMutation = useAdminLinkInstance();
 
-  useEffect(() => { if (!open) { setSelectedUsuarioId(''); setVincularTodos(false); } }, [open]);
+  useEffect(() => { if (!open) { setSelectedUsuarioIds([]); setVincularTodos(false); } }, [open]);
 
   // Usuários ainda não vinculados a ESTA instância
   const jaVinculados = new Set(instancia.usuarios.map(u => u.usuario_id));
@@ -293,8 +304,8 @@ function VincularDialog({
       linkMutation.mutate({ instanceId: instancia.id, targetUsuarioIds: disponiveis.map(u => u.usuario_id) }, { onSuccess: onClose });
       return;
     }
-    if (!selectedUsuarioId) return;
-    linkMutation.mutate({ instanceId: instancia.id, targetUsuarioId: selectedUsuarioId }, { onSuccess: onClose });
+    if (selectedUsuarioIds.length === 0) return;
+    linkMutation.mutate({ instanceId: instancia.id, targetUsuarioIds: selectedUsuarioIds }, { onSuccess: onClose });
   }
 
   return (
@@ -331,10 +342,10 @@ function VincularDialog({
                 />
               </div>
               {!vincularTodos && (
-                <UsuarioCombobox
+                <UsuarioMultiCombobox
                   usuarios={disponiveis}
-                  value={selectedUsuarioId}
-                  onChange={setSelectedUsuarioId}
+                  value={selectedUsuarioIds}
+                  onChange={setSelectedUsuarioIds}
                 />
               )}
             </>
@@ -344,7 +355,7 @@ function VincularDialog({
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
             onClick={handleVincular}
-            disabled={(!vincularTodos && !selectedUsuarioId) || linkMutation.isPending || disponiveis.length === 0}
+            disabled={(!vincularTodos && selectedUsuarioIds.length === 0) || linkMutation.isPending || disponiveis.length === 0}
           >
             {linkMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
             Vincular
@@ -366,11 +377,11 @@ function NovaInstanciaDialog({
   todosUsuarios: UsuarioOpcao[];
   onClose: () => void;
 }) {
-  const [selectedUsuarioId, setSelectedUsuarioId] = useState('');
+  const [selectedUsuarioIds, setSelectedUsuarioIds] = useState<string[]>([]);
   const [vincularTodos, setVincularTodos] = useState(false);
   const createMutation = useAdminCreateInstance();
 
-  useEffect(() => { if (!open) { setSelectedUsuarioId(''); setVincularTodos(false); } }, [open]);
+  useEffect(() => { if (!open) { setSelectedUsuarioIds([]); setVincularTodos(false); } }, [open]);
 
   function handleCriar() {
     if (vincularTodos) {
@@ -380,7 +391,10 @@ function NovaInstanciaDialog({
       );
       return;
     }
-    createMutation.mutate({ targetUsuarioId: selectedUsuarioId || undefined }, { onSuccess: onClose });
+    createMutation.mutate(
+      { targetUsuarioIds: selectedUsuarioIds.length > 0 ? selectedUsuarioIds : undefined },
+      { onSuccess: onClose },
+    );
   }
 
   return (
@@ -416,12 +430,12 @@ function NovaInstanciaDialog({
           {!vincularTodos && (
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">
-                Vincular a usuário <span className="font-normal">(opcional)</span>
+                Vincular a usuário(s) <span className="font-normal">(opcional)</span>
               </label>
-              <UsuarioCombobox
+              <UsuarioMultiCombobox
                 usuarios={todosUsuarios}
-                value={selectedUsuarioId}
-                onChange={setSelectedUsuarioId}
+                value={selectedUsuarioIds}
+                onChange={setSelectedUsuarioIds}
                 placeholder="Sem vínculo por enquanto..."
               />
             </div>

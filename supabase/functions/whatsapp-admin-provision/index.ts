@@ -130,12 +130,14 @@ serve(async (req) => {
       const webhookRes = await fetch(`${UAZAPI_BASE_URL}/webhook`, {
         method: "POST",
         headers: { "Content-Type": "application/json", token },
-        body: JSON.stringify({ url: webhookUrl, enabled: true, events: "All" }),
+        body: JSON.stringify({ url: webhookUrl, enabled: true, events: ["All"] }),
       });
 
       if (!webhookRes.ok) {
+        const webhookText = await webhookRes.text().catch(() => "");
+        console.error("[whatsapp-admin-provision] erro em /webhook", { status: webhookRes.status, body: webhookText });
         await deleteOrphan(UAZAPI_BASE_URL, token);
-        return json({ error: "Erro ao configurar webhook na uazapi" }, 500);
+        return json({ error: "Erro ao configurar webhook na uazapi", status: webhookRes.status, detail: webhookText }, 500);
       }
 
       const { data: newInst, error: insertError } = await supabase

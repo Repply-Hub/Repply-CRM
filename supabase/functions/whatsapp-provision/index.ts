@@ -220,7 +220,7 @@ serve(async (req) => {
       const webhookRes = await fetch(`${UAZAPI_BASE_URL}/webhook`, {
         method: "POST",
         headers: { "Content-Type": "application/json", token },
-        body: JSON.stringify({ url: webhookUrl, enabled: true, events: "All" }),
+        body: JSON.stringify({ url: webhookUrl, enabled: true, events: ["All"] }),
       });
       const webhookText = await webhookRes.text().catch(() => "");
       if (!webhookRes.ok) {

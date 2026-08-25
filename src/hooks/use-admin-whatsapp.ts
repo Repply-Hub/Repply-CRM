@@ -16,7 +16,10 @@ async function callAdminProvision(body: Record<string, unknown>) {
     headers: { Authorization: `Bearer ${session.access_token}` },
   });
   if (res.error) throw res.error;
-  if (res.data?.error) throw new Error(res.data.error);
+  if (res.data?.error) {
+    const detail = res.data.detail ? `: ${res.data.detail}` : '';
+    throw new Error(`${res.data.error}${detail}`);
+  }
   return res.data;
 }
 

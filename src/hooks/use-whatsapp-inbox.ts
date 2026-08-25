@@ -1366,9 +1366,17 @@ export function useWaAddNota() {
       if (error) throw error;
       return data as WaMensagem;
     },
+    // O `.insert().select()` devolve só as colunas de `whatsapp_mensagens`,
+    // sem o join `usuario:usuarios(...)` do MENSAGEM_SELECT (ver
+    // `buscarUsuarioNoCache`) — sem preencher isso aqui, a nota nascia no
+    // cache do autor sem `usuario.nome`, e a UI de "nota interna" usa
+    // exatamente esse campo pra diferenciar nota digitada (âmbar) de nota de
+    // sistema (cinza): sem nome, caía sempre em cinza pra quem acabou de
+    // criar, mesmo a nota sendo âmbar pra todo mundo depois de recarregar.
     onSuccess: (nota) => {
+      const usuario = buscarUsuarioNoCache(qc, nota.usuario_id ?? profile?.id ?? '', profile);
       qc.setQueryData<WaMensagem[]>(['wa_mensagens', nota.conversa_id], (old) =>
-        old ? [...old, nota] : old,
+        old ? [...old, { ...nota, usuario }] : old,
       );
     },
     onError: (err: any) => {
