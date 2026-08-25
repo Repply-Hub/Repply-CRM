@@ -395,17 +395,28 @@ serve(async (req) => {
     const responseText = envio.texto;
     const fetchError = envio.erroFetch;
 
-    // Debug — aguardado para garantir que erros sejam registrados antes do retorno
-    await supabase.from("webhook_debug").insert({
-      payload: {
-        _debug: true, url: wapiUrl, status: wapiStatus, response: responseText, fetch_error: fetchError || null,
-        replyid_enviado: quoted_wamid ? rawMessageId(quoted_wamid) : null,
-        repetido_por_lid: repetidoPorLid,
-        ...(varianteTentada
-          ? { variante_tentada: varianteTentada, variante_funcionou: varianteFuncionou }
-          : {}),
-      }
-    });
+    // Só registra QUANDO DEU ERRADO — o comentário anterior dizia "para garantir que erros
+    // sejam registrados", mas o insert rodava em todo envio, inclusive nos que deram certo.
+    //
+    // Medido em 25/08/2026: `webhook_debug` tinha 74.233 linhas e 79 MB (16% do banco), e
+    // ninguém consegue LER a tabela — ela está com RLS ligada e zero políticas desde agosto,
+    // quando se descobriu que vazava o token da operadora. Era gravação pura, sem leitor.
+    //
+    // O envio que dá certo já deixa rastro no lugar certo: a mensagem gravada em
+    // `whatsapp_mensagens`, com o `wamid`. Aqui só interessa o que falhou.
+    const envioFalhou = !!fetchError || !wapiStatus || wapiStatus >= 400;
+    if (envioFalhou) {
+      await supabase.from("webhook_debug").insert({
+        payload: {
+          _debug: true, url: wapiUrl, status: wapiStatus, response: responseText, fetch_error: fetchError || null,
+          replyid_enviado: quoted_wamid ? rawMessageId(quoted_wamid) : null,
+          repetido_por_lid: repetidoPorLid,
+          ...(varianteTentada
+            ? { variante_tentada: varianteTentada, variante_funcionou: varianteFuncionou }
+            : {}),
+        }
+      });
+    }
 
     /**
      * Auto-conserto: a variante funcionou, então o telefone gravado está errado.

@@ -941,7 +941,19 @@ export function useWaMarcarLida() {
         .from('whatsapp_mensagens')
         .update({ lida: true })
         .eq('conversa_id', conversaId)
-        .eq('direcao', 'entrada');
+        // 🔴 `.eq('lida', false)` NÃO é otimização, é o conserto de um desperdício medido.
+        //
+        // Sem ele, abrir uma conversa REESCREVIA todas as mensagens recebidas dela — inclusive
+        // as lidas há semanas. Medido em 25/08/2026, na conversa mais pesada (1.574 recebidas,
+        // ZERO não lidas): 2.155 ms e 1.196 páginas de disco sujas, para não mudar nada. Com o
+        // filtro: 6,7 ms e ZERO páginas. As páginas sujas são o que consome o orçamento de
+        // disco do Supabase, e isso rodou 17.382 vezes.
+        //
+        // Média por abertura: 38 linhas reescritas, das quais ~4% precisavam mudar.
+        //
+        // O chat interno já fazia certo (`use-chat.ts:658`); só este tinha ficado sem.
+        .eq('direcao', 'entrada')
+        .eq('lida', false);
 
       await supabase
         .from('whatsapp_conversas')

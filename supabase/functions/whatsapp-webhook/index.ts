@@ -230,6 +230,35 @@ serve(async (req) => {
   }
 });
 
+/**
+ * Apaga campo de credencial de qualquer profundidade antes de o pacote ir para
+ * `webhook_debug`.
+ *
+ * 🔴 POR QUE ISTO EXISTE: `webhook_debug` é a tabela que vazou o token da operadora.
+ * Ela foi FECHADA PARA LEITURA em 20/08/2026 (RLS ligada, zero políticas), mas continuou
+ * ACUMULANDO credencial — medido em 25/08/2026: 5.781 linhas com a palavra "token", sendo
+ * 902 nos últimos 5 dias, a mais recente do próprio dia. Fechar a porta não parou o
+ * despejo; só escondeu.
+ *
+ * O pacote cru da uazapi traz o token da instância no meio dos dados do evento. Os três
+ * pontos deste arquivo que gravam pacote cru passam por aqui.
+ *
+ * Guarda o NOME do campo e o marca como removido, em vez de apagar sem deixar rastro:
+ * quem for depurar precisa saber que havia algo ali, sem poder lê-lo.
+ */
+function semSegredos(valor: unknown, profundidade = 0): unknown {
+  if (profundidade > 8 || valor === null || typeof valor !== "object") return valor;
+  if (Array.isArray(valor)) return valor.map((v) => semSegredos(v, profundidade + 1));
+
+  const saida: Record<string, unknown> = {};
+  for (const [chave, v] of Object.entries(valor as Record<string, unknown>)) {
+    saida[chave] = /token|secret|apikey|api_key|authorization|password|senha/i.test(chave)
+      ? "[removido]"
+      : semSegredos(v, profundidade + 1);
+  }
+  return saida;
+}
+
 // Registra em webhook_debug qualquer ponto em que uma mensagem/evento é descartado
 // sem gravar nada — sem isso, perdas silenciosas só são descobertas quando alguém
 // nota "faltou uma mensagem" dias depois, sem nenhuma pista de qual campo faltou.
@@ -237,7 +266,7 @@ async function logWebhookDrop(supabase: any, motivo: string, payload: unknown) {
   try {
     await supabase
       .from("webhook_debug")
-      .insert({ payload: { _drop_reason: motivo, payload } });
+      .insert({ payload: { _drop_reason: motivo, payload: semSegredos(payload) } });
   } catch (e) {
     console.error("[webhook] falha ao gravar webhook_debug:", e);
   }
@@ -637,8 +666,8 @@ async function handleIncomingMessage(
     await supabase.from("webhook_debug").insert({
       payload: {
         _reaction_debug: true,
-        msg,
-        chat: payload.chat,
+        msg: semSegredos(msg),
+        chat: semSegredos(payload.chat),
         reactionEmoji,
         reactionTargetWamid,
       },
@@ -1060,7 +1089,7 @@ async function handleCallEvent(supabase: any, empresaId: string, payload: any) {
   const ev = payload.event ?? {};
 
   await supabase.from("webhook_debug").insert({
-    payload: { _call_debug: true, payload },
+    payload: { _call_debug: true, payload: semSegredos(payload) },
   });
 
   const tag = String(ev.Data?.Tag ?? "").toLowerCase();
