@@ -17,12 +17,11 @@ export interface SidebarItem {
 export const ROTA_APP = '/app';
 
 export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
-  // Primeiro da lista para quem entra agora. Quem JÁ tem menu salvo recebe o item pela
-  // mesclagem lá embaixo, que acrescenta no FIM — é o preço de não reordenar o menu que a
-  // pessoa arrumou. Ela pode arrastar para onde quiser.
-  { id: 'hoje', path: '/hoje', label: 'Hoje', icon: 'Sun', visible: true },
   { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard', visible: true },
   { id: 'pipeline', path: ROTA_APP, label: 'Negócios', icon: 'Kanban', visible: true },
+  // Abaixo de Negócios e acima de Clientes — posição escolhida pelo dono do produto em
+  // 25/08/2026. Vale também para quem JÁ tem menu salvo: ver `inserirNaPosicaoDoPadrao`.
+  { id: 'hoje', path: '/hoje', label: 'Hoje', icon: 'Sun', visible: true },
   { id: 'clientes', path: '/clientes', label: 'Clientes', icon: 'Users', visible: true },
   { id: 'obras', path: '/obras', label: 'Obras', icon: 'HardHat', visible: true },
   { id: 'fabricantes', path: '/fabricantes', label: 'Fabricantes', icon: 'Factory', visible: true },
@@ -58,6 +57,57 @@ function fixChatWhatsappIcons(list: SidebarItem[]): SidebarItem[] {
 // landing page. Esta função é o mecanismo de migração — roda em toda leitura,
 // nos três caminhos de retorno, e reescreve o path antigo. Por isso não é
 // preciso migration de dados.
+/**
+ * Item novo entra na POSIÇÃO que ele tem no padrão, não no fim da lista.
+ *
+ * POR QUE ISTO EXISTE: a mesclagem antes fazia `[...saved, ...newDefaults]`, e quem já
+ * usava o sistema recebia toda seção nova como último item do menu. Em 25/08/2026 o dono
+ * do produto pediu que "Hoje" ficasse entre Negócios e Clientes — e "entre" não acontece
+ * quando o item cai no fim.
+ *
+ * A regra: procura, de trás para frente no padrão, o primeiro vizinho ANTERIOR que a
+ * pessoa já tem, e entra logo depois dele. Sem nenhum vizinho anterior, entra no começo.
+ *
+ * O que ela NÃO faz: reordenar o que a pessoa já arrumou. Só decide onde o item NOVO
+ * pousa; tudo que já estava salvo mantém a ordem escolhida.
+ */
+export function inserirNaPosicaoDoPadrao(
+  saved: SidebarItem[],
+  novos: SidebarItem[],
+): SidebarItem[] {
+  if (novos.length === 0) return saved;
+
+  const ordemPadrao = DEFAULT_SIDEBAR_ITEMS.map((d) => d.id);
+  const resultado = [...saved];
+
+  // Do primeiro ao último do padrão: assim, dois itens novos seguidos entram na ordem
+  // certa entre si (o segundo encontra o primeiro já posicionado).
+  const novosEmOrdem = [...novos].sort(
+    (a, b) => ordemPadrao.indexOf(a.id) - ordemPadrao.indexOf(b.id),
+  );
+
+  for (const novo of novosEmOrdem) {
+    const posNoPadrao = ordemPadrao.indexOf(novo.id);
+    // Item que não existe no padrão (atalho da empresa, por exemplo) vai para o fim.
+    if (posNoPadrao < 0) {
+      resultado.push(novo);
+      continue;
+    }
+
+    let destino = 0;
+    for (let i = posNoPadrao - 1; i >= 0; i--) {
+      const idx = resultado.findIndex((s) => s.id === ordemPadrao[i]);
+      if (idx >= 0) {
+        destino = idx + 1;
+        break;
+      }
+    }
+    resultado.splice(destino, 0, novo);
+  }
+
+  return resultado;
+}
+
 export function normalizarPipeline(list: SidebarItem[]): SidebarItem[] {
   return list.map(i => {
     if (i.id === 'pipeline') return { ...i, path: ROTA_APP, label: 'Negócios', icon: 'Kanban' };
@@ -161,7 +211,7 @@ export function useSidebarPreferences() {
       const newDefaults = [...empresaPadraoItems, ...DEFAULT_SIDEBAR_ITEMS].filter(
         (d, idx, arr) => !savedIds.has(d.id) && arr.findIndex(x => x.id === d.id) === idx
       );
-      const merged = [...saved, ...newDefaults];
+      const merged = inserirNaPosicaoDoPadrao(saved, newDefaults);
 
       if (needsCleanup) {
         await supabase

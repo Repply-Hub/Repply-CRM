@@ -306,11 +306,29 @@ function ProtectedRoute({
   );
 }
 
+/**
+ * Para onde a pessoa vai ao entrar no sistema.
+ *
+ * Decisão do dono do produto em 25/08/2026: a pauta do dia ("Hoje") é a primeira tela.
+ * Mas a seção é opcional — hoje só a MD Representações a tem ligada. Mandar as outras
+ * sete para /hoje as jogaria direto na tela de "Seção não disponível" do `SecaoRoute`,
+ * que é a pior primeira impressão possível depois de digitar a senha.
+ *
+ * Por isso a entrada decide: /hoje só quando a resposta é um SIM explícito. Dúvida,
+ * erro de rede ou admin global sem empresa caem em /app, que é o comportamento de
+ * sempre. É o mesmo princípio do resto do sistema — "não sei" nunca tranca ninguém.
+ */
+function EntradaDoApp() {
+  const { ligada, carregando } = useSecaoLigada('hoje');
+  if (carregando) return <PageFallback />;
+  return <Navigate to={ligada === true ? '/hoje' : '/app'} replace />;
+}
+
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { session, loading, profileLoaded } = useAuth();
   // Só redireciona quando o estado do perfil está assentado, para não entrar no
   // app com dados parciais e quebrar a renderização.
-  if (!loading && profileLoaded && session) return <Navigate to="/app" replace />;
+  if (!loading && profileLoaded && session) return <EntradaDoApp />;
   return <>{children}</>;
 }
 
@@ -331,7 +349,7 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
 const LandingRoute = () => {
   const { session, loading, profileLoaded } = useAuth();
   if (session && (loading || !profileLoaded)) return <PageFallback />;
-  if (!loading && profileLoaded && session) return <Navigate to="/app" replace />;
+  if (!loading && profileLoaded && session) return <EntradaDoApp />;
   return <Landing />;
 };
 
