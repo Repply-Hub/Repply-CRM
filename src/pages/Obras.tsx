@@ -47,6 +47,9 @@ import { MapaObras } from '@/components/obras/MapaObras';
 import { MapaObrasPainel } from '@/components/obras/MapaObrasPainel';
 import { MarcadoresObrasDialog } from '@/components/obras/MarcadoresObrasDialog';
 import { VendasDaObra } from '@/components/obras/VendasDaObra';
+import { HistoricoVisitasObra } from '@/components/obras/HistoricoVisitasObra';
+import { ContatosDaObra } from '@/components/obras/ContatosDaObra';
+import { NovaRotaVisitaDialog } from '@/components/obras/NovaRotaVisitaDialog';
 import { cn, hasTextSelection } from '@/lib/utils';
 import { FilterButton } from '@/components/shared/FilterButton';
 import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
@@ -211,6 +214,7 @@ export default function Obras() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirmDeleteBulk, setConfirmDeleteBulk] = useState(false);
+  const [rotaVisitaDialogOpen, setRotaVisitaDialogOpen] = useState(false);
 
   // `marcador_id` vazio = obra sem marcador, que é um estado válido e é o PADRÃO. Não há
   // pré-seleção: a lista de marcadores nasce vazia de propósito e o campo é opcional.
@@ -633,15 +637,26 @@ export default function Obras() {
                   <div className="flex items-center gap-4">
                     <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
                     {selectedIds.length > 0 && (
-                      <Button 
-                        variant="destructive" 
-                        size="sm" 
-                        onClick={() => setConfirmDeleteBulk(true)}
-                        className="gap-2 h-8"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Remover Selecionados ({selectedIds.length})
-                      </Button>
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setRotaVisitaDialogOpen(true)}
+                          className="gap-2 h-8"
+                        >
+                          <HardHat className="h-3.5 w-3.5" />
+                          Criar rota de visita
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setConfirmDeleteBulk(true)}
+                          className="gap-2 h-8"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Remover Selecionados ({selectedIds.length})
+                        </Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -903,6 +918,16 @@ export default function Obras() {
                 <div className="border-t pt-6">
                   <h3 className="mb-3 text-sm font-semibold">Vendas desta obra</h3>
                   <VendasDaObra obraId={selectedObra.id} />
+                </div>
+
+                <div className="border-t pt-6">
+                  <h3 className="mb-3 text-sm font-semibold">Histórico de visitas</h3>
+                  <HistoricoVisitasObra obraId={selectedObra.id} />
+                </div>
+
+                <div className="border-t pt-6">
+                  <h3 className="mb-3 text-sm font-semibold">Contatos desta obra</h3>
+                  <ContatosDaObra obraId={selectedObra.id} />
                 </div>
               </div>
 
@@ -1292,6 +1317,15 @@ export default function Obras() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <NovaRotaVisitaDialog
+          open={rotaVisitaDialogOpen}
+          onOpenChange={(v) => {
+            setRotaVisitaDialogOpen(v);
+            if (!v) setSelectedIds([]);
+          }}
+          obrasIniciais={(obras ?? []).filter((o) => selectedIds.includes(o.id))}
+        />
       </div>
     </AppLayout>
   );

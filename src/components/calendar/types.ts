@@ -17,6 +17,12 @@ export interface CalendarEvent {
   lembreteMinutos?: number | null;
   grupoId?: string;
   criadoPor?: string;
+  // Presente quando o evento é uma visita a obra (rota de visita). Uma visita
+  // é sempre tipoCalendario 'empresa' — não existe visita "pessoal" escondida.
+  obraId?: string | null;
+  obraNome?: string | null;
+  visitaRealizada?: boolean;
+  visitaObservacao?: string | null;
 }
 
 export interface EventoForm {
@@ -29,6 +35,9 @@ export interface EventoForm {
   cor: string;
   participantes?: string[]; // user_ids (auth) dos participantes do evento
   lembreteMinutos: number | null; // antecedência em minutos p/ notificar os participantes
+  obraId?: string | null;
+  visitaRealizada?: boolean;
+  visitaObservacao?: string;
 }
 
 export const CALENDAR_COLORS: Record<CalendarType, string> = {

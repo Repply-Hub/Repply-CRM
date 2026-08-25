@@ -1,5 +1,6 @@
 import { format, isToday, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { HardHat } from 'lucide-react';
 import { getMonthGrid, eventsForDay } from './calendarUtils';
 import type { CalendarEvent } from './types';
 
@@ -84,6 +85,7 @@ export function CalendarMonthView({
                         {!ev.diaInteiro && (
                           <span className="opacity-80 mr-0.5">{format(ev.inicio, 'HH:mm')}</span>
                         )}
+                        {ev.obraId && <HardHat className="inline h-2.5 w-2.5 mr-0.5 -mt-0.5" />}
                         {ev.titulo}
                       </div>
                     ))}

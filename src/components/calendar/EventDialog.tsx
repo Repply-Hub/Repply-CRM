@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Trash2, Users, Check, ChevronDown } from 'lucide-react';
+import { Trash2, Users, Check, ChevronDown, HardHat } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -62,6 +62,9 @@ const defaultForm = (): EventoForm => {
     cor: CALENDAR_COLORS.empresa,
     participantes: [],
     lembreteMinutos: null,
+    obraId: null,
+    visitaRealizada: false,
+    visitaObservacao: '',
   };
 };
 
@@ -118,6 +121,9 @@ export function EventDialog({
         // participantes existentes (useEventoParticipantes) — ver efeito abaixo.
         participantes: [],
         lembreteMinutos: editingEvent.lembreteMinutos ?? null,
+        obraId: editingEvent.obraId ?? null,
+        visitaRealizada: editingEvent.visitaRealizada ?? false,
+        visitaObservacao: editingEvent.visitaObservacao ?? '',
       });
     } else {
       setForm({
@@ -169,6 +175,9 @@ export function EventDialog({
   };
 
   const isEditing = !!editingEvent;
+  // Visita a obra: obra_id é fixado na criação (rota de visita) e não pode
+  // ser desvinculado por aqui — só a data/observação/status são editáveis.
+  const isVisita = isEditing && !!editingEvent?.obraId;
   const participantesSelecionados = form.participantes ?? [];
   // Ao criar, quem está preenchendo o formulário é sempre o organizador. Ao
   // editar, só o organizador original pode adicionar/remover participantes —
@@ -191,6 +200,13 @@ export function EventDialog({
         </DialogHeader>
 
         <fieldset disabled={somenteLeitura} className="space-y-4 py-2 px-6 overflow-y-auto flex-1 min-h-0 border-0 m-0 min-w-0">
+          {isVisita && (
+            <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+              <HardHat className="h-4 w-4 shrink-0 text-primary" />
+              <span className="truncate font-medium">Visita: {editingEvent?.obraNome || 'obra'}</span>
+            </div>
+          )}
+
           {/* Título */}
           <div className="space-y-1.5">
             <Label htmlFor="titulo">Título</Label>
@@ -229,17 +245,47 @@ export function EventDialog({
             />
           </div>
 
-          {/* Tipo de calendário */}
-          <div className="flex items-center justify-between">
-            <Label htmlFor="disponivel-empresa" className="cursor-pointer">
-              Disponibilizar este evento para toda a empresa
-            </Label>
-            <Switch
-              id="disponivel-empresa"
-              checked={form.tipoCalendario === 'empresa'}
-              onCheckedChange={(v) => handleCalendarTypeChange(v ? 'empresa' : 'pessoal')}
-            />
-          </div>
+          {/* Tipo de calendário — visita a obra é sempre visível para a empresa toda,
+              nunca fica "pessoal" escondida de quem também acessa a obra. */}
+          {isVisita ? (
+            <p className="text-xs text-muted-foreground">
+              Visível para toda a empresa, como todo registro de visita.
+            </p>
+          ) : (
+            <div className="flex items-center justify-between">
+              <Label htmlFor="disponivel-empresa" className="cursor-pointer">
+                Disponibilizar este evento para toda a empresa
+              </Label>
+              <Switch
+                id="disponivel-empresa"
+                checked={form.tipoCalendario === 'empresa'}
+                onCheckedChange={(v) => handleCalendarTypeChange(v ? 'empresa' : 'pessoal')}
+              />
+            </div>
+          )}
+
+          {/* Status da visita — marcação manual, não deduzida pela data (uma visita
+              agendada pode não acontecer, e pode ser registrada depois de ocorrer). */}
+          {isVisita && (
+            <div className="space-y-1.5 rounded-md border p-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="visita-realizada" className="cursor-pointer">Visita realizada</Label>
+                <Switch
+                  id="visita-realizada"
+                  checked={!!form.visitaRealizada}
+                  onCheckedChange={(v) => set('visitaRealizada', v)}
+                />
+              </div>
+              {form.visitaRealizada && (
+                <Textarea
+                  placeholder="O que você viu na obra?"
+                  rows={2}
+                  value={form.visitaObservacao ?? ''}
+                  onChange={(e) => set('visitaObservacao', e.target.value)}
+                />
+              )}
+            </div>
+          )}
 
           {/* Participantes */}
           {funcionariosDisponiveis.length > 0 && (

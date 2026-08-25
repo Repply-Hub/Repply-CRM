@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Upload, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Upload, Search, HardHat } from 'lucide-react';
 import { format, addDays, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ interface CalendarHeaderProps {
   onViewModeChange: (mode: ViewMode) => void;
   onNavigate: (direction: 'prev' | 'next' | 'today') => void;
   onNewEvent: () => void;
+  onNewVisita?: () => void;
   onImport?: () => void;
   searchQuery?: string;
   onSearchQueryChange?: (query: string) => void;
@@ -48,6 +49,7 @@ export function CalendarHeader({
   onViewModeChange,
   onNavigate,
   onNewEvent,
+  onNewVisita,
   onImport,
   searchQuery,
   onSearchQueryChange,
@@ -122,6 +124,18 @@ export function CalendarHeader({
           >
             <Upload className="h-3.5 w-3.5" />
             {!isMobile && "Importar"}
+          </Button>
+        )}
+
+        {onNewVisita && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1.5 px-2 sm:px-3 shadow-sm transition-all font-bold hover:bg-orange-50 hover:text-orange-600"
+            onClick={onNewVisita}
+          >
+            <HardHat className="h-3.5 w-3.5" />
+            {!isMobile && "Nova visita a obra"}
           </Button>
         )}
 

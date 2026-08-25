@@ -10,10 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConteudoDialogo } from '@/components/shared/DialogoResponsivo';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { ArrowLeft, User, Mail, Phone, Loader2, Pencil, Trash2, Building2, Calendar, Clock, MessageSquare, History, Factory, DollarSign, Plus, ListChecks } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Loader2, Pencil, Trash2, Building2, Calendar, Clock, MessageSquare, History, Factory, DollarSign, Plus, ListChecks, HardHat } from 'lucide-react';
 import { toast } from 'sonner';
 import { slugify } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -63,6 +64,7 @@ const ContatoDetalhe = () => {
 
   const contato = contatos?.find(c => c.id === id);
   const clienteVinculado = clientes?.find(c => c.empresa === contato?.empresa);
+  const obraVinculada = clienteVinculado?.obras?.find((o) => o.id === contato?.obra_id);
   const [vincularOpen, setVincularOpen] = useState(false);
   const [selectedEmpresaId, setSelectedEmpresaId] = useState('');
 
@@ -107,6 +109,7 @@ const ContatoDetalhe = () => {
     telefone: '',
     cargo: '',
     empresa: '',
+    obraId: '',
   });
 
   const openEdit = () => {
@@ -117,6 +120,7 @@ const ContatoDetalhe = () => {
       telefone: contato.telefone ?? '',
       cargo: (contato as any).cargo ?? '',
       empresa: contato.empresa ?? '',
+      obraId: contato.obra_id ?? '',
     });
     setEditOpen(true);
   };
@@ -132,6 +136,7 @@ const ContatoDetalhe = () => {
         telefone: editData.telefone || undefined,
         cargo: editData.cargo || undefined,
         empresa: editData.empresa || undefined,
+        obra_id: editData.obraId || null,
       });
       toast.success('Contato atualizado com sucesso!');
       setEditOpen(false);
@@ -259,6 +264,21 @@ const ContatoDetalhe = () => {
                   </Button>
                 )}
               </div>
+              {obraVinculada && (
+                <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                    <HardHat className="h-3.5 w-3.5" /> Obra
+                  </p>
+                  <p className="text-base font-bold text-foreground truncate">{obraVinculada.nome_obra || 'Obra sem nome'}</p>
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto text-xs text-primary font-semibold mt-2 hover:no-underline"
+                    onClick={() => navigate('/obras', { state: { selectedObraId: obraVinculada.id } })}
+                  >
+                    Ver obra →
+                  </Button>
+                </div>
+              )}
               <div className="space-y-3 pt-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Cargo</span>
@@ -549,6 +569,25 @@ const ContatoDetalhe = () => {
                   onValueChange={v => setEditData(d => ({ ...d, cargo: v }))}
                 />
               </div>
+              {clienteVinculado?.obras && clienteVinculado.obras.length > 0 && (
+                <div>
+                  <Label>Obra</Label>
+                  <Select
+                    value={editData.obraId || '__nenhuma__'}
+                    onValueChange={v => setEditData(d => ({ ...d, obraId: v === '__nenhuma__' ? '' : v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Contato da empresa toda" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__nenhuma__">Contato da empresa toda</SelectItem>
+                      {clienteVinculado.obras.map((obra) => (
+                        <SelectItem key={obra.id} value={obra.id}>{obra.nome_obra || 'Obra sem nome'}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div>
                 <Label>Empresa</Label>
                 <Input 

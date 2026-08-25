@@ -57,7 +57,7 @@ async function fetchAllContatos() {
   while (hasMore) {
     const query = supabase
       .from('contatos')
-      .select('*, cliente:clientes!cliente_id(id, empresa), criado_por_usuario:usuarios!criado_por_usuario_id(nome)')
+      .select('*, cliente:clientes!cliente_id(id, empresa), criado_por_usuario:usuarios!criado_por_usuario_id(nome), obra:obras!obra_id(id, nome_obra)')
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
 

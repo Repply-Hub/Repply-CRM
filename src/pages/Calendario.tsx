@@ -6,7 +6,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, HardHat } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { CalendarHeader } from "@/components/calendar/CalendarHeader";
 import { TimeGridView } from "@/components/calendar/TimeGridView";
 import { CalendarMonthView } from "@/components/calendar/CalendarMonthView";
 import { EventDialog } from "@/components/calendar/EventDialog";
+import { NovaRotaVisitaDialog } from "@/components/obras/NovaRotaVisitaDialog";
 import { getWeekDays } from "@/components/calendar/calendarUtils";
 import type { ViewMode, CalendarType, EventoForm, CalendarEvent } from "@/components/calendar/types";
 import { CALENDAR_COLORS } from "@/components/calendar/types";
@@ -113,6 +114,7 @@ export default function Calendario() {
   const [initialSlot, setInitialSlot] = useState<Partial<EventoForm>>({});
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [rotaVisitaDialogOpen, setRotaVisitaDialogOpen] = useState(false);
 
   const [isImporting, setIsImporting] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -317,6 +319,7 @@ export default function Calendario() {
             onViewModeChange={setViewMode}
             onNavigate={navigate}
             onNewEvent={() => openNewEvent()}
+            onNewVisita={() => setRotaVisitaDialogOpen(true)}
             onImport={handleImportClick}
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}
@@ -394,6 +397,10 @@ export default function Calendario() {
                   <div className="w-2.5 h-2.5 rounded-sm shrink-0 bg-[#6b7280]" />
                   <span className="text-xs text-muted-foreground">Contatos</span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <HardHat className="h-2.5 w-2.5 shrink-0 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Visita a obra</span>
+                </div>
               </div>
             </div>
           </aside>
@@ -431,6 +438,9 @@ export default function Calendario() {
           onSave={handleSave}
           onDelete={handleDelete}
         />
+
+        {/* Dialog de rota de visita a obras */}
+        <NovaRotaVisitaDialog open={rotaVisitaDialogOpen} onOpenChange={setRotaVisitaDialogOpen} />
 
         {/* Dialog de importação */}
         <Dialog

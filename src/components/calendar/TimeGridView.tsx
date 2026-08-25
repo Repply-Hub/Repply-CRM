@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { format, isToday, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { HardHat } from 'lucide-react';
 import {
   HOUR_HEIGHT,
   getEventTopPx,
@@ -53,7 +54,10 @@ function EventBlock({
       className="absolute left-0.5 right-0.5 rounded px-1 sm:px-1.5 py-0.5 text-white text-[10px] sm:text-[11px] font-medium overflow-hidden cursor-pointer hover:brightness-90 transition-all z-10"
       style={{ top, height, backgroundColor: event.cor }}
     >
-      <p className="truncate leading-tight">{event.titulo}</p>
+      <p className="truncate leading-tight">
+        {event.obraId && <HardHat className="inline h-2.5 w-2.5 mr-0.5 -mt-0.5" />}
+        {event.titulo}
+      </p>
       {height > 30 && (
         <p className="truncate leading-tight opacity-80">
           {format(event.inicio, 'HH:mm')} – {format(event.fim, 'HH:mm')}
@@ -79,6 +83,7 @@ function AllDayChip({
       className="truncate rounded px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-medium text-white cursor-pointer hover:brightness-90 mb-0.5"
       style={{ backgroundColor: event.cor }}
     >
+      {event.obraId && <HardHat className="inline h-2.5 w-2.5 mr-0.5 -mt-0.5" />}
       {event.titulo}
     </div>
   );

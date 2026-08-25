@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './use-auth';
 import type { CalendarEvent, CalendarType, EventoForm } from '@/components/calendar/types';
+import { CALENDAR_COLORS } from '@/components/calendar/types';
 
 // Estrutura local para mapear a row do banco
 interface EventoRow {
@@ -19,6 +20,10 @@ interface EventoRow {
   grupo_id: string;
   criado_por: string;
   updated_at?: string;
+  obra_id: string | null;
+  visita_realizada: boolean;
+  visita_observacao: string | null;
+  obras: { nome_obra: string | null } | null;
 }
 
 // Tipagem local para as queries de calendário
@@ -62,7 +67,7 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
       while (hasMore) {
         const { data, error } = await supabase
           .from('eventos')
-          .select('*')
+          .select('*, obras(nome_obra)')
           .or(`user_id.eq.${user!.id},tipo_calendario.eq.empresa`)
           .order('inicio')
           .range(from, from + pageSize - 1);
@@ -144,6 +149,10 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
           lembreteMinutos: e.lembrete_minutos,
           grupoId: e.grupo_id,
           criadoPor: e.criado_por,
+          obraId: e.obra_id,
+          obraNome: e.obras?.nome_obra ?? null,
+          visitaRealizada: e.visita_realizada,
+          visitaObservacao: e.visita_observacao,
         });
       }
     });
@@ -251,12 +260,86 @@ export function useCreateEvento() {
         tipo_calendario: form.tipoCalendario,
         cor: form.cor,
         lembrete_minutos: form.lembreteMinutos,
+        obra_id: form.obraId || null,
+        visita_realizada: form.visitaRealizada ?? false,
+        visita_observacao: form.visitaObservacao || null,
       }));
 
       const { error } = await supabase.from('eventos').insert(rows);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['eventos'] }),
+  });
+}
+
+export interface ParadaRotaVisita {
+  obraId: string;
+  nomeObra: string;
+  observacao?: string;
+}
+
+// Cria uma "rota de visita": um evento de calendário por obra selecionada,
+// todos do tipo 'empresa' (visita nunca é pessoal — decisão de produto de
+// 25/08/2026) e ligados à obra via obra_id. Cada parada recebe seu próprio
+// grupo_id (não um grupo_id compartilhado pela rota inteira): se todas as
+// paradas dividissem o mesmo grupo_id, editar uma delas depois via
+// useUpdateEvento propagaria data/horário/observação para as outras, porque
+// esse hook trata "mesmo grupo_id" como "mesmo evento com vários
+// participantes" e sincroniza o grupo inteiro. A rota é só uma conveniência
+// de criação em lote — cada parada segue independente depois de criada.
+export function useCreateRotaVisita() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      data,
+      horaInicio,
+      duracaoMinutos = 60,
+      paradas,
+      jaRealizada,
+    }: {
+      data: string; // yyyy-MM-dd
+      horaInicio: string; // HH:mm
+      duracaoMinutos?: number;
+      paradas: ParadaRotaVisita[];
+      jaRealizada: boolean;
+    }) => {
+      if (paradas.length === 0) {
+        throw new Error('Selecione ao menos uma obra para a rota de visita.');
+      }
+
+      let cursor = new Date(`${data}T${horaInicio}:00`);
+
+      const rows = paradas.map((parada) => {
+        const inicio = new Date(cursor);
+        const fim = new Date(cursor.getTime() + duracaoMinutos * 60 * 1000);
+        cursor = fim;
+        return {
+          user_id: user!.id,
+          grupo_id: crypto.randomUUID(),
+          criado_por: user!.id,
+          titulo: `Visita: ${parada.nomeObra}`,
+          descricao: null,
+          inicio: inicio.toISOString(),
+          fim: fim.toISOString(),
+          dia_inteiro: false,
+          tipo_calendario: 'empresa',
+          cor: CALENDAR_COLORS.empresa,
+          lembrete_minutos: null,
+          obra_id: parada.obraId,
+          visita_realizada: jaRealizada,
+          visita_observacao: parada.observacao || null,
+        };
+      });
+
+      const { error } = await supabase.from('eventos').insert(rows);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['eventos'] });
+      qc.invalidateQueries({ queryKey: ['obra_visitas'] });
+    },
   });
 }
 
@@ -340,6 +423,8 @@ export function useUpdateEvento() {
         tipo_calendario: form.tipoCalendario,
         cor: form.cor,
         lembrete_minutos: form.lembreteMinutos,
+        visita_realizada: form.visitaRealizada ?? false,
+        visita_observacao: form.visitaObservacao || null,
         updated_at: new Date().toISOString(),
       };
 

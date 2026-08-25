@@ -942,6 +942,7 @@ export type Database = {
           logradouro: string | null
           nome_contato: string | null
           numero: string | null
+          obra_id: string | null
           telefone: string | null
           uf: string | null
           updated_at: string
@@ -965,6 +966,7 @@ export type Database = {
           logradouro?: string | null
           nome_contato?: string | null
           numero?: string | null
+          obra_id?: string | null
           telefone?: string | null
           uf?: string | null
           updated_at?: string
@@ -988,6 +990,7 @@ export type Database = {
           logradouro?: string | null
           nome_contato?: string | null
           numero?: string | null
+          obra_id?: string | null
           telefone?: string | null
           uf?: string | null
           updated_at?: string
@@ -1006,6 +1009,13 @@ export type Database = {
             columns: ["criado_por_usuario_id"]
             isOneToOne: false
             referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contatos_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
             referencedColumns: ["id"]
           },
         ]
@@ -1670,10 +1680,13 @@ export type Database = {
           inicio: string
           lembrete_enviado: boolean
           lembrete_minutos: number | null
+          obra_id: string | null
           tipo_calendario: string
           titulo: string
           updated_at: string
           user_id: string
+          visita_observacao: string | null
+          visita_realizada: boolean
         }
         Insert: {
           cor?: string
@@ -1687,10 +1700,13 @@ export type Database = {
           inicio: string
           lembrete_enviado?: boolean
           lembrete_minutos?: number | null
+          obra_id?: string | null
           tipo_calendario?: string
           titulo: string
           updated_at?: string
           user_id: string
+          visita_observacao?: string | null
+          visita_realizada?: boolean
         }
         Update: {
           cor?: string
@@ -1704,12 +1720,23 @@ export type Database = {
           inicio?: string
           lembrete_enviado?: boolean
           lembrete_minutos?: number | null
+          obra_id?: string | null
           tipo_calendario?: string
           titulo?: string
           updated_at?: string
           user_id?: string
+          visita_observacao?: string | null
+          visita_realizada?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "eventos_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fabricantes: {
         Row: {
@@ -3755,18 +3782,21 @@ export type Database = {
         Row: {
           conversa_id: string
           id: string
+          quantidade: number
           usuario_id: string
           visualizado_em: string
         }
         Insert: {
           conversa_id: string
           id?: string
+          quantidade?: number
           usuario_id: string
           visualizado_em?: string
         }
         Update: {
           conversa_id?: string
           id?: string
+          quantidade?: number
           usuario_id?: string
           visualizado_em?: string
         }
@@ -4467,6 +4497,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      wa_registrar_visualizacao: {
+        Args: {
+          _conversa_id: string
+        }
+        Returns: {
+          quantidade: number
+          visualizado_em: string
+        }[]
       }
     }
     Enums: {

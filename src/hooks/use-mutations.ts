@@ -41,6 +41,7 @@ export function useCreateContato() {
       email?: string;
       telefone?: string;
       cargo?: string;
+      obra_id?: string | null;
       campos_extras?: Record<string, string>;
     }) => {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
@@ -124,6 +125,7 @@ export function useUpdateContato() {
       cargo?: string;
       empresa?: string;
       cliente_id?: string | null;
+      obra_id?: string | null;
       campos_extras?: Record<string, string>;
     }) => {
       const { error } = await supabase.from('contatos').update(data).eq('id', id);

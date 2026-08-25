@@ -553,7 +553,7 @@ const ClienteDetalhe = () => {
   const { data: camposConfigContatos } = useConfiguracoesCampos('contatos', empresaId);
 
   // Novo contato extra
-  const [novoContato, setNovoContato] = useState({ nome_contato: '', cargo: '', email: '', telefone: '' });
+  const [novoContato, setNovoContato] = useState({ nome_contato: '', cargo: '', email: '', telefone: '', obraId: '' });
   const [novoContatoCamposExtras, setNovoContatoCamposExtras] = useState<Record<string, string>>({});
   const handleAddContato = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -581,14 +581,16 @@ const ClienteDetalhe = () => {
     try {
       await createContato.mutateAsync({
         empresa: cliente.empresa,
+        cliente_id: cliente.id,
         nome_contato: novoContato.nome_contato.trim(),
         cargo: novoContato.cargo.trim() || undefined,
         email: novoContato.email.trim() || undefined,
         telefone: novoContato.telefone.trim() || undefined,
+        obra_id: novoContato.obraId || null,
         campos_extras: novoContatoCamposExtras,
       });
       toast.success('Contato adicionado!');
-      setNovoContato({ nome_contato: '', cargo: '', email: '', telefone: '' });
+      setNovoContato({ nome_contato: '', cargo: '', email: '', telefone: '', obraId: '' });
       setNovoContatoCamposExtras({});
       setAddContatoOpen(false);
     } catch (err: any) {
@@ -1353,6 +1355,7 @@ const ClienteDetalhe = () => {
                       <TableRow className="bg-muted/50">
                         <TableHead>Nome</TableHead>
                         <TableHead>Tipo / Cargo</TableHead>
+                        <TableHead>Obra</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Telefone</TableHead>
                         <TableHead className="w-10"></TableHead>
@@ -1361,7 +1364,7 @@ const ClienteDetalhe = () => {
                     <TableBody>
                       {contatosExtras.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                             Nenhum contato adicional cadastrado.
                           </TableCell>
                         </TableRow>
@@ -1373,6 +1376,9 @@ const ClienteDetalhe = () => {
                           <TableCell className="font-medium">{c.nome_contato || '-'}</TableCell>
                           <TableCell onClick={e => e.stopPropagation()}>
                             {c.cargo ? <Badge variant="outline">{c.cargo}</Badge> : <span className="text-muted-foreground text-xs">-</span>}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm" onClick={e => e.stopPropagation()}>
+                            {c.obra?.nome_obra || '-'}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm" onClick={e => e.stopPropagation()}>{c.email || '-'}</TableCell>
                           <TableCell className="text-muted-foreground text-sm" onClick={e => e.stopPropagation()}>{c.telefone || '-'}</TableCell>
@@ -1422,6 +1428,28 @@ const ClienteDetalhe = () => {
                         onValueChange={v => setNovoContato(c => ({ ...c, cargo: v }))}
                       />
                     </div>
+                    {cliente.obras && cliente.obras.length > 0 && (
+                      <div className="space-y-2">
+                        <Label>Obra</Label>
+                        <Select
+                          value={novoContato.obraId || '__nenhuma__'}
+                          onValueChange={v => setNovoContato(c => ({ ...c, obraId: v === '__nenhuma__' ? '' : v }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Contato da empresa toda" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__nenhuma__">Contato da empresa toda</SelectItem>
+                            {cliente.obras.map((obra) => (
+                              <SelectItem key={obra.id} value={obra.id}>{obra.nome_obra || 'Obra sem nome'}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Opcional. Vincule quando este contato falar especificamente por uma obra, não pela empresa toda.
+                        </p>
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label>Email *</Label>
                       <Input
