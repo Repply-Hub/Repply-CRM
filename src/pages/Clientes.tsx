@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ConteudoDialogo } from '@/components/shared/DialogoResponsivo';
+import { ConteudoDialogo, CabecalhoAssistente, CorpoDialogo, RodapeDialogo, RodapeAssistente } from '@/components/shared/DialogoResponsivo';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ChevronDown, FileWarning, Check, Calendar, Briefcase, ExternalLink, IdCard, Tag, UserCheck } from 'lucide-react';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ChevronDown, FileWarning, Calendar, Briefcase, ExternalLink, IdCard, Tag, UserCheck } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/clientes/ImportClientesDialog';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
@@ -1246,34 +1246,18 @@ const Clientes = () => {
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" /> {activeTab === 'empresas' ? 'Nova Empresa' : 'Novo Contato'}</Button>
             </DialogTrigger>
-            <ConteudoDialogo className="max-w-lg">
-              <DialogHeader><DialogTitle>{activeTab === 'empresas' ? 'Cadastrar Empresa' : 'Cadastrar Contato'}</DialogTitle></DialogHeader>
+            <ConteudoDialogo className="max-w-2xl">
+              <CabecalhoAssistente
+                titulo={activeTab === 'empresas' ? 'Cadastrar Empresa' : 'Cadastrar Contato'}
+                etapas={activeTab === 'empresas' ? EMPRESA_STEPS : undefined}
+                etapaAtual={activeTab === 'empresas' ? step : undefined}
+              />
 
-              {activeTab === 'empresas' && (
-                <div className="pt-1">
-                  <div className="flex items-center">
-                    {EMPRESA_STEPS.map((s, idx) => (
-                      <div key={s.id} className="flex items-center flex-1 last:flex-none">
-                        <div className={cn(
-                          "h-6 w-6 shrink-0 rounded-full flex items-center justify-center text-[11px] font-semibold border transition-colors",
-                          step === s.id ? "bg-primary text-primary-foreground border-primary" :
-                          step > s.id ? "bg-primary/15 text-primary border-primary/40" : "border-border text-muted-foreground"
-                        )}>
-                          {step > s.id ? <Check className="h-3.5 w-3.5" /> : s.id}
-                        </div>
-                        {idx < EMPRESA_STEPS.length - 1 && (
-                          <div className={cn("h-px flex-1 mx-1.5", step > s.id ? "bg-primary/40" : "bg-border")} />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Etapa {step} de {EMPRESA_STEPS.length} · {EMPRESA_STEPS[step - 1].label}
-                  </p>
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+              {/* className="contents": o <form> some da caixa (display:contents) para o corpo
+                  rolar e o rodapé ficar fixo, mas continua sendo o ancestral de formulário —
+                  o botão type="submit" da aba Contato dispara handleSubmit normalmente. */}
+              <form onSubmit={handleSubmit} className="contents">
+              <CorpoDialogo className="space-y-4 mt-2">
                 {activeTab === 'empresas' ? (
                   <>
                     {step === 1 && (
@@ -1388,22 +1372,6 @@ const Clientes = () => {
                       </div>
                     )}
 
-                    <div className="flex gap-2 pt-2">
-                      {step > 1 && (
-                        <Button type="button" variant="outline" className="flex-1" onClick={() => setStep(s => s - 1)}>
-                          Voltar
-                        </Button>
-                      )}
-                      {step < EMPRESA_STEPS.length ? (
-                        <Button type="button" className="flex-1" onClick={handleNextStep}>
-                          Avançar
-                        </Button>
-                      ) : (
-                        <Button type="button" className="flex-1" onClick={handleSaveEmpresa} disabled={createCliente.isPending || createContato.isPending || updateContato.isPending}>
-                          {(createCliente.isPending || createContato.isPending || updateContato.isPending) ? 'Salvando...' : 'Salvar'}
-                        </Button>
-                      )}
-                    </div>
                   </>
                 ) : (
                   <>
@@ -1424,11 +1392,35 @@ const Clientes = () => {
                         />
                       </div>
                     ))}
-                    <Button type="submit" className="w-full" disabled={createContato.isPending}>
-                      {createContato.isPending ? 'Salvando...' : 'Salvar'}
-                    </Button>
                   </>
                 )}
+              </CorpoDialogo>
+
+              {activeTab === 'empresas' ? (
+                <RodapeAssistente
+                  esquerda={step > 1 ? (
+                    <Button type="button" variant="outline" onClick={() => setStep(s => s - 1)}>
+                      Voltar
+                    </Button>
+                  ) : undefined}
+                >
+                  {step < EMPRESA_STEPS.length ? (
+                    <Button type="button" onClick={handleNextStep}>
+                      Avançar
+                    </Button>
+                  ) : (
+                    <Button type="button" onClick={handleSaveEmpresa} disabled={createCliente.isPending || createContato.isPending || updateContato.isPending}>
+                      {(createCliente.isPending || createContato.isPending || updateContato.isPending) ? 'Salvando...' : 'Salvar'}
+                    </Button>
+                  )}
+                </RodapeAssistente>
+              ) : (
+                <RodapeDialogo>
+                  <Button type="submit" className="w-full" disabled={createContato.isPending}>
+                    {createContato.isPending ? 'Salvando...' : 'Salvar'}
+                  </Button>
+                </RodapeDialogo>
+              )}
               </form>
             </ConteudoDialogo>
           </Dialog>

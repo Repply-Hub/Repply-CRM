@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Globe } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogTitle } from '@/components/ui/dialog';
+import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -61,11 +62,11 @@ export function SidebarAddItemDialog({ open, onOpenChange, onSave, initialItem }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
+      <ConteudoDialogo className="max-w-sm">
+        <CabecalhoDialogo>
           <DialogTitle>{isEditing ? 'Editar Item' : 'Adicionar Item'}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 py-2">
+        </CabecalhoDialogo>
+        <CorpoDialogo className="space-y-3 py-2">
           <Input placeholder="Nome do item" value={label} onChange={e => setLabel(e.target.value)} />
           <div className="flex items-center gap-2">
             {isExternal && (
@@ -106,11 +107,11 @@ export function SidebarAddItemDialog({ open, onOpenChange, onSave, initialItem }
               </SelectContent>
             </Select>
           )}
-        </div>
-        <DialogFooter>
+        </CorpoDialogo>
+        <RodapeDialogo>
           <Button onClick={handleSave} className="w-full">{isEditing ? 'Salvar' : 'Adicionar'}</Button>
-        </DialogFooter>
-      </DialogContent>
+        </RodapeDialogo>
+      </ConteudoDialogo>
     </Dialog>
   );
 }

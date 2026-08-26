@@ -8,8 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
+import { Dialog, DialogTitle } from '@/components/ui/dialog';
+import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo, CabecalhoAssistente, RodapeAssistente } from '@/components/shared/DialogoResponsivo';
 import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { useMarcadores } from '@/hooks/use-marcadores';
@@ -517,25 +517,18 @@ function NovoNegocioFormContent({
 
   return (
     <>
-      <DialogContent className="max-w-4xl h-[90vh] flex flex-col gap-0 p-0">
-        <DialogHeader className="shrink-0 border-b px-6 py-4">
-          <DialogTitle>Novo Negócio</DialogTitle>
+      <ConteudoDialogo className="sm:max-w-4xl p-0">
+        <CabecalhoAssistente
+          className="border-b px-6 py-4"
+          titulo="Novo Negócio"
+          etapas={[
+            { id: 1, label: 'Informações do Negócio' },
+            { id: 2, label: 'Itens do Negócio' },
+          ]}
+          etapaAtual={step}
+        />
 
-          {/* Progress */}
-          <div className="flex items-center gap-3 pt-2">
-            <div className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors", step === 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-              <span className="w-6 h-6 rounded-full bg-background/20 flex items-center justify-center text-xs font-bold">1</span>
-              Informações do Negócio
-            </div>
-            <div className="h-px w-8 bg-border" />
-            <div className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors", step === 2 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-              <span className="w-6 h-6 rounded-full bg-background/20 flex items-center justify-center text-xs font-bold">2</span>
-              Itens do Negócio
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <CorpoDialogo className="mx-0 px-6 py-5">
         {step === 1 ? (
             <div className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1043,16 +1036,16 @@ function NovoNegocioFormContent({
 
             </div>
           )}
-        </div>
+        </CorpoDialogo>
 
-        <DialogFooter className="shrink-0 border-t px-6 py-4 sm:justify-between">
-          {step === 2 ? (
+        <RodapeAssistente
+          className="border-t px-6 py-4"
+          esquerda={step === 2 ? (
             <Button variant="outline" onClick={() => setStep(1)}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
             </Button>
-          ) : (
-            <div />
-          )}
+          ) : undefined}
+        >
           {step === 1 ? (
             <Button onClick={handleNext} disabled={!isStep1Complete || !isStep2Complete}>
               Próximo <ArrowRight className="h-4 w-4 ml-1" />
@@ -1063,8 +1056,8 @@ function NovoNegocioFormContent({
               {isUploading ? 'Enviando PDF...' : createPedido.isPending ? 'Criando...' : 'Criar Negócio'}
             </Button>
           )}
-        </DialogFooter>
-      </DialogContent>
+        </RodapeAssistente>
+      </ConteudoDialogo>
 
       {/* Atalho "Nova Obra". Usa <ConteudoDialogo> (e não <DialogContent> cru) porque agora
           é um formulário de três campos: sem teto de altura e sem rolagem, num notebook
@@ -1124,47 +1117,51 @@ function NovoNegocioFormContent({
         </ConteudoDialogo>
       </Dialog>
       <Dialog open={origemDialogOpen} onOpenChange={setOrigemDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <ConteudoDialogo>
+          <CabecalhoDialogo>
             <DialogTitle>Nova Origem</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Nome da Origem *</Label>
-              <Input
-                value={newOrigemLabel}
-                onChange={(e) => setNewOrigemLabel(e.target.value)}
-                placeholder="Ex: Evento de Construção"
-              />
+          </CabecalhoDialogo>
+          <CorpoDialogo>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Nome da Origem *</Label>
+                <Input
+                  value={newOrigemLabel}
+                  onChange={(e) => setNewOrigemLabel(e.target.value)}
+                  placeholder="Ex: Evento de Construção"
+                />
+              </div>
             </div>
-          </div>
-          <DialogFooter>
+          </CorpoDialogo>
+          <RodapeDialogo>
             <Button variant="outline" onClick={() => setOrigemDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleCreateOrigem}>
               Criar Origem
             </Button>
-          </DialogFooter>
-        </DialogContent>
+          </RodapeDialogo>
+        </ConteudoDialogo>
       </Dialog>
       <Dialog open={unidadeDialogOpen} onOpenChange={(o) => { setUnidadeDialogOpen(o); if (!o) setUnidadeDialogItemId(null); }}>
-        <DialogContent>
-          <DialogHeader>
+        <ConteudoDialogo>
+          <CabecalhoDialogo>
             <DialogTitle>Nova unidade</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label>Nome da unidade</Label>
-            <Input
-              value={newUnidadeLabel}
-              onChange={(e) => setNewUnidadeLabel(e.target.value)}
-              placeholder="Ex.: Caixa, Saco, Rolo..."
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddUnidade(); } }}
-            />
-          </div>
-          <DialogFooter>
+          </CabecalhoDialogo>
+          <CorpoDialogo>
+            <div className="space-y-2">
+              <Label>Nome da unidade</Label>
+              <Input
+                value={newUnidadeLabel}
+                onChange={(e) => setNewUnidadeLabel(e.target.value)}
+                placeholder="Ex.: Caixa, Saco, Rolo..."
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddUnidade(); } }}
+              />
+            </div>
+          </CorpoDialogo>
+          <RodapeDialogo>
             <Button variant="outline" onClick={() => { setUnidadeDialogOpen(false); setNewUnidadeLabel(''); setUnidadeDialogItemId(null); }}>Cancelar</Button>
             <Button onClick={handleAddUnidade}>Adicionar</Button>
-          </DialogFooter>
-        </DialogContent>
+          </RodapeDialogo>
+        </ConteudoDialogo>
       </Dialog>
     </>
   );

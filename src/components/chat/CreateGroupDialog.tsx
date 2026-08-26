@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -145,14 +146,14 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
           Criar grupo
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <ConteudoDialogo className="sm:max-w-md">
+        <CabecalhoDialogo>
           <DialogTitle className="flex items-center gap-2">
             <Users2 className="h-5 w-5 text-primary" />
             Criar Grupo
           </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
+        </CabecalhoDialogo>
+        <CorpoDialogo className="space-y-4">
           <div className="flex justify-center">
             <input
               ref={fotoInputRef}
@@ -254,12 +255,14 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
               </p>
             )}
           </div>
+        </CorpoDialogo>
+        <RodapeDialogo>
           <Button onClick={handleCreate} disabled={creating} className="w-full">
             {creating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Criar Grupo
           </Button>
-        </div>
-      </DialogContent>
+        </RodapeDialogo>
+      </ConteudoDialogo>
     </Dialog>
   );
 }

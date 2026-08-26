@@ -1,13 +1,7 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,15 +37,15 @@ export function CriarMarcadorDialog({ open, onOpenChange, contaId }: Props) {
         onOpenChange(o);
       }}
     >
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <ConteudoDialogo className="max-w-md">
+        <CabecalhoDialogo>
           <DialogTitle>Novo marcador</DialogTitle>
           <DialogDescription>
             Cria um marcador direto na caixa de e-mail conectada — o mesmo que aparece se você criar um rótulo no Gmail.
           </DialogDescription>
-        </DialogHeader>
+        </CabecalhoDialogo>
 
-        <div className="space-y-1.5">
+        <CorpoDialogo className="space-y-1.5">
           <Label htmlFor="novo-marcador-nome">Nome</Label>
           <Input
             id="novo-marcador-nome"
@@ -63,9 +57,9 @@ export function CriarMarcadorDialog({ open, onOpenChange, contaId }: Props) {
             }}
             autoFocus
           />
-        </div>
+        </CorpoDialogo>
 
-        <DialogFooter>
+        <RodapeDialogo>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
@@ -73,8 +67,8 @@ export function CriarMarcadorDialog({ open, onOpenChange, contaId }: Props) {
             {criarMut.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Criar
           </Button>
-        </DialogFooter>
-      </DialogContent>
+        </RodapeDialogo>
+      </ConteudoDialogo>
     </Dialog>
   );
 }
