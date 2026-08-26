@@ -421,6 +421,29 @@ chegar a zero antes do Passo 7.
 **Fora de ordem:** depende do Passo 1. Se vier depois do 6/7, o cliente vê as telas quebradas
 durante o conserto.
 
+#### 2.1 — Chat interno: FEITO em 26/08/2026
+
+Foram **29 pontos**, não 8: a contagem original olhou só os arquivos de mensagem e não incluiu
+as 17 fotos (avatar de pessoa, foto de grupo, foto do Chat Geral) espalhadas pela tela.
+
+Em vez de 29 alterações à mão, duas peças:
+
+· **`<ImagemPrivada>`** (`src/components/shared/ImagemPrivada.tsx`) — uma `<img>` que pede o
+  link sozinha. Serve para os 17 pontos de foto aqui e para as próximas telas. Uma consulta por
+  endereço DISTINTO, não por tag: o mesmo avatar repetido em vinte lugares vira um pedido só.
+· **`useArquivosPrivados` sobre a lista de mensagens** — os 12 pontos que precisam do endereço
+  como VALOR (link de download, `<video>`, tocador de áudio, visualizador de documento) leem de
+  um `enderecoDe(...)` único, assinado em lote. Um pedido por balde, não um por anexo.
+
+Medido antes de subir: **211 de 211** endereços de `chat-files` gravados no banco encontram um
+objeto real (zero órfãos); tipo em 35 (a linha de base); lint em 2 avisos, o mesmo de antes;
+223 testes passando.
+
+🔴 **Falta a conferência que só o uso real dá.** Os baldes continuam abertos, então uma falha
+de assinatura aqui é INVISÍVEL — a imagem aparece do mesmo jeito, pelo endereço antigo. Por
+isso o contador foi exposto no console do navegador: **F12 → `quedasDeArquivo.ver()`**. Precisa
+devolver vazio depois de alguém usar o chat de verdade.
+
 ### Passo 3 — WhatsApp: assinar o link antes de entregar à operadora
 
 **O que faz.** Em `supabase/functions/whatsapp-send/index.ts`, antes de montar o corpo do POST

@@ -27,6 +27,8 @@ import { linkifyText } from '@/lib/linkify';
 import { CreateGroupDialog } from '@/components/chat/CreateGroupDialog';
 import { validateFile } from '@/lib/file-validation';
 import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
+import { ImagemPrivada } from '@/components/shared/ImagemPrivada';
+import { useArquivosPrivados } from '@/hooks/use-arquivo-privado';
 import { ChatMessageSearch } from '@/components/chat/ChatMessageSearch';
 import {
   Sheet,
@@ -132,7 +134,7 @@ function MembersList({
           >
             <Avatar className="h-7 w-7 border border-border">
               {geralFotoUrl && (
-                <img src={geralFotoUrl} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                <ImagemPrivada src={geralFotoUrl} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
               )}
               <AvatarFallback className="bg-primary text-primary-foreground text-[8px]">
                 <Users className="h-3.5 w-3.5" />
@@ -156,7 +158,7 @@ function MembersList({
               >
                 <Avatar className="h-7 w-7 border border-border">
                   {g.foto_url && (
-                    <img src={g.foto_url} alt={g.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                    <ImagemPrivada src={g.foto_url} alt={g.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                   )}
                   <AvatarFallback className="bg-primary text-primary-foreground text-[8px] font-semibold">
                     <Users2 className="h-3.5 w-3.5" />
@@ -182,7 +184,7 @@ function MembersList({
               >
                 <Avatar className="h-7 w-7 border border-border">
                   {m.avatar_url && (
-                    <img src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                    <ImagemPrivada src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                   )}
                   <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
                     {getInitials(m.nome)}
@@ -243,7 +245,7 @@ function MembersList({
               >
                 <Avatar className="h-8 w-8 border border-border">
                   {geralFotoUrl && (
-                    <img src={geralFotoUrl} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                    <ImagemPrivada src={geralFotoUrl} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                   )}
                   <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
                     <Users className="h-4 w-4" />
@@ -280,7 +282,7 @@ function MembersList({
             >
               <Avatar className="h-8 w-8 border border-border">
                 {g.foto_url && (
-                  <img src={g.foto_url} alt={g.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                  <ImagemPrivada src={g.foto_url} alt={g.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                 )}
                 <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
                   <Users2 className="h-4 w-4" />
@@ -336,7 +338,7 @@ function MembersList({
                 <div className="relative">
                   <Avatar className="h-8 w-8 border border-border">
                     {m.avatar_url && (
-                      <img src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                      <ImagemPrivada src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                     )}
                     <AvatarFallback className={`${colorForId(m.id)} text-white text-[10px] font-semibold`}>
                       {getInitials(m.nome)}
@@ -635,6 +637,14 @@ const Chat = () => {
   const activeGrupoId = target.type === 'grupo' ? target.grupoId : null;
   const activeRecipientId = target.type === 'dm' ? target.recipientId : null;
   const { data: messages, isLoading } = useChatMessages(activeGrupoId, activeRecipientId);
+
+  // Os arquivos das mensagens, assinados de uma vez so — Passo 2 do plano dos baldes
+  // privados. Um pedido por balde, nao um por anexo: a conversa carrega 50 mensagens de
+  // uma vez, e 50 chamadas separadas somariam meio segundo antes da primeira miniatura.
+  //
+  // Mensagem que ainda esta subindo tem `arquivo_url` do tipo `blob:` (use-chat.ts:590):
+  // nao e do nosso armazenamento, entao passa direto e continua aparecendo na hora.
+  const { enderecoDe } = useArquivosPrivados((messages ?? []).map((m) => m.arquivo_url));
   const { send } = useSendMessage();
   const clearChat = useClearChat();
   const { data: grupos = [] } = useChatGrupos();
@@ -703,13 +713,13 @@ const Chat = () => {
       {items.map((m) => (
         <a
           key={m.id}
-          href={m.arquivo_url!}
+          href={enderecoDe(m.arquivo_url)!}
           target="_blank"
           rel="noopener noreferrer"
           className="aspect-square rounded-md overflow-hidden border border-border hover:opacity-80 transition-opacity"
           title={format(new Date(m.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
         >
-          <img src={m.arquivo_url!} alt={m.arquivo_nome ?? 'imagem'} className="h-full w-full object-cover" />
+          <img src={enderecoDe(m.arquivo_url)!} alt={m.arquivo_nome ?? 'imagem'} className="h-full w-full object-cover" />
         </a>
       ))}
     </div>
@@ -720,13 +730,13 @@ const Chat = () => {
       {items.map((m) => (
         <a
           key={m.id}
-          href={m.arquivo_url!}
+          href={enderecoDe(m.arquivo_url)!}
           target="_blank"
           rel="noopener noreferrer"
           className="relative aspect-square rounded-md overflow-hidden border border-border bg-black/5 hover:opacity-80 transition-opacity"
           title={format(new Date(m.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
         >
-          <video src={m.arquivo_url!} className="h-full w-full object-cover" muted />
+          <video src={enderecoDe(m.arquivo_url)!} className="h-full w-full object-cover" muted />
           <span className="absolute inset-0 flex items-center justify-center bg-black/20">
             <Play className="h-5 w-5 text-white fill-white" />
           </span>
@@ -748,7 +758,7 @@ const Chat = () => {
             )}
             onClick={
               isPreviewableDoc
-                ? () => setPreviewFile({ url: m.arquivo_url!, nome: m.arquivo_nome ?? 'Arquivo', mime: m.arquivo_tipo })
+                ? () => setPreviewFile({ url: enderecoDe(m.arquivo_url)!, nome: m.arquivo_nome ?? 'Arquivo', mime: m.arquivo_tipo })
                 : undefined
             }
           >
@@ -767,7 +777,7 @@ const Chat = () => {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                downloadFile(m.arquivo_url!, m.arquivo_nome!);
+                downloadFile(enderecoDe(m.arquivo_url)!, m.arquivo_nome!);
               }}
               className="p-1.5 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors shrink-0"
             >
@@ -1321,7 +1331,7 @@ const Chat = () => {
                     <>
                       <Avatar className="h-8 w-8 border border-border">
                         {activeGrupo?.foto_url && (
-                          <img src={activeGrupo.foto_url} alt={chatHeaderName} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                          <ImagemPrivada src={activeGrupo.foto_url} alt={chatHeaderName} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                         )}
                         <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                           <Users2 className="h-4 w-4" />
@@ -1337,7 +1347,7 @@ const Chat = () => {
                       <div className="relative shrink-0">
                         <Avatar className="h-8 w-8 border border-border">
                           {selectedMemberData.avatar_url && (
-                            <img src={selectedMemberData.avatar_url} alt={selectedMemberData.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                            <ImagemPrivada src={selectedMemberData.avatar_url} alt={selectedMemberData.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                           )}
                           <AvatarFallback className={`${colorForId(target.memberId)} text-white text-xs`}>
                             {getInitials(chatHeaderName)}
@@ -1356,7 +1366,7 @@ const Chat = () => {
                     <>
                       <Avatar className="h-8 w-8 border border-border">
                         {geralConfig?.foto_url && (
-                          <img src={geralConfig.foto_url} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                          <ImagemPrivada src={geralConfig.foto_url} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                         )}
                         <AvatarFallback className="bg-primary text-primary-foreground">
                           <Users className="h-4 w-4" />
@@ -1443,7 +1453,7 @@ const Chat = () => {
                           >
                             <Avatar className="h-14 w-14 border border-border">
                               {activeGrupo?.foto_url && (
-                                <img src={activeGrupo.foto_url} alt={chatHeaderName} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                                <ImagemPrivada src={activeGrupo.foto_url} alt={chatHeaderName} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                               )}
                               <AvatarFallback className="bg-primary text-primary-foreground">
                                 <Users2 className="h-6 w-6" />
@@ -1506,7 +1516,7 @@ const Chat = () => {
                                   >
                                     <Avatar className="h-6 w-6 shrink-0 border border-border">
                                       {m.avatar_url && (
-                                        <img src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                                        <ImagemPrivada src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                                       )}
                                       <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
                                         {getInitials(m.nome)}
@@ -1544,7 +1554,7 @@ const Chat = () => {
                             >
                               <Avatar className="h-14 w-14 border border-border">
                                 {geralConfig?.foto_url && (
-                                  <img src={geralConfig.foto_url} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                                  <ImagemPrivada src={geralConfig.foto_url} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                                 )}
                                 <AvatarFallback className="bg-primary text-primary-foreground">
                                   <Users className="h-6 w-6" />
@@ -1595,7 +1605,7 @@ const Chat = () => {
                                   >
                                     <Avatar className="h-6 w-6 shrink-0 border border-border">
                                       {m.avatar_url && (
-                                        <img src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                                        <ImagemPrivada src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                                       )}
                                       <AvatarFallback className={`${colorForId(m.id)} text-white text-[8px] font-semibold`}>
                                         {getInitials(m.nome)}
@@ -1825,7 +1835,7 @@ const Chat = () => {
                             {showAvatar ? (
                               <Avatar className="h-8 w-8 shrink-0 border border-border">
                                 {msg.vendedor?.avatar_url && (
-                                  <img src={msg.vendedor.avatar_url} alt={name} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                                  <ImagemPrivada src={msg.vendedor.avatar_url} alt={name} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                                 )}
                                 <AvatarFallback className={`${colorForId(msg.usuario_id)} text-white text-xs`}>
                                   {getInitials(name)}
@@ -1902,19 +1912,19 @@ const Chat = () => {
                                 {msg.arquivo_url && (
                                   <div className="mb-1">
                                     {msg.arquivo_tipo?.startsWith('audio/') ? (
-                                      <ChatAudioPlayer src={msg.arquivo_url} isMe={isMe} />
+                                      <ChatAudioPlayer src={enderecoDe(msg.arquivo_url)!} isMe={isMe} />
                                     ) : msg.arquivo_tipo?.startsWith('image/') ? (
                                       <div className="relative group/img">
-                                        <a href={msg.arquivo_url} target="_blank" rel="noopener noreferrer">
+                                        <a href={enderecoDe(msg.arquivo_url)!} target="_blank" rel="noopener noreferrer">
                                           <img
-                                            src={msg.arquivo_url}
+                                            src={enderecoDe(msg.arquivo_url)!}
                                             alt={msg.arquivo_nome || 'imagem'}
                                             className="max-w-[240px] max-h-[200px] rounded-lg object-cover"
                                           />
                                         </a>
                                         <button
                                           type="button"
-                                          onClick={() => downloadFile(msg.arquivo_url!, msg.arquivo_nome || 'imagem')}
+                                          onClick={() => downloadFile(enderecoDe(msg.arquivo_url)!, msg.arquivo_nome || 'imagem')}
                                           className="absolute top-2 right-2 p-1.5 bg-background/80 hover:bg-background rounded-full opacity-0 group-hover/img:opacity-100 transition-opacity shadow-sm"
                                           title="Baixar imagem"
                                         >
@@ -1924,7 +1934,7 @@ const Chat = () => {
                                     ) : isPreviewable(msg.arquivo_nome || 'arquivo', msg.arquivo_tipo) ? (
                                       <button
                                         type="button"
-                                        onClick={() => setPreviewFile({ url: msg.arquivo_url!, nome: msg.arquivo_nome || 'Arquivo', mime: msg.arquivo_tipo })}
+                                        onClick={() => setPreviewFile({ url: enderecoDe(msg.arquivo_url)!, nome: msg.arquivo_nome || 'Arquivo', mime: msg.arquivo_tipo })}
                                         className={`flex items-center gap-2 p-2 rounded-lg transition-colors w-full text-left ${
                                           isMe ? 'bg-primary-foreground/10 hover:bg-primary-foreground/20' : 'bg-background/50 hover:bg-background/80'
                                         }`}
@@ -1935,7 +1945,7 @@ const Chat = () => {
                                     ) : (
                                       <button
                                         type="button"
-                                        onClick={() => downloadFile(msg.arquivo_url!, msg.arquivo_nome || 'Arquivo')}
+                                        onClick={() => downloadFile(enderecoDe(msg.arquivo_url)!, msg.arquivo_nome || 'Arquivo')}
                                         className={`flex items-center gap-2 p-2 rounded-lg transition-colors w-full text-left ${
                                           isMe ? 'bg-primary-foreground/10 hover:bg-primary-foreground/20' : 'bg-background/50 hover:bg-background/80'
                                         }`}
@@ -1971,7 +1981,7 @@ const Chat = () => {
                                     {viewers.slice(0, 3).map(v => (
                                       <Avatar key={v.id} className="h-4 w-4 border border-background">
                                         {v.avatar_url && (
-                                          <img src={v.avatar_url} alt={v.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                                          <ImagemPrivada src={v.avatar_url} alt={v.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                                         )}
                                         <AvatarFallback className={`${colorForId(v.id)} text-white text-[7px]`}>
                                           {getInitials(v.nome)}
@@ -2058,7 +2068,7 @@ const Chat = () => {
                     <div key={vendedor.id} className="flex items-center gap-3 px-4 py-2">
                       <Avatar className="h-9 w-9 shrink-0 border border-border">
                         {vendedor.avatar_url && (
-                          <img src={vendedor.avatar_url} alt={vendedor.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                          <ImagemPrivada src={vendedor.avatar_url} alt={vendedor.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                         )}
                         <AvatarFallback className={`${colorForId(vendedor.id)} text-white text-xs`}>
                           {getInitials(vendedor.nome)}
@@ -2156,7 +2166,7 @@ const Chat = () => {
                           />
                           <Avatar className="h-7 w-7 border border-border">
                             {m.avatar_url && (
-                              <img src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                              <ImagemPrivada src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
                             )}
                             <AvatarFallback className={`${colorForId(m.id)} text-white text-[9px] font-semibold`}>
                               {getInitials(m.nome)}

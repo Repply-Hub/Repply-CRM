@@ -199,3 +199,22 @@ export async function enderecosDosArquivos(
 
   return saida;
 }
+
+/**
+ * O placar exposto no console do navegador, de propósito também em produção.
+ *
+ * 🔴 SEM ISTO O PLANO NÃO FECHA. O passo que fecha os baldes só pode acontecer depois de o
+ * contador acima ficar em zero DURANTE USO REAL — e uso real acontece na produção, na tela
+ * dos vendedores, não aqui na máquina de desenvolvimento. Enquanto os baldes seguem abertos,
+ * uma falha de assinatura não aparece na tela: o arquivo abre do mesmo jeito, pelo endereço
+ * antigo. Este é o único lugar onde ela fica visível.
+ *
+ * Não expõe dado nenhum: são contagens e mensagens de erro do próprio Storage. Para ler,
+ * abra o console do navegador (F12) e digite `quedasDeArquivo.ver()`.
+ */
+if (typeof window !== 'undefined') {
+  (window as unknown as Record<string, unknown>).quedasDeArquivo = {
+    ver: quedasRegistradas,
+    zerar: zerarQuedas,
+  };
+}
