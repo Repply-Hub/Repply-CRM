@@ -18,23 +18,6 @@ export function useObrasByCliente(clienteId: string | null) {
   });
 }
 
-export function useTabelaPrecos(fabricanteId: string | null) {
-  return useQuery({
-    queryKey: ['tabela_precos', fabricanteId],
-    enabled: !!fabricanteId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('tabela_precos')
-        .select('*')
-        .eq('fabricante_id', fabricanteId!)
-        .eq('vigente', true)
-        .order('descricao_material');
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
 export function useMyVendedorId() {
   return useQuery({
     queryKey: ['my_vendedor_id'],
@@ -74,13 +57,6 @@ export interface NovoPedidoPayload {
   observacoes?: string;
   pdf_url?: string;
   valor_total?: number;
-  itens: {
-    descricao_material: string;
-    referencia_fabricante?: string;
-    quantidade: number;
-    unidade?: string;
-    preco_unitario: number;
-  }[];
   proximo_contato?: string;
   campos_extras?: Record<string, string>;
 }
@@ -119,17 +95,15 @@ export function useCreatePedidoCompleto() {
         .single();
       if (pedidoErr) throw pedidoErr;
 
-      // 2. Insert items
-      const itensData = payload.itens.map(item => ({
-        pedido_id: pedido.id,
-        descricao_material: item.descricao_material,
-        referencia_fabricante: item.referencia_fabricante || null,
-        quantidade: item.quantidade,
-        unidade: item.unidade || null,
-        preco_unitario: item.preco_unitario,
-      }));
-      const { error: itensErr } = await supabase.from('itens_pedido').insert(itensData);
-      if (itensErr) throw itensErr;
+      // 2. 🔴 NÃO grava mais em `itens_pedido`.
+      //
+      // O módulo de catálogo de produtos saiu em 26/08/2026: nunca teve dado real (1 item em
+      // 11.910 negócios, nenhum criado dentro do CRM), e o que a representação precisa é o PDF
+      // do orçamento com o valor, não a lista de produtos.
+      //
+      // A TABELA CONTINUA EXISTINDO, de propósito: ela guarda aquela 1 linha de um negócio
+      // real, e apagá-la destruiria o único registro que alguém um dia pode perguntar por quê.
+      // Ela só deixou de receber linha nova. Ver docs/operacao/catalogo-de-produtos-removido.md.
 
       // 3. Insert historico_contatos if proximo_contato set
       if (payload.proximo_contato) {

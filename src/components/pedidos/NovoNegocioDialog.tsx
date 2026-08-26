@@ -4,17 +4,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
+
 import { Dialog, DialogTitle } from '@/components/ui/dialog';
 import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo, CabecalhoAssistente, RodapeAssistente } from '@/components/shared/DialogoResponsivo';
 import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { useMarcadores } from '@/hooks/use-marcadores';
 import { useFunis } from '@/hooks/use-funis';
-import { useObrasByCliente, useTabelaPrecos, useMyVendedorId, useIsGestor, useCreatePedidoCompleto } from '@/hooks/use-novo-pedido';
+import { useObrasByCliente, useMyVendedorId, useIsGestor, useCreatePedidoCompleto } from '@/hooks/use-novo-pedido';
 import { useCreateObra } from '@/hooks/use-mutations';
 import { useAuth } from '@/hooks/use-auth';
 import { useConfiguracoesCampos, resolveFieldLabel, isCampoObrigatorioNaEtapa } from '@/hooks/use-configuracoes-campos';
@@ -35,7 +35,7 @@ import { CampoCnpj } from '@/components/shared/CampoCnpj';
 import { SeletorMarcadorObra } from '@/components/obras/SeletorMarcadorObra';
 import { validarCnpjDaObra } from '@/lib/obra-cnpj';
 import type { CnpjData } from '@/lib/cnpj';
-import { formatarMoedaBRL } from '@/lib/moeda';
+
 import { getNomeNegocioAutomatico } from '@/lib/nome-negocio';
 
 const DEFAULT_ORIGENS = [
@@ -44,17 +44,6 @@ const DEFAULT_ORIGENS = [
   { value: 'indicacao', label: 'Indicação' },
   { value: 'obra_nova', label: 'Obra Nova' },
 ];
-
-const DEFAULT_UNIDADES = ['Litro', 'Grama', 'Quilograma', 'Peça', 'Metro quadrado', 'Balde'];
-
-interface ItemPedido {
-  id: string;
-  descricao_material: string;
-  referencia_fabricante: string;
-  quantidade: number;
-  unidade: string;
-  preco_unitario: number;
-}
 
 export interface NovoNegocioDialogProps {
   open: boolean;
@@ -134,35 +123,6 @@ function NovoNegocioFormContent({
   const [origemDialogOpen, setOrigemDialogOpen] = useState(false);
   const [newOrigemLabel, setNewOrigemLabel] = useState('');
 
-  const [unidades, setUnidades] = useState<string[]>(() => {
-    const saved = localStorage.getItem('custom_unidades');
-    if (saved) {
-      try { return [...DEFAULT_UNIDADES, ...JSON.parse(saved)]; } catch { return DEFAULT_UNIDADES; }
-    }
-    return DEFAULT_UNIDADES;
-  });
-  const [unidadeDialogOpen, setUnidadeDialogOpen] = useState(false);
-  const [unidadeDialogItemId, setUnidadeDialogItemId] = useState<string | null>(null);
-  const [newUnidadeLabel, setNewUnidadeLabel] = useState('');
-
-  const handleAddUnidade = () => {
-    const nome = newUnidadeLabel.trim();
-    if (!nome) { toast.error('Informe o nome da unidade'); return; }
-    if (unidades.some(u => u.toLowerCase() === nome.toLowerCase())) {
-      toast.error('Esta unidade já existe');
-      return;
-    }
-    const novas = [...unidades, nome];
-    setUnidades(novas);
-    const customs = novas.filter(u => !DEFAULT_UNIDADES.includes(u));
-    localStorage.setItem('custom_unidades', JSON.stringify(customs));
-    if (unidadeDialogItemId) updateItem(unidadeDialogItemId, 'unidade', nome);
-    setNewUnidadeLabel('');
-    setUnidadeDialogOpen(false);
-    setUnidadeDialogItemId(null);
-    toast.success('Unidade adicionada');
-  };
-
   const [step, setStep] = useState(1);
 
   // Step 1 fields
@@ -182,29 +142,27 @@ function NovoNegocioFormContent({
   const [nomeAutomatico, setNomeAutomatico] = useState(true);
 
   // Step 2 fields
-  const [itens, setItens] = useState<ItemPedido[]>([]);
   const [observacoes, setObservacoes] = useState('');
   const { profile } = useAuth();
   const { data: camposConfig } = useConfiguracoesCampos('pedidos', profile?.empresa_id);
   const { data: marcadores } = useMarcadores(profile?.empresa_id);
   const [camposExtras, setCamposExtras] = useState<Record<string, string>>({});
   const [valorManual, setValorManual] = useState<number | null>(null);
-  const [isManualMode, setIsManualMode] = useState(false);
 
   // Derived
   const selectedCliente = useMemo(() => clientes?.find(c => c.id === clienteId), [clientes, clienteId]);
   const isConstrutora = selectedCliente?.tipo === 'construtora' || !clienteId;
   const { data: obras } = useObrasByCliente(clienteId || null);
   const selectedObra = useMemo(() => obras?.find(o => o.id === obraId), [obras, obraId]);
-  const { data: tabelaPrecos } = useTabelaPrecos(fabricanteId || null);
   const selectedFabricante = useMemo(() => fabricantes?.find(f => f.id === fabricanteId), [fabricantes, fabricanteId]);
   const nomeAutomaticoPreview = useMemo(
     () => getNomeNegocioAutomatico(selectedCliente, selectedFabricante),
     [selectedCliente, selectedFabricante],
   );
 
-  const valorTotalItens = useMemo(() => itens.reduce((sum, i) => sum + i.quantidade * i.preco_unitario, 0), [itens]);
-  const valorFinal = isManualMode ? (valorManual || 0) : valorTotalItens;
+  // Sem itens, o valor é sempre o que a pessoa digitou. A chave "modo manual" que existia
+  // aqui só escolhia entre somar os itens e aceitar o número — virou pergunta sem sentido.
+  const valorFinal = valorManual || 0;
 
   // Set default vendedor when data loads
   useEffect(() => {
@@ -223,38 +181,6 @@ function NovoNegocioFormContent({
     setClienteId(id);
     setObraId('');
     setEnderecoEntrega('');
-  };
-
-  // Items
-  const addItem = () => {
-    setItens(prev => [...prev, {
-      id: crypto.randomUUID(),
-      descricao_material: '',
-      referencia_fabricante: '',
-      quantidade: 1,
-      unidade: '',
-      preco_unitario: 0,
-    }]);
-  };
-
-  const updateItem = (id: string, field: keyof ItemPedido, value: any) => {
-    setItens(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
-  };
-
-  const removeItem = (id: string) => {
-    setItens(prev => prev.filter(i => i.id !== id));
-  };
-
-  const selectFromTabela = (itemId: string, tabelaId: string) => {
-    const tp = tabelaPrecos?.find(t => t.id === tabelaId);
-    if (!tp) return;
-    setItens(prev => prev.map(i => i.id === itemId ? {
-      ...i,
-      descricao_material: tp.descricao_material,
-      referencia_fabricante: tp.referencia || '',
-      preco_unitario: tp.preco_unitario,
-      unidade: tp.unidade || '',
-    } : i));
   };
 
   // Validation
@@ -287,13 +213,12 @@ function NovoNegocioFormContent({
       endereco_entrega: enderecoEntrega,
       prazo_resposta: prazoResposta ? 'ok' : undefined,
       observacoes: observacoes,
-      itens: itens.length > 0 ? 'ok' : undefined,
-      // Valor manual só é exigível quando o modo manual está ativo — fora dele,
-      // o valor vem do somatório dos itens.
-      valor_manual: (!isManualMode || valorManual != null) ? 'ok' : undefined,
+      // Desde 26/08/2026 não há somatório de itens: o valor é sempre digitado, então
+      // basta estar preenchido.
+      valor_manual: valorManual != null ? 'ok' : undefined,
     };
     const camposDaEtapa = (camposConfig ?? []).filter(c =>
-      // "Próximo Contato Agendado" saiu da tela, mas a linha dele continua na
+      // "Próximo Contato Agendado" tinha saído da tela e a linha continuava na
       // configuração de campos por empresa e ainda pode estar (ou vir a ser)
       // marcada como obrigatória lá. Sem esta exceção, a empresa que marcasse
       // ficaria sem nenhum lugar onde preencher: a validação reprovaria sempre e
@@ -306,7 +231,11 @@ function NovoNegocioFormContent({
       // preencher, e o botão "Criar Negócio" nunca habilitaria. A linha continua gravada
       // na configuração de campos e volta a valer se a seção for religada.
       (temObras === true || c.campo_key !== 'obra_id') &&
-      (etapaAlvo === 'step2' ? c.etapa === 'Itens do Negócio' : c.etapa !== 'Itens do Negócio')
+      // 🔴 Este texto casa LITERALMENTE com `configuracoes_campos.etapa` no banco. Foi
+      // renomeado de "Itens do Negócio" para cá na migration 20260826180000, e os dois lados
+      // precisam mudar juntos — mudar só um faz o passo 2 deixar de reconhecer os próprios
+      // campos, em silêncio.
+      (etapaAlvo === 'step2' ? c.etapa === 'Valor e orçamento' : c.etapa !== 'Valor e orçamento')
     );
     for (const campo of camposDaEtapa) {
       if (!isCampoObrigatorioNaEtapa(campo, currentKanbanColunaId)) continue;
@@ -386,13 +315,10 @@ function NovoNegocioFormContent({
         observacoes: observacoes || undefined,
         pdf_url: pdfUrl,
         campos_extras: camposExtras,
-        itens: itens.map(i => ({
-          descricao_material: i.descricao_material,
-          referencia_fabricante: i.referencia_fabricante || undefined,
-          quantidade: i.quantidade,
-          unidade: i.unidade || undefined,
-          preco_unitario: i.preco_unitario,
-        })),
+        // Sem `itens`: o módulo de catálogo de produtos saiu em 26/08/2026 e o negócio passou
+        // a ter só o valor e o PDF do orçamento. A tabela `itens_pedido` CONTINUA existindo,
+        // com a única linha real que ela sempre teve — ela só não recebe linha nova. Ver
+        // docs/operacao/catalogo-de-produtos-removido.md.
         // `proximo_contato` saiu do payload junto com o campo da tela. Omitir é seguro:
         // o hook só criava a linha em historico_contatos QUANDO o valor vinha preenchido
         // (use-novo-pedido.ts), então não mandar nada não apaga nem sobrescreve nada.
@@ -523,7 +449,7 @@ function NovoNegocioFormContent({
           titulo="Novo Negócio"
           etapas={[
             { id: 1, label: 'Informações do Negócio' },
-            { id: 2, label: 'Itens do Negócio' },
+            { id: 2, label: 'Valor e orçamento' },
           ]}
           etapaAtual={step}
         />
@@ -672,54 +598,6 @@ function NovoNegocioFormContent({
                   </Select>
                 </div>
               </div>
-              {/* Anexo PDF */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  Anexar PDF{obrigatorio('anexo_pdf', true) && ' *'}
-                  {obrigatorio('anexo_pdf', true) && (
-                    <span className="text-xs font-normal text-muted-foreground">(Obrigatório)</span>
-                  )}
-                </Label>
-                <div className={cn(
-                  "relative border-2 border-dashed rounded-lg p-4 transition-colors",
-                  pdfFile ? "border-primary/50 bg-primary/5" : "border-muted hover:border-primary/30"
-                )}>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <div className="flex items-center justify-center gap-3">
-                    {pdfFile ? (
-                      <>
-                        <FileText className="h-6 w-6 text-primary" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{pdfFile.name}</p>
-                          <p className="text-xs text-muted-foreground">{(pdfFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive"
-                          onClick={(e) => { e.stopPropagation(); setPdfFile(null); }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-6 w-6 text-muted-foreground" />
-                        <div className="text-center">
-                          <p className="text-sm font-medium">Clique ou arraste o PDF aqui</p>
-                          <p className="text-xs text-muted-foreground">Apenas arquivos PDF são aceitos</p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Data de Criação */}
                 <div className="space-y-2">
@@ -835,205 +713,78 @@ function NovoNegocioFormContent({
 
             </div>
           ) : (
-            <div className="space-y-5">
-              {/* Items table */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <Label className="text-base font-semibold">Itens do Negócio{obrigatorio('itens', false) && ' *'}</Label>
-                  {itens.length > 0 && (
-                    <Button size="sm" variant="outline" onClick={addItem}>
-                      <Plus className="h-4 w-4 mr-1" /> Adicionar Item
-                    </Button>
+            <div className="space-y-6">
+              {/* O passo 2 era "Itens do Negócio": uma tabela de produtos vinda do catálogo,
+                  com o valor escondido no rodapé dela. O catálogo de produtos saiu em
+                  26/08/2026 (nunca teve dado real: 1 item em 11.910 negócios, nenhum criado
+                  dentro do CRM), e o passo virou o que o representante realmente faz — anexar
+                  o orçamento e dizer quanto é.
+
+                  O anexo vem ANTES do valor de propósito: é a ordem do trabalho real, em que
+                  a pessoa olha o PDF que montou e então digita o número. */}
+              {/* Anexo PDF */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  Anexar PDF{obrigatorio('anexo_pdf', true) && ' *'}
+                  {obrigatorio('anexo_pdf', true) && (
+                    <span className="text-xs font-normal text-muted-foreground">(Obrigatório)</span>
                   )}
-                </div>
-
-                {itens.length === 0 ? (
-                  <div className="space-y-6">
-                    <div className="border border-dashed border-border rounded-lg p-12 text-center bg-muted/5">
-                      <p className="text-sm text-muted-foreground mb-4">Ainda não há itens neste negócio.</p>
-                      <Button size="sm" onClick={addItem}>
-                        <Plus className="h-4 w-4 mr-1" /> Adicionar primeiro item
-                      </Button>
-                    </div>
-
-                    {/* Aqui existia uma grade de duas colunas: "Valor de Negociação" e "Próximo
-                        Contato Agendado". Com o agendamento fora, sobrou um cartão só — a grade
-                        saiu e o cartão ganhou `max-w-sm`, o mesmo formato da tela de edição
-                        (EditarPedido.tsx), pra não virar um campo esticado na linha inteira. */}
-                    <div className="space-y-2 p-4 border rounded-xl bg-muted/10 max-w-sm">
-                      <Label className="text-sm font-semibold">Valor de Negociação</Label>
-                      {/* CampoMoeda no lugar do <input type="number"> antigo. Dois defeitos
-                          morreram aqui de uma vez:
-                          1. o campo era do padrão dos EUA e a leitura usava parseFloat —
-                             parseFloat("99.888,47") devolve 99.888, MIL VEZES MENOS, sem
-                             erro nenhum. Foi o que gravou 106.387.320,00 no lugar de
-                             106.387,32 em produção;
-                          2. em type="number" a roda do mouse altera o valor sozinha quando
-                             o cursor está por cima do campo — a pessoa rola a página para
-                             ver o resto do formulário e o valor muda sem ela ver.
-                          O CampoMoeda entrega número puro no onChange, então nada de
-                          parseFloat volta aqui. */}
-                      <CampoMoeda
-                        className="h-10 text-base font-bold"
-                        value={valorManual}
-                        onChange={(v) => {
-                          setValorManual(v);
-                          setIsManualMode(true);
-                        }}
-                      />
-                      <p className="text-[10px] text-muted-foreground">Defina o valor manualmente caso não queira listar itens individuais.</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-border overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead className="min-w-[200px]">Descrição do Material</TableHead>
-                          <TableHead className="w-32">Unidade</TableHead>
-                          <TableHead className="w-20">Qtd</TableHead>
-                          <TableHead className="w-28">Preço Unit.</TableHead>
-                          <TableHead className="w-28">Preço Total</TableHead>
-                          <TableHead className="w-10"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {itens.map(item => (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              <ItemDescricaoField
-                                value={item.descricao_material}
-                                onChange={(v) => updateItem(item.id, 'descricao_material', v)}
-                                tabelaPrecos={tabelaPrecos ?? []}
-                                onSelect={(tpId) => selectFromTabela(item.id, tpId)}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Select
-                                value={item.unidade}
-                                onValueChange={(v) => updateItem(item.id, 'unidade', v)}
-                              >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="Un." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {unidades.map(u => (
-                                    <SelectItem key={u} value={u}>{u}</SelectItem>
-                                  ))}
-                                  <div className="border-t mt-1 pt-1">
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10 h-8"
-                                      onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setUnidadeDialogItemId(item.id);
-                                        setUnidadeDialogOpen(true);
-                                      }}
-                                    >
-                                      <Plus className="mr-2 h-3 w-3" />
-                                      Nova unidade
-                                    </Button>
-                                  </div>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              {/* Quantidade não é dinheiro, mas também não é campo do
-                                  navegador: o step="0.001" PROMETIA quantidade quebrada que o
-                                  type="number" não deixava digitar. Ao teclar a vírgula o
-                                  navegador considera o valor inválido e devolve string VAZIA;
-                                  o parseFloat('') || 0 gravava zero e o campo controlado
-                                  reescrevia "0" por cima de quem estava escrevendo. Vender
-                                  1,5 m² ou 0,75 tonelada ficava impossível pelo caminho que o
-                                  brasileiro usa.
-                                  casasDecimais={3} porque itens_pedido.quantidade é
-                                  numeric(10,3) — é o TETO do que dá para digitar, não ordem de
-                                  exibir três casas: 1,5 continua "1,5", porque "1,500" se lê
-                                  como mil e quinhentos.
-                                  Sem type="number", o onWheel e o min="0" saem juntos: roda de
-                                  mouse não mexe em campo de texto, e o CampoMoeda já recusa
-                                  negativo por padrão. O placeholder é "0" na mão porque o
-                                  padrão do componente é "0,00", que é cara de dinheiro em
-                                  coluna de quantidade. */}
-                              <CampoMoeda
-                                comPrefixo={false}
-                                casasDecimais={3}
-                                placeholder="0"
-                                className="h-8 text-xs"
-                                value={item.quantidade}
-                                onChange={(v) => updateItem(item.id, 'quantidade', v ?? 0)}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {/* Sem "R$" porque a coluna já se chama "Preço Unit." e o espaço
-                                  é curto. Erro aqui é pior que no valor total: preço unitário
-                                  errado é multiplicado pela quantidade. */}
-                              <CampoMoeda
-                                comPrefixo={false}
-                                className="h-8 text-xs"
-                                value={item.preco_unitario}
-                                onChange={(v) => updateItem(item.id, 'preco_unitario', v ?? 0)}
-                              />
-                            </TableCell>
-                            <TableCell className="text-right font-medium text-sm">
-                              {formatarMoedaBRL(item.quantidade * item.preco_unitario)}
-                            </TableCell>
-                            <TableCell>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeItem(item.id)}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    <div className="flex justify-between items-center px-4 py-3 bg-muted/30 border-t border-border">
-                      <div className="flex-1 max-w-[200px] space-y-1">
-                        <Label className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Valor de Negociação</Label>
-                        {/* A <div relative> de fora fica: é ela que ancora o botão
-                            "Automático" por cima do campo. O CampoMoeda traz a sua própria
-                            caixa e o seu próprio "R$" — aninhar as duas não quebra nada.
-                            O valor passa cru (pode ser null): converter null para 0 aqui
-                            faria o campo se reescrever com "0" no instante em que a pessoa
-                            apagasse o conteúdo, o que parece defeito. */}
-                        <div className="relative">
-                          <CampoMoeda
-                            className={cn("h-9 text-sm font-bold transition-all", isManualMode ? "border-primary ring-1 ring-primary bg-background" : "bg-muted/30 border-transparent")}
-                            value={isManualMode ? valorManual : valorTotalItens}
-                            onChange={(v) => {
-                              setValorManual(v);
-                              setIsManualMode(true);
-                            }}
-                          />
-                          {isManualMode && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="absolute right-1 top-1 h-7 px-2 text-[10px] text-primary"
-                              onClick={() => {
-                                setIsManualMode(false);
-                                setValorManual(null);
-                              }}
-                            >
-                              Automático
-                            </Button>
-                          )}
+                </Label>
+                <div className={cn(
+                  "relative border-2 border-dashed rounded-lg p-4 transition-colors",
+                  pdfFile ? "border-primary/50 bg-primary/5" : "border-muted hover:border-primary/30"
+                )}>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="flex items-center justify-center gap-3">
+                    {pdfFile ? (
+                      <>
+                        <FileText className="h-6 w-6 text-primary" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{pdfFile.name}</p>
+                          <p className="text-xs text-muted-foreground">{(pdfFile.size / 1024 / 1024).toFixed(2)} MB</p>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">{isManualMode ? 'Valor Manual' : 'Total dos Itens'}</p>
-                        <p className="text-lg font-bold text-foreground">
-                          {formatarMoedaBRL(valorFinal)}
-                        </p>
-                      </div>
-                    </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={(e) => { e.stopPropagation(); setPdfFile(null); }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-6 w-6 text-muted-foreground" />
+                        <div className="text-center">
+                          <p className="text-sm font-medium">Clique ou arraste o PDF aqui</p>
+                          <p className="text-xs text-muted-foreground">Apenas arquivos PDF são aceitos</p>
+                        </div>
+                      </>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
 
+              <div className="space-y-2 p-4 border rounded-xl bg-muted/10 max-w-sm">
+                <Label className="text-sm font-semibold">Valor de Negociação{obrigatorio('valor_manual', false) && ' *'}</Label>
+                {/* CampoMoeda, nunca <input type="number"> nem parseFloat. Dois defeitos
+                    morreram aqui de uma vez e os dois eram silenciosos:
+                    1. parseFloat("99.888,47") devolve 99.888 — MIL VEZES MENOS, sem erro. Foi
+                       o que gravou 106.387.320,00 no lugar de 106.387,32 em produção;
+                    2. em type="number" a roda do mouse altera o valor quando o cursor está
+                       por cima — a pessoa rola a página e o valor muda sem ela ver.
+                    O CampoMoeda entrega número puro no onChange. Ver CLAUDE.md §7.10. */}
+                <CampoMoeda
+                  className="h-10 text-base font-bold"
+                  value={valorManual}
+                  onChange={setValorManual}
+                />
+              </div>
             </div>
           )}
         </CorpoDialogo>
@@ -1141,111 +892,6 @@ function NovoNegocioFormContent({
           </RodapeDialogo>
         </ConteudoDialogo>
       </Dialog>
-      <Dialog open={unidadeDialogOpen} onOpenChange={(o) => { setUnidadeDialogOpen(o); if (!o) setUnidadeDialogItemId(null); }}>
-        <ConteudoDialogo>
-          <CabecalhoDialogo>
-            <DialogTitle>Nova unidade</DialogTitle>
-          </CabecalhoDialogo>
-          <CorpoDialogo>
-            <div className="space-y-2">
-              <Label>Nome da unidade</Label>
-              <Input
-                value={newUnidadeLabel}
-                onChange={(e) => setNewUnidadeLabel(e.target.value)}
-                placeholder="Ex.: Caixa, Saco, Rolo..."
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddUnidade(); } }}
-              />
-            </div>
-          </CorpoDialogo>
-          <RodapeDialogo>
-            <Button variant="outline" onClick={() => { setUnidadeDialogOpen(false); setNewUnidadeLabel(''); setUnidadeDialogItemId(null); }}>Cancelar</Button>
-            <Button onClick={handleAddUnidade}>Adicionar</Button>
-          </RodapeDialogo>
-        </ConteudoDialogo>
-      </Dialog>
     </>
-  );
-}
-
-// Quantas sugestões do catálogo cabem na listinha sem virar rolagem infinita.
-// O corte já existia; o que faltava era AVISAR que ele existe — sem aviso, quem
-// digita um termo genérico acha que a fábrica só tem 10 produtos.
-const MAX_SUGESTOES_CATALOGO = 10;
-
-// Autocomplete component for item description
-function ItemDescricaoField({
-  value,
-  onChange,
-  tabelaPrecos,
-  onSelect,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  tabelaPrecos: any[];
-  onSelect: (id: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-
-  // A tela do Catálogo promete busca por referência, mas aqui só a descrição era
-  // procurada. Quem sabe o código do produto de cabeça não achava nada e acabava
-  // digitando o item na mão — perdendo o preço que veio da tabela da fábrica.
-  const encontrados = useMemo(() => {
-    const termo = value.trim().toLowerCase();
-    if (!termo) return tabelaPrecos;
-    return tabelaPrecos.filter(tp =>
-      (tp.descricao_material ?? '').toLowerCase().includes(termo) ||
-      (tp.referencia ?? '').toLowerCase().includes(termo)
-    );
-  }, [value, tabelaPrecos]);
-
-  const filtered = encontrados.slice(0, MAX_SUGESTOES_CATALOGO);
-  const ocultos = encontrados.length - filtered.length;
-
-  return (
-    <div className="relative">
-      <Input
-        className="h-8 text-xs"
-        value={value}
-        onChange={e => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 200)}
-        placeholder="Descrição..."
-      />
-      {open && filtered.length > 0 && (
-        <div className="absolute top-full left-0 z-50 mt-1 w-72 rounded-md border bg-popover text-popover-foreground shadow-md">
-          <Command>
-            <CommandList>
-              <CommandGroup>
-                {filtered.map(tp => (
-                  <CommandItem
-                    key={tp.id}
-                    onSelect={() => {
-                      onSelect(tp.id);
-                      setOpen(false);
-                    }}
-                    className="text-xs"
-                  >
-                    <div>
-                      <p>{tp.descricao_material}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {tp.referencia && `Ref: ${tp.referencia} · `}
-                        {formatarMoedaBRL(tp.preco_unitario)}
-                        {tp.unidade && ` / ${tp.unidade}`}
-                        {tp.estoque_disponivel !== undefined && ` · Estoque: ${tp.estoque_disponivel}`}
-                      </p>
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-          {ocultos > 0 && (
-            <p className="border-t px-2 py-1.5 text-[10px] text-muted-foreground">
-              Mais {ocultos} {ocultos === 1 ? 'item encontrado' : 'itens encontrados'} — escreva mais da descrição ou a referência.
-            </p>
-          )}
-        </div>
-      )}
-    </div>
   );
 }

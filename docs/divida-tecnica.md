@@ -47,6 +47,7 @@ acrescentados em 21/08/2026.
 | 30 | [Miudezas do módulo Calendário](#30-miudezas-do-módulo-calendário) | Baixa | Não |
 | 31 | [Exceções da seleção em massa viajam na URL](#31-a-lista-de-exceções-da-seleção-em-massa-viaja-na-url-e-trava-em-800) | Média | Trava a operação acima de ~800 e não explica por quê |
 | 32 | [Cópia sem uso da chave do Resend no Vault](#32-cópia-sem-uso-da-chave-do-resend-no-vault) | Baixa | Não — higiene de credencial |
+| 33 | [O WhatsApp não tem contagem de envio nenhuma](#33-o-whatsapp-não-tem-contagem-de-envio-nenhuma) | **Alta** | Não hoje — mas um número da MD é compartilhado por 13 pessoas, sem trava |
 
 ---
 
@@ -1262,6 +1263,53 @@ achando que é a que vale. Nada quebra hoje.
 **Conserto:** apagar `RESEND_API_KEY` do Vault e `Resend_api_key` dos secrets das Edge
 Functions. Depois **republicar a função** — segredo trocado não afeta instância já morna — e
 conferir que `aviso_nome_do_segredo` sumiu do registro em `automation_logs`.
+
+---
+
+## 33. O WhatsApp não tem contagem de envio nenhuma
+
+**Gravidade: alta. Não bloqueia nada hoje — e é por sorte, não por desenho.**
+
+**Medido em 26/08/2026:**
+
+```
+limite de frequência em supabase/functions/whatsapp-send   ->  NÃO EXISTE
+                                     para texto            ->  nenhum
+                                     para mídia            ->  nenhum
+
+MD Representações  ->  número 1: 13 pessoas ligadas   (conectado)
+                       número 2: 12 pessoas ligadas   (conectado)
+```
+
+A conexão com o WhatsApp é por **API não oficial**. Número que dispara muita mensagem em pouco
+tempo é derrubado, e perder o número é perder operação — não funcionalidade.
+
+**Por que ninguém sentiu ainda:** todo envio é hoje um humano digitando na caixa de entrada, um
+de cada vez. O ritmo humano é a única trava que existe. Qualquer código novo que mande mensagem
+em laço, ou qualquer pessoa com acesso ao console do navegador, passa por cima disso sem
+encontrar nada.
+
+🔴 **O teto tem que ser por NÚMERO, não por pessoa.** Treze pessoas com dez envios cada dão 130
+disparos de um único aparelho — e quem o WhatsApp bane é o aparelho. Foi essa conta que corrigiu
+o desenho do drive de catálogos, e é o erro que qualquer trava por usuário vai repetir.
+
+### Por que não foi corrigido junto com o drive de catálogos
+
+`whatsapp-send` é o **caminho crítico do atendimento**. Um representante numa conversa rápida
+manda muitas mensagens em pouco tempo, de forma inteiramente legítima — uma trava genérica ali
+quebraria o atendimento para proteger o catálogo. O envio de catálogo ganhou trava própria, no
+seu próprio caminho.
+
+### O conserto, quando for a hora
+
+O mecanismo desenhado para o catálogo serve inteiro:
+[`superpowers/specs/2026-08-26-drive-de-catalogos-design.md`](superpowers/specs/2026-08-26-drive-de-catalogos-design.md) §8.
+
+1. Registrar cada envio com `instancia_id`, `usuario_id` e a hora
+2. Contar **no servidor**, dentro da função — botão desabilitado não protege de nada
+3. Dois tetos: por número (o que protege o ativo) e por pessoa (o que limita abuso)
+4. A mensagem de recusa diz **quando libera** e **de quem é o limite** — aviso sem horário faz a
+   pessoa clicar de novo, e "você atingiu seu limite" para quem mandou duas mensagens parece bug
 
 ---
 

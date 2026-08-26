@@ -66,7 +66,6 @@ const REQUIRED_FIELDS: Record<string, Set<string>> = {
   clientes_empresas: new Set(['empresa', 'razao_social', 'cnpj']),
   clientes_contatos: new Set(['empresa', 'nome_contato']),
   negocios: new Set(['cliente', 'fabricante', 'valor']),
-  catalogo_geral: new Set(['fabricante_nome', 'descricao_material', 'preco_unitario']),
 };
 
 // Fields that are internal/processed and shouldn't be shown for editing
@@ -102,14 +101,6 @@ function tipoDeCadastroDoCampo(campo: string, tipoImportacao: string): CampoDeCa
 
   if (campo === 'cliente') return { tipo: 'cliente', permitirNovo: true, avisoNaoCadastrado: CRIA_SOZINHO };
   if (campo === 'fabricante') return { tipo: 'fabricante', permitirNovo: true, avisoNaoCadastrado: CRIA_SOZINHO };
-  // No catálogo o fabricante NÃO nasce sozinho: retryCatalogo exige que já exista e
-  // recusa a linha com "Fabricante não encontrado". Oferecer "cadastrar novo" ali só
-  // levaria a pessoa direto para outra falha.
-  if (campo === 'fabricante_nome') return {
-    tipo: 'fabricante',
-    permitirNovo: false,
-    avisoNaoCadastrado: 'Não existe fabricante com este nome — a importação vai recusar a linha de novo.',
-  };
   // `status`/`marcador` só têm cadastro correspondente na importação de negócios;
   // `tipo` só existe na de clientes. Amarrar ao tipo da linha evita oferecer a
   // lista errada caso uma planilha traga uma coluna com o mesmo nome.
@@ -445,7 +436,6 @@ const FALLBACK_FIELDS: Record<string, string[]> = {
   clientes_empresas: ['empresa', 'razao_social', 'tipo', 'cnpj', 'email', 'telefone', 'cidade', 'uf'],
   clientes_contatos: ['empresa', 'nome_contato', 'cargo', 'email', 'telefone'],
   negocios: ['cliente', 'fabricante', 'obra', 'valor', 'status', 'data_pedido', 'observacoes'],
-  catalogo_geral: ['fabricante_nome', 'descricao_material', 'preco_unitario', 'unidade', 'categoria', 'referencia'],
 };
 
 async function logLinhaIgnoradaRetry(tipo: string, dados: Record<string, unknown>, motivo: string, nomeArquivo?: string) {
@@ -502,40 +492,6 @@ async function retryContato(fields: Record<string, string>, nomeArquivo?: string
     if (error) throw error;
   } catch (err) {
     await logLinhaIgnoradaRetry('clientes_contatos', fields, (err as Error).message, nomeArquivo);
-    throw err;
-  }
-}
-
-// Import de Catálogo também não passa pelo useBulkImport — reenvia direto pra
-// tabela_precos, resolvendo o fabricante pelo nome (mesma regra da GlobalImportCatalogoDialog).
-async function retryCatalogo(fields: Record<string, string>, nomeArquivo?: string) {
-  try {
-    const precoNum = Number(fields.preco_unitario);
-    if (!fields.fabricante_nome || !fields.descricao_material || !(precoNum > 0)) {
-      throw new Error('Falta Fabricante, Descrição ou Preço');
-    }
-    const { data: fab, error: fabError } = await supabase
-      .from('fabricantes')
-      .select('id')
-      .ilike('nome', fields.fabricante_nome.trim())
-      .maybeSingle();
-    if (fabError) throw fabError;
-    if (!fab) throw new Error('Fabricante não encontrado — verifique se o nome está exatamente igual ao cadastrado');
-
-    const { error } = await supabase.from('tabela_precos').insert({
-      fabricante_id: fab.id,
-      descricao_material: fields.descricao_material,
-      referencia: fields.referencia || null,
-      categoria: fields.categoria || null,
-      unidade: fields.unidade || null,
-      imagem_url: fields.imagem_url || null,
-      estoque_disponivel: fields.estoque_disponivel ? Number(fields.estoque_disponivel) : null,
-      preco_unitario: precoNum,
-      vigente: true,
-    });
-    if (error) throw error;
-  } catch (err) {
-    await logLinhaIgnoradaRetry('catalogo_geral', fields, (err as Error).message, nomeArquivo);
     throw err;
   }
 }
@@ -799,9 +755,6 @@ export default function LinhasIgnoradas() {
         success = summary.inserted > 0;
       } else if (tipo === 'clientes_contatos') {
         await retryContato(retryFields, retryRow.nome_arquivo);
-        success = true;
-      } else if (tipo === 'catalogo_geral') {
-        await retryCatalogo(retryFields, retryRow.nome_arquivo);
         success = true;
       } else {
         // forceKeepDuplicate pula a checagem de hash — usado quando o usuário já revisou a
