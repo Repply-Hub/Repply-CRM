@@ -7,7 +7,6 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
-import { useSecaoLigada } from '@/hooks/use-secoes';
 import {
   useConfiguracoesAutomacao,
   useSalvarConfiguracaoAutomacao,
@@ -24,6 +23,12 @@ import {
  *
  * Agora cada controle grava em `configuracoes_automacao` e tem efeito imediato na tela
  * "Hoje", porque a função de banco que monta a pauta lê estas mesmas chaves.
+ *
+ * 🔴 QUEM GARANTE QUE A SEÇÃO ESTÁ LIGADA É QUEM RENDERIZA A ABA, não este arquivo.
+ * `Configuracoes.tsx` esconde gatilho E conteúdo quando a empresa não tem "Hoje" — igual
+ * faz com a aba do WhatsApp. Por isso aqui não há conferência nenhuma: duas guardas para a
+ * mesma coisa é como uma delas fica para trás. Se um dia esta aba for renderizada de outro
+ * lugar, a guarda vai junto.
  *
  * O que NÃO está aqui e estava no desenho original: "obra fria" e "tabela de preço
  * vencendo". Os dois módulos estão vazios — 0 obras cadastradas, 0 tabelas de preço, e o
@@ -48,7 +53,6 @@ interface Props {
 export function AutomacaoTab({ empresaId }: Props) {
   const { data: config, isLoading } = useConfiguracoesAutomacao(empresaId);
   const salvar = useSalvarConfiguracaoAutomacao(empresaId);
-  const { ligada: temPauta } = useSecaoLigada('hoje');
 
   // Os campos de número são digitados: guardar em texto deixa o campo ficar vazio enquanto
   // a pessoa apaga para redigitar. Converter a cada tecla faria "" virar 0 e o cursor
@@ -119,14 +123,6 @@ export function AutomacaoTab({ empresaId }: Props) {
 
   return (
     <div className="grid gap-4">
-      {!temPauta && (
-        <div className="rounded-lg border border-dashed border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-          A seção <strong className="text-card-foreground">Hoje</strong> está desligada para
-          esta empresa, então nada aqui tem efeito por enquanto: não há pauta e não há e-mail.
-          Quem liga a seção é o administrador da Repply.
-        </div>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle className="text-base">A pauta do dia</CardTitle>

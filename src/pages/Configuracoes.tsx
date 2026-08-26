@@ -782,7 +782,19 @@ const Configuracoes = () => {
   // vez que abrisse o favorito. Esconder o conteúdo enquanto carrega já é o que
   // as guardas abaixo fazem; trocar de aba é decisão que só se toma sabendo.
   const { ligada: temWhatsapp } = useSecaoLigada('whatsapp');
-  const activeTab = abaDaUrl === 'whatsapp' && temWhatsapp === false ? 'perfil' : abaDaUrl;
+  // A aba Automação segue a MESMA regra, pela mesma razão: tudo o que ela configura é a
+  // pauta da seção "Hoje" — dias parados, quantos itens, e o resumo por e-mail. Sem a
+  // seção, cada controle ali grava um valor que nada lê. Era o que acontecia até
+  // 26/08/2026: a empresa via a aba inteira com um aviso de que nada tinha efeito, o que
+  // é a mesma armadilha que esta tela acabou de perder (ver o cabeçalho de AutomacaoTab).
+  //
+  // Some a aba, não o recurso: no dia em que a seção for ligada para a empresa, a aba
+  // reaparece sozinha, já com tudo funcionando.
+  const { ligada: temHoje } = useSecaoLigada('hoje');
+  const abaDeSecaoDesligada =
+    (abaDaUrl === 'whatsapp' && temWhatsapp === false) ||
+    (abaDaUrl === 'automacao' && temHoje === false);
+  const activeTab = abaDeSecaoDesligada ? 'perfil' : abaDaUrl;
   const setActiveTab = (aba: string) => setSearchParams({ tab: aba }, { replace: true });
   // A aba de Usuários usa layout de altura fixa (scroll interno nos cards); as demais rolam a página normalmente.
   const noPageScroll = activeTab === 'vendedores';
@@ -823,7 +835,7 @@ const Configuracoes = () => {
             {isGestor && temWhatsapp === true && (
               <TabsTrigger value="whatsapp" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><Smartphone className="h-4 w-4" /> WhatsApp</TabsTrigger>
             )}
-            {isGestor && (
+            {isGestor && temHoje === true && (
               <TabsTrigger value="automacao" className={TOGGLE_TRIGGER_CLASS}>Automação</TabsTrigger>
             )}
             {isGestor && (
@@ -858,7 +870,8 @@ const Configuracoes = () => {
           )}
 
 
-          {isGestor && (
+          {/* O conteúdo some junto com o gatilho, pelo mesmo motivo do WhatsApp acima. */}
+          {isGestor && temHoje === true && (
             <TabsContent value="automacao" className="mt-4">
               <AutomacaoTab empresaId={profile?.empresa_id ?? profile?.empresas?.id ?? undefined} />
             </TabsContent>

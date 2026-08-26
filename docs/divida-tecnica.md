@@ -36,7 +36,7 @@ acrescentados em 21/08/2026.
 | 19 | [11.903 negócios com data trocada](#19-11903-negócios-com-data-trocada-em-produção) | **Alta** | Distorce todo relatório por data |
 | 20 | [Empresa "MD" duplicada com 6.374 negócios órfãos](#20-empresa-md-duplicada-com-6374-negócios-órfãos) | Média | Não |
 | 21 | [Colunas de data com nome que não bate com a tela](#21-colunas-de-data-com-nome-que-não-bate-com-a-tela) | Média | Não |
-| 22 | [Automação diária filtra por um slug que não existe](#22-a-automação-diária-filtra-por-um-slug-que-não-existe) | **Alta** | Não — mas manda alerta errado todo dia |
+| 22 | [Automação diária nunca rodou, e tem 5 defeitos em série](#22-a-automação-diária-nunca-rodou-e-tem-cinco-defeitos-em-série) | Baixa hoje, **Alta** se agendada | Não — está dormente, nunca criou notificação |
 | 23 | [Etapa final é reconhecida por texto fixo](#23-etapa-final-é-reconhecida-por-texto-fixo-não-por-marca-na-tabela) | **Alta** | Sim — impede funil realmente configurável |
 | 24 | [`SearchableSelect` identifica opção pelo rótulo](#24-searchableselect-identifica-a-opção-pelo-rótulo) | Média | Não |
 | 25 | [522 tamanhos de fonte travados em pixel](#25-522-tamanhos-de-fonte-travados-em-pixel) | Média | Não |
@@ -779,9 +779,29 @@ a renomeação vira tarefa própria depois, com calma.
 
 ---
 
-## 22. A automação diária filtra por um slug que não existe
+## 22. A automação diária nunca rodou, e tem cinco defeitos em série
 
-**Gravidade: alta. Confirmado no código em 21/08/2026.**
+**Gravidade: alta SE alguém a agendar. Hoje o impacto real é zero — ela está dormente.**
+
+**Medido em 26/08/2026, em produção:**
+
+| | |
+|---|---|
+| agendamento (`cron.job`) | **não existe** |
+| execuções registradas em `automation_logs` | **nenhuma** |
+| notificações `inatividade` no banco | **0** |
+| notificações `followup` no banco | **0** |
+| (as 36 notificações que existem são `evento_lembrete`, de outro caminho) | |
+
+🔴 **A versão anterior deste item dizia que "o vendedor recebe follow-up atrasado para
+venda que já fechou". Isso nunca aconteceu** — a função nunca foi invocada uma vez. O
+defeito do slug é real e está descrito abaixo, mas ele não tem consequência enquanto nada
+chamar a função. Corrigido aqui para não mandar ninguém consertar um sintoma inexistente.
+
+**Não basta trocar o slug e agendar.** São cinco coisas, e as três últimas foram
+encontradas em 26/08/2026:
+
+**Confirmado no código em 21/08/2026:**
 
 `supabase/functions/automacao-diaria/index.ts:44` exclui do follow-up os negócios já
 encerrados assim:
@@ -800,13 +820,13 @@ novo_lead · elaboracao · enviado · negociacao · fechamento · perdido
 `'fechado'` era o nome antigo, abandonado quando as visões foram reescritas para
 `'fechamento'` em `20260426171830_...sql`. A função de borda ficou para trás.
 
-### O que acontece na prática
+### O que aconteceria se ela fosse ligada hoje
 
 `'perdido'` casa e é excluído certo. `'fechamento'` **não casa com nada**, então negócio
-já **ganho** continua no filtro, e a linha 52 (`if (!pedido) continue; // already closed`)
-nunca o descarta. Resultado: o vendedor recebe **"⚠️ Follow-up atrasado"** para venda que
-já fechou. É o inverso do que o comentário do código promete — não deixa de disparar,
-dispara demais.
+já **ganho** continuaria no filtro, e a linha 52 (`if (!pedido) continue; // already
+closed`) nunca o descartaria. O vendedor receberia **"⚠️ Follow-up atrasado"** para venda
+que já fechou. É o inverso do que o comentário do código promete — não deixaria de
+disparar, dispararia demais.
 
 ### Está no banco também
 
@@ -820,9 +840,60 @@ Ou seja, negócio ganho e parado também gera **"🔴 Pedido parado há N dias"*
 Terceira ocorrência: `supabase/functions/import-data/index.ts:38`, no prompt que descreve
 os status válidos — mas essa função é órfã (item 6).
 
-**Conserto:** trocar `'fechado'` por `'fechamento'` nos três pontos. O da visão exige
-migration nova (nunca editar a existente). É barato e para de gastar a confiança do
-vendedor nas notificações do sistema.
+### Defeito 3: a visão não tem corte de dias nenhum
+
+`vw_pedidos_inativos` **não filtra por tempo**. Não existe `WHERE dias_parado > N` — ela
+devolve todo negócio aberto. Medido em 26/08/2026: **8.712 linhas**. A função percorre a
+lista inteira criando uma notificação por linha, uma vez por dia.
+
+O campo "Dias para alerta" que existia na aba Automação até 26/08/2026 sugeria que esse
+corte era configurável. Nunca foi: aquele campo era um `useState('5')` que não era lido do
+banco nem gravado nele, ao lado de dois interruptores sem função de clique.
+
+### Defeito 4: a função lê colunas que a visão não devolve
+
+`index.ts` monta a notificação com `p.usuario_id` e `p.cliente_id`. A definição vigente da
+visão devolve `pedido_id, status, ultima_atualizacao, dias_parado, cliente_nome,
+usuario_nome` — **nenhum dos dois id está lá**. Os dois chegariam `undefined` e a inserção
+falharia nas 8.712, ou gravaria nulo onde a coluna permitir.
+
+### Defeito 5 (o que invalida a métrica): `dias_parado` mede a importação, não a parada
+
+A visão calcula `now() - p.updated_at`, e `updated_at` é uma das
+[colunas envenenadas pela importação](arquitetura/modelo-de-dados.md) — carimbada entre
+18 e 21/08/2026 em massa. Medido em 26/08/2026:
+
+```
+negócios na visão ............... 8.712
+com "parado" entre 0 e 7 dias ... 8.712   ← TODOS
+com mais de 7 dias .............. 0
+carimbados pela importação ...... 8.707
+datas distintas de atualização .. 6
+```
+
+**Não existe negócio "parado há mais de 7 dias" segundo essa conta** — e existem milhares
+parados de verdade. O número mede há quanto tempo a importação rodou. Consertar os
+defeitos 1 a 4 e agendar produziria 8.712 notificações dizendo "parado há 7 dias" no mesmo
+dia, todas com o mesmo número, todas erradas.
+
+### Conserto
+
+**Não é trocar o slug e agendar.** Nessa ordem:
+
+1. Trocar `'fechado'` por `'fechamento'` nos três pontos (o da visão exige migration nova —
+   nunca editar a existente)
+2. Trocar a base do tempo: `pedidos_historico_status` (confiável a partir de 08/2026) ou
+   `data_pedido`, nunca `updated_at`
+3. Pôr corte de dias na visão, e ler o corte de `configuracoes_automacao` em vez de cravar
+4. Devolver `usuario_id` e `cliente_id` na visão
+5. Só então agendar
+
+**Antes de fazer isso, confira se ainda faz sentido.** A seção "Hoje"
+([plano](operacao/plano-pauta-do-dia.md)) já entrega essa ideia funcionando, com o corte
+configurável de verdade, priorização por valor e teto diário — justamente para não virar
+8.712 avisos. Reviver esta função criaria **um segundo lugar com a mesma regra**, e é assim
+que os dois números divergem seis meses depois. Decisão do Lucas em 26/08/2026: **deixar
+documentada e dormente**, sem consertar nem apagar.
 
 ---
 
