@@ -94,7 +94,15 @@ export function useSalvarConfiguracaoAutomacao(empresaId?: string) {
           chave: args.chave,
           valor: args.valor as never,
           updated_at: new Date().toISOString(),
-          updated_by: profile?.id ?? null,
+          // 🔴 `user_id`, NÃO `id`. A coluna aponta para `auth.users(id)`, e o que casa com
+          // isso é `usuarios.user_id` — `usuarios.id` é outro identificador e NUNCA existe
+          // em auth.users. Mandar o errado viola a chave estrangeira e a gravação falha
+          // inteira. É a ambiguidade do CLAUDE.md §4.2, e ela mordeu aqui em 25/08/2026.
+          //
+          // Cuidado ao copiar daqui: `historico_contatos.usuario_id` aponta para
+          // `usuarios(id)` e quer o OUTRO. Os dois campos têm cara de "quem foi" e vão para
+          // tabelas diferentes.
+          updated_by: profile?.user_id ?? null,
         } as never,
         { onConflict: 'empresa_id,chave' },
       );

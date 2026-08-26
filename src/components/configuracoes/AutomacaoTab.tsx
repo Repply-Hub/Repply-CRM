@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { useSecaoLigada } from '@/hooks/use-secoes';
 import {
   useConfiguracoesAutomacao,
@@ -67,9 +68,9 @@ export function AutomacaoTab({ empresaId }: Props) {
     try {
       await salvar.mutateAsync({ chave, valor });
     } catch (e) {
-      toast.error(
-        e instanceof Error && e.message ? `Não salvou: ${e.message}` : 'Não foi possível salvar',
-      );
+      // O `e instanceof Error` que estava aqui escondia justamente o erro que importa —
+      // ver o porquê em `@/lib/mensagem-de-erro`.
+      toast.error(`Não salvou: ${mensagemDeErro(e)}`);
     }
   };
 

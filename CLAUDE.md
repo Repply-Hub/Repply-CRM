@@ -100,7 +100,7 @@ traduza para inglês**, a consistência vale mais que a preferência.
 | **Usuário** | `usuarios` | Membro da equipe. Antigamente `vendedores` |
 | **Empresa** | `empresas` | O **assinante do SaaS**, não o cliente dele |
 
-### Quatro ambiguidades que já causaram bug
+### Seis ambiguidades que já causaram bug
 
 1. **"empresa" significa duas coisas.** `empresas` é o assinante do SaaS. Mas `clientes`
    tem um campo `empresa` de texto, que é o nome da empresa **cliente**. Inquilino é
@@ -123,6 +123,41 @@ traduza para inglês**, a consistência vale mais que a preferência.
    O mapa completo de tela × banco está em
    [`docs/arquitetura/modelo-de-dados.md`](docs/arquitetura/modelo-de-dados.md), junto com o
    motivo de não renomearmos (o rename quebra 8 funções do banco em silêncio).
+
+5. 🔴 **`usuarios.id` e `usuarios.user_id` são identificadores DIFERENTES da mesma pessoa,
+   e as colunas "quem fez" se dividem entre os dois.** `user_id` é o login (a linha em
+   `auth.users`); `id` é a linha na nossa tabela `usuarios`. **Nenhum `usuarios.id` existe
+   em `auth.users`** — medido em 26/08/2026: 0 de 26 pessoas.
+
+   Não dá para deduzir qual usar pelo nome da coluna. As duas famílias convivem:
+
+   | coluna | aponta para | mande |
+   |---|---|---|
+   | `historico_contatos.usuario_id` | `usuarios(id)` | `profile.id` |
+   | `tarefas.usuario_id` | `usuarios(id)` | `profile.id` |
+   | `configuracoes_automacao.updated_by` | `auth.users(id)` | **`profile.user_id`** |
+
+   **Confira no banco antes de escrever**, com
+   `select pg_get_constraintdef(oid) from pg_constraint where conrelid = 'sua_tabela'::regclass`.
+
+   Errar não dá erro visível: a gravação inteira é recusada pela chave estrangeira e, se o
+   `catch` da tela for o padrão de baixo, a pessoa vê uma frase genérica. A aba Automação
+   ficou assim desde que nasceu — **zero linha gravada**, e ninguém percebeu porque a tela
+   "Hoje" usa o padrão quando não há configuração. Custou duas investigações no mesmo dia.
+
+6. 🔴 **Erro do Supabase NÃO é um `Error`.** É um objeto simples
+   (`{ message, details, hint, code }`), então `e instanceof Error` dá **falso** justamente
+   para os erros que interessam, e a tela cai na frase genérica do `else` — escondendo a
+   explicação que o banco mandou junto.
+
+   Use `mensagemDeErro` de `src/lib/mensagem-de-erro.ts` em gravação de tabela, e
+   `mensagemDeErroDaFunction` de `src/lib/erro-edge-function.ts` quando o erro vier de
+   função que roda no servidor (ali a frase está dentro do corpo HTTP e a leitura é
+   assíncrona). O padrão abaixo existe em ~13 outros arquivos e é dívida conhecida:
+
+   ```ts
+   e instanceof Error ? e.message : 'Não foi possível salvar'   // ❌ esconde erro de banco
+   ```
 
 ### Termos do ramo
 

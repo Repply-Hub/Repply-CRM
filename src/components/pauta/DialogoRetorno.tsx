@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { useRegistrarRetorno } from '@/hooks/use-pauta';
 
 interface Props {
@@ -77,10 +78,10 @@ export function DialogoRetorno({ aberto, aoFechar, pedidoId, tituloDoNegocio }: 
       toast.success(`Retorno marcado para ${format(retorno, "dd 'de' MMMM", { locale: ptBR })}`);
       aoFechar();
     } catch (e) {
+      // Mesma armadilha da aba de Automação: o erro do banco não é um `Error`, e o
+      // `instanceof` mandava todo mundo para a frase genérica. Ver `@/lib/mensagem-de-erro`.
       toast.error(
-        e instanceof Error && e.message
-          ? `Não foi possível registrar: ${e.message}`
-          : 'Não foi possível registrar o retorno. Tente de novo.',
+        `Não foi possível registrar: ${mensagemDeErro(e, 'tente de novo em instantes')}`,
       );
     }
   };
