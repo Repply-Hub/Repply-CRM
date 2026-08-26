@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Trash2, Users, Check, ChevronDown, HardHat } from 'lucide-react';
+import { ptBR } from 'date-fns/locale';
+import { AlertTriangle, CalendarDays, Trash2, Users, Check, ChevronDown, HardHat } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -8,6 +9,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,7 +32,7 @@ import {
 } from '@/components/ui/command';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useAuth } from '@/hooks/use-auth';
-import { useEventoParticipantes } from '@/hooks/use-eventos';
+import { useEventoParticipantes, buscarConflitosDeVisita, type ConflitoVisita } from '@/hooks/use-eventos';
 import type { CalendarEvent, EventoForm, CalendarType } from './types';
 import { EVENT_PRESET_COLORS, CALENDAR_COLORS } from './types';
 import { EventDateTimeField } from './EventDateTimeField';
@@ -39,6 +45,13 @@ interface EventDialogProps {
   onClose: () => void;
   onSave: (form: EventoForm) => void;
   onDelete?: (id: string) => void;
+  /**
+   * Aba "Visita a obra" do tablist não cria a visita aqui dentro — entrega
+   * para o mesmo diálogo de rota de visita usado em Obras/Calendário, que já
+   * suporta várias paradas. Um evento comum (obra_id nulo) não vira rota; só
+   * a rota de visita cria linha em `eventos` com obra_id.
+   */
+  onAbrirRotaVisita?: (dataInicial?: Date) => void;
 }
 
 function toDatetimeLocal(iso: string): string {
@@ -75,9 +88,12 @@ export function EventDialog({
   onClose,
   onSave,
   onDelete,
+  onAbrirRotaVisita,
 }: EventDialogProps) {
   const [form, setForm] = useState<EventoForm>(defaultForm());
   const [participantesOpen, setParticipantesOpen] = useState(false);
+  const [conflitos, setConflitos] = useState<ConflitoVisita[]>([]);
+  const [verificandoConflito, setVerificandoConflito] = useState(false);
   const { user } = useAuth();
   const { data: usuarios, refetch: refetchUsuarios } = useVendedores();
   const { data: participantesExistentes } = useEventoParticipantes(
@@ -168,16 +184,11 @@ export function EventDialog({
     );
   };
 
-  const handleSubmit = () => {
-    if (!form.titulo.trim()) return;
-    onSave(form);
-    onClose();
-  };
-
   const isEditing = !!editingEvent;
-  // Visita a obra: obra_id é fixado na criação (rota de visita) e não pode
-  // ser desvinculado por aqui — só a data/observação/status são editáveis.
-  const isVisita = isEditing && !!editingEvent?.obraId;
+  // Visita a obra: obra_id só existe em evento criado pela rota de visita
+  // (ver `onAbrirRotaVisita`). Editar aqui muda data/participantes/status,
+  // nunca desvincula a obra.
+  const isVisita = isEditing && !!form.obraId;
   const participantesSelecionados = form.participantes ?? [];
   // Ao criar, quem está preenchendo o formulário é sempre o organizador. Ao
   // editar, só o organizador original pode adicionar/remover participantes —
@@ -187,7 +198,45 @@ export function EventDialog({
   // é participante nem organizador: pode abrir e ler, não pode salvar/excluir.
   const somenteLeitura = isEditing && editingEvent?.podeEditar === false;
 
+  const salvarDeFato = () => {
+    onSave(form);
+    onClose();
+  };
+
+  const handleSubmit = async () => {
+    if (!form.titulo.trim()) return;
+
+    if (isVisita && participantesSelecionados.length > 0) {
+      const inicio = form.diaInteiro
+        ? new Date(form.inicio + 'T00:00:00').toISOString()
+        : new Date(form.inicio).toISOString();
+      const fim = form.diaInteiro
+        ? new Date(form.fim + 'T23:59:59').toISOString()
+        : new Date(form.fim).toISOString();
+
+      setVerificandoConflito(true);
+      try {
+        const encontrados = await buscarConflitosDeVisita({
+          participantes: participantesSelecionados,
+          janelas: [{ inicio, fim }],
+          excluirGrupoId: editingEvent?.grupoId,
+        });
+        if (encontrados.length > 0) {
+          setConflitos(encontrados);
+          setVerificandoConflito(false);
+          return;
+        }
+      } catch {
+        // Se a checagem falhar (ex.: rede), não trava o salvamento — só deixa de avisar.
+      }
+      setVerificandoConflito(false);
+    }
+
+    salvarDeFato();
+  };
+
   return (
+    <>
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-[560px] max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
@@ -199,8 +248,39 @@ export function EventDialog({
           )}
         </DialogHeader>
 
+        {/* Tablist só na criação: ao editar, o tipo (evento comum ou visita a
+            obra) já foi decidido na criação e não muda mais por aqui.
+            "Visita a obra" não abre um formulário aqui dentro — entrega para o
+            diálogo de rota de visita, que suporta várias paradas. Fazer a
+            visita nascer aqui de novo reintroduziria o mesmo bug: só criava
+            uma visita avulsa, nunca a rota. */}
+        {!isEditing && onAbrirRotaVisita && (
+          <div className="px-6 pb-2 shrink-0">
+            <Tabs
+              value="evento"
+              onValueChange={(v) => {
+                if (v !== 'visita') return;
+                const dataBase = form.diaInteiro
+                  ? new Date(form.inicio + 'T00:00:00')
+                  : new Date(form.inicio);
+                onClose();
+                onAbrirRotaVisita(isNaN(dataBase.getTime()) ? undefined : dataBase);
+              }}
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="evento" className="gap-1.5">
+                  <CalendarDays className="h-3.5 w-3.5" /> Evento
+                </TabsTrigger>
+                <TabsTrigger value="visita" className="gap-1.5">
+                  <HardHat className="h-3.5 w-3.5" /> Visita a obra
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
+
         <fieldset disabled={somenteLeitura} className="space-y-4 py-2 px-6 overflow-y-auto flex-1 min-h-0 border-0 m-0 min-w-0">
-          {isVisita && (
+          {isEditing && isVisita && (
             <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
               <HardHat className="h-4 w-4 shrink-0 text-primary" />
               <span className="truncate font-medium">Visita: {editingEvent?.obraNome || 'obra'}</span>
@@ -443,13 +523,61 @@ export function EventDialog({
                 </Button>
               )}
               <Button variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
-              <Button size="sm" onClick={handleSubmit} disabled={!form.titulo.trim()}>
-                {isEditing ? 'Salvar' : 'Criar'}
+              <Button
+                size="sm"
+                onClick={handleSubmit}
+                disabled={!form.titulo.trim() || verificandoConflito}
+              >
+                {verificandoConflito ? 'Verificando agenda...' : isEditing ? 'Salvar' : 'Criar'}
               </Button>
             </>
           )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={conflitos.length > 0} onOpenChange={(o) => !o && setConflitos([])}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            Já existe visita marcada nesse horário
+          </AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2 text-left">
+              <p>Pelo menos um participante já tem outra visita que colide com este horário:</p>
+              <ul className="space-y-1 rounded-md border bg-muted/40 p-2.5 text-xs">
+                {conflitos.map((c, i) => {
+                  const nome =
+                    funcionariosDisponiveis.find((u: { user_id: string }) => u.user_id === c.userId)?.nome ??
+                    'Alguém da equipe';
+                  return (
+                    <li key={i} className="flex flex-col">
+                      <span className="font-medium text-foreground">{nome}</span>
+                      <span>
+                        {c.obraNome} — {format(new Date(c.inicio), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p>Quer salvar mesmo assim?</p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              setConflitos([]);
+              salvarDeFato();
+            }}
+          >
+            Salvar mesmo assim
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

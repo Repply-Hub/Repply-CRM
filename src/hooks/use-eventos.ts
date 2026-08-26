@@ -276,6 +276,73 @@ export interface ParadaRotaVisita {
   obraId: string;
   nomeObra: string;
   observacao?: string;
+  horario: string; // HH:mm — cada parada tem seu próprio horário, editado à mão
+}
+
+export interface ConflitoVisita {
+  userId: string;
+  obraNome: string;
+  inicio: string; // ISO
+  fim: string; // ISO
+}
+
+/**
+ * Verifica, ANTES de criar/editar uma visita, se algum dos participantes já
+ * tem outra visita (a qualquer obra) que colide de horário. Não bloqueia —
+ * quem chama decide se avisa e deixa confirmar mesmo assim.
+ *
+ * A busca no banco recorta só pelo intervalo [menor início, maior fim] entre
+ * todas as janelas pedidas (mais largo que cada parada isolada), e o filtro
+ * fino — cada janela contra cada linha — é feito aqui, porque paradas de uma
+ * mesma rota costumam ter horários bem espaçados dentro do dia e não faz
+ * sentido barrar por uma colisão em outra parada que nem se sobrepõe.
+ */
+export async function buscarConflitosDeVisita({
+  participantes,
+  janelas,
+  excluirGrupoId,
+}: {
+  participantes: string[];
+  janelas: { inicio: string; fim: string }[]; // ISO
+  /** Ao editar uma visita existente, não conflitar com ela mesma. */
+  excluirGrupoId?: string;
+}): Promise<ConflitoVisita[]> {
+  if (participantes.length === 0 || janelas.length === 0) return [];
+
+  const inicioMin = janelas.reduce((min, j) => (j.inicio < min ? j.inicio : min), janelas[0].inicio);
+  const fimMax = janelas.reduce((max, j) => (j.fim > max ? j.fim : max), janelas[0].fim);
+
+  let query = supabase
+    .from('eventos')
+    .select('user_id, grupo_id, inicio, fim, obras(nome_obra)')
+    .not('obra_id', 'is', null)
+    .in('user_id', participantes)
+    .lt('inicio', fimMax)
+    .gt('fim', inicioMin);
+
+  if (excluirGrupoId) {
+    query = query.neq('grupo_id', excluirGrupoId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const linhas = (data ?? []) as unknown as {
+    user_id: string;
+    grupo_id: string;
+    inicio: string;
+    fim: string;
+    obras: { nome_obra: string | null } | null;
+  }[];
+
+  return linhas
+    .filter((linha) => janelas.some((j) => linha.inicio < j.fim && linha.fim > j.inicio))
+    .map((linha) => ({
+      userId: linha.user_id,
+      obraNome: linha.obras?.nome_obra || 'obra sem nome',
+      inicio: linha.inicio,
+      fim: linha.fim,
+    }));
 }
 
 // Cria uma "rota de visita": um evento de calendário por obra selecionada,
@@ -294,30 +361,36 @@ export function useCreateRotaVisita() {
   return useMutation({
     mutationFn: async ({
       data,
-      horaInicio,
       duracaoMinutos = 60,
       paradas,
       jaRealizada,
+      participantes,
     }: {
       data: string; // yyyy-MM-dd
-      horaInicio: string; // HH:mm
       duracaoMinutos?: number;
       paradas: ParadaRotaVisita[];
       jaRealizada: boolean;
+      /** user_ids (auth) que vão participar de TODAS as paradas da rota. Vazio cai para o próprio criador. */
+      participantes?: string[];
     }) => {
       if (paradas.length === 0) {
         throw new Error('Selecione ao menos uma obra para a rota de visita.');
       }
 
-      let cursor = new Date(`${data}T${horaInicio}:00`);
+      // Mesma lógica de `useCreateEvento`: uma linha por participante,
+      // compartilhando o grupo_id — mas aqui o grupo_id é por PARADA, não da
+      // rota inteira (ver comentário acima da função).
+      const alvos = new Set<string>(
+        participantes && participantes.length > 0 ? participantes : [user!.id],
+      );
 
-      const rows = paradas.map((parada) => {
-        const inicio = new Date(cursor);
-        const fim = new Date(cursor.getTime() + duracaoMinutos * 60 * 1000);
-        cursor = fim;
-        return {
-          user_id: user!.id,
-          grupo_id: crypto.randomUUID(),
+      const rows = paradas.flatMap((parada) => {
+        const inicio = new Date(`${data}T${parada.horario}:00`);
+        const fim = new Date(inicio.getTime() + duracaoMinutos * 60 * 1000);
+        const grupoId = crypto.randomUUID();
+        return Array.from(alvos).map((uid) => ({
+          user_id: uid,
+          grupo_id: grupoId,
           criado_por: user!.id,
           titulo: `Visita: ${parada.nomeObra}`,
           descricao: null,
@@ -330,7 +403,7 @@ export function useCreateRotaVisita() {
           obra_id: parada.obraId,
           visita_realizada: jaRealizada,
           visita_observacao: parada.observacao || null,
-        };
+        }));
       });
 
       const { error } = await supabase.from('eventos').insert(rows);
@@ -339,6 +412,7 @@ export function useCreateRotaVisita() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['eventos'] });
       qc.invalidateQueries({ queryKey: ['obra_visitas'] });
+      qc.invalidateQueries({ queryKey: ['obra_visitas_todas'] });
     },
   });
 }

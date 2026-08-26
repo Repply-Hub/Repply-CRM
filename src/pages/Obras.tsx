@@ -48,6 +48,7 @@ import { MapaObrasPainel } from '@/components/obras/MapaObrasPainel';
 import { MarcadoresObrasDialog } from '@/components/obras/MarcadoresObrasDialog';
 import { VendasDaObra } from '@/components/obras/VendasDaObra';
 import { HistoricoVisitasObra } from '@/components/obras/HistoricoVisitasObra';
+import { VisitasObrasPainel } from '@/components/obras/VisitasObrasPainel';
 import { ContatosDaObra } from '@/components/obras/ContatosDaObra';
 import { NovaRotaVisitaDialog } from '@/components/obras/NovaRotaVisitaDialog';
 import { cn, hasTextSelection } from '@/lib/utils';
@@ -511,6 +512,9 @@ export default function Obras() {
                 <TabsTrigger value="mapa" className={TOGGLE_TRIGGER_CLASS}>
                   <MapIcon className="h-4 w-4" /> Mapa
                 </TabsTrigger>
+                <TabsTrigger value="visitas" className={TOGGLE_TRIGGER_CLASS}>
+                  <HardHat className="h-4 w-4" /> Visitas
+                </TabsTrigger>
               </TabsList>
 
               <SearchWithRecent
@@ -609,6 +613,15 @@ export default function Obras() {
                 </div>
               </FilterButton>
 
+              <Button
+                variant="outline"
+                onClick={() => setRotaVisitaDialogOpen(true)}
+                className="gap-2 shrink-0 h-10"
+              >
+                <HardHat className="h-4 w-4" />
+                Criar rota de visita
+              </Button>
+
               <Button onClick={() => setDialogOpen(true)} className="gap-2 shrink-0 h-10 bg-[#F06A00] hover:bg-[#F06A00]/90">
                 <Plus className="h-4 w-4" />
                 Nova Obra
@@ -637,26 +650,15 @@ export default function Obras() {
                   <div className="flex items-center gap-4">
                     <p className="text-sm text-muted-foreground">{filtered.length} obra(s) encontrada(s)</p>
                     {selectedIds.length > 0 && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setRotaVisitaDialogOpen(true)}
-                          className="gap-2 h-8"
-                        >
-                          <HardHat className="h-3.5 w-3.5" />
-                          Criar rota de visita
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => setConfirmDeleteBulk(true)}
-                          className="gap-2 h-8"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Remover Selecionados ({selectedIds.length})
-                        </Button>
-                      </>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setConfirmDeleteBulk(true)}
+                        className="gap-2 h-8"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Remover Selecionados ({selectedIds.length})
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -825,6 +827,15 @@ export default function Obras() {
                   onVerDetalhes={(id) => setSelectedObra(obras?.find(o => o.id === id) ?? null)}
                 />
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="visitas" className="mt-0 flex-1 data-[state=active]:flex flex-col min-h-0">
+            <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-border/60 bg-card p-4">
+              <VisitasObrasPainel
+                searchTerm={search}
+                onSelectObra={(obraId) => setSelectedObra(obras?.find((o) => o.id === obraId) ?? null)}
+              />
             </div>
           </TabsContent>
         </Tabs>

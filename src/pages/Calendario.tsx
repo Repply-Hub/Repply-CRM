@@ -115,6 +115,7 @@ export default function Calendario() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [rotaVisitaDialogOpen, setRotaVisitaDialogOpen] = useState(false);
+  const [rotaVisitaDataInicial, setRotaVisitaDataInicial] = useState<Date | undefined>(undefined);
 
   const [isImporting, setIsImporting] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -180,6 +181,11 @@ export default function Calendario() {
     setEditingEvent(null);
     setInitialSlot(slot ?? {});
     setDialogOpen(true);
+  };
+
+  const abrirRotaVisita = (dataInicial?: Date) => {
+    setRotaVisitaDataInicial(dataInicial);
+    setRotaVisitaDialogOpen(true);
   };
 
   const openEditEvent = (event: CalendarEvent) => {
@@ -319,7 +325,7 @@ export default function Calendario() {
             onViewModeChange={setViewMode}
             onNavigate={navigate}
             onNewEvent={() => openNewEvent()}
-            onNewVisita={() => setRotaVisitaDialogOpen(true)}
+            onNewVisita={() => abrirRotaVisita()}
             onImport={handleImportClick}
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}
@@ -437,10 +443,15 @@ export default function Calendario() {
           onClose={() => setDialogOpen(false)}
           onSave={handleSave}
           onDelete={handleDelete}
+          onAbrirRotaVisita={abrirRotaVisita}
         />
 
         {/* Dialog de rota de visita a obras */}
-        <NovaRotaVisitaDialog open={rotaVisitaDialogOpen} onOpenChange={setRotaVisitaDialogOpen} />
+        <NovaRotaVisitaDialog
+          open={rotaVisitaDialogOpen}
+          onOpenChange={setRotaVisitaDialogOpen}
+          dataInicial={rotaVisitaDataInicial}
+        />
 
         {/* Dialog de importação */}
         <Dialog

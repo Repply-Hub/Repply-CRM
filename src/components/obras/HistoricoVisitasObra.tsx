@@ -110,7 +110,7 @@ export function HistoricoVisitasObra({ obraId }: { obraId: string }) {
                     disabled={marcarRealizada.isPending}
                     onClick={() => {
                       marcarRealizada.mutate(
-                        { id: visita.id, obraId, realizada: true, observacao: observacaoRascunho },
+                        { grupoId: visita.grupoId, obraId, realizada: true, observacao: observacaoRascunho },
                         { onSuccess: () => setEditandoId(null) },
                       );
                     }}
