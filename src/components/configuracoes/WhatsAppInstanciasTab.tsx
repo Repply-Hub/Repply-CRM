@@ -103,9 +103,14 @@ function UsuarioMultiCombobox({
 }) {
   const [open, setOpen] = useState(false);
   const selected = usuarios.filter(u => value.includes(u.usuario_id));
+  const todosMarcados = usuarios.length > 0 && usuarios.every(u => value.includes(u.usuario_id));
 
   function toggle(id: string) {
     onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id]);
+  }
+
+  function toggleTodos() {
+    onChange(todosMarcados ? [] : usuarios.map(u => u.usuario_id));
   }
 
   return (
@@ -138,6 +143,15 @@ function UsuarioMultiCombobox({
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command>
           <CommandInput placeholder="Buscar usuário..." />
+          {usuarios.length > 0 && (
+            <button
+              type="button"
+              onClick={toggleTodos}
+              className="w-full border-b px-3 py-1.5 text-left text-xs font-medium text-primary hover:bg-accent"
+            >
+              {todosMarcados ? 'Desmarcar todos' : 'Marcar todos'}
+            </button>
+          )}
           <CommandList>
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>

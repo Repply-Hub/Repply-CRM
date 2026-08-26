@@ -3004,7 +3004,7 @@ function LeadSheet({
       <SheetContent className="sm:max-w-md overflow-y-auto flex flex-col gap-0 p-0">
         {/* Header */}
         <SheetHeader className="px-6 py-5 border-b">
-          <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex flex-row items-center gap-3 text-left">
             <button
               type="button"
               onClick={() =>
@@ -3021,22 +3021,22 @@ function LeadSheet({
                   "cursor-pointer transition-opacity hover:opacity-80",
               )}
             >
-              <Avatar className="h-20 w-20 border border-primary/10">
+              <Avatar className="h-14 w-14 border border-primary/10">
                 {conversa.foto_perfil_url && (
                   <AvatarImage src={conversa.foto_perfil_url} alt="" />
                 )}
                 <AvatarFallback
                   className={cn(
                     colorForPhone(conversa.telefone),
-                    "text-white text-2xl font-semibold",
+                    "text-white text-lg font-semibold",
                   )}
                 >
                   {initials(conversa.nome_contato, conversa.telefone)}
                 </AvatarFallback>
               </Avatar>
             </button>
-            <div className="min-w-0">
-              <div className="flex items-center justify-center gap-1.5">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-start gap-1.5">
                 <SheetTitle className="text-base font-bold leading-tight truncate">
                   {displayName}
                 </SheetTitle>
@@ -8325,7 +8325,7 @@ export default function WhatsAppInbox() {
         open={!!viewingImage}
         onOpenChange={(open) => !open && setViewingImage(null)}
       >
-        <DialogContent className="max-w-6xl w-full p-0 gap-0 flex flex-col max-h-[95vh]">
+        <DialogContent className="w-fit min-w-[22rem] max-w-[min(95vw,72rem)] p-0 gap-0 flex flex-col max-h-[95vh]">
           <DialogHeader className="px-4 py-3 border-b border-border">
             <DialogTitle>Visualizar imagem</DialogTitle>
           </DialogHeader>
