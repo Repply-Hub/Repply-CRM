@@ -65,12 +65,12 @@ serve(async (req) => {
 
     const { data: instLink } = await supabase
       .from("wapi_instancia_usuarios")
-      .select("configuracoes_wapi:instancia_id(instance_url, api_key, instance_name, api_instance_name, status)")
+      .select("configuracoes_wapi:instancia_id(id, instance_url, api_key, instance_name, api_instance_name, status)")
       .eq("usuario_auth_id", user.id)
       .limit(1)
       .maybeSingle();
     const config = (instLink?.configuracoes_wapi ?? null) as {
-      instance_url: string; api_key: string; instance_name: string;
+      id: string; instance_url: string; api_key: string; instance_name: string;
       api_instance_name: string | null; status: string;
     } | null;
     if (!config) {
@@ -136,8 +136,8 @@ serve(async (req) => {
     const { data: conversa, error: convError } = await supabase
       .from("whatsapp_conversas")
       .upsert(
-        { empresa_id: userData.empresa_id, telefone, nome_contato: nome.trim(), arquivada: false, is_group: true, participantes: participantesDoGrupo },
-        { onConflict: "empresa_id,telefone" }
+        { empresa_id: userData.empresa_id, telefone, nome_contato: nome.trim(), arquivada: false, is_group: true, participantes: participantesDoGrupo, instancia_id: config.id },
+        { onConflict: "empresa_id,telefone,instancia_id" }
       )
       .select("*")
       .single();

@@ -203,7 +203,7 @@ serve(async (req) => {
     } else if (eventType.includes("connection")) {
       await handleConnectionUpdate(supabase, empresaId, instanceName, payload);
     } else if (eventType.includes("call")) {
-      await handleCallEvent(supabase, empresaId, payload);
+      await handleCallEvent(supabase, empresaId, config.id, payload);
     } else if (
       !eventType.includes("presence") &&
       !eventType.includes("group")
@@ -898,11 +898,18 @@ async function handleIncomingMessage(
     msgExistenteConteudo = msgExistente?.conteudo ?? null;
   }
 
+  // Busca a conversa DESTA instância — não basta empresa_id+telefone. Um mesmo
+  // cliente pode conversar com dois números diferentes da mesma empresa
+  // (instâncias distintas), e sem o filtro por instancia_id a mensagem que
+  // chega pela segunda instância "sequestrava" a conversa que já existia com a
+  // primeira, misturando os dois atendimentos numa linha só. Ver
+  // 20260826100000_whatsapp_conversas_unica_por_instancia.sql.
   let { data: existente } = await supabase
     .from("whatsapp_conversas")
     .select("id, nao_lidas, nome_contato, nome_contato_editado_manualmente, arquivada")
     .eq("empresa_id", empresaId)
     .eq("telefone", telefone)
+    .eq("instancia_id", config.id)
     .maybeSingle();
 
   /**
@@ -926,6 +933,7 @@ async function handleIncomingMessage(
       .select("id, nao_lidas, nome_contato, nome_contato_editado_manualmente, arquivada")
       .eq("empresa_id", empresaId)
       .eq("telefone", chaveLegada)
+      .eq("instancia_id", config.id)
       .maybeSingle();
     if (legada) {
       const { error: erroRename } = await supabase
@@ -1085,7 +1093,7 @@ async function handleIncomingMessage(
 // isso direto cria uma conversa fantasma; o telefone de fato vem em
 // `payload.sender_pn` / `event.Data.Attrs.caller_pn`, no formato
 // "<numero>@s.whatsapp.net".
-async function handleCallEvent(supabase: any, empresaId: string, payload: any) {
+async function handleCallEvent(supabase: any, empresaId: string, instanciaId: string, payload: any) {
   const ev = payload.event ?? {};
 
   await supabase.from("webhook_debug").insert({
@@ -1141,6 +1149,7 @@ async function handleCallEvent(supabase: any, empresaId: string, payload: any) {
     .select("id, nao_lidas")
     .eq("empresa_id", empresaId)
     .eq("telefone", telefone)
+    .eq("instancia_id", instanciaId)
     .maybeSingle();
 
   // Mesmo fallback de chave legada do fluxo de mensagens (ver comentário lá):
@@ -1152,6 +1161,7 @@ async function handleCallEvent(supabase: any, empresaId: string, payload: any) {
       .select("id, nao_lidas")
       .eq("empresa_id", empresaId)
       .eq("telefone", chaveLegada)
+      .eq("instancia_id", instanciaId)
       .maybeSingle();
     if (legada) {
       await supabase.from("whatsapp_conversas").update({ telefone }).eq("id", legada.id);
@@ -1184,6 +1194,7 @@ async function handleCallEvent(supabase: any, empresaId: string, payload: any) {
         nao_lidas: 1,
         arquivada: false,
         is_group: isGroupCall,
+        instancia_id: instanciaId,
       })
       .select("id")
       .single();

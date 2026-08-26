@@ -195,25 +195,6 @@ serve(async (req) => {
     const assinarRemetente = (userData.empresas as { whatsapp_assinar_remetente: boolean } | null)
       ?.whatsapp_assinar_remetente ?? true;
 
-    const { data: instLink } = await supabase
-      .from("wapi_instancia_usuarios")
-      .select("configuracoes_wapi:instancia_id(id, instance_url, api_key, instance_name, api_instance_name, status)")
-      .eq("usuario_auth_id", user.id)
-      .limit(1)
-      .maybeSingle();
-    const config = (instLink?.configuracoes_wapi ?? null) as {
-      id: string; instance_url: string; api_key: string; instance_name: string;
-      api_instance_name: string | null; status: string;
-    } | null;
-    if (!config) {
-      return await recusar(supabase, "sem_instancia_vinculada", "Seu usuário não tem WhatsApp vinculado. Peça ao gestor para liberar em Configurações.", 400,
-        { user_id: user.id, usuario_id: userData.id });
-    }
-    if (config.status !== "connected") {
-      return await recusar(supabase, "instancia_desconectada", "O WhatsApp está desconectado. Reconecte em Configurações e tente de novo.", 400,
-        { instancia_id: config.id, instance_name: config.instance_name, status_instancia: config.status });
-    }
-
     /**
      * O `conversa_id` vem do corpo e era usado SEM verificar o dono — o insert
      * da mensagem e (desde o fallback de variante) o rename do telefone
@@ -223,11 +204,16 @@ serve(async (req) => {
      * Um UUID alheio não é adivinhável, mas segurança por sorteio não é
      * segurança. Conversa que não é da empresa do chamador: recusa antes de
      * qualquer efeito.
+     *
+     * A busca sobe aqui (antes de resolver `config`) porque a instância da
+     * PRÓPRIA CONVERSA agora tem prioridade sobre a instância do usuário
+     * logado — ver comentário abaixo.
      */
+    let conversaExistente: { id: string; instancia_id: string | null } | null = null;
     if (conversa_id) {
       const { data: conversaDoCaller } = await supabase
         .from("whatsapp_conversas")
-        .select("id")
+        .select("id, instancia_id")
         .eq("id", conversa_id)
         .eq("empresa_id", userData.empresa_id)
         .maybeSingle();
@@ -235,6 +221,53 @@ serve(async (req) => {
         return await recusar(supabase, "conversa_de_outra_empresa", "Esta conversa não foi encontrada. Recarregue a página.", 404,
           { conversa_id, usuario_id: userData.id });
       }
+      conversaExistente = conversaDoCaller;
+    }
+
+    type ConfigInstancia = {
+      id: string; instance_url: string; api_key: string; instance_name: string;
+      api_instance_name: string | null; status: string;
+    };
+
+    /**
+     * A instância que envia é a da CONVERSA, não a do usuário que está logado
+     * no momento — do contrário, dois atendentes vinculados a números
+     * diferentes respondendo a mesma conversa fariam o cliente ver respostas
+     * saindo de números diferentes do que ele mesmo escreveu (o número "salta"
+     * a cada envio, dependendo de quem respondeu por último). Mesma lógica do
+     * lado do recebimento em whatsapp-webhook/index.ts (handleIncomingMessage).
+     *
+     * Só cai no fallback "instância vinculada ao usuário logado" quando a
+     * conversa é nova (sem conversa_id) ou ainda não tem instancia_id própria
+     * (ex: criada via "Nova conversa" antes desta mudança, ou histórico
+     * legado) — nesses casos não há "número do cliente" ainda estabelecido.
+     */
+    let config: ConfigInstancia | null = null;
+    if (conversaExistente?.instancia_id) {
+      const { data: instDaConversa } = await supabase
+        .from("configuracoes_wapi")
+        .select("id, instance_url, api_key, instance_name, api_instance_name, status")
+        .eq("id", conversaExistente.instancia_id)
+        .eq("empresa_id", userData.empresa_id)
+        .maybeSingle();
+      config = (instDaConversa ?? null) as ConfigInstancia | null;
+    }
+    if (!config) {
+      const { data: instLink } = await supabase
+        .from("wapi_instancia_usuarios")
+        .select("configuracoes_wapi:instancia_id(id, instance_url, api_key, instance_name, api_instance_name, status)")
+        .eq("usuario_auth_id", user.id)
+        .limit(1)
+        .maybeSingle();
+      config = (instLink?.configuracoes_wapi ?? null) as ConfigInstancia | null;
+    }
+    if (!config) {
+      return await recusar(supabase, "sem_instancia_vinculada", "Seu usuário não tem WhatsApp vinculado. Peça ao gestor para liberar em Configurações.", 400,
+        { user_id: user.id, usuario_id: userData.id });
+    }
+    if (config.status !== "connected") {
+      return await recusar(supabase, "instancia_desconectada", "O WhatsApp desta conversa está desconectado. Reconecte em Configurações e tente de novo.", 400,
+        { instancia_id: config.id, instance_name: config.instance_name, status_instancia: config.status });
     }
 
     const digits = telefone.replace(/\D/g, "");
@@ -519,7 +552,7 @@ serve(async (req) => {
       const { data: conv } = await supabase.from("whatsapp_conversas")
         .upsert(
           { empresa_id: userData.empresa_id, telefone: numeroUsado, ultima_mensagem: conteudo.slice(0, 200), ultima_mensagem_at: now, ultima_mensagem_direcao: "saida", instancia_id: config.id },
-          { onConflict: "empresa_id,telefone" }
+          { onConflict: "empresa_id,telefone,instancia_id" }
         ).select("id").single();
       conversaId = conv?.id;
     }
