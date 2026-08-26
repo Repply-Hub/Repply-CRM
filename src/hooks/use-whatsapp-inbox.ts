@@ -45,6 +45,11 @@ export interface WaResponsavel {
 
 export interface WaVisualizador extends WaResponsavel {
   visualizado_em: string;
+  // Quantas vezes este usuário visualizou a conversa sem assumir, somando
+  // ciclos sucessivos de "ficou sem responsável" — não é só a última vez
+  // (ver migration wa_conversa_visualizacoes_quantidade e comentário de
+  // useWaRegistrarVisualizacao sobre quando soma versus só atualiza a data).
+  quantidade: number;
 }
 
 export interface WaConversa {
@@ -193,7 +198,7 @@ export function useWaConversas() {
       if (!empresaId) return [];
       const { data, error } = await supabase
         .from('whatsapp_conversas')
-        .select('*, responsaveis:whatsapp_conversa_responsaveis(usuario:usuarios(id, nome, avatar_url)), visualizadores:whatsapp_conversa_visualizacoes(visualizado_em, usuario:usuarios(id, nome, avatar_url))')
+        .select('*, responsaveis:whatsapp_conversa_responsaveis(usuario:usuarios(id, nome, avatar_url)), visualizadores:whatsapp_conversa_visualizacoes(visualizado_em, quantidade, usuario:usuarios(id, nome, avatar_url))')
         .eq('empresa_id', empresaId);
       if (error) throw error;
       return ((data ?? []) as any[])
@@ -204,8 +209,8 @@ export function useWaConversas() {
           // não dá pra só extrair `v.usuario` como o campo de responsáveis
           // faz — precisa juntar os dois na mesma hora que filtra usuário nulo.
           visualizadores: (c.visualizadores ?? [])
-            .map((v: { usuario: WaResponsavel | null; visualizado_em: string }) =>
-              v.usuario ? { ...v.usuario, visualizado_em: v.visualizado_em } : null,
+            .map((v: { usuario: WaResponsavel | null; visualizado_em: string; quantidade: number }) =>
+              v.usuario ? { ...v.usuario, visualizado_em: v.visualizado_em, quantidade: v.quantidade } : null,
             )
             .filter(Boolean),
         }) as WaConversa)
@@ -1341,35 +1346,45 @@ export function useWaRegistrarVisualizacao() {
   const { profile } = useAuth();
 
   return useMutation({
+    // Chama a função de banco em vez de fazer upsert direto: a REST API do
+    // PostgREST só aceita valor literal no payload, não "quantidade =
+    // quantidade + 1" — sem RPC, duas visualizações quase simultâneas leriam
+    // o mesmo valor antigo e uma pisaria na outra. wa_registrar_visualizacao
+    // (migration wa_conversa_visualizacoes_quantidade) resolve isso num único
+    // INSERT ... ON CONFLICT atômico, e só soma quantidade quando a conversa
+    // reabriu (precisa_atribuicao=true) depois da última vez que este usuário
+    // olhou — nunca a cada vez que a mesma aba é reaberta sem nada mudar.
     mutationFn: async (conversaId: string) => {
-      if (!profile?.id) return;
-      const { error } = await supabase
-        .from('whatsapp_conversa_visualizacoes')
-        .upsert(
-          { conversa_id: conversaId, usuario_id: profile.id, visualizado_em: new Date().toISOString() },
-          { onConflict: 'conversa_id,usuario_id' },
-        );
+      if (!profile?.id) return null;
+      const { data, error } = await supabase
+        .rpc('wa_registrar_visualizacao', { _conversa_id: conversaId })
+        .single();
       if (error) throw error;
+      return data as { quantidade: number; visualizado_em: string } | null;
     },
-    onSuccess: (_, conversaId) => {
-      if (!profile?.id) return;
+    onSuccess: (data, conversaId) => {
+      if (!profile?.id || !data) return;
       qc.setQueryData<WaConversa[]>(['wa_conversas'], (old) =>
         (old ?? []).map((c) => {
           if (c.id !== conversaId) return c;
           const jaVisualizou = c.visualizadores?.some((v) => v.id === profile.id);
-          if (jaVisualizou) return c;
-          return {
-            ...c,
-            visualizadores: [
-              ...(c.visualizadores ?? []),
-              {
-                id: profile.id,
-                nome: profile.nome,
-                avatar_url: profile.avatar_url ?? null,
-                visualizado_em: new Date().toISOString(),
-              },
-            ],
-          };
+          const visualizadores = jaVisualizou
+            ? (c.visualizadores ?? []).map((v) =>
+                v.id === profile.id
+                  ? { ...v, visualizado_em: data.visualizado_em, quantidade: data.quantidade }
+                  : v,
+              )
+            : [
+                ...(c.visualizadores ?? []),
+                {
+                  id: profile.id,
+                  nome: profile.nome,
+                  avatar_url: profile.avatar_url ?? null,
+                  visualizado_em: data.visualizado_em,
+                  quantidade: data.quantidade,
+                },
+              ];
+          return { ...c, visualizadores };
         }),
       );
     },

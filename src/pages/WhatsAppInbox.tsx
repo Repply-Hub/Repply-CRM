@@ -228,7 +228,10 @@ import {
   DateRangePicker,
   type DateRange,
 } from "@/components/shared/DateRangePicker";
-import type { ConversaExportRow, ConversaParaExportar } from "@/lib/generate-conversa-pdf";
+import type {
+  ConversaExportRow,
+  ConversaParaExportar,
+} from "@/lib/generate-conversa-pdf";
 import {
   TOGGLE_LIST_CLASS,
   TOGGLE_BUTTON_CLASS,
@@ -274,7 +277,9 @@ function buildConversaExportRows(
       } else if (!m.tipo || m.tipo === "texto") {
         mensagem = m.conteudo || "";
       } else {
-        mensagem = m.conteudo ? `[${tipoLabel}] — ${m.conteudo}` : `[${tipoLabel}]`;
+        mensagem = m.conteudo
+          ? `[${tipoLabel}] — ${m.conteudo}`
+          : `[${tipoLabel}]`;
       }
       return {
         dataHora: format(new Date(m.created_at), "dd/MM/yyyy HH:mm", {
@@ -590,7 +595,9 @@ function conversaNaoLida(
 // em supabase/functions/whatsapp-webhook/index.ts) e volta a false assim que
 // alguém assume (useWaSetResponsaveis).
 function precisaAssumir(conv: WaConversa): boolean {
-  return (conv.responsaveis ?? []).length === 0 && conv.precisa_atribuicao === true;
+  return (
+    (conv.responsaveis ?? []).length === 0 && conv.precisa_atribuicao === true
+  );
 }
 
 // Badge de não lidas. Quando a conversa está aberta (`ativa`) o contador não
@@ -747,7 +754,10 @@ function ConversaVisualizadoresStack({
         >
           {m.foto && <AvatarImage src={m.foto} alt="" />}
           <AvatarFallback
-            className={cn(colorForPhone(m.chave), "text-white font-semibold text-[7px]")}
+            className={cn(
+              colorForPhone(m.chave),
+              "text-white font-semibold text-[7px]",
+            )}
           >
             {initials(m.nome, m.chave)}
           </AvatarFallback>
@@ -781,7 +791,9 @@ function VisualizadoresSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const visualizadores = [...(conv?.visualizadores ?? [])].sort(
-    (a, b) => new Date(b.visualizado_em).getTime() - new Date(a.visualizado_em).getTime(),
+    (a, b) =>
+      new Date(b.visualizado_em).getTime() -
+      new Date(a.visualizado_em).getTime(),
   );
 
   return (
@@ -809,15 +821,34 @@ function VisualizadoresSheet({
                 {visualizadores.map((v) => (
                   <div key={v.id} className="flex items-center gap-3 px-4 py-2">
                     <Avatar className="h-9 w-9 shrink-0 border border-dashed border-orange-400 dark:border-orange-500/60">
-                      {v.avatar_url && <AvatarImage src={v.avatar_url} alt="" />}
-                      <AvatarFallback className={cn(colorForPhone(v.id), "text-white font-semibold text-xs")}>
+                      {v.avatar_url && (
+                        <AvatarImage src={v.avatar_url} alt="" />
+                      )}
+                      <AvatarFallback
+                        className={cn(
+                          colorForPhone(v.id),
+                          "text-white font-semibold text-xs",
+                        )}
+                      >
                         {initials(v.nome, v.id)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
-                      <p className="text-sm truncate">{v.nome}</p>
+                      <p className="text-sm truncate">
+                        {v.nome}
+                        {v.quantidade > 1 && (
+                          <span className="text-muted-foreground font-normal">
+                            {" "}
+                            ({v.quantidade}x)
+                          </span>
+                        )}
+                      </p>
                       <p className="text-[11px] text-muted-foreground truncate">
-                        {format(new Date(v.visualizado_em), "d 'de' MMM 'às' HH:mm", { locale: ptBR })}
+                        {format(
+                          new Date(v.visualizado_em),
+                          "d 'de' MMM 'às' HH:mm",
+                          { locale: ptBR },
+                        )}
                       </p>
                     </div>
                   </div>
@@ -1138,7 +1169,9 @@ function MeusChatsList({
                               "text-foreground font-medium",
                           )}
                         >
-                          <UltimaMensagemPreview mensagem={conv.ultima_mensagem} />
+                          <UltimaMensagemPreview
+                            mensagem={conv.ultima_mensagem}
+                          />
                         </span>
                       </TableCell>
                       <TableCell className="px-4 py-4">
@@ -1255,7 +1288,8 @@ function WaAudioPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState<(typeof AUDIO_SPEEDS)[number]>(1);
+  const [playbackRate, setPlaybackRate] =
+    useState<(typeof AUDIO_SPEEDS)[number]>(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -1398,7 +1432,12 @@ function WaAudioPlayer({
         </div>
 
         <div className="flex justify-between items-center text-[9px] px-0.5">
-          <span className={cn("opacity-75", isSaida ? "text-white/90" : "text-muted-foreground")}>
+          <span
+            className={cn(
+              "opacity-75",
+              isSaida ? "text-white/90" : "text-muted-foreground",
+            )}
+          >
             {formatAudioTime(currentTime || duration)}
           </span>
           <button
@@ -1459,7 +1498,9 @@ function QuotedPreview({
 }) {
   const label = remetenteNome || "Você";
   const texto =
-    conteudo && !MENSAGEM_PLACEHOLDERS.includes(conteudo) ? conteudo : conteudo || "";
+    conteudo && !MENSAGEM_PLACEHOLDERS.includes(conteudo)
+      ? conteudo
+      : conteudo || "";
   return (
     <div
       data-no-drag={onClick ? true : undefined}
@@ -1718,10 +1759,7 @@ function DraggableBubble({
                 de swipe-to-reply da bolha (que só ignora button/a/img/video/audio)
                 capturava o ponteiro antes do clique chegar ao Radix, fechando o menu
                 sem disparar a ação. */}
-            <DropdownMenuContent
-              align={isSaida ? "end" : "start"}
-              data-no-drag
-            >
+            <DropdownMenuContent align={isSaida ? "end" : "start"} data-no-drag>
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={() => onExcluir(msg)}
@@ -1754,7 +1792,12 @@ function MessageContent({
 
   if (msg.apagada_para_todos) {
     return (
-      <p className={cn("text-sm italic flex items-center gap-1.5", isSaida ? "text-white/70" : "text-muted-foreground")}>
+      <p
+        className={cn(
+          "text-sm italic flex items-center gap-1.5",
+          isSaida ? "text-white/70" : "text-muted-foreground",
+        )}
+      >
         <EyeOff className="h-3.5 w-3.5 shrink-0" />
         Esta mensagem foi apagada
       </p>
@@ -1881,7 +1924,12 @@ function MessageContent({
     }
 
     return (
-      <a href={url} target="_blank" rel="noopener noreferrer" className={sharedClassName}>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={sharedClassName}
+      >
         {content}
       </a>
     );
@@ -2500,11 +2548,14 @@ function LeadSheet({
     from: new Date(2000, 0, 1),
     to: new Date(),
   }));
-  const [exportando, setExportando] = useState<"pdf" | "xlsx" | "md" | null>(null);
+  const [exportando, setExportando] = useState<"pdf" | "xlsx" | "md" | null>(
+    null,
+  );
   async function handleExportarConversa(formato: "pdf" | "xlsx" | "md") {
     setExportando(formato);
     try {
-      const nomeContato = conversa.nome_contato ?? formatPhone(conversa.telefone);
+      const nomeContato =
+        conversa.nome_contato ?? formatPhone(conversa.telefone);
       const mensagensPeriodo = await fetchMensagensParaExportar(
         conversa.id,
         exportRange.from,
@@ -2517,13 +2568,16 @@ function LeadSheet({
       const linhas = buildConversaExportRows(mensagensPeriodo, nomeContato);
       const periodoLabel = `${format(exportRange.from, "dd/MM/yyyy", { locale: ptBR })} a ${format(exportRange.to, "dd/MM/yyyy", { locale: ptBR })}`;
       if (formato === "pdf") {
-        const { generateConversaPdf } = await import("@/lib/generate-conversa-pdf");
+        const { generateConversaPdf } =
+          await import("@/lib/generate-conversa-pdf");
         await generateConversaPdf(linhas, nomeContato, periodoLabel);
       } else if (formato === "xlsx") {
-        const { generateConversaExcel } = await import("@/lib/generate-conversa-excel");
+        const { generateConversaExcel } =
+          await import("@/lib/generate-conversa-excel");
         generateConversaExcel(linhas, nomeContato);
       } else {
-        const { generateConversaMarkdown } = await import("@/lib/generate-conversa-markdown");
+        const { generateConversaMarkdown } =
+          await import("@/lib/generate-conversa-markdown");
         generateConversaMarkdown(linhas, nomeContato, periodoLabel);
       }
       setExportDialogOpen(false);
@@ -2535,7 +2589,7 @@ function LeadSheet({
     }
   }
   const { data: tarefasConversa = [] } = useTarefasPorConversa(conversa.id);
-  const { ligada: temTarefas } = useSecaoLigada('tarefas');
+  const { ligada: temTarefas } = useSecaoLigada("tarefas");
   // Notas internas (mensagens is_nota_interna) criadas a partir desta conversa,
   // mais recente primeiro — tarefasConversa já vem ordenada desc pelo hook.
   const notasConversa = useMemo(
@@ -2545,6 +2599,19 @@ function LeadSheet({
         .slice()
         .sort((a, b) => b.created_at.localeCompare(a.created_at)),
     [mensagens],
+  );
+  // Quem do time já abriu esta conversa sem assumir — mesma lista usada em
+  // VisualizadoresSheet (aberta pelo avatar-stack no aviso "Conversa sem
+  // responsável!"), só que aqui embutida como aba de "Notas e tarefas" pra
+  // quem já abriu o painel de detalhes não precisar clicar em outro lugar.
+  const visualizadoresConversa = useMemo(
+    () =>
+      [...(conversa.visualizadores ?? [])].sort(
+        (a, b) =>
+          new Date(b.visualizado_em).getTime() -
+          new Date(a.visualizado_em).getTime(),
+      ),
+    [conversa.visualizadores],
   );
   const atuais = conversa.responsaveis ?? [];
   const atuaisIds = useMemo(() => new Set(atuais.map((r) => r.id)), [atuais]);
@@ -2614,7 +2681,9 @@ function LeadSheet({
             <StickyNote className="h-3.5 w-3.5" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs break-words text-foreground">{linkifyText(n.conteudo)}</p>
+            <p className="text-xs break-words text-foreground">
+              {linkifyText(n.conteudo)}
+            </p>
             <p className="text-[10px] text-amber-700/70 dark:text-amber-300/60">
               {format(new Date(n.created_at), "dd/MM/yyyy HH:mm", {
                 locale: ptBR,
@@ -2643,6 +2712,45 @@ function LeadSheet({
               {t.status}
               {t.prazo_final &&
                 ` · prazo ${format(new Date(t.prazo_final), "dd/MM/yyyy", { locale: ptBR })}`}
+            </p>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+
+  const renderVisualizadoresList = (items: typeof visualizadoresConversa) => (
+    <ul className="space-y-2">
+      {items.map((v) => (
+        <li
+          key={v.id}
+          className="flex items-center gap-2.5 p-2 rounded-lg border bg-muted/30"
+        >
+          <Avatar className="h-7 w-7 shrink-0 border border-dashed border-orange-400 dark:border-orange-500/60">
+            {v.avatar_url && <AvatarImage src={v.avatar_url} alt="" />}
+            <AvatarFallback
+              className={cn(
+                colorForPhone(v.id),
+                "text-white font-semibold text-[10px]",
+              )}
+            >
+              {initials(v.nome, v.id)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium truncate">
+              {v.nome}
+              {v.quantidade > 1 && (
+                <span className="text-muted-foreground font-normal">
+                  {" "}
+                  ({v.quantidade}x)
+                </span>
+              )}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              {format(new Date(v.visualizado_em), "dd/MM/yyyy HH:mm", {
+                locale: ptBR,
+              })}
             </p>
           </div>
         </li>
@@ -3015,7 +3123,9 @@ function LeadSheet({
                     <button
                       className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1"
                       onClick={() => {
-                        navigate(`/clientes/${slugify(cliente.empresa || "cliente")}-${cliente.id}`);
+                        navigate(
+                          `/clientes/${slugify(cliente.empresa || "cliente")}-${cliente.id}`,
+                        );
                         onOpenChange(false);
                       }}
                     >
@@ -3032,7 +3142,9 @@ function LeadSheet({
                     <button
                       className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1"
                       onClick={() => {
-                        navigate(`/contatos/${slugify(contato.nome_contato || "contato")}-${contato.id}`);
+                        navigate(
+                          `/contatos/${slugify(contato.nome_contato || "contato")}-${contato.id}`,
+                        );
                         onOpenChange(false);
                       }}
                     >
@@ -3246,13 +3358,31 @@ function LeadSheet({
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
               {/* Deixar "Notas e tarefas" escrito numa empresa sem a seção é o vazamento
                   mais óbvio desta tela. */}
-              <StickyNote className="h-3 w-3" /> {temTarefas === true ? 'Notas e tarefas' : 'Notas'}
+              <StickyNote className="h-3 w-3" />{" "}
+              {temTarefas === true
+                ? "Notas, tarefas e visualizadores"
+                : "Notas"}
             </p>
             <Tabs defaultValue="notas" className="w-full">
-              {/* As duas classes escritas por extenso, de propósito: o Tailwind não gera
+              {/* As classes escritas por extenso, de propósito: o Tailwind não gera
                   classe montada em texto (`grid-cols-${n}` nunca existiria no CSS final).
-                  Sem isto, a aba Notas ocupa metade e a outra metade vira um buraco. */}
-              <TabsList className={cn('grid w-full h-9 items-center rounded-lg border border-muted-foreground/25 overflow-hidden', temTarefas === true ? 'grid-cols-2' : 'grid-cols-1')}>
+                  Sem isto, uma aba ocupa espaço demais e sobra buraco na grade. */}
+              <TabsList
+                className={cn(
+                  "grid w-full h-9 items-center rounded-lg border border-muted-foreground/25 overflow-hidden",
+                  1 +
+                    (temTarefas === true ? 1 : 0) +
+                    (visualizadoresConversa.length > 0 ? 1 : 0) ===
+                    3
+                    ? "grid-cols-3"
+                    : 1 +
+                          (temTarefas === true ? 1 : 0) +
+                          (visualizadoresConversa.length > 0 ? 1 : 0) ===
+                        2
+                      ? "grid-cols-2"
+                      : "grid-cols-1",
+                )}
+              >
                 <TabsTrigger
                   value="notas"
                   className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none"
@@ -3261,13 +3391,24 @@ function LeadSheet({
                   {notasConversa.length > 0 && ` (${notasConversa.length})`}
                 </TabsTrigger>
                 {temTarefas === true && (
-                <TabsTrigger
-                  value="tarefas"
-                  className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none"
-                >
-                  Tarefas
-                  {tarefasConversa.length > 0 && ` (${tarefasConversa.length})`}
-                </TabsTrigger>
+                  <TabsTrigger
+                    value="tarefas"
+                    className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none"
+                  >
+                    Tarefas
+                    {tarefasConversa.length > 0 &&
+                      ` (${tarefasConversa.length})`}
+                  </TabsTrigger>
+                )}
+                {/* Só aparece quando há histórico — a maioria das conversas nunca
+                    fica sem responsável, então a aba vazia seria só ruído. */}
+                {visualizadoresConversa.length > 0 && (
+                  <TabsTrigger
+                    value="visualizadores"
+                    className="text-[10px] px-1 py-1 rounded-md border border-transparent data-[state=active]:border-muted-foreground/40 data-[state=active]:shadow-none"
+                  >
+                    Visualizadores ({visualizadoresConversa.length})
+                  </TabsTrigger>
                 )}
               </TabsList>
 
@@ -3296,29 +3437,35 @@ function LeadSheet({
               </TabsContent>
 
               {temTarefas === true && (
-              <TabsContent value="tarefas" className="mt-3">
-                {tarefasConversa.length === 0 ? (
-                  <p className="text-xs text-muted-foreground px-1 py-6 text-center">
-                    Nenhuma tarefa criada a partir desta conversa.
-                  </p>
-                ) : (
-                  <>
-                    {renderTarefasList(
-                      tarefasConversa.slice(0, HISTORICO_PREVIEW_LIMIT),
-                    )}
-                    {tarefasConversa.length > HISTORICO_PREVIEW_LIMIT && (
-                      <button
-                        type="button"
-                        className="mt-2 w-full text-center text-xs font-medium text-primary hover:underline"
-                        onClick={() => setExpandedHistoricoTab("tarefas")}
-                      >
-                        Ver mais... (+
-                        {tarefasConversa.length - HISTORICO_PREVIEW_LIMIT})
-                      </button>
-                    )}
-                  </>
-                )}
-              </TabsContent>
+                <TabsContent value="tarefas" className="mt-3">
+                  {tarefasConversa.length === 0 ? (
+                    <p className="text-xs text-muted-foreground px-1 py-6 text-center">
+                      Nenhuma tarefa criada a partir desta conversa.
+                    </p>
+                  ) : (
+                    <>
+                      {renderTarefasList(
+                        tarefasConversa.slice(0, HISTORICO_PREVIEW_LIMIT),
+                      )}
+                      {tarefasConversa.length > HISTORICO_PREVIEW_LIMIT && (
+                        <button
+                          type="button"
+                          className="mt-2 w-full text-center text-xs font-medium text-primary hover:underline"
+                          onClick={() => setExpandedHistoricoTab("tarefas")}
+                        >
+                          Ver mais... (+
+                          {tarefasConversa.length - HISTORICO_PREVIEW_LIMIT})
+                        </button>
+                      )}
+                    </>
+                  )}
+                </TabsContent>
+              )}
+
+              {visualizadoresConversa.length > 0 && (
+                <TabsContent value="visualizadores" className="mt-3">
+                  {renderVisualizadoresList(visualizadoresConversa)}
+                </TabsContent>
               )}
             </Tabs>
           </div>
@@ -3540,7 +3687,10 @@ function LeadSheet({
                   <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                     Período
                   </Label>
-                  <DateRangePicker value={exportRange} onChange={setExportRange} />
+                  <DateRangePicker
+                    value={exportRange}
+                    onChange={setExportRange}
+                  />
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <button
@@ -3723,7 +3873,7 @@ export default function WhatsAppInbox() {
 
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
   // Nome diferente do usado no LeadSheet (temTarefas) para não confundir os dois escopos.
-  const { ligada: temTarefasSecao } = useSecaoLigada('tarefas');
+  const { ligada: temTarefasSecao } = useSecaoLigada("tarefas");
 
   /**
    * Mesmo padrão de formulário/campos do modal de criação em src/pages/Tarefas.tsx.
@@ -3903,9 +4053,13 @@ export default function WhatsAppInbox() {
   // `texto`, e `mentionedParticipantes` guarda telefone->nome de quem já foi
   // inserido, para montar o campo `mentions` no envio (ver handleSend).
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
-  const [mentionStartIndex, setMentionStartIndex] = useState<number | null>(null);
+  const [mentionStartIndex, setMentionStartIndex] = useState<number | null>(
+    null,
+  );
   const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
-  const [mentionedParticipantes, setMentionedParticipantes] = useState<Map<string, string>>(new Map());
+  const [mentionedParticipantes, setMentionedParticipantes] = useState<
+    Map<string, string>
+  >(new Map());
   // Participantes do grupo: os salvos na criação (via CRM) somados aos remetentes
   // distintos vistos nas mensagens (cobre membros que entraram depois ou grupos
   // criados fora do CRM, onde a uazapi não devolveu a lista completa).
@@ -3943,11 +4097,14 @@ export default function WhatsAppInbox() {
   const mentionSuggestions = useMemo(() => {
     if (mentionQuery === null) return [];
     const q = mentionQuery.trim().toLowerCase();
-    const todos = "todos".startsWith(q) || q === ""
-      ? [{ telefone: "all", nome: "Todos" }]
-      : [];
+    const todos =
+      "todos".startsWith(q) || q === ""
+        ? [{ telefone: "all", nome: "Todos" }]
+        : [];
     const pessoas = participantesGrupo
-      .filter((p) => (p.nome ?? formatPhone(p.telefone)).toLowerCase().includes(q))
+      .filter((p) =>
+        (p.nome ?? formatPhone(p.telefone)).toLowerCase().includes(q),
+      )
       .slice(0, 8);
     return [...todos, ...pessoas];
   }, [mentionQuery, participantesGrupo]);
@@ -3984,7 +4141,9 @@ export default function WhatsAppInbox() {
     // do badge), então usá-la aqui nunca deixaria a mutation disparar pro próprio
     // responsável, e o contador ficaria acumulando pra sempre do ponto de vista de
     // quem vê a conversa sem ser o responsável (gestor/admin).
-    const souResponsavel = (conv.responsaveis ?? []).some((r) => r.id === profile.id);
+    const souResponsavel = (conv.responsaveis ?? []).some(
+      (r) => r.id === profile.id,
+    );
     if (souResponsavel && (conv.nao_lidas > 0 || conv.nao_lidas_forcada)) {
       marcarLida.mutate(conversaAtivaId);
     }
@@ -4000,8 +4159,18 @@ export default function WhatsAppInbox() {
     const conv = conversas.find((c) => c.id === conversaAtivaId);
     if (!conv) return;
     const naoAtribuida = (conv.responsaveis ?? []).length === 0;
-    const jaVisualizou = (conv.visualizadores ?? []).some((v) => v.id === profile.id);
-    if (naoAtribuida && !jaVisualizou) {
+    const jaVisualizou = (conv.visualizadores ?? []).some(
+      (v) => v.id === profile.id,
+    );
+    // Depois da primeira vez, só chama de novo se a conversa está marcada
+    // como reaberta (precisa_atribuicao) — senão nunca voltaria a registrar
+    // depois de um ciclo fechar/reabrir e o contador de wa_registrar_visualizacao
+    // ficaria travado em 1 pra sempre. Chamar de novo é seguro mesmo trocando
+    // de conversa e voltando sem nada ter mudado: quem decide se soma
+    // quantidade é a função de banco (compara updated_at da conversa com o
+    // visualizado_em já salvo), não este efeito — aqui só decide SE vale a
+    // pena tentar, não SE vai somar.
+    if (naoAtribuida && (!jaVisualizou || conv.precisa_atribuicao)) {
       registrarVisualizacao.mutate(conversaAtivaId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4057,11 +4226,7 @@ export default function WhatsAppInbox() {
       const podePerguntar =
         !c.foto_perfil_expires_at ||
         new Date(c.foto_perfil_expires_at).getTime() <= Date.now();
-      if (
-        podePerguntar &&
-        !c.is_group &&
-        !fotoRequestedRef.current.has(c.id)
-      ) {
+      if (podePerguntar && !c.is_group && !fotoRequestedRef.current.has(c.id)) {
         fotoRequestedRef.current.add(c.id);
         fetchContactPhoto.mutate(c.id);
         pedidas++;
@@ -4724,7 +4889,10 @@ export default function WhatsAppInbox() {
   // Guarda a altura/posição de rolagem no instante em que uma página de
   // mensagens mais antigas foi pedida, pra manter o conteúdo visualmente
   // ancorado quando ela chegar (em vez de saltar pro fundo do chat).
-  const prependAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const prependAnchorRef = useRef<{
+    scrollHeight: number;
+    scrollTop: number;
+  } | null>(null);
 
   useLayoutEffect(() => {
     autoResizeTextarea(inputRef.current);
@@ -4753,15 +4921,16 @@ export default function WhatsAppInbox() {
     // rolou até o topo) — mantém o mesmo conteúdo ancorado na tela em vez de
     // forçar a rolagem pro fundo, senão a tela "salta" a cada página carregada.
     if (prependAnchorRef.current) {
-      const { scrollHeight: alturaAnterior, scrollTop: topoAnterior } = prependAnchorRef.current;
-      viewport.scrollTop = viewport.scrollHeight - alturaAnterior + topoAnterior;
+      const { scrollHeight: alturaAnterior, scrollTop: topoAnterior } =
+        prependAnchorRef.current;
+      viewport.scrollTop =
+        viewport.scrollHeight - alturaAnterior + topoAnterior;
       prependAnchorRef.current = null;
       return;
     }
 
     const isNearBottom =
-      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
-      150;
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 150;
     if (isNearBottom || mensagens.length > 0) {
       viewport.scrollTop = viewport.scrollHeight;
     }
@@ -4829,7 +4998,10 @@ export default function WhatsAppInbox() {
 
   function confirmarApagarMensagem() {
     if (!msgParaApagar || !conversaAtiva) return;
-    excluirMensagem.mutate({ conversaId: conversaAtiva.id, mensagemId: msgParaApagar.id });
+    excluirMensagem.mutate({
+      conversaId: conversaAtiva.id,
+      mensagemId: msgParaApagar.id,
+    });
     setMsgParaApagar(null);
   }
 
@@ -4927,12 +5099,16 @@ export default function WhatsAppInbox() {
   // de uma conversa (ConversaDetalhesSheet), repetida por conversa e
   // concatenada num arquivo só.
   const [exportSelecionadasOpen, setExportSelecionadasOpen] = useState(false);
-  const [exportSelecionadasRange, setExportSelecionadasRange] = useState<DateRange>(() => ({
-    from: new Date(2000, 0, 1),
-    to: new Date(),
-  }));
-  const [exportandoSelecionadas, setExportandoSelecionadas] = useState<"pdf" | "xlsx" | "md" | null>(null);
-  const [progressoExportSelecionadas, setProgressoExportSelecionadas] = useState<{ atual: number; total: number } | null>(null);
+  const [exportSelecionadasRange, setExportSelecionadasRange] =
+    useState<DateRange>(() => ({
+      from: new Date(2000, 0, 1),
+      to: new Date(),
+    }));
+  const [exportandoSelecionadas, setExportandoSelecionadas] = useState<
+    "pdf" | "xlsx" | "md" | null
+  >(null);
+  const [progressoExportSelecionadas, setProgressoExportSelecionadas] =
+    useState<{ atual: number; total: number } | null>(null);
   async function handleExportarSelecionadas(formato: "pdf" | "xlsx" | "md") {
     const alvo = conversas.filter((c) => selecionadas.has(c.id));
     setExportandoSelecionadas(formato);
@@ -4961,13 +5137,16 @@ export default function WhatsAppInbox() {
       }
       const periodoLabel = `${format(exportSelecionadasRange.from, "dd/MM/yyyy", { locale: ptBR })} a ${format(exportSelecionadasRange.to, "dd/MM/yyyy", { locale: ptBR })}`;
       if (formato === "pdf") {
-        const { generateConversasPdf } = await import("@/lib/generate-conversa-pdf");
+        const { generateConversasPdf } =
+          await import("@/lib/generate-conversa-pdf");
         await generateConversasPdf(conversasComMensagens, periodoLabel);
       } else if (formato === "xlsx") {
-        const { generateConversasExcel } = await import("@/lib/generate-conversa-excel");
+        const { generateConversasExcel } =
+          await import("@/lib/generate-conversa-excel");
         generateConversasExcel(conversasComMensagens);
       } else {
-        const { generateConversasMarkdown } = await import("@/lib/generate-conversa-markdown");
+        const { generateConversasMarkdown } =
+          await import("@/lib/generate-conversa-markdown");
         generateConversasMarkdown(conversasComMensagens, periodoLabel);
       }
       setExportSelecionadasOpen(false);
@@ -4991,8 +5170,7 @@ export default function WhatsAppInbox() {
   }
 
   const conversasPorTipoEBusca = conversas.filter((c) => {
-    if (filtroConversa === "geral" && !precisaAssumir(c))
-      return false;
+    if (filtroConversa === "geral" && !precisaAssumir(c)) return false;
     // "Meus chats" tem o mesmo significado pra vendedor e admin/gestor:
     // só o que está atribuído ao usuário logado.
     if (
@@ -5432,7 +5610,7 @@ export default function WhatsAppInbox() {
     } catch (err) {
       // Idem: a mutação já avisou com o motivo real vindo do servidor. Um segundo
       // toast genérico aqui só encobriria a explicação boa.
-      console.error('[whatsapp] falha ao enviar áudio:', err);
+      console.error("[whatsapp] falha ao enviar áudio:", err);
     } finally {
       setIsUploading(false);
       // Adia pro próximo tick: o textarea ainda está com `disabled` no DOM neste
@@ -5460,8 +5638,9 @@ export default function WhatsAppInbox() {
     // Só entra no envio quem ainda está mencionado no texto final: se a pessoa
     // apagou o "@Nome" depois de escolher no dropdown, a menção não deve ir.
     // "all" ignora esse filtro — não há "@Todos " literal no texto de destaque.
-    const mentionsAtivas = Array.from(mentionedParticipantes.entries())
-      .filter(([telefone, nome]) => telefone === "all" || texto.includes(`@${nome}`));
+    const mentionsAtivas = Array.from(mentionedParticipantes.entries()).filter(
+      ([telefone, nome]) => telefone === "all" || texto.includes(`@${nome}`),
+    );
     const mentionsList = mentionsAtivas.map(([telefone]) => telefone);
     const mentions = mentionsList.includes("all")
       ? "all"
@@ -5541,7 +5720,7 @@ export default function WhatsAppInbox() {
       // Sem toast aqui: o onError da mutação já avisou, e repetir mostrava a
       // mesma mensagem duas vezes na tela. Este catch existe só para o estado
       // não ficar travado em "enviando".
-      console.error('[whatsapp] falha ao enviar:', err);
+      console.error("[whatsapp] falha ao enviar:", err);
     } finally {
       isSendingRef.current = false;
       // Adia pro próximo tick: o textarea ainda está com `disabled` no DOM neste
@@ -5580,7 +5759,9 @@ export default function WhatsAppInbox() {
     if (mentionStartIndex === null) return;
     const label = p.nome || formatPhone(p.telefone);
     const before = texto.slice(0, mentionStartIndex);
-    const after = texto.slice(mentionStartIndex + 1 + (mentionQuery?.length ?? 0));
+    const after = texto.slice(
+      mentionStartIndex + 1 + (mentionQuery?.length ?? 0),
+    );
     const insercao = `@${label} `;
     const novoTexto = before + insercao + after;
     setTexto(novoTexto);
@@ -5608,7 +5789,10 @@ export default function WhatsAppInbox() {
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        setMentionActiveIndex((i) => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length);
+        setMentionActiveIndex(
+          (i) =>
+            (i - 1 + mentionSuggestions.length) % mentionSuggestions.length,
+        );
         return;
       }
       if (e.key === "Enter" || e.key === "Tab") {
@@ -5677,7 +5861,9 @@ export default function WhatsAppInbox() {
             <p
               className={cn(
                 "text-sm font-medium text-foreground truncate",
-                conversaNaoLida(conv, profile?.id) && !modoSelecao && "font-bold",
+                conversaNaoLida(conv, profile?.id) &&
+                  !modoSelecao &&
+                  "font-bold",
               )}
             >
               {conv.nome_contato ?? formatPhone(conv.telefone)}
@@ -5707,7 +5893,7 @@ export default function WhatsAppInbox() {
               </div>
             )}
         </div>
-        {/* Rodapé da conversa: instância à esquerda, "Não atribuído" à
+        {/* Rodapé da conversa: "Não atribuído" à esquerda, instância à
             direita (`ml-auto` no segundo em vez de `justify-between` no
             container — assim cada badge continua na ponta certa mesmo
             quando só um dos dois existe). */}
@@ -6588,167 +6774,171 @@ export default function WhatsAppInbox() {
                                 ))}
                               </>
                             )}
-                            {vendedores.length > 0 && filtroStatus !== "fechado" && (
-                              <>
-                                <div className="mx-3 my-1 border-t border-border/50" />
-                                <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                                  Responsável
-                                </p>
-                                <Popover
-                                  open={filtroResponsavelOpenMobile}
-                                  onOpenChange={(v) => {
-                                    setFiltroResponsavelOpenMobile(v);
-                                    if (!v) setBuscaFiltroResponsavel("");
-                                  }}
-                                >
-                                  <PopoverTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className={cn(
-                                        "mx-1 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
-                                        filtroResponsavel.length > 0 &&
-                                          "bg-primary/10 text-primary",
-                                      )}
-                                    >
-                                      <span className="flex min-w-0 items-center gap-2">
-                                        {vendedoresResponsavelSelecionados.length ===
-                                        1 ? (
-                                          <>
-                                            <Avatar className="h-5 w-5 shrink-0">
-                                              {vendedoresResponsavelSelecionados[0]
-                                                .avatar_url ? (
-                                                <img
-                                                  src={
-                                                    vendedoresResponsavelSelecionados[0]
-                                                      .avatar_url
-                                                  }
-                                                  alt={
-                                                    vendedoresResponsavelSelecionados[0]
-                                                      .nome
-                                                  }
-                                                  className="h-full w-full object-cover rounded-full"
-                                                />
-                                              ) : (
-                                                <AvatarFallback className="text-[9px] bg-muted-foreground/20">
-                                                  {vendedoresResponsavelSelecionados[0].nome
-                                                    .trim()
-                                                    .split(" ")
-                                                    .map((p: string) => p[0])
-                                                    .slice(0, 2)
-                                                    .join("")
-                                                    .toUpperCase()}
-                                                </AvatarFallback>
-                                              )}
-                                            </Avatar>
+                            {vendedores.length > 0 &&
+                              filtroStatus !== "fechado" && (
+                                <>
+                                  <div className="mx-3 my-1 border-t border-border/50" />
+                                  <p className="px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                                    Responsável
+                                  </p>
+                                  <Popover
+                                    open={filtroResponsavelOpenMobile}
+                                    onOpenChange={(v) => {
+                                      setFiltroResponsavelOpenMobile(v);
+                                      if (!v) setBuscaFiltroResponsavel("");
+                                    }}
+                                  >
+                                    <PopoverTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className={cn(
+                                          "mx-1 flex items-center justify-between gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors hover:bg-muted/80",
+                                          filtroResponsavel.length > 0 &&
+                                            "bg-primary/10 text-primary",
+                                        )}
+                                      >
+                                        <span className="flex min-w-0 items-center gap-2">
+                                          {vendedoresResponsavelSelecionados.length ===
+                                          1 ? (
+                                            <>
+                                              <Avatar className="h-5 w-5 shrink-0">
+                                                {vendedoresResponsavelSelecionados[0]
+                                                  .avatar_url ? (
+                                                  <img
+                                                    src={
+                                                      vendedoresResponsavelSelecionados[0]
+                                                        .avatar_url
+                                                    }
+                                                    alt={
+                                                      vendedoresResponsavelSelecionados[0]
+                                                        .nome
+                                                    }
+                                                    className="h-full w-full object-cover rounded-full"
+                                                  />
+                                                ) : (
+                                                  <AvatarFallback className="text-[9px] bg-muted-foreground/20">
+                                                    {vendedoresResponsavelSelecionados[0].nome
+                                                      .trim()
+                                                      .split(" ")
+                                                      .map((p: string) => p[0])
+                                                      .slice(0, 2)
+                                                      .join("")
+                                                      .toUpperCase()}
+                                                  </AvatarFallback>
+                                                )}
+                                              </Avatar>
+                                              <span className="truncate">
+                                                {
+                                                  vendedoresResponsavelSelecionados[0]
+                                                    .nome
+                                                }
+                                              </span>
+                                            </>
+                                          ) : vendedoresResponsavelSelecionados.length >
+                                            1 ? (
                                             <span className="truncate">
                                               {
-                                                vendedoresResponsavelSelecionados[0]
-                                                  .nome
-                                              }
+                                                vendedoresResponsavelSelecionados.length
+                                              }{" "}
+                                              selecionados
                                             </span>
-                                          </>
-                                        ) : vendedoresResponsavelSelecionados.length >
-                                          1 ? (
-                                          <span className="truncate">
-                                            {
-                                              vendedoresResponsavelSelecionados.length
-                                            }{" "}
-                                            selecionados
-                                          </span>
-                                        ) : (
-                                          <span>Todos</span>
-                                        )}
-                                      </span>
-                                      {filtroResponsavelOpenMobile ? (
-                                        <ChevronUp className="h-3.5 w-3.5 shrink-0" />
-                                      ) : (
-                                        <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-                                      )}
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent
-                                    align="start"
-                                    className="w-56 p-0"
-                                  >
-                                    <Command shouldFilter={false}>
-                                      <CommandInput
-                                        placeholder="Buscar responsável..."
-                                        value={buscaFiltroResponsavel}
-                                        onValueChange={
-                                          setBuscaFiltroResponsavel
-                                        }
-                                      />
-                                      <CommandList>
-                                        <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
-                                          Nenhum usuário encontrado.
-                                        </CommandEmpty>
-                                        <CommandGroup>
-                                          <CommandItem
-                                            value="todos"
-                                            onSelect={() => {
-                                              setFiltroResponsavel([]);
-                                              setFiltroResponsavelOpenMobile(
-                                                false,
-                                              );
-                                            }}
-                                            className="gap-2.5"
-                                          >
-                                            <span className="flex-1">
-                                              Todos
-                                            </span>
-                                            {filtroResponsavel.length === 0 && (
-                                              <Check className="h-3.5 w-3.5 shrink-0" />
-                                            )}
-                                          </CommandItem>
-                                          {vendedoresFiltroResponsavel.map(
-                                            (v) => (
-                                              <CommandItem
-                                                key={v.id}
-                                                value={v.id}
-                                                onSelect={() =>
-                                                  toggleFiltroResponsavel(v.id)
-                                                }
-                                                className="gap-2.5"
-                                              >
-                                                <Avatar className="h-6 w-6 shrink-0">
-                                                  {v.avatar_url ? (
-                                                    <img
-                                                      src={v.avatar_url}
-                                                      alt={v.nome}
-                                                      className="h-full w-full object-cover rounded-full"
-                                                    />
-                                                  ) : (
-                                                    <AvatarFallback className="text-[9px] bg-muted-foreground/20">
-                                                      {v.nome
-                                                        .trim()
-                                                        .split(" ")
-                                                        .map(
-                                                          (p: string) => p[0],
-                                                        )
-                                                        .slice(0, 2)
-                                                        .join("")
-                                                        .toUpperCase()}
-                                                    </AvatarFallback>
-                                                  )}
-                                                </Avatar>
-                                                <span className="flex-1 truncate">
-                                                  {v.nome}
-                                                </span>
-                                                {filtroResponsavel.includes(
-                                                  v.id,
-                                                ) && (
-                                                  <Check className="h-3.5 w-3.5 shrink-0" />
-                                                )}
-                                              </CommandItem>
-                                            ),
+                                          ) : (
+                                            <span>Todos</span>
                                           )}
-                                        </CommandGroup>
-                                      </CommandList>
-                                    </Command>
-                                  </PopoverContent>
-                                </Popover>
-                              </>
-                            )}
+                                        </span>
+                                        {filtroResponsavelOpenMobile ? (
+                                          <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                                        ) : (
+                                          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                                        )}
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                      align="start"
+                                      className="w-56 p-0"
+                                    >
+                                      <Command shouldFilter={false}>
+                                        <CommandInput
+                                          placeholder="Buscar responsável..."
+                                          value={buscaFiltroResponsavel}
+                                          onValueChange={
+                                            setBuscaFiltroResponsavel
+                                          }
+                                        />
+                                        <CommandList>
+                                          <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
+                                            Nenhum usuário encontrado.
+                                          </CommandEmpty>
+                                          <CommandGroup>
+                                            <CommandItem
+                                              value="todos"
+                                              onSelect={() => {
+                                                setFiltroResponsavel([]);
+                                                setFiltroResponsavelOpenMobile(
+                                                  false,
+                                                );
+                                              }}
+                                              className="gap-2.5"
+                                            >
+                                              <span className="flex-1">
+                                                Todos
+                                              </span>
+                                              {filtroResponsavel.length ===
+                                                0 && (
+                                                <Check className="h-3.5 w-3.5 shrink-0" />
+                                              )}
+                                            </CommandItem>
+                                            {vendedoresFiltroResponsavel.map(
+                                              (v) => (
+                                                <CommandItem
+                                                  key={v.id}
+                                                  value={v.id}
+                                                  onSelect={() =>
+                                                    toggleFiltroResponsavel(
+                                                      v.id,
+                                                    )
+                                                  }
+                                                  className="gap-2.5"
+                                                >
+                                                  <Avatar className="h-6 w-6 shrink-0">
+                                                    {v.avatar_url ? (
+                                                      <img
+                                                        src={v.avatar_url}
+                                                        alt={v.nome}
+                                                        className="h-full w-full object-cover rounded-full"
+                                                      />
+                                                    ) : (
+                                                      <AvatarFallback className="text-[9px] bg-muted-foreground/20">
+                                                        {v.nome
+                                                          .trim()
+                                                          .split(" ")
+                                                          .map(
+                                                            (p: string) => p[0],
+                                                          )
+                                                          .slice(0, 2)
+                                                          .join("")
+                                                          .toUpperCase()}
+                                                      </AvatarFallback>
+                                                    )}
+                                                  </Avatar>
+                                                  <span className="flex-1 truncate">
+                                                    {v.nome}
+                                                  </span>
+                                                  {filtroResponsavel.includes(
+                                                    v.id,
+                                                  ) && (
+                                                    <Check className="h-3.5 w-3.5 shrink-0" />
+                                                  )}
+                                                </CommandItem>
+                                              ),
+                                            )}
+                                          </CommandGroup>
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                </>
+                              )}
                           </div>
                         </FilterButton>
                         {renderPeriodoFilterButton(
@@ -7384,7 +7574,9 @@ export default function WhatsAppInbox() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Excluir mensagem?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Esta mensagem será removida do WhatsApp para todos os participantes da conversa. Esta ação não pode ser desfeita.
+                          Esta mensagem será removida do WhatsApp para todos os
+                          participantes da conversa. Esta ação não pode ser
+                          desfeita.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -7439,338 +7631,350 @@ export default function WhatsAppInbox() {
                               </span>
                             </div>
                             {grupo.itens.map(({ msg, index: i }) => {
-                            const isSaida = msg.direcao === "saida";
-                            const prevMsg = mensagens[i - 1];
-                            const showDate =
-                              !prevMsg ||
-                              new Date(msg.created_at).toDateString() !==
-                                new Date(prevMsg.created_at).toDateString();
-                            const isLast = i === mensagens.length - 1;
-                            // Mensagem de saída sem usuario_id = veio de fora do CRM (WhatsApp
-                            // Web/celular físico, ver comentário no whatsapp-webhook) — quem
-                            // mandou costuma se identificar com um prefixo manual "*Nome:*".
-                            const prefixoExterno =
-                              isSaida && !msg.usuario
-                                ? extrairPrefixoRemetenteExterno(msg.conteudo)
+                              const isSaida = msg.direcao === "saida";
+                              const prevMsg = mensagens[i - 1];
+                              const showDate =
+                                !prevMsg ||
+                                new Date(msg.created_at).toDateString() !==
+                                  new Date(prevMsg.created_at).toDateString();
+                              const isLast = i === mensagens.length - 1;
+                              // Mensagem de saída sem usuario_id = veio de fora do CRM (WhatsApp
+                              // Web/celular físico, ver comentário no whatsapp-webhook) — quem
+                              // mandou costuma se identificar com um prefixo manual "*Nome:*".
+                              const prefixoExterno =
+                                isSaida && !msg.usuario
+                                  ? extrairPrefixoRemetenteExterno(msg.conteudo)
+                                  : null;
+                              const usuarioExterno = prefixoExterno
+                                ? (vendedores.find(
+                                    (v) =>
+                                      normalizeNomeBusca(v.nome) ===
+                                      normalizeNomeBusca(prefixoExterno.nome),
+                                  ) ?? null)
                                 : null;
-                            const usuarioExterno = prefixoExterno
-                              ? (vendedores.find(
-                                  (v) =>
-                                    normalizeNomeBusca(v.nome) ===
-                                    normalizeNomeBusca(prefixoExterno.nome),
-                                ) ?? null)
-                              : null;
-                            const msgParaExibir = prefixoExterno
-                              ? { ...msg, conteudo: prefixoExterno.resto }
-                              : msg;
-                            // Chave de quem mandou uma mensagem de saída: id do usuário do CRM,
-                            // senão o nome extraído do prefixo manual "*Nome:*" — sem isso, duas
-                            // pessoas diferentes respondendo por fora do CRM em sequência caíam no
-                            // mesmo "null === null" e a segunda ficava sem nome, empilhada como se
-                            // fosse a primeira.
-                            const remetenteSaidaChave = (m: WaMensagem): string | null =>
-                              m.usuario?.id ??
-                              extrairPrefixoRemetenteExterno(m.conteudo)?.nome ??
-                              null;
-                            // Empilha mensagens consecutivas do mesmo remetente sem repetir o
-                            // nome/número acima de cada bolha — só mostra na primeira da leva.
-                            // Quando a mensagem de saída atual não tem como se identificar (sem
-                            // usuario_id nem prefixo "*Nome:*"), assume que é continuação de quem
-                            // já estava mandando — não tem como saber se é uma pessoa nova, e tratar
-                            // como "nova" faria o badge genérico "Fora do CRM" repetir a cada
-                            // mensagem de uma sequência da mesma pessoa.
-                            const isFirstDoRemetente =
-                              !prevMsg ||
-                              showDate ||
-                              prevMsg.direcao !== msg.direcao ||
-                              (isSaida
-                                ? remetenteSaidaChave(msg) !== null &&
-                                  remetenteSaidaChave(prevMsg) !==
-                                    remetenteSaidaChave(msg)
-                                : (prevMsg.remetente_telefone ?? null) !==
-                                  (msg.remetente_telefone ?? null));
-  
-                            // Notificação de chamada de voz/vídeo feita pelo cliente via WhatsApp
-                            // (webhook de evento "call" da uazapi) — assim como o WhatsApp Web/app
-                            // oficial, renderiza como um chip centralizado em vez de bolha normal,
-                            // já que não é uma mensagem de texto trocada entre as partes.
-                            if (msg.tipo === "chamada") {
-                              return (
-                                <div
-                                  key={msg.id}
-                                  id={`wa-msg-${msg.id}`}
-                                  ref={isLast ? msgScrollRef : undefined}
-                                >
-                                  <div
-                                    className={cn(
-                                      "flex justify-center",
-                                      prevMsg?.direcao !== msg.direcao
-                                        ? "mt-3"
-                                        : "mt-0.5",
-                                    )}
-                                  >
-                                    <div className="max-w-[75%] items-center">
-                                      <div
-                                        className={cn(
-                                          "px-3 py-2 break-words rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/15 text-foreground flex items-center gap-1.5",
-                                          msg.id === destacadaMsgId &&
-                                            "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                                        )}
-                                      >
-                                        <Phone className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                                        <p className="text-xs text-center whitespace-pre-wrap">
-                                          {msg.conteudo}
-                                        </p>
-                                      </div>
-                                      <div className="flex items-center gap-1 mt-0.5 justify-center">
-                                        <span className="text-[9px] text-muted-foreground">
-                                          {format(
-                                            new Date(msg.created_at),
-                                            "HH:mm",
-                                          )}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            }
+                              const msgParaExibir = prefixoExterno
+                                ? { ...msg, conteudo: prefixoExterno.resto }
+                                : msg;
+                              // Chave de quem mandou uma mensagem de saída: id do usuário do CRM,
+                              // senão o nome extraído do prefixo manual "*Nome:*" — sem isso, duas
+                              // pessoas diferentes respondendo por fora do CRM em sequência caíam no
+                              // mesmo "null === null" e a segunda ficava sem nome, empilhada como se
+                              // fosse a primeira.
+                              const remetenteSaidaChave = (
+                                m: WaMensagem,
+                              ): string | null =>
+                                m.usuario?.id ??
+                                extrairPrefixoRemetenteExterno(m.conteudo)
+                                  ?.nome ??
+                                null;
+                              // Empilha mensagens consecutivas do mesmo remetente sem repetir o
+                              // nome/número acima de cada bolha — só mostra na primeira da leva.
+                              // Quando a mensagem de saída atual não tem como se identificar (sem
+                              // usuario_id nem prefixo "*Nome:*"), assume que é continuação de quem
+                              // já estava mandando — não tem como saber se é uma pessoa nova, e tratar
+                              // como "nova" faria o badge genérico "Fora do CRM" repetir a cada
+                              // mensagem de uma sequência da mesma pessoa.
+                              const isFirstDoRemetente =
+                                !prevMsg ||
+                                showDate ||
+                                prevMsg.direcao !== msg.direcao ||
+                                (isSaida
+                                  ? remetenteSaidaChave(msg) !== null &&
+                                    remetenteSaidaChave(prevMsg) !==
+                                      remetenteSaidaChave(msg)
+                                  : (prevMsg.remetente_telefone ?? null) !==
+                                    (msg.remetente_telefone ?? null));
 
-                            // Nota de sistema (ex: "Fulano assumiu esta conversa") — nunca foi
-                            // enviada ao WhatsApp. Renderiza centralizada (como um chip de
-                            // sistema). Notas digitadas manualmente usam bg âmbar; notas de
-                            // sistema usam um cinza neutro, pra diferenciar as duas na conversa.
-                            if (msg.is_nota_interna) {
-                              const isNotaManual =
-                                msg.usuario?.nome &&
-                                !msg.conteudo?.startsWith(msg.usuario.nome);
-                              return (
-                                <div
-                                  key={msg.id}
-                                  id={`wa-msg-${msg.id}`}
-                                  ref={isLast ? msgScrollRef : undefined}
-                                >
+                              // Notificação de chamada de voz/vídeo feita pelo cliente via WhatsApp
+                              // (webhook de evento "call" da uazapi) — assim como o WhatsApp Web/app
+                              // oficial, renderiza como um chip centralizado em vez de bolha normal,
+                              // já que não é uma mensagem de texto trocada entre as partes.
+                              if (msg.tipo === "chamada") {
+                                return (
                                   <div
-                                    className={cn(
-                                      "flex justify-center",
-                                      prevMsg?.direcao !== msg.direcao
-                                        ? "mt-3"
-                                        : "mt-0.5",
-                                    )}
+                                    key={msg.id}
+                                    id={`wa-msg-${msg.id}`}
+                                    ref={isLast ? msgScrollRef : undefined}
                                   >
-                                    <div className="max-w-[75%] items-center">
-                                      <div
-                                        className={cn(
-                                          "px-3 py-2 break-words rounded-2xl border text-foreground",
-                                          isNotaManual
-                                            ? "bg-amber-100 dark:bg-amber-950/50 border-amber-200/70 dark:border-amber-900/50"
-                                            : "bg-slate-200 dark:bg-slate-800/70 border-slate-300 dark:border-slate-700",
-                                          msg.id === destacadaMsgId &&
-                                            "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                                        )}
-                                      >
-                                        <p className="text-xs text-center whitespace-pre-wrap text-foreground">
-                                          <StickyNote
-                                            className={cn(
-                                              "inline-block h-3 w-3 mr-1 -mt-0.5",
-                                              isNotaManual
-                                                ? "text-amber-600 dark:text-amber-400"
-                                                : "text-slate-600 dark:text-slate-400",
-                                            )}
-                                          />
-                                          <span
-                                            className={cn(
-                                              "font-semibold",
-                                              isNotaManual
-                                                ? "text-amber-800 dark:text-amber-300"
-                                                : "text-slate-700 dark:text-slate-300",
-                                            )}
-                                          >
-                                            Nota interna
-                                            {/* Notas de sistema (assumir/direcionar/fechar conversa,
-                                                adicionar/remover responsável) já embutem o nome do
-                                                autor no início do texto — repetir aqui seria
-                                                redundante. Só mostra o nome quando ele não aparece
-                                                no início do conteúdo (nota digitada manualmente). */}
-                                            {isNotaManual ? ` (${msg.usuario.nome})` : ""}:
-                                          </span>{" "}
-                                          {linkifyText(msg.conteudo)}
-                                        </p>
-                                      </div>
-                                      <div className="flex items-center gap-1 mt-0.5 justify-center">
-                                        <span className="text-[9px] text-muted-foreground">
-                                          {format(
-                                            new Date(msg.created_at),
-                                            "HH:mm",
-                                          )}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            }
-  
-                            return (
-                              <div
-                                key={msg.id}
-                                id={`wa-msg-${msg.id}`}
-                                ref={isLast ? msgScrollRef : undefined}
-                              >
-                                <div
-                                  className={cn(
-                                    "flex",
-                                    isSaida ? "justify-end" : "justify-start",
-                                    prevMsg?.direcao !== msg.direcao
-                                      ? "mt-3"
-                                      : "mt-0.5",
-                                  )}
-                                >
-                                  <div
-                                    className={cn(
-                                      "max-w-[75%]",
-                                      isSaida ? "items-end" : "items-start",
-                                    )}
-                                  >
-                                    <DraggableBubble
-                                      msg={msg}
-                                      isSaida={isSaida}
-                                      onReply={handleReply}
-                                      onReact={handleReact}
-                                      onExcluir={setMsgParaApagar}
+                                    <div
+                                      className={cn(
+                                        "flex justify-center",
+                                        prevMsg?.direcao !== msg.direcao
+                                          ? "mt-3"
+                                          : "mt-0.5",
+                                      )}
                                     >
-                                      <div
-                                        className={cn(
-                                          "relative",
-                                          msg.tipo === "audio"
-                                            ? "p-0.5"
-                                            : "px-3 py-2",
-                                          "break-words transition-shadow duration-500",
-                                          isSaida
-                                            ? "bg-orange-500 text-white rounded-2xl rounded-tr-sm"
-                                            : "bg-muted text-foreground rounded-2xl rounded-tl-sm",
-                                          msg.id === destacadaMsgId &&
-                                            "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                                        )}
-                                      >
-                                        {isSaida &&
-                                          msg.usuario &&
-                                          isFirstDoRemetente && (
-                                            <UserPreviewPopover
-                                              usuario={msg.usuario}
-                                              nameClassName={cn(
-                                                "block w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight mb-2 text-white",
-                                                msg.tipo === "audio" &&
-                                                  "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
-                                              )}
-                                            />
-                                          )}
-                                        {isSaida &&
-                                          !msg.usuario &&
-                                          isFirstDoRemetente && (
-                                            <div
-                                              className={cn(
-                                                "flex items-center gap-1 mb-2",
-                                                msg.tipo === "audio" &&
-                                                  "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
-                                              )}
-                                            >
-                                              {usuarioExterno ? (
-                                                <UserPreviewPopover
-                                                  usuario={usuarioExterno}
-                                                  nameClassName="w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight text-white"
-                                                />
-                                              ) : (
-                                                <span className="w-fit max-w-full truncate text-sm font-semibold leading-tight text-white">
-                                                  {/* Sem "*Nome*" no início do texto pra identificar
-                                                      quem mandou (convenção manual) — não dá pra saber
-                                                      quem foi, mas ainda assim sinaliza que não veio do
-                                                      CRM, em vez de deixar a bolha sem nenhuma pista. */}
-                                                  {prefixoExterno?.nome ?? "Fora do CRM"}
-                                                </span>
-                                              )}
-                                              <span
-                                                title="Enviado fora do CRM (WhatsApp Web/celular) — sem como identificar quem enviou"
-                                                className="inline-flex items-center gap-0.5 shrink-0 px-1 py-0.5 rounded text-[9px] font-medium bg-white/20 text-white"
-                                              >
-                                                <Smartphone className="h-2.5 w-2.5" />
-                                              </span>
-                                            </div>
-                                          )}
-                                        {!isSaida && isFirstDoRemetente && (
-                                          <ContactPreviewPopover
-                                            conversa={conversaAtiva}
-                                            remetenteNome={msg.remetente_nome}
-                                            remetenteTelefone={
-                                              msg.remetente_telefone
-                                            }
-                                            nameClassName={cn(
-                                              "block w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight mb-2",
-                                              senderNameColor(conversaAtiva.id),
-                                              msg.tipo === "audio" &&
-                                                "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
-                                            )}
-                                          />
-                                        )}
-                                        {msg.quoted_wamid && (
-                                          <QuotedPreview
-                                            remetenteNome={
-                                              msg.quoted_remetente_nome
-                                            }
-                                            conteudo={msg.quoted_conteudo}
-                                            tipo={msg.quoted_tipo}
-                                            isSaida={isSaida}
-                                            onClick={() => {
-                                              const originalId = idPorWamid.get(
-                                                msg.quoted_wamid!,
-                                              );
-                                              if (!originalId) return;
-                                              irParaMensagem(originalId);
-                                            }}
-                                          />
-                                        )}
-                                        <MessageContent
-                                          msg={msgParaExibir}
-                                          isSaida={isSaida}
-                                          onImageClick={(url) =>
-                                            setViewingImage({ url })
-                                          }
-                                          onPreviewFile={setPreviewFile}
-                                          conversaAtiva={conversaAtiva}
-                                        />
-                                        <ReactionBadge
-                                          reacoes={msg.reacoes ?? []}
-                                          isSaida={isSaida}
-                                          onToggle={(emoji) =>
-                                            handleReact(msg, emoji)
-                                          }
-                                        />
-                                      </div>
-                                      {msg.tipo !== "texto" && (
+                                      <div className="max-w-[75%] items-center">
                                         <div
                                           className={cn(
-                                            "flex items-center gap-1 mt-0.5",
-                                            isSaida
-                                              ? "justify-end mr-1"
-                                              : "justify-start ml-1",
+                                            "px-3 py-2 break-words rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/15 text-foreground flex items-center gap-1.5",
+                                            msg.id === destacadaMsgId &&
+                                              "ring-2 ring-primary ring-offset-2 ring-offset-background",
                                           )}
                                         >
+                                          <Phone className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                          <p className="text-xs text-center whitespace-pre-wrap">
+                                            {msg.conteudo}
+                                          </p>
+                                        </div>
+                                        <div className="flex items-center gap-1 mt-0.5 justify-center">
                                           <span className="text-[9px] text-muted-foreground">
                                             {format(
                                               new Date(msg.created_at),
                                               "HH:mm",
                                             )}
                                           </span>
-                                          {isSaida && (
-                                            <MessageStatus status={msg.status} />
-                                          )}
                                         </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              // Nota de sistema (ex: "Fulano assumiu esta conversa") — nunca foi
+                              // enviada ao WhatsApp. Renderiza centralizada (como um chip de
+                              // sistema). Notas digitadas manualmente usam bg âmbar; notas de
+                              // sistema usam um cinza neutro, pra diferenciar as duas na conversa.
+                              if (msg.is_nota_interna) {
+                                const isNotaManual =
+                                  msg.usuario?.nome &&
+                                  !msg.conteudo?.startsWith(msg.usuario.nome);
+                                return (
+                                  <div
+                                    key={msg.id}
+                                    id={`wa-msg-${msg.id}`}
+                                    ref={isLast ? msgScrollRef : undefined}
+                                  >
+                                    <div
+                                      className={cn(
+                                        "flex justify-center",
+                                        prevMsg?.direcao !== msg.direcao
+                                          ? "mt-3"
+                                          : "mt-0.5",
                                       )}
-                                    </DraggableBubble>
+                                    >
+                                      <div className="max-w-[75%] items-center">
+                                        <div
+                                          className={cn(
+                                            "px-3 py-2 break-words rounded-2xl border text-foreground",
+                                            isNotaManual
+                                              ? "bg-amber-100 dark:bg-amber-950/50 border-amber-200/70 dark:border-amber-900/50"
+                                              : "bg-slate-200 dark:bg-slate-800/70 border-slate-300 dark:border-slate-700",
+                                            msg.id === destacadaMsgId &&
+                                              "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                                          )}
+                                        >
+                                          <p className="text-xs text-center whitespace-pre-wrap text-foreground">
+                                            <StickyNote
+                                              className={cn(
+                                                "inline-block h-3 w-3 mr-1 -mt-0.5",
+                                                isNotaManual
+                                                  ? "text-amber-600 dark:text-amber-400"
+                                                  : "text-slate-600 dark:text-slate-400",
+                                              )}
+                                            />
+                                            <span
+                                              className={cn(
+                                                "font-semibold",
+                                                isNotaManual
+                                                  ? "text-amber-800 dark:text-amber-300"
+                                                  : "text-slate-700 dark:text-slate-300",
+                                              )}
+                                            >
+                                              Nota interna
+                                              {/* Notas de sistema (assumir/direcionar/fechar conversa,
+                                                adicionar/remover responsável) já embutem o nome do
+                                                autor no início do texto — repetir aqui seria
+                                                redundante. Só mostra o nome quando ele não aparece
+                                                no início do conteúdo (nota digitada manualmente). */}
+                                              {isNotaManual
+                                                ? ` (${msg.usuario.nome})`
+                                                : ""}
+                                              :
+                                            </span>{" "}
+                                            {linkifyText(msg.conteudo)}
+                                          </p>
+                                        </div>
+                                        <div className="flex items-center gap-1 mt-0.5 justify-center">
+                                          <span className="text-[9px] text-muted-foreground">
+                                            {format(
+                                              new Date(msg.created_at),
+                                              "HH:mm",
+                                            )}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div
+                                  key={msg.id}
+                                  id={`wa-msg-${msg.id}`}
+                                  ref={isLast ? msgScrollRef : undefined}
+                                >
+                                  <div
+                                    className={cn(
+                                      "flex",
+                                      isSaida ? "justify-end" : "justify-start",
+                                      prevMsg?.direcao !== msg.direcao
+                                        ? "mt-3"
+                                        : "mt-0.5",
+                                    )}
+                                  >
+                                    <div
+                                      className={cn(
+                                        "max-w-[75%]",
+                                        isSaida ? "items-end" : "items-start",
+                                      )}
+                                    >
+                                      <DraggableBubble
+                                        msg={msg}
+                                        isSaida={isSaida}
+                                        onReply={handleReply}
+                                        onReact={handleReact}
+                                        onExcluir={setMsgParaApagar}
+                                      >
+                                        <div
+                                          className={cn(
+                                            "relative",
+                                            msg.tipo === "audio"
+                                              ? "p-0.5"
+                                              : "px-3 py-2",
+                                            "break-words transition-shadow duration-500",
+                                            isSaida
+                                              ? "bg-orange-500 text-white rounded-2xl rounded-tr-sm"
+                                              : "bg-muted text-foreground rounded-2xl rounded-tl-sm",
+                                            msg.id === destacadaMsgId &&
+                                              "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                                          )}
+                                        >
+                                          {isSaida &&
+                                            msg.usuario &&
+                                            isFirstDoRemetente && (
+                                              <UserPreviewPopover
+                                                usuario={msg.usuario}
+                                                nameClassName={cn(
+                                                  "block w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight mb-2 text-white",
+                                                  msg.tipo === "audio" &&
+                                                    "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
+                                                )}
+                                              />
+                                            )}
+                                          {isSaida &&
+                                            !msg.usuario &&
+                                            isFirstDoRemetente && (
+                                              <div
+                                                className={cn(
+                                                  "flex items-center gap-1 mb-2",
+                                                  msg.tipo === "audio" &&
+                                                    "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
+                                                )}
+                                              >
+                                                {usuarioExterno ? (
+                                                  <UserPreviewPopover
+                                                    usuario={usuarioExterno}
+                                                    nameClassName="w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight text-white"
+                                                  />
+                                                ) : (
+                                                  <span className="w-fit max-w-full truncate text-sm font-semibold leading-tight text-white">
+                                                    {/* Sem "*Nome*" no início do texto pra identificar
+                                                      quem mandou (convenção manual) — não dá pra saber
+                                                      quem foi, mas ainda assim sinaliza que não veio do
+                                                      CRM, em vez de deixar a bolha sem nenhuma pista. */}
+                                                    {prefixoExterno?.nome ??
+                                                      "Fora do CRM"}
+                                                  </span>
+                                                )}
+                                                <span
+                                                  title="Enviado fora do CRM (WhatsApp Web/celular) — sem como identificar quem enviou"
+                                                  className="inline-flex items-center gap-0.5 shrink-0 px-1 py-0.5 rounded text-[9px] font-medium bg-white/20 text-white"
+                                                >
+                                                  <Smartphone className="h-2.5 w-2.5" />
+                                                </span>
+                                              </div>
+                                            )}
+                                          {!isSaida && isFirstDoRemetente && (
+                                            <ContactPreviewPopover
+                                              conversa={conversaAtiva}
+                                              remetenteNome={msg.remetente_nome}
+                                              remetenteTelefone={
+                                                msg.remetente_telefone
+                                              }
+                                              nameClassName={cn(
+                                                "block w-fit max-w-full whitespace-nowrap text-sm font-semibold leading-tight mb-2",
+                                                senderNameColor(
+                                                  conversaAtiva.id,
+                                                ),
+                                                msg.tipo === "audio" &&
+                                                  "w-[calc(100%-0.75rem)] mx-1.5 mt-1.5",
+                                              )}
+                                            />
+                                          )}
+                                          {msg.quoted_wamid && (
+                                            <QuotedPreview
+                                              remetenteNome={
+                                                msg.quoted_remetente_nome
+                                              }
+                                              conteudo={msg.quoted_conteudo}
+                                              tipo={msg.quoted_tipo}
+                                              isSaida={isSaida}
+                                              onClick={() => {
+                                                const originalId =
+                                                  idPorWamid.get(
+                                                    msg.quoted_wamid!,
+                                                  );
+                                                if (!originalId) return;
+                                                irParaMensagem(originalId);
+                                              }}
+                                            />
+                                          )}
+                                          <MessageContent
+                                            msg={msgParaExibir}
+                                            isSaida={isSaida}
+                                            onImageClick={(url) =>
+                                              setViewingImage({ url })
+                                            }
+                                            onPreviewFile={setPreviewFile}
+                                            conversaAtiva={conversaAtiva}
+                                          />
+                                          <ReactionBadge
+                                            reacoes={msg.reacoes ?? []}
+                                            isSaida={isSaida}
+                                            onToggle={(emoji) =>
+                                              handleReact(msg, emoji)
+                                            }
+                                          />
+                                        </div>
+                                        {msg.tipo !== "texto" && (
+                                          <div
+                                            className={cn(
+                                              "flex items-center gap-1 mt-0.5",
+                                              isSaida
+                                                ? "justify-end mr-1"
+                                                : "justify-start ml-1",
+                                            )}
+                                          >
+                                            <span className="text-[9px] text-muted-foreground">
+                                              {format(
+                                                new Date(msg.created_at),
+                                                "HH:mm",
+                                              )}
+                                            </span>
+                                            {isSaida && (
+                                              <MessageStatus
+                                                status={msg.status}
+                                              />
+                                            )}
+                                          </div>
+                                        )}
+                                      </DraggableBubble>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
+                              );
                             })}
                           </div>
                         ))}
@@ -7839,7 +8043,8 @@ export default function WhatsAppInbox() {
                                 onSelect={() => handleSelectMention(p)}
                                 className={cn(
                                   "cursor-pointer",
-                                  i === mentionActiveIndex && "bg-accent text-accent-foreground",
+                                  i === mentionActiveIndex &&
+                                    "bg-accent text-accent-foreground",
                                 )}
                               >
                                 {p.nome || formatPhone(p.telefone)}
@@ -8006,10 +8211,10 @@ export default function WhatsAppInbox() {
                             nota", que é do WhatsApp e não tem relação com Tarefas — menu
                             com um item só funciona normalmente. */}
                         {temTarefasSecao === true && (
-                        <DropdownMenuItem onClick={abrirNovaTarefa}>
-                          <ListTodo className="h-4 w-4 mr-2" />
-                          Nova tarefa
-                        </DropdownMenuItem>
+                          <DropdownMenuItem onClick={abrirNovaTarefa}>
+                            <ListTodo className="h-4 w-4 mr-2" />
+                            Nova tarefa
+                          </DropdownMenuItem>
                         )}
                         <DropdownMenuItem onClick={() => setNovaNotaOpen(true)}>
                           <StickyNote className="h-4 w-4 mr-2" />
@@ -8144,7 +8349,9 @@ export default function WhatsAppInbox() {
                   )}
                   style={{
                     transform: `scale(${imgZoom}) translate(${imgOffset.x}px, ${imgOffset.y}px)`,
-                    transition: isDraggingImg ? "none" : "transform 0.15s ease-out",
+                    transition: isDraggingImg
+                      ? "none"
+                      : "transform 0.15s ease-out",
                   }}
                 />
                 <div className="absolute bottom-3 right-3 flex items-center gap-0.5 rounded-full border border-border bg-background/90 px-1 py-1 shadow-sm backdrop-blur">
@@ -8290,11 +8497,8 @@ export default function WhatsAppInbox() {
             <AlertDialogCancel onClick={() => confirmarSelecionarTodas(false)}>
               Só as {filtroStatus === "aberto" ? "em aberto" : "fechadas"}
             </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => confirmarSelecionarTodas(true)}
-            >
-              Incluir as{" "}
-              {filtroStatus === "aberto" ? "fechadas" : "em aberto"}
+            <AlertDialogAction onClick={() => confirmarSelecionarTodas(true)}>
+              Incluir as {filtroStatus === "aberto" ? "fechadas" : "em aberto"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -8335,175 +8539,180 @@ export default function WhatsAppInbox() {
           formulário estão presas ao diálogo (useClientes e usePedidosOptions, que puxam
           1.305 clientes e até 500 negócios). Com ele fora da árvore, nada disso dispara. */}
       {temTarefasSecao === true && (
-      <Dialog open={novaTarefaOpen} onOpenChange={setNovaTarefaOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Nova Tarefa</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
-              <Label>Título *</Label>
-              <Input
-                value={tarefaForm.titulo}
-                onChange={(e) =>
-                  setTarefaForm((f) => ({ ...f, titulo: e.target.value }))
-                }
-                placeholder="Ex: Follow-up com o cliente"
-              />
-            </div>
-            <div>
-              <Label>Descrição</Label>
-              <Textarea
-                value={tarefaForm.descricao}
-                onChange={(e) =>
-                  setTarefaForm((f) => ({ ...f, descricao: e.target.value }))
-                }
-                rows={3}
-                placeholder="Detalhes da tarefa (opcional)"
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Dialog open={novaTarefaOpen} onOpenChange={setNovaTarefaOpen}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Nova Tarefa</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-2">
               <div>
-                <Label>Status</Label>
-                <Select
-                  value={tarefaForm.status}
-                  onValueChange={(v) =>
-                    setTarefaForm((f) => ({ ...f, status: v }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {KANBAN_STAGES_TAREFAS.map((stage) => (
-                      <SelectItem key={stage.key} value={stage.key}>
-                        {stage.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Prazo Final</Label>
+                <Label>Título *</Label>
                 <Input
-                  type="datetime-local"
-                  value={tarefaForm.prazo_final}
+                  value={tarefaForm.titulo}
                   onChange={(e) =>
-                    setTarefaForm((f) => ({
-                      ...f,
-                      prazo_final: e.target.value,
-                    }))
+                    setTarefaForm((f) => ({ ...f, titulo: e.target.value }))
                   }
+                  placeholder="Ex: Follow-up com o cliente"
                 />
               </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label>Descrição</Label>
+                <Textarea
+                  value={tarefaForm.descricao}
+                  onChange={(e) =>
+                    setTarefaForm((f) => ({ ...f, descricao: e.target.value }))
+                  }
+                  rows={3}
+                  placeholder="Detalhes da tarefa (opcional)"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label>Status</Label>
+                  <Select
+                    value={tarefaForm.status}
+                    onValueChange={(v) =>
+                      setTarefaForm((f) => ({ ...f, status: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {KANBAN_STAGES_TAREFAS.map((stage) => (
+                        <SelectItem key={stage.key} value={stage.key}>
+                          {stage.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Prazo Final</Label>
+                  <Input
+                    type="datetime-local"
+                    value={tarefaForm.prazo_final}
+                    onChange={(e) =>
+                      setTarefaForm((f) => ({
+                        ...f,
+                        prazo_final: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Responsável</Label>
+                  <SearchableSelect
+                    options={vendedores.map((v) => ({
+                      value: v.nome,
+                      label: v.nome,
+                    }))}
+                    value={tarefaForm.responsavel}
+                    onValueChange={(v) =>
+                      setTarefaForm((f) => ({ ...f, responsavel: v }))
+                    }
+                    placeholder="Selecione o responsável"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Projeto / Obra</Label>
+                  <ProjetoSelect
+                    value={tarefaForm.projeto}
+                    onChange={(v) =>
+                      setTarefaForm((f) => ({ ...f, projeto: v }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Empresa (cliente)</Label>
+                  <SearchableSelect
+                    options={clientesTarefas.map((c) => ({
+                      value: c.id,
+                      label: c.empresa,
+                    }))}
+                    value={tarefaForm.cliente_id}
+                    onValueChange={(v) =>
+                      setTarefaForm((f) => ({ ...f, cliente_id: v }))
+                    }
+                    placeholder="Vincular a uma empresa"
+                    contentClassName="w-[min(28rem,90vw)]"
+                    // Antes, as duas listas já estavam carregadas muito antes de o
+                    // diálogo abrir — ao custo de buscá-las em toda entrada na
+                    // inbox. Agora que só carregam ao abrir, "lista vazia" passou
+                    // a ser o estado inicial garantido, e o texto padrão
+                    // ("Nenhuma opção encontrada") faria a pessoa concluir que não
+                    // há clientes cadastrados e salvar a tarefa sem vínculo.
+                    emptyMessage={
+                      carregandoClientes
+                        ? "Carregando empresas..."
+                        : "Nenhuma opção encontrada."
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Negócio</Label>
+                  <SearchableSelect
+                    options={pedidosOptionsTarefas.map((p) => ({
+                      value: p.id,
+                      label: getNomeNegocio(p),
+                    }))}
+                    value={tarefaForm.pedido_id}
+                    onValueChange={(v) =>
+                      setTarefaForm((f) => ({ ...f, pedido_id: v }))
+                    }
+                    placeholder="Vincular a um negócio"
+                    contentClassName="w-[min(28rem,90vw)]"
+                    emptyMessage={
+                      carregandoPedidos
+                        ? "Carregando negócios..."
+                        : "Nenhuma opção encontrada."
+                    }
+                  />
+                </div>
+              </div>
               <div className="space-y-1.5">
-                <Label>Responsável</Label>
-                <SearchableSelect
-                  options={vendedores.map((v) => ({
-                    value: v.nome,
-                    label: v.nome,
-                  }))}
-                  value={tarefaForm.responsavel}
-                  onValueChange={(v) =>
-                    setTarefaForm((f) => ({ ...f, responsavel: v }))
+                <Label>Participantes</Label>
+                <ParticipantesMultiSelect
+                  value={tarefaForm.participantes}
+                  onChange={(v) =>
+                    setTarefaForm((f) => ({ ...f, participantes: v }))
                   }
-                  placeholder="Selecione o responsável"
+                  usuarios={vendedores}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Projeto / Obra</Label>
-                <ProjetoSelect
-                  value={tarefaForm.projeto}
-                  onChange={(v) => setTarefaForm((f) => ({ ...f, projeto: v }))}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Empresa (cliente)</Label>
-                <SearchableSelect
-                  options={clientesTarefas.map((c) => ({
-                    value: c.id,
-                    label: c.empresa,
-                  }))}
-                  value={tarefaForm.cliente_id}
-                  onValueChange={(v) =>
-                    setTarefaForm((f) => ({ ...f, cliente_id: v }))
-                  }
-                  placeholder="Vincular a uma empresa"
-                  contentClassName="w-[min(28rem,90vw)]"
-                  // Antes, as duas listas já estavam carregadas muito antes de o
-                  // diálogo abrir — ao custo de buscá-las em toda entrada na
-                  // inbox. Agora que só carregam ao abrir, "lista vazia" passou
-                  // a ser o estado inicial garantido, e o texto padrão
-                  // ("Nenhuma opção encontrada") faria a pessoa concluir que não
-                  // há clientes cadastrados e salvar a tarefa sem vínculo.
-                  emptyMessage={
-                    carregandoClientes
-                      ? "Carregando empresas..."
-                      : "Nenhuma opção encontrada."
-                  }
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Negócio</Label>
-                <SearchableSelect
-                  options={pedidosOptionsTarefas.map((p) => ({
-                    value: p.id,
-                    label: getNomeNegocio(p),
-                  }))}
-                  value={tarefaForm.pedido_id}
-                  onValueChange={(v) =>
-                    setTarefaForm((f) => ({ ...f, pedido_id: v }))
-                  }
-                  placeholder="Vincular a um negócio"
-                  contentClassName="w-[min(28rem,90vw)]"
-                  emptyMessage={
-                    carregandoPedidos
-                      ? "Carregando negócios..."
-                      : "Nenhuma opção encontrada."
+                <Label>Marcadores</Label>
+                <MarcadoresMultiSelect
+                  value={tarefaForm.marcadores}
+                  onChange={(v) =>
+                    setTarefaForm((f) => ({ ...f, marcadores: v }))
                   }
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Participantes</Label>
-              <ParticipantesMultiSelect
-                value={tarefaForm.participantes}
-                onChange={(v) =>
-                  setTarefaForm((f) => ({ ...f, participantes: v }))
-                }
-                usuarios={vendedores}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Marcadores</Label>
-              <MarcadoresMultiSelect
-                value={tarefaForm.marcadores}
-                onChange={(v) =>
-                  setTarefaForm((f) => ({ ...f, marcadores: v }))
-                }
-              />
-            </div>
-          </div>
-          <DialogFooter className="mt-6">
-            <Button variant="outline" onClick={() => setNovaTarefaOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={salvarNovaTarefa}
-              disabled={createTarefa.isPending}
-            >
-              {createTarefa.isPending && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              )}
-              Criar Tarefa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter className="mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setNovaTarefaOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={salvarNovaTarefa}
+                disabled={createTarefa.isPending}
+              >
+                {createTarefa.isPending && (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                )}
+                Criar Tarefa
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       <Dialog open={novaNotaOpen} onOpenChange={setNovaNotaOpen}>
@@ -8561,8 +8770,8 @@ export default function WhatsAppInbox() {
                 : "conversas selecionadas"}
             </DialogTitle>
             <DialogDescription>
-              Escolha o período e o formato do arquivo. Cada conversa aparece com
-              o nome do contato ou grupo no topo, para separar uma da outra.
+              Escolha o período e o formato do arquivo. Cada conversa aparece
+              com o nome do contato ou grupo no topo, para separar uma da outra.
             </DialogDescription>
           </CabecalhoDialogo>
           <CorpoDialogo>
