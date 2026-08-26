@@ -325,7 +325,6 @@ export default function Calendario() {
             onViewModeChange={setViewMode}
             onNavigate={navigate}
             onNewEvent={() => openNewEvent()}
-            onNewVisita={() => abrirRotaVisita()}
             onImport={handleImportClick}
             searchQuery={searchQuery}
             onSearchQueryChange={setSearchQuery}
