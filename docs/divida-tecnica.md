@@ -43,6 +43,10 @@ acrescentados em 21/08/2026.
 | 26 | [Cabeçalho de página sem slot de ação](#26-o-cabeçalho-de-página-não-tem-slot-de-ação-e-7-páginas-o-remontam-à-mão) | Baixa | Não |
 | 27 | [`src/data/mockData.ts` órfão](#27-srcdatamockdatats-é-arquivo-órfão) | Baixa | Não |
 | 28 | [Busca de negócio filtra por lista de ids na URL](#28-a-busca-de-negócio-filtra-por-lista-de-ids-na-url-e-por-isso-tem-teto) | Média | Não — mas a busca fica incompleta com termo curto |
+| 29 | [Filtro de período do WhatsApp abre no mês errado](#29-o-filtro-de-período-do-whatsapp-abre-no-mês-errado) | Baixa | Não — último calendário com o defeito |
+| 30 | [Miudezas do módulo Calendário](#30-miudezas-do-módulo-calendário) | Baixa | Não |
+| 31 | [Exceções da seleção em massa viajam na URL](#31-a-lista-de-exceções-da-seleção-em-massa-viaja-na-url-e-trava-em-800) | Média | Trava a operação acima de ~800 e não explica por quê |
+| 32 | [Cópia sem uso da chave do Resend no Vault](#32-cópia-sem-uso-da-chave-do-resend-no-vault) | Baixa | Não — higiene de credencial |
 
 ---
 
@@ -295,8 +299,11 @@ src/test/example.test.ts                                     1
 
 Agrava dois outros fatos:
 
-- **Publicar está a um comando de distância** (`npx vercel --prod`) — e quem publica é
-  quem acabou de escrever o código, sem ninguém entre ele e o cliente
+- 🔴 **Publicar não está mais a um comando de distância: está a ZERO.** Desde 26/08/2026 o
+  repositório voltou a ser público e a Vercel publica sozinha a cada commit no `main`. Quem
+  escreve o código o coloca no cliente pagante no mesmo gesto, e **sumiu a etapa onde o erro
+  ainda podia aparecer antes** (ver `CLAUDE.md` §16). Isso torna a cobertura de teste mais
+  cara de não ter, não menos
 - **O TypeScript está frouxo** (item 12) — o compilador também não segura o erro
 
 É por isso que este projeto exige **autorização do Lucas antes de cada commit**
@@ -1228,6 +1235,33 @@ exceções num teto e dizer isso na tela.
 **Não confundir com o defeito irmão, que JÁ foi corrigido:** as exceções ficarem órfãs
 quando o filtro muda (o botão prometia "Excluir 1.574" e o banco apagava 1.584). Esse foi
 resolvido em 21/08/2026 — ver Resolvidos.
+
+---
+
+## 32. Cópia sem uso da chave do Resend no Vault
+
+**Gravidade: baixa. Registrado em 26/08/2026, a pedido do Lucas, para fazer depois.**
+
+A chave da API do Resend existe em **três** lugares do projeto Supabase, e só um é lido:
+
+| onde | nome | quem lê |
+|---|---|---|
+| Project Settings → Edge Functions → Secrets | `RESEND_API_KEY` | ✅ a função do resumo diário |
+| Project Settings → Edge Functions → Secrets | `Resend_api_key` | ninguém — sobra da grafia antiga |
+| Integrations → **Vault** | `RESEND_API_KEY` | **ninguém** |
+
+A cópia no Vault nasceu de uma confusão entre duas telas: as duas se chamam "Secrets", as duas
+têm um botão "Add new secret", mas o Vault é o cofre do **banco** e não alimenta função de
+servidor. A história completa está no comentário de `lerChaveDoResend`, em
+`supabase/functions/pauta-resumo-diario/index.ts`.
+
+**Por que limpar:** chave viva parada num lugar que ninguém consulta é superfície a mais sem
+contrapartida — mais um sítio de onde vazar, e mais um para alguém rotacionar por engano
+achando que é a que vale. Nada quebra hoje.
+
+**Conserto:** apagar `RESEND_API_KEY` do Vault e `Resend_api_key` dos secrets das Edge
+Functions. Depois **republicar a função** — segredo trocado não afeta instância já morna — e
+conferir que `aviso_nome_do_segredo` sumiu do registro em `automation_logs`.
 
 ---
 

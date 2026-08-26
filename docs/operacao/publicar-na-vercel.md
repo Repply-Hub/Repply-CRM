@@ -1,24 +1,44 @@
 # Publicar o site
 
-> 🔴 **Enviar para o `main` NÃO publica.** Depois do `git push`, alguém precisa rodar
-> `npx vercel --prod`. Se você commitou e não rodou o comando, **o que você fez não está no
-> ar** — e o ✗ vermelho ao lado do commit no GitHub é a Vercel recusando, não um erro seu.
+> 🔴 **Enviar para o `main` PUBLICA.** Desde 26/08/2026 a Vercel publica sozinha a cada
+> commit, em minutos. **Não há comando a rodar depois** — e não há mais uma etapa entre o
+> seu `git push` e o cliente pagante.
 
 ---
 
-## Por que é manual, e a história que explica o ✗ vermelho
+## A regra, e as três reviravoltas que a trouxeram até aqui
 
-**A regra hoje (24/08/2026, decisão do Lucas):** o repositório é PRIVADO e pertence à
-organização `Repply-Hub`. O plano gratuito da Vercel recusa exatamente essa combinação, e a
-recusa aparece em todo commit:
+**Hoje (26/08/2026, verificado na API do GitHub):** o repositório é **PÚBLICO**, e a
+publicação automática funciona.
+
+```
+gh repo view Repply-Hub/Repply-CRM --json visibility   ->  "PUBLIC"
+gh api repos/.../commits/<sha>/status                  ->  state: success, contexto "Vercel"
+```
+
+A recusa que aparecia antes, lida direto da API:
 
 ```
 Cannot deploy from a private GitHub organization repository on the Hobby plan
 ```
 
-Manter o código fechado é decisão de negócio — é um SaaS com cliente pagante. O preço dela é
-publicar por comando. As alternativas (Vercel Pro, ou Cloudflare Pages, cujo plano grátis
-aceita repositório privado **e** permite uso comercial) estão comparadas em
+A palavra que decide é **privado**, não "organização". O plano gratuito publica repositório de
+organização sem problema — recusa quando ele é privado.
+
+| quando | repositório | publicação automática |
+|---|---|---|
+| até 24/08/2026 | privado | não |
+| 24/08/2026, de manhã | público | sim |
+| 24/08/2026, no mesmo dia | privado de novo, por apuração de segurança | não |
+| **desde 26/08/2026** | **público** | **sim** — estado atual |
+
+🔴 **Se a publicação parar de disparar, confira a visibilidade ANTES de qualquer outra
+hipótese.** É a causa mais provável e a mais barata de medir. E não mude a visibilidade para
+"consertar" nada: as duas vezes que ela mudou foi decisão do dono do produto.
+
+Manter o código aberto ou fechado é decisão de negócio, não técnica. As alternativas que
+permitem fechá-lo sem perder a publicação automática (Vercel Pro, ou Cloudflare Pages, cujo
+plano grátis aceita repositório privado **e** permite uso comercial) continuam comparadas em
 [`migrar-hospedagem.md`](migrar-hospedagem.md).
 
 ### O diagnóstico errado que custou dois dias
@@ -170,7 +190,7 @@ clique, sem mexer no código.
 
 ## Erros comuns
 
-**"Commitei e não vejo a mudança."** Você não publicou. Rode `npx vercel --prod`.
+**"Commitei e não vejo a mudança."** A publicação leva alguns minutos. Se passou disso, confira se saiu — `gh api repos/Repply-Hub/Repply-CRM/commits/<sha>/status` — e confira a visibilidade do repositório antes de qualquer outra hipótese.
 
 **"Pede login toda vez."** O `vercel login` vale por máquina e por usuário do sistema. Se
 você trocou de máquina ou de usuário, refaça.

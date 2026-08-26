@@ -32,9 +32,9 @@ Produto da **Repply** (Grupo MD · Natal/RN). Cliente-âncora: **MD Representaç
 
 Três fatos que mudam como se trabalha neste repositório:
 
-1. **Enviar para o `main` NÃO publica.** Depois do `git push`, alguém precisa rodar
-   `npx vercel --prod`. O repositório é privado e pertence a uma organização, e o plano
-   gratuito da Vercel recusa essa combinação — ver
+1. 🔴 **Enviar para o `main` PUBLICA.** Desde 26/08/2026 o repositório é público e a Vercel
+   publica sozinha a cada commit, em minutos. Não há comando depois, e não há etapa
+   intermediária onde um erro apareça antes do cliente pagante — ver
    [`docs/operacao/publicar-na-vercel.md`](docs/operacao/publicar-na-vercel.md).
 2. **Quase não existe rede de proteção automática.** São 10 arquivos de teste para 78 mil
    linhas; o TypeScript está configurado de forma frouxa de propósito; e o `npm run lint`
@@ -284,21 +284,37 @@ documentar dentro do arquivo, o deploy falha.
 
 ## Titularidade e acessos
 
-Este sistema foi construído por uma agência terceirizada e está em transferência para a
-Repply. Situação em **19/08/2026**:
+Este sistema foi construído por uma agência terceirizada e foi transferido para a Repply.
+Situação em **26/08/2026**, cada linha conferida na fonte e não de memória:
 
-| Item | Situação |
+| Item | Situação | como conferir |
+|---|---|---|
+| **Supabase** | ✅ Organização **Repply Hub**, plano Pro. Migration pode ser aplicada e testada | `get_organization` |
+| **GitHub** | ✅ `Repply-Hub/Repply-CRM`, organização da Repply, **público** | `gh repo view` |
+| **Vercel** | ✅ Time `repply1`, servindo `crm.repplyhub.com.br`. A conta do desenvolvedor anterior foi desconectada em 24/08 | ver `CLAUDE.md` §16 |
+| Domínio, Stripe, Nylas, arquivo de ambiente | ✅ Resolvidos | |
+| uazapi, Google Cloud | ❌ Pendentes | |
+| Lovable | ✅ Dispensado (último commit do robô em 19/06/2026) | |
+
+> 🔴 **O texto anterior desta seção dizia que mudança de banco "pode ser escrita mas não
+> aplicada nem testada".** Isso deixou de valer — em 25 e 26/08/2026 várias migrations foram
+> aplicadas em produção. Continue pedindo autorização ao Lucas antes de mexer no banco (é
+> regra dele, não limitação de acesso), mas **não recuse trabalho de banco alegando falta de
+> acesso** sem antes conferir.
+
+### Contas de terceiro que continuam ativas, por decisão
+
+Duas contas do desenvolvedor anterior seguem dentro da empresa **MD Representações**:
+
+| conta | papel |
 |---|---|
-| Domínio, Stripe, Nylas, arquivo de ambiente | ✅ Resolvidos |
-| **Supabase** | ⚠️ Conta acessível, mas o projeto segue em organização de terceiro |
-| **GitHub** | ⚠️ Temos envio, mas o repositório está em conta pessoal do desenvolvedor anterior |
-| Vercel, uazapi, Google Cloud | ❌ Pendentes |
-| Lovable | ✅ Dispensado (último commit do robô em 19/06/2026) |
+| `arthurgabrieel803@gmail.com` | **gestor** |
+| `godoy@grupoclimb.ai` | vendedor |
 
-**Por que isso está num README:** enquanto o projeto Supabase não for da Repply, toda
-mudança de banco pode ser escrita mas não aplicada nem testada — e é aí que vive a maior
-parte do trabalho neste projeto. Antes de prometer qualquer coisa que envolva banco,
-confirme se o acesso já existe.
+**Decisão do Lucas em 26/08/2026: ficam como estão.** Está escrito aqui porque gestor é o
+papel de maior alcance dentro de uma empresa, e elas aparecem em qualquer levantamento de
+acesso — inclusive na lista de quem recebe o resumo diário por e-mail. **Não as sinalize como
+problema de novo**; se algo mudar, o Lucas avisa.
 
 ---
 

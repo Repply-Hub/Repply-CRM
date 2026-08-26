@@ -41,8 +41,8 @@ empresas de fora usando — **este sistema está em produção com cliente pagan
 - **Gráficos:** Recharts · **Mapas:** Leaflet + OpenStreetMap (sem chave de API)
 - **Backend:** Supabase (Postgres + Auth + Storage + Edge Functions em Deno)
 - **Testes:** Vitest + Testing Library, ambiente jsdom
-- **Deploy:** Vercel — 🔴 **NÃO publica sozinha.** A publicação é manual, por
-  `npx vercel --prod`, com login na conta da Repply. Ver §16
+- **Deploy:** Vercel — 🔴 **`git push` PUBLICA.** Desde 26/08/2026 o repositório voltou a
+  ser público e a publicação é automática a cada commit no `main`. Ver §16
 
 **TypeScript está frouxo de propósito** (`strictNullChecks: false`, `noImplicitAny: false`).
 Não conte com garantia de tipo ao ler nem ao escrever: o compilador não vai te avisar.
@@ -631,8 +631,11 @@ git push origin main
 Mensagem no padrão convencional, em português. Prefixos: `feat`, `fix`, `refactor`,
 `docs`, `chore`, `style`.
 
-**5. Publicar.** Enviar para o `main` **não** coloca nada no ar. Rode `npx vercel --prod`.
-O assistente pode rodá-lo sozinho; o Lucas autorizou em 24/08/2026. Ver §16.
+**5. Publicar — já aconteceu.** 🔴 **O `git push` do passo 4 É a publicação.** Desde
+26/08/2026 a Vercel publica sozinha a cada commit no `main`; não há comando a rodar depois.
+
+Isso **aperta** o passo 1, não afasta: o "pode" do Lucas agora libera código para o cliente
+pagante no mesmo gesto, sem etapa intermediária onde alguém repense. Ver §16.
 
 > **Histórico da regra:** o projeto experimentou branch + Pull Request em 19/08/2026
 > (PR #1, o único do repositório). A decisão foi revertida no mesmo dia, para não conviver
@@ -681,61 +684,95 @@ engordar mais o arquivo.
 
 ---
 
-## 16. 🔴 Publicar é um passo MANUAL
+## 16. 🔴 `git push` PUBLICA
 
-**Enviar para o `main` não coloca nada no ar.**
+**Enviar para o `main` coloca no ar, sozinho, em minutos.** Não há comando a rodar depois.
 
-```sh
-npx vercel --prod
+Medido em 26/08/2026, direto da API do GitHub:
+
+```
+gh repo view Repply-Hub/Repply-CRM --json visibility   ->  "PUBLIC"
+gh api repos/.../commits/<sha>/status                  ->  state: success, contexto "Vercel"
 ```
 
-### A explicação correta — e por que ela mudou duas vezes em dois dias
+### A regra de verdade, depois de três reviravoltas em quatro dias
 
-Entre 22 e 24/08/2026 este arquivo dizia que "o plano gratuito não **conecta** repositório de
-organização". **Isso é falso**, e o erro custou dois dias de diagnóstico furado. A conexão
-sempre existiu e sempre disparou; o que ela recebia de volta a cada commit era esta recusa,
-lida direto da API do GitHub:
+Este arquivo já errou duas vezes sobre exatamente isto, e o erro custou dois dias de
+diagnóstico furado. A explicação que resiste:
 
 > `Cannot deploy from a private GitHub organization repository on the Hobby plan`
 
 A palavra que decide é **privado**, não "organização". O plano gratuito publica repositório de
-organização sem problema — recusa quando esse repositório é **privado**.
+organização sem problema — recusa quando esse repositório é **privado**. A conexão com o
+GitHub sempre existiu e sempre disparou; era a resposta que voltava recusada.
 
-Em 24/08/2026 o repositório foi tornado **público** para a publicação automática voltar, e ela
-voltou. **No mesmo dia foi tornado privado de novo**, por decisão do dono do produto, depois de
-uma apuração de segurança. Ficou privado.
+| quando | repositório | publicação automática |
+|---|---|---|
+| até 24/08/2026 | privado | não |
+| 24/08/2026, de manhã | público | **sim** |
+| 24/08/2026, no mesmo dia | privado de novo, por apuração de segurança | não |
+| **desde 26/08/2026** | **público** | **sim** — é o estado atual |
 
-**Logo: a publicação automática NÃO funciona, e não vai funcionar enquanto o plano for gratuito
-e o repositório for privado.**
+🔴 **Não mude a visibilidade do repositório para "consertar" nada.** As duas vezes que ela
+mudou foi por decisão do dono do produto, com levantamento na mão. Se a publicação parar de
+disparar, **confira a visibilidade antes de qualquer outra hipótese** — é a causa mais provável
+e a mais fácil de medir, com o comando acima.
 
-> 🔴 Não "conserte" isso tornando o repositório público de novo sem falar com o Lucas. Fechá-lo
-> foi decisão tomada com o levantamento na mão, não descuido.
+### O que isso muda na prática
 
-### Como cada dev publica
+**A trava do §13 virou a única que existe.** Antes havia duas etapas: o "pode" do Lucas para
+commitar, e depois alguém rodando o comando de publicar. A segunda sumiu. Agora o "pode" solta
+o código direto para o cliente pagante.
 
-Login na **conta da Vercel da Repply** — não na conta pessoal —, e `npx vercel --prod` da pasta
-do projeto. É assim que dev de fora publica também: o acesso vem da conta compartilhada, não do
-repositório.
+Some isso à rede de proteção fraca (lint com 493 problemas herdados, TypeScript frouxo, 18
+arquivos de teste para 78 mil linhas) e a conclusão é simples: **rode a verificação do §9 ANTES
+de pedir autorização, não depois.** Não existe mais um passo seguinte onde o erro apareça.
 
-### Publicar é SEMPRE à mão
-
-Não existe caso em que o `git push` publique. Depois de subir o código, alguém roda:
+### O comando manual ainda existe, e é exceção
 
 ```sh
 npx vercel --prod
 ```
 
-> 🔴 **Nunca publique da pasta de trabalho quando houver outra sessão codando nela.** O
-> `vercel --prod` manda o **disco**, não o commitado — sobe junto o que a outra sessão deixou
-> pela metade. Aconteceu de verdade em 24/08/2026 e foi evitado publicando de uma cópia limpa:
->
-> ```sh
-> git clone --local . /tmp/publicar && cd /tmp/publicar && npm ci && rm -f .env
-> ```
->
-> O `rm -f .env` não é zelo: o `.env` das máquinas de desenvolvimento não é igual ao da
-> Vercel, e um build local com ele publicaria variável ausente ou velha **sem nenhum erro
-> aparecer**.
+Serve para republicar sem commit novo — por exemplo, quando a publicação automática falha e
+você quer tentar de novo sem sujar o histórico. **Não use como rotina**, e nunca use quando
+outra sessão estiver codando na pasta: o `vercel --prod` manda o **disco**, não o commitado,
+e sobe junto o que a outra sessão deixou pela metade. Aconteceu em 24/08/2026.
+
+Quando precisar mesmo, publique de uma cópia limpa do commitado:
+
+```sh
+git archive HEAD | tar -x -C /tmp/publicar    # só o commitado, sem .git
+```
+
+E **apague o `.env`** antes de mandar: o das máquinas de desenvolvimento não é igual ao da
+Vercel, e um build com ele publicaria variável ausente ou velha **sem nenhum erro aparecer**.
+
+Na cópia limpa não existe o vínculo `.vercel` (ele é ignorado pelo git). Recrie apontando para
+o projeto que JÁ EXISTE, senão o CLI deduz pelo nome da pasta e cria um projeto novo — a
+armadilha que perde domínio, variáveis e histórico:
+
+```
+.vercel/project.json
+{"projectId":"prj_ljqQNZgO85fZyKJOoP5lqCw39pnn","orgId":"team_NaSoZXQeqdu96E4KMeIPDqkI"}
+```
+
+### Como conferir se uma publicação saiu
+
+Não confie em ter rodado o comando — o CLI já reportou `ECONNRESET` em 26/08/2026 numa
+publicação que **tinha concluído**. Confira o que está no ar:
+
+```sh
+gh api repos/Repply-Hub/Repply-CRM/commits/<sha>/status --jq '.state, [.statuses[].context]'
+```
+
+Para provar que uma mudança específica chegou, baixe o pedaço de código dela e procure dentro.
+O nome de cada arquivo em `/assets/` carrega o resumo do conteúdo, então ele muda quando o
+conteúdo muda:
+
+```sh
+curl -s https://crm.repplyhub.com.br/ | grep -oE '/assets/index-[^"]+\.js'
+```
 
 ### A Vercel do desenvolvedor anterior — desconectada em 24/08/2026
 
@@ -743,21 +780,9 @@ Até 24/08/2026 cada commit disparava **duas** publicações: a da Repply (`verc
 que serve `crm.repplyhub.com.br`) e uma da conta do desenvolvedor anterior
 (`vercel.com/arthurclimb`), que mantinha uma cópia do CRM no ar.
 
-Conferido em 24/08/2026: o commit mais recente traz **uma só** verificação. A segunda conta
-saiu. Se ela reaparecer entre as verificações de um commit, a ligação voltou — avise o Lucas.
-
-### Quem publica
-
-**Desde 24/08/2026, o assistente publica.** O Lucas autorizou expressamente que o Claude rode
-esse comando sem pedir a cada vez.
-
-> **A autorização por commit (§13) NÃO mudou.** O que caiu foi só a etapa de publicar. Subir
-> código para o `main` continua exigindo o "pode" do Lucas, por commit. São duas travas
-> diferentes e só uma foi removida.
-
-> ⚠️ **Na prática isso depende da permissão da sessão.** Com a trava automática ligada, o
-> `vercel --prod` é recusado antes de rodar. Quando acontecer: **diga ao Lucas e passe o
-> comando para ele**, nunca tente contornar por outro caminho.
+Conferido de novo em 26/08/2026: o commit mais recente traz **uma só** verificação, contexto
+`Vercel`. A segunda conta continua fora. Se aparecerem duas num mesmo commit, a ligação
+voltou — avise o Lucas.
 
 ### O conector da Vercel NÃO substitui o CLI
 
@@ -789,9 +814,14 @@ que originou esta regra — a chave do Google Maps — deixou de existir em 08/2
 mapa passou a ser Leaflet + OpenStreetMap sem chave; a regra continua valendo para as
 variáveis do Supabase e qualquer outra que venha a existir.)
 
-**Função de servidor é outro caminho.** `npx vercel --prod` publica o site. As funções em
-`supabase/functions/` são publicadas no Supabase, à parte. Mexeu numa delas e só publicou o
-site? A versão antiga continua rodando.
+🔴 **Função de servidor é OUTRO caminho, e a publicação automática não a alcança.** O `git
+push` publica o **site**. As funções em `supabase/functions/` vivem no Supabase e sobem à
+parte. Commitar uma delas **não** a coloca no ar, e publicar a função **não** a commita — são
+dois gestos, e esquecer qualquer um deixa código e produção divergentes sem aviso.
+
+Aconteceu em 26/08/2026: o resumo diário rodou cinco versões publicadas no Supabase enquanto o
+repositório tinha só a primeira. Ao mexer numa função, faça as duas coisas e diga qual versão
+do Supabase corresponde ao commit.
 
 ### Primeira vez numa máquina
 
