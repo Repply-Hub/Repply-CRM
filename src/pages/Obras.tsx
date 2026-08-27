@@ -26,7 +26,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import {
   Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon,
   Tag, Table as TableIcon, Plus, Settings2, Filter, ChevronDown, X, Trash2,
-  FileText
+  FileText, Route
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -49,6 +49,10 @@ import { MarcadoresObrasDialog } from '@/components/obras/MarcadoresObrasDialog'
 import { VendasDaObra } from '@/components/obras/VendasDaObra';
 import { HistoricoVisitasObra } from '@/components/obras/HistoricoVisitasObra';
 import { VisitasObrasPainel } from '@/components/obras/VisitasObrasPainel';
+import type { RotaNoMapa } from '@/components/obras/MapaObras';
+import type { RotaDoDia } from '@/lib/rota-do-dia';
+import { useRotaOsrm } from '@/hooks/use-rota-osrm';
+import { distanciaLegivel, duracaoLegivel } from '@/lib/osrm';
 import { ContatosDaObra } from '@/components/obras/ContatosDaObra';
 import { SeletorContatosObra } from '@/components/obras/SeletorContatosObra';
 import { useContatosDaObra, useSalvarContatosDaObra } from '@/hooks/use-obra-contatos';
@@ -193,6 +197,44 @@ export default function Obras() {
   // Abre no MAPA, não na lista (Lucas, 27/08/2026). Quem chega em Obras quer ver onde elas
   // estão; quem procura um cadastro específico usa a busca, que vale nas três abas.
   const [activeTab, setActiveTab] = useState('mapa');
+
+  /**
+   * A rota de visita que está desenhada no mapa, escolhida na aba "Visitas".
+   *
+   * Fica AQUI e não dentro do mapa porque quem escolhe é a outra aba: a página é o único lugar
+   * que enxerga as duas.
+   */
+  const [rotaEscolhida, setRotaEscolhida] = useState<RotaDoDia | null>(null);
+
+  // Só as paradas COM localização vão para o cálculo do trajeto — obra sem coordenada não tem
+  // como entrar numa rota de carro. Quantas ficaram de fora já é dito na aba "Visitas".
+  const pontosDaRota = useMemo(
+    () =>
+      rotaEscolhida?.podeDesenhar
+        ? rotaEscolhida.comPonto.map((p) => ({ lat: p.latitude!, lng: p.longitude! }))
+        : null,
+    [rotaEscolhida],
+  );
+
+  const { data: trajeto, isLoading: buscandoTrajeto, isError: trajetoFalhou } =
+    useRotaOsrm(pontosDaRota);
+
+  const rotaNoMapa: RotaNoMapa | null = useMemo(() => {
+    if (!rotaEscolhida?.podeDesenhar) return null;
+    return {
+      chave: rotaEscolhida.chave,
+      paradas: rotaEscolhida.comPonto.map((p) => ({
+        id: p.id,
+        nome: p.obraNome,
+        lat: p.latitude!,
+        lng: p.longitude!,
+        horario: p.inicio,
+      })),
+      // `undefined` enquanto busca, `null` quando não veio: o traçado cai na linha reta
+      // tracejada nos dois casos, e a barra acima do mapa é quem explica qual é qual.
+      rota: trajetoFalhou ? null : trajeto,
+    };
+  }, [rotaEscolhida, trajeto, trajetoFalhou]);
   // Obra selecionada NA ABA MAPA (cartão flutuante + destaque do pino). Independente do
   // `selectedObra` acima, que abre o Sheet lateral de detalhes. O `focoTick` cresce a cada
   // clique de seleção para o mapa refocar até quando o id clicado é o mesmo (reclicar a
@@ -857,6 +899,42 @@ export default function Obras() {
               altura explícita resolve para "auto" e deixava o conjunto encolhido no rodapé.
               O lg:grid-rows-1 (linha de 1fr) é o que estica painel e mapa na vertical. */}
           <TabsContent value="mapa" className="mt-0 flex-1 min-h-0 data-[state=active]:flex flex-col">
+            {/* Barra da rota. Só existe quando há uma escolhida, e é ela que dá a saída — sem
+                isso a rota ficaria presa no mapa, sem nada dizendo como voltar ao mapa comum. */}
+            {rotaEscolhida && (
+              <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+                <Route className="h-4 w-4 shrink-0 text-primary" />
+                <span className="text-sm font-medium capitalize text-card-foreground">
+                  Rota de {format(rotaEscolhida.data, "EEEE, d 'de' MMM", { locale: ptBR })}
+                </span>
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                  {rotaEscolhida.comPonto.length} paradas
+                  {trajeto
+                    ? ` · ${distanciaLegivel(trajeto.distanciaM)} · cerca de ${duracaoLegivel(trajeto.duracaoS)}`
+                    : ''}
+                </span>
+                {buscandoTrajeto && (
+                  <span className="text-xs text-muted-foreground">calculando o trajeto…</span>
+                )}
+                {trajetoFalhou && (
+                  // Dizer o que a linha reta significa é o que evita a pessoa achar que o
+                  // sistema está mostrando um caminho que não existe.
+                  <span className="text-xs text-muted-foreground">
+                    o serviço de rotas não respondeu — as linhas mostram a ordem das visitas, não
+                    o caminho pelas ruas
+                  </span>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto h-7 px-2 text-xs"
+                  onClick={() => setRotaEscolhida(null)}
+                >
+                  Sair da rota
+                </Button>
+              </div>
+            )}
+
             <div className="flex-1 min-h-0 flex flex-col gap-4 lg:grid lg:grid-cols-[360px_1fr] lg:grid-rows-1">
               <Card className="flex flex-col min-h-0 overflow-hidden max-h-[40dvh] lg:max-h-none p-0">
                 <MapaObrasPainel
@@ -882,6 +960,7 @@ export default function Obras() {
                   onPontoBusca={setPontoBusca}
                   onSelectObra={selecionarObraMapa}
                   onVerDetalhes={(id) => setSelectedObra(obras?.find(o => o.id === id) ?? null)}
+                  rotaNoMapa={rotaNoMapa}
                 />
               </div>
             </div>
@@ -892,6 +971,12 @@ export default function Obras() {
               <VisitasObrasPainel
                 searchTerm={search}
                 onSelectObra={(obraId) => setSelectedObra(obras?.find((o) => o.id === obraId) ?? null)}
+                onVerRotaNoMapa={(rota) => {
+                  setRotaEscolhida(rota);
+                  // Sem trocar de aba, clicar em "Ver no mapa" não faria nada visível — a
+                  // pessoa continuaria olhando a lista de visitas.
+                  setActiveTab('mapa');
+                }}
               />
             </div>
           </TabsContent>

@@ -87,11 +87,27 @@ export interface VisitaObraListagem extends ObraVisita {
   obraId: string;
   nomeObra: string;
   clienteEmpresa: string | null;
+  /**
+   * Onde a obra fica. Nulo quando o serviço de endereço não achou o local — 8 das 82 obras da
+   * MD estão assim em 27/08/2026.
+   *
+   * 🔴 Nulo NÃO pode virar zero em lugar nenhum do caminho: (0, 0) é um ponto de verdade, no
+   * golfo da Guiné, e o trajeto sairia de Natal para o meio do Atlântico sem erro nenhum
+   * aparecer. Quem desenha separa as paradas com ponto das sem ponto, e diz na tela quantas
+   * ficaram de fora.
+   */
+  latitude: number | null;
+  longitude: number | null;
 }
 
 interface EventoVisitaComObraRow extends EventoVisitaRow {
   obra_id: string;
-  obras: { nome_obra: string | null; clientes: { empresa: string | null } | null } | null;
+  obras: {
+    nome_obra: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    clientes: { empresa: string | null } | null;
+  } | null;
 }
 
 /**
@@ -107,7 +123,9 @@ export function useTodasVisitasObras() {
       const { data, error } = await supabase
         .from('eventos')
         .select(
-          'id, grupo_id, user_id, titulo, inicio, fim, dia_inteiro, visita_realizada, visita_observacao, criado_por, obra_id, obras(nome_obra, clientes(empresa))',
+          // `latitude`/`longitude` vêm daqui para o traçado da rota no mapa não precisar de uma
+          // segunda consulta só para descobrir onde cada obra fica.
+          'id, grupo_id, user_id, titulo, inicio, fim, dia_inteiro, visita_realizada, visita_observacao, criado_por, obra_id, obras(nome_obra, latitude, longitude, clientes(empresa))',
         )
         .not('obra_id', 'is', null)
         .order('inicio', { ascending: false });
@@ -125,6 +143,9 @@ export function useTodasVisitasObras() {
         obraId: e.obra_id,
         nomeObra: e.obras?.nome_obra || 'Obra sem nome',
         clienteEmpresa: e.obras?.clientes?.empresa ?? null,
+        // `?? null` e não `|| 0`: ver o comentário do tipo.
+        latitude: e.obras?.latitude ?? null,
+        longitude: e.obras?.longitude ?? null,
       })) as VisitaObraListagem[];
       return dedupPorGrupo(linhas);
     },

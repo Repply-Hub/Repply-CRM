@@ -124,7 +124,12 @@ export function useEnviarCatalogo() {
         qc.invalidateQueries({ queryKey: ['fabricante-arquivos'] });
         // A conversa daquele contato ganhou uma mensagem: sem isto, quem abrir o WhatsApp em
         // seguida veria a lista velha.
-        qc.invalidateQueries({ queryKey: ['wa-conversas'] });
+        //
+        // 🔴 `wa_conversas` com SUBLINHADO. Aqui estava escrito com hífen, e por isso a
+        // atualização nunca chegava: a consulta real da caixa de entrada é
+        // `['wa_conversas']` (use-whatsapp-inbox.ts:195), e chave que não bate simplesmente não
+        // invalida nada — sem erro, sem aviso, sem nada na tela indicando que falhou.
+        qc.invalidateQueries({ queryKey: ['wa_conversas'] });
       }
       void arquivo;
     },

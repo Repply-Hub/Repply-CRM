@@ -1,17 +1,22 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, CheckCircle2, Circle, MapPin, Building2, HardHat } from 'lucide-react';
+import { Loader2, CheckCircle2, Circle, MapPin, Building2, HardHat, Route, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/use-auth';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useTodasVisitasObras, useMarcarVisitaRealizada, type VisitaObraListagem } from '@/hooks/use-obra-visitas';
+import { agruparEmRotasDoDia, type RotaDoDia } from '@/lib/rota-do-dia';
+import { linkDoGoogleMaps, mensagemDaRota } from '@/lib/rota-no-whatsapp';
+import { EnviarRotaDialog } from './EnviarRotaDialog';
 
 interface VisitasObrasPainelProps {
   searchTerm: string;
   onSelectObra: (obraId: string) => void;
+  /** Mostrar o trajeto daquele dia no mapa. Sem isto, os botões de rota não aparecem. */
+  onVerRotaNoMapa?: (rota: RotaDoDia) => void;
 }
 
 /**
@@ -21,13 +26,18 @@ interface VisitasObrasPainelProps {
  * aqui é para quem quer ver a agenda de visitas inteira, não uma obra de
  * cada vez.
  */
-export function VisitasObrasPainel({ searchTerm, onSelectObra }: VisitasObrasPainelProps) {
+export function VisitasObrasPainel({
+  searchTerm,
+  onSelectObra,
+  onVerRotaNoMapa,
+}: VisitasObrasPainelProps) {
   const { profile } = useAuth();
   const { data: visitas, isLoading } = useTodasVisitasObras();
   const { data: usuarios = [] } = useVendedores();
   const marcarRealizada = useMarcarVisitaRealizada();
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [observacaoRascunho, setObservacaoRascunho] = useState('');
+  const [rotaParaEnviar, setRotaParaEnviar] = useState<RotaDoDia | null>(null);
 
   const filtradas = useMemo(() => {
     const lista = visitas ?? [];
@@ -52,6 +62,46 @@ export function VisitasObrasPainel({ searchTerm, onSelectObra }: VisitasObrasPai
     }
     return [...mapa.values()];
   }, [filtradas]);
+
+  /**
+   * As rotas que dá para desenhar, indexadas pelo dia.
+   *
+   * 🔴 SEPARADAS POR PESSOA, e não só por dia. Duas pessoas visitando obras no mesmo dia são
+   * DOIS carros — juntá-las num traçado só desenharia um caminho que ninguém vai fazer, e o
+   * tempo total seria a soma de dois trajetos diferentes. Medido em 27/08/2026: nenhum dia da
+   * base tem visita de duas pessoas, mas a equipe tem 13 pessoas e isso não vai continuar assim.
+   */
+  const rotasPorDia = useMemo(() => {
+    const mapa = new Map<string, RotaDoDia[]>();
+    for (const rota of agruparEmRotasDoDia(
+      filtradas.map((v) => ({
+        id: v.id,
+        obraId: v.obraId,
+        obraNome: v.nomeObra,
+        inicio: new Date(v.inicio),
+        criadoPor: v.criadoPor,
+        latitude: v.latitude,
+        longitude: v.longitude,
+      })),
+    )) {
+      if (!rota.podeDesenhar) continue;
+      const chave = format(rota.data, 'yyyy-MM-dd');
+      const lista = mapa.get(chave);
+      if (lista) lista.push(rota);
+      else mapa.set(chave, [rota]);
+    }
+    return mapa;
+  }, [filtradas]);
+
+  const textoDaRota = (rota: RotaDoDia) => {
+    const paradas = rota.paradas.map((p) => ({
+      nome: p.obraNome,
+      horario: p.inicio,
+      lat: p.latitude,
+      lng: p.longitude,
+    }));
+    return mensagemDaRota({ data: rota.data, paradas, link: linkDoGoogleMaps(paradas) });
+  };
 
   const nomePor = (userId: string) => usuarios.find((u) => u.user_id === userId)?.nome || 'Alguém da equipe';
 
@@ -86,7 +136,13 @@ export function VisitasObrasPainel({ searchTerm, onSelectObra }: VisitasObrasPai
     // Cada dia virou um cartão próprio, e os cartões se arrumam em grade — mesma ideia do
     // drive de catálogos das fábricas. Pedido do Lucas em 27/08/2026.
     <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {porDia.map(({ chave, dia, visitasDoDia }) => (
+      {porDia.map(({ chave, dia, visitasDoDia }) => {
+        const rotasDoDia = rotasPorDia.get(chave) ?? [];
+        // Só nomeia a pessoa quando há mais de uma rota no dia: com uma só, dizer de quem é
+        // seria ruído — é de quem está olhando, quase sempre.
+        const precisaNomear = rotasDoDia.length > 1;
+
+        return (
         <section key={chave} className="rounded-xl border border-border bg-card">
           <header className="flex items-baseline justify-between gap-2 border-b border-border px-4 py-2.5">
             <h3 className="text-sm font-semibold capitalize text-card-foreground">
@@ -96,6 +152,52 @@ export function VisitasObrasPainel({ searchTerm, onSelectObra }: VisitasObrasPai
               {visitasDoDia.length} {visitasDoDia.length === 1 ? 'visita' : 'visitas'}
             </span>
           </header>
+
+          {/* Rota do dia. Só aparece quando há 2+ paradas COM localização: com uma parada só
+              não há trajeto, e sem localização não há o que desenhar. */}
+          {rotasDoDia.length > 0 && (
+            <div className="space-y-1.5 border-b border-border bg-muted/30 px-3 py-2">
+              {rotasDoDia.map((rota) => (
+                <div key={rota.chave} className="flex flex-wrap items-center gap-1.5">
+                  {precisaNomear && (
+                    <span className="mr-auto truncate text-xs text-muted-foreground">
+                      {nomePor(rota.criadoPor ?? '')}
+                    </span>
+                  )}
+                  {onVerRotaNoMapa && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1.5 px-2 text-xs"
+                      onClick={() => onVerRotaNoMapa(rota)}
+                    >
+                      <Route className="h-3.5 w-3.5" />
+                      Ver no mapa
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 px-2 text-xs"
+                    onClick={() => setRotaParaEnviar(rota)}
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    Enviar
+                  </Button>
+                  {rota.semPonto.length > 0 && (
+                    // Dizer o que ficou de fora é o que impede a pessoa de achar que a rota tem
+                    // menos paradas do que ela cadastrou.
+                    <span className="w-full text-[11px] text-muted-foreground">
+                      {rota.semPonto.length}{' '}
+                      {rota.semPonto.length === 1
+                        ? 'obra sem localização fica fora do mapa'
+                        : 'obras sem localização ficam fora do mapa'}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="space-y-3 p-3">
             {visitasDoDia.map((visita) => (
@@ -133,7 +235,15 @@ export function VisitasObrasPainel({ searchTerm, onSelectObra }: VisitasObrasPai
             ))}
           </div>
         </section>
-      ))}
+        );
+      })}
+
+      <EnviarRotaDialog
+        open={!!rotaParaEnviar}
+        onOpenChange={(aberto) => !aberto && setRotaParaEnviar(null)}
+        mensagem={rotaParaEnviar ? textoDaRota(rotaParaEnviar) : ''}
+        totalDeParadas={rotaParaEnviar?.paradas.length ?? 0}
+      />
     </div>
   );
 }
