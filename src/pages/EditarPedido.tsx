@@ -47,6 +47,7 @@ import { CampoCnpj } from '@/components/shared/CampoCnpj';
 import { SeletorMarcadorObra } from '@/components/obras/SeletorMarcadorObra';
 import { validarCnpjDaObra } from '@/lib/obra-cnpj';
 import type { CnpjData } from '@/lib/cnpj';
+import { enderecoDoArquivo } from '@/lib/arquivo-privado';
 
 const DEFAULT_ORIGENS = [
   { value: 'recompra', label: 'Recompra' },
@@ -788,10 +789,13 @@ const EditarPedido = () => {
                             variant="outline"
                             size="sm"
                             className="relative z-10"
-                            onClick={(e) => {
+                            onClick={async (e) => {
                               e.stopPropagation();
-                              const url = repairCorruptedBitrixUrl(pdfUrl);
-                              setPdfPreview({ url, nome: filenameFromUrl(url, 'anexo.pdf') });
+                              const original = repairCorruptedBitrixUrl(pdfUrl);
+                              const nome = filenameFromUrl(original, 'anexo.pdf');
+                              // Assina no clique. O nome sai do endereço ORIGINAL, onde o caminho está
+                              // limpo, sem a assinatura pendurada no fim.
+                              setPdfPreview({ url: (await enderecoDoArquivo(original)) ?? original, nome });
                             }}
                           >
                             Ver PDF

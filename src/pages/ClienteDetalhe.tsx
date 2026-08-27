@@ -38,10 +38,10 @@ import { ColumnSettings, type ColumnDefinition } from '@/components/shared/Colum
 import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
 import { parseMoedaBRL } from '@/lib/moeda';
 import { useTableSettings } from '@/hooks/use-table-settings';
-import { repairCorruptedBitrixUrl } from '@/lib/repair-bitrix-url';
 import { CargoSelect } from '@/components/shared/CargoSelect';
 import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEmailDialog';
 import { slugify } from '@/lib/utils';
+import { LinkAnexoPrivado } from '@/components/shared/LinkAnexoPrivado';
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
 const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física', condominio: 'Condomínio', hospital: 'Hospital', distribuidor: 'Distribuidor', hotel: 'Hotel', escola: 'Escola', instalador: 'Instalador' };
@@ -747,14 +747,7 @@ const ClienteDetalhe = () => {
         return (
           <TableCell key={colId} onClick={e => e.stopPropagation()}>
             {p.pdf_url ? (
-              <a
-                href={repairCorruptedBitrixUrl(p.pdf_url)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-primary hover:underline"
-              >
-                <FileText className="h-3.5 w-3.5" /> PDF
-              </a>
+              <LinkAnexoPrivado url={p.pdf_url} />
             ) : '—'}
           </TableCell>
         );

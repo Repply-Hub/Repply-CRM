@@ -69,6 +69,8 @@ import { repairCorruptedBitrixUrl } from '@/lib/repair-bitrix-url';
 import { filenameFromUrl } from '@/lib/download-file';
 import { FilePreviewDialog, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
 import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
+import { LinkAnexoPrivado } from '@/components/shared/LinkAnexoPrivado';
+import { enderecoDoArquivo } from '@/lib/arquivo-privado';
 
 const ImportPedidosDialog = lazy(() =>
   import('@/components/pedidos/ImportPedidosDialog').then(m => ({ default: m.ImportPedidosDialog }))
@@ -315,14 +317,7 @@ const PedidoRow = memo(({
           return (
             <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5" onClick={e => e.stopPropagation()}>
               {pedido.pdf_url ? (
-                <a
-                  href={repairCorruptedBitrixUrl(pedido.pdf_url)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-primary hover:underline"
-                >
-                  <FileText className="h-3.5 w-3.5" /> PDF
-                </a>
+                <LinkAnexoPrivado url={pedido.pdf_url} />
               ) : '—'}
             </TableCell>
           );
@@ -373,14 +368,7 @@ const PedidoRow = memo(({
             return (
               <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5" onClick={e => e.stopPropagation()}>
                 {pedido.pdf_url ? (
-                  <a
-                    href={repairCorruptedBitrixUrl(pedido.pdf_url)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-primary hover:underline"
-                  >
-                    <FileText className="h-3.5 w-3.5" /> PDF
-                  </a>
+                  <LinkAnexoPrivado url={pedido.pdf_url} />
                 ) : '—'}
               </TableCell>
             );
@@ -1637,6 +1625,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         data_pedido: p => p.data_pedido ?? '',
         prazo_resposta: p => p.prazo_resposta ?? '',
         observacoes: p => p.observacoes ?? '',
+        // 🔴 NÃO ASSINE ESTE ENDEREÇO. Vai o valor gravado, cru, de propósito.
+        //
+        // Os cabeçalhos desta planilha são os mesmos que o assistente de importação
+        // reconhece — é isso que deixa exportar, ajustar no Excel e reimportar. E a
+        // importação GRAVA de volta em `pedidos.pdf_url` o que encontrar aqui
+        // (`resolve-pedido-pdf.ts`: endereço que não é do Bitrix passa intacto).
+        // Exportar um link assinado plantaria no banco, para sempre, um endereço que
+        // morre em uma hora — e ninguém veria, porque a importação não reclama.
+        //
+        // Consequência aceita: quando o balde fechar (Passo 7), este endereço deixa de
+        // abrir para quem receber a planilha. É o objetivo, não um efeito colateral —
+        // hoje qualquer pessoa com a planilha na mão baixa o orçamento sem estar logada.
+        // A ida e volta exportar → editar → reimportar continua funcionando.
         pdf_url: p => p.pdf_url ?? '',
       };
 
@@ -2226,9 +2227,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   </p>
                   <button
                     type="button"
-                    onClick={() => {
-                      const url = repairCorruptedBitrixUrl(selectedViewOrder.pdf_url);
-                      setPdfPreview({ url, nome: filenameFromUrl(url, 'anexo.pdf') });
+                    onClick={async () => {
+                      const original = repairCorruptedBitrixUrl(selectedViewOrder.pdf_url);
+                      const nome = filenameFromUrl(original, 'anexo.pdf');
+                      // Assina no clique, não ao desenhar a lista: só paga pelo anexo que alguém
+                      // de fato abre. O nome sai do endereço ORIGINAL, onde o caminho está limpo.
+                      setPdfPreview({ url: (await enderecoDoArquivo(original)) ?? original, nome });
                     }}
                     className="inline-flex items-center gap-2 p-2.5 rounded-lg border bg-muted/30 text-sm font-medium text-primary hover:underline w-fit"
                   >

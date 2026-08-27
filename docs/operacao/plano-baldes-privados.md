@@ -444,6 +444,45 @@ de assinatura aqui é INVISÍVEL — a imagem aparece do mesmo jeito, pelo ender
 isso o contador foi exposto no console do navegador: **F12 → `quedasDeArquivo.ver()`**. Precisa
 devolver vazio depois de alguém usar o chat de verdade.
 
+#### 2.2 — Anexos de negócio: FEITO em 26/08/2026
+
+**Três coisas que a §4.2 deste plano dizia errado**, corrigidas por leitura do código:
+
+| O plano dizia | O código diz |
+|---|---|
+| `KanbanCard.tsx:149` — link do anexo | **Não há link.** O cartão só escreve "Anexo disponível". Nada a mudar |
+| `Negocios.tsx:1173` — exportação | **Não é exportação.** É a validação de campo obrigatório ao arrastar entre etapas; só testa se está preenchido |
+| Exportação: recomendado exportar link da tela do CRM | **Isso quebraria a planilha.** Ver abaixo |
+
+**O que foi trocado (5 pontos, 4 arquivos):** os quatro links viraram `<LinkAnexoPrivado>`
+(coluna "Anexo" e o alias legado `pdf_url` da lista de Negócios, a lista dentro da ficha do
+cliente, e a prévia da importação), e os dois botões "Ver PDF" assinam NO CLIQUE — ali vale a
+pena, porque o visualizador abre dentro do app e só se paga pelo anexo que alguém abre.
+
+O reparo de endereço corrompido do Bitrix roda ANTES da assinatura. A ordem importa: extrair
+caminho de um endereço quebrado não acharia arquivo nenhum.
+
+##### 🔴 A exportação NÃO assina, e isso é decisão, não esquecimento
+
+Os cabeçalhos da planilha exportada são os mesmos que o assistente de importação reconhece —
+de propósito, para deixar exportar, ajustar no Excel e reimportar. E a importação **grava de
+volta em `pedidos.pdf_url` o que encontrar na coluna** (`resolve-pedido-pdf.ts`: endereço que
+não é do Bitrix passa intacto).
+
+Logo, exportar link assinado **plantaria no banco, de forma permanente, endereços que morrem
+em uma hora** — e ninguém veria, porque a importação não reclama. A recomendação (a) do §6.1
+(exportar link para a tela do CRM) tem o mesmo defeito por outro caminho: a reimportação
+gravaria o endereço de uma PÁGINA como se fosse o anexo.
+
+**Decisão: a exportação continua levando o valor gravado, cru.** A ida e volta segue
+funcionando. A consequência, que precisa ser avisada à equipe antes do Passo 7: **quem receber
+a planilha deixa de conseguir abrir o PDF.** Hoje qualquer pessoa com a planilha na mão baixa
+o orçamento sem estar logada — o fim disso é o objetivo do projeto, não um efeito colateral.
+
+**Medido antes de subir:** 5.179 negócios com anexo — 5.175 no nosso armazenamento, **todos os
+5.175 encontram um objeto real, zero órfãos**; 4 externos (CDN do Bitrix) que passam intactos.
+258 testes passando; tipo em 35 e lint sem subir em nenhum dos 4 arquivos.
+
 ### Passo 3 — WhatsApp: assinar o link antes de entregar à operadora
 
 **O que faz.** Em `supabase/functions/whatsapp-send/index.ts`, antes de montar o corpo do POST
