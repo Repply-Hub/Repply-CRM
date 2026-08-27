@@ -5,6 +5,7 @@ import { erroLegivelDaFunction } from '@/lib/erro-edge-function';
 import { normalizeWhatsappPhone } from '@/hooks/use-whatsapp-inbox';
 import { BALDE, type ArquivoDaFabrica } from '@/hooks/use-fabricante-arquivos';
 import type { MotivoDeRecusa } from '@/lib/recusa-de-envio';
+import type { DestinoWhatsApp } from '@/lib/destinos-whatsapp';
 
 /**
  * Mandar um catálogo pelo WhatsApp, respeitando as travas contra banimento.
@@ -30,21 +31,36 @@ export interface ResultadoDoEnvio {
 
 export interface PedidoDeEnvio {
   arquivo: ArquivoDaFabrica;
-  contatoId: string;
-  telefone: string;
-  nomeDoContato: string;
+  /**
+   * Para quem vai: contato do cadastro OU conversa já aberta.
+   *
+   * 🔴 Desde 27/08/2026 as duas coisas cabem aqui, e o tratamento do TELEFONE difere entre
+   * elas — ver o comentário dentro da mutação.
+   */
+  destino: DestinoWhatsApp;
 }
 
 export function useEnviarCatalogo() {
   const qc = useQueryClient();
 
   return useMutation<ResultadoDoEnvio, Error, PedidoDeEnvio>({
-    mutationFn: async ({ arquivo, contatoId, telefone }) => {
-      // 🔴 O nono dígito NÃO é forçado. Enfiá-lo em qualquer número de 10 dígitos quebra os
-      // telefones FIXOS que têm WhatsApp — e isso já respondeu por 100% das falhas de envio
-      // deste sistema, com um cliente real de fixo (84) 2030-0387. CLAUDE.md §7.1.
-      const numero = normalizeWhatsappPhone(telefone);
-      if (!numero) throw new Error('Contato sem telefone válido.');
+    mutationFn: async ({ arquivo, destino }) => {
+      // 🔴 DUAS ORIGENS, DOIS TRATAMENTOS — e confundi-los estraga em silêncio.
+      //
+      // CONTATO do cadastro: o número foi DIGITADO por gente, vem em formatos variados
+      // ("(84) 99988-7766", "84 3232-1010"), e precisa ser arrumado. O nono dígito NÃO é
+      // forçado: enfiá-lo em qualquer número de 10 dígitos quebra os telefones FIXOS que têm
+      // WhatsApp — já respondeu por 100% das falhas de envio deste sistema, com um cliente real
+      // de fixo (84) 2030-0387 (CLAUDE.md §7.1).
+      //
+      // CONVERSA já aberta: o destino é o que o WhatsApp devolveu, e vai LITERAL. O
+      // identificador de grupo antigo tem hífen (`5511988345626-1425926780`), e
+      // `normalizeWhatsappPhone` limpa não-dígitos — o hífen morre, o destino deixa de existir,
+      // a uazapi responde SUCESSO e não entrega nada. A tela diria "enviado" e o cliente nunca
+      // receberia (CLAUDE.md §7.2). Quem decide se é grupo é o servidor, em `whatsapp-send`.
+      const numero =
+        destino.origem === 'conversa' ? destino.telefone : normalizeWhatsappPhone(destino.telefone);
+      if (!numero) throw new Error('Este destino está sem número de WhatsApp válido.');
 
       // ── 1. Reservar a vaga ────────────────────────────────────────────────
       //
@@ -53,7 +69,10 @@ export function useEnviarCatalogo() {
       // envio que não aconteceu.
       const { data, error } = await supabase.rpc('reservar_envio_de_catalogo' as never, {
         p_arquivo_id: arquivo.id,
-        p_contato_id: contatoId,
+        // Nulo para conversa sem cadastro — que hoje são as 779. Desde 27/08/2026 a trava de
+        // repetição sabe usar o telefone nesse caso; antes ela tratava todas as conversas como
+        // a mesma pessoa e recusava o segundo envio dizendo que já tinha mandado.
+        p_contato_id: destino.contatoId,
         p_telefone: numero,
       } as never);
       if (error) throw error;

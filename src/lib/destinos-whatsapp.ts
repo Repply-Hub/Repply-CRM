@@ -46,6 +46,15 @@ export interface DestinoWhatsApp {
   telefone: string;
   /** O contato do CRM, quando existe. Nulo para conversa sem cadastro — que hoje são todas. */
   contatoId: string | null;
+  /**
+   * A conversa de WhatsApp, quando o destino veio de uma.
+   *
+   * 🔴 É o ÚNICO jeito de abrir a conversa certa depois. A caixa de entrada seleciona a conversa
+   * por `?conversaId=` (WhatsAppInbox.tsx:3876) — `?telefone=` não é lido por ninguém, e um
+   * botão "ver na conversa" montado com ele abre o WhatsApp na tela padrão, sem nada
+   * acontecendo, como se o clique tivesse falhado.
+   */
+  conversaId: string | null;
   ehGrupo: boolean;
 }
 
@@ -115,6 +124,7 @@ export function montarDestinos(
       // 🔴 O telefone é o da CONVERSA, literal: é o destino que já está funcionando.
       telefone: conversa.telefone,
       contatoId: doCadastro?.id ?? null,
+      conversaId: conversa.id,
       ehGrupo: !!conversa.is_group,
     });
   }
@@ -132,6 +142,8 @@ export function montarDestinos(
       detalhe: contato.empresa,
       telefone: contato.telefone,
       contatoId: contato.id,
+      // Contato do cadastro pode nem ter conversa aberta ainda — quem mandar cria a primeira.
+      conversaId: null,
       ehGrupo: false,
     });
   }

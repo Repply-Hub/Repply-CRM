@@ -66,6 +66,21 @@ describe('montarDestinos', () => {
     expect(r).toEqual([]);
   });
 
+  it('🔴 a conversa carrega o ID DELA, senão não dá para abri-la depois', () => {
+    // A caixa de entrada seleciona a conversa por `?conversaId=` (WhatsAppInbox.tsx:3876).
+    // Um botão "ver na conversa" sem este id abre o WhatsApp na tela padrão, sem nada
+    // acontecendo — como se o clique tivesse falhado.
+    const r = montarDestinos(CONTATOS, CONVERSAS);
+    const daConversa = r.find((d) => d.origem === 'conversa')!;
+    expect(daConversa.conversaId).toBeTruthy();
+  });
+
+  it('contato do cadastro não inventa conversa que não existe', () => {
+    // Ele pode nunca ter recebido mensagem: quem mandar é que cria a primeira conversa.
+    const r = montarDestinos(CONTATOS, []);
+    expect(r.every((d) => d.conversaId === null)).toBe(true);
+  });
+
   it('cada linha tem chave própria, para a tela não embaralhar', () => {
     const r = montarDestinos(CONTATOS, CONVERSAS);
     expect(new Set(r.map((d) => d.chave)).size).toBe(r.length);
