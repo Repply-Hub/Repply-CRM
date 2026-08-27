@@ -696,7 +696,20 @@ export default function Obras() {
                 </div>
                 
                 <div className="rounded-lg border border-border/60 overflow-auto bg-card flex-1 min-h-0">
-                  <table className="w-full text-sm table-fixed" style={{ width: obrasTableTotalWidth }}>
+                  {/* 🔴 `minWidth: '100%'` — as colunas repartem o espaço que sobra.
+                      A largura em pixels continua sendo a soma das colunas (é ela que faz o
+                      redimensionar de coluna funcionar), mas o `min-width` obriga a tabela a
+                      ocupar a caixa inteira quando essa soma é MENOR que a tela. O navegador
+                      distribui a sobra entre as colunas, na proporção da largura de cada uma.
+
+                      Antes de 26/08/2026 só havia o `width`, e a tabela parava na soma. Medido
+                      no navegador com as larguras reais desta tela: caixa de 1.770px, tabela de
+                      1.457px — 313px de branco à direita. Com o `min-width` a tabela vai a
+                      1.770 e cada coluna cresce cerca de 21%.
+
+                      Quando a soma PASSA da largura da tela — a tabela de Clientes tem 17
+                      colunas — o `min-width` não faz nada e a tabela rola como sempre rolou. */}
+                  <table className="text-sm table-fixed" style={{ width: obrasTableTotalWidth, minWidth: '100%' }}>
                     <colgroup>
                       <col style={{ width: OBRAS_CHECKBOX_COL_WIDTH }} />
                       {visibleColumns.map((colId, i) => (
