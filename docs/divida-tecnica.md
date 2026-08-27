@@ -48,6 +48,7 @@ acrescentados em 21/08/2026.
 | 31 | [Exceções da seleção em massa viajam na URL](#31-a-lista-de-exceções-da-seleção-em-massa-viaja-na-url-e-trava-em-800) | Média | Trava a operação acima de ~800 e não explica por quê |
 | 32 | [Cópia sem uso da chave do Resend no Vault](#32-cópia-sem-uso-da-chave-do-resend-no-vault) | Baixa | Não — higiene de credencial |
 | 33 | [O WhatsApp não tem contagem de envio nenhuma](#33-o-whatsapp-não-tem-contagem-de-envio-nenhuma) | **Alta** | Não hoje — mas um número da MD é compartilhado por 13 pessoas, sem trava |
+| 34 | [A etapa da configuração não é verificada contra a tela](#34-a-etapa-gravada-na-configuração-não-é-verificada-contra-a-tela) | Média | Já travou o Novo Negócio 3 vezes — campo obrigatório sem onde preencher |
 
 ---
 
@@ -1310,6 +1311,65 @@ O mecanismo desenhado para o catálogo serve inteiro:
 3. Dois tetos: por número (o que protege o ativo) e por pessoa (o que limita abuso)
 4. A mensagem de recusa diz **quando libera** e **de quem é o limite** — aviso sem horário faz a
    pessoa clicar de novo, e "você atingiu seu limite" para quem mandou duas mensagens parece bug
+
+---
+
+## 34. A etapa gravada na configuração não é verificada contra a tela
+
+**Gravidade: média. Já travou o assistente de Novo Negócio TRÊS vezes.**
+
+A aba **Campos** das Configurações deixa cada empresa marcar um campo como obrigatório e
+dizer em que **etapa** do assistente ele vive (`configuracoes_campos.etapa`). A tela, por
+outro lado, decide onde desenhar cada campo **no código**.
+
+🔴 **Nada liga as duas coisas.** Elas combinam por acordo tácito, e quando desencontram o
+resultado é sempre o mesmo: **um campo obrigatório sem lugar onde ser preenchido**. O botão
+some, sem mensagem, e não há como sair do passo.
+
+### As três vezes
+
+| quando | o quê | como foi resolvido |
+|---|---|---|
+| antes de 08/2026 | `proximo_contato` saiu da tela; a linha de configuração ficou | exceção escrita à mão em `NovoNegocioDialog` |
+| — | `obra_id` não é desenhado quando a seção Obras está desligada | segunda exceção à mão |
+| **26/08/2026** | `anexo_pdf` foi movido para o passo 2; a configuração continuou dizendo passo 1 | migration `20260826234500`, e mais dois consertos no código (commit `841c7d63`) |
+
+O terceiro caso mostra por que exceção à mão não é conserto: o campo **existia** e **devia**
+continuar obrigatório — só tinha mudado de passo. Uma exceção teria escondido o problema em
+vez de alinhar as duas verdades.
+
+E ele veio acompanhado de dois defeitos DORMENTES que a mudança acordou: o botão "Próximo" e o
+`handleNext` exigiam o passo 2 completo para sair do passo 1. Eram inofensivos enquanto o
+passo 2 não tinha campo obrigatório nenhum.
+
+### O estado hoje: consistente, mas sem rede
+
+Medido em 26/08/2026, depois dos consertos — as 12 chaves configuradas são todas conhecidas
+pelo código, e cada uma é desenhada no passo que a configuração declara:
+
+```
+obrigatórios do PASSO 1 ... cliente_id, data_pedido, fabricante_id, vendedor_id
+obrigatórios do PASSO 2 ... anexo_pdf
+```
+
+**Não há incêndio aberto.** O que não existe é o que impede o próximo desencontro — e ele vem
+de graça no dia em que alguém mover um campo de passo, esconder um por seção, ou acrescentar
+uma chave em `configuracoes_campos` que a tela não conhece.
+
+### O conserto, por ordem de custo
+
+1. **Uma fonte só para "que campo vive em que passo".** Hoje isso está em dois lugares: a
+   ordem do JSX e a coluna `etapa`. Declarar um mapa em código e usá-lo tanto para desenhar
+   quanto para validar acaba com a classe inteira de bug — as duas verdades viram uma.
+2. **Um aviso em desenvolvimento** quando chega configuração com `campo_key` que o mapa não
+   conhece. Barato, e transforma "o botão não habilita" em "este campo não existe na tela".
+3. **Enquanto nenhum dos dois existir:** ao mover um campo de passo, mover a linha de
+   `configuracoes_campos` na MESMA entrega, e conferir com
+
+   ```sql
+   select campo_key, etapa, bool_or(obrigatorio) from configuracoes_campos
+    where entidade = 'pedidos' and origem = 'padrao' group by 1,2 order by 1;
+   ```
 
 ---
 
