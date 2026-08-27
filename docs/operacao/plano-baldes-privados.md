@@ -410,7 +410,9 @@ gravado direto. Ordem sugerida, do menor risco ao maior:
    `KanbanCard.tsx`, `ImportPedidosDialog.tsx`) — inclui a decisão sobre a exportação (§6.1).
 3. **Caixa do WhatsApp** (`WhatsAppInbox.tsx`, 11 pontos) — o mais delicado: imagem, áudio,
    vídeo, documento, galeria e download, tudo na mesma tela.
-4. **Fotos de perfil** — só se `avatars` for fechar; ver §8.
+4. ~~**Fotos de perfil**~~ — **não entra.** A §8 decide manter `avatars` público, e a
+   foto de perfil do contato do WhatsApp nem é nossa (as 650 são do `whatsapp.net`).
+   **Com isso o Passo 2 está COMPLETO em 26/08/2026.**
 
 **Verificar, módulo a módulo:** abrir a tela e conferir que **tudo que aparecia antes continua
 aparecendo**. Como os baldes ainda estão públicos, um erro aqui é invisível — por isso o
@@ -536,6 +538,30 @@ mídia pelo CRM para de funcionar.**
 > Fica registrado: mesmo assinado, o link entregue à operadora é um endereço sem senha durante
 > os minutos de validade. Isso é inerente — a operadora precisa baixar o arquivo. O ganho é que
 > o endereço morre em minutos, em vez de valer para sempre.
+
+#### Passo 3 — ESCRITO em 26/08/2026, **ainda não publicado**
+
+`supabase/functions/_shared/arquivo-privado.ts` (novo) e uma linha em `whatsapp-send`:
+`file: media_url` virou `file: await enderecoParaQuemBaixaDeFora(supabase, media_url)`.
+
+**Validade de 30 minutos, não os 10 sugeridos.** A operadora baixa em segundos, mas se a fila
+dela atrasar um link vencido faz a mensagem **não chegar em silêncio** — ela responde 200 do
+mesmo jeito. Vinte minutos a mais num endereço que ninguém tem é um preço baixo perto de um
+envio perdido sem aviso.
+
+⚠️ **A cópia do extrator é gêmea de `src/lib/arquivo-privado.ts` e não dá para importar aquele
+aqui** (isto roda em Deno, fora do projeto do navegador) — mesma situação de
+`normalizeWhatsappPhone`, e o `CLAUDE.md` §7.1 registra o estrago quando as duas divergem.
+**Conferido na hora de escrever: o corpo executável é byte a byte idêntico** (512 caracteres
+dos dois lados, ignorando comentário, tipo e vírgula final), então os 8 testes de
+`arquivo-privado.test.ts` valem para os dois.
+
+`whatsapp_mensagens.media_url` continua gravando o endereço CRU. O banco guarda o
+identificador durável; quem assina é a tela, na hora de mostrar.
+
+🔴 **A verificação deste passo não pode ser feita por quem escreveu o código:** exige mandar
+uma imagem, um áudio, um vídeo e um PDF pela tela e confirmar que chegaram no celular. Não há
+como testar isso sem enviar mensagem de verdade para uma pessoa de verdade.
 
 ### Passo 4 — Dividir `email-assets`
 
