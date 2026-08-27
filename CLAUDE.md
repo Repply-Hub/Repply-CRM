@@ -547,6 +547,9 @@ Além disso, conforme o que mudou:
 - ❌ Chamar este produto de "Imob"
 - ❌ Commitar ou enviar qualquer coisa **sem autorização do Lucas** (ver §13)
 - ❌ Commitar sem antes rodar `git fetch` e conferir se entrou commit de outra pessoa
+- ❌ `git add -A` (§13) — outra sessão trabalha nesta pasta; liste os arquivos um a um
+- ❌ Restaurar arquivo do projeto de um backup seu (§13) — apaga o que a outra sessão
+  escreveu nele, e o `git status` mostra só um `M` igual a qualquer alteração sua
 
 ---
 
@@ -606,8 +609,19 @@ código no `main`. Antes de commitar:
 ```sh
 git fetch origin
 git log --oneline HEAD..origin/main    # vazio = nada novo
-git status --short                      # vazio = área limpa
+git status --short                      # a fila INTEIRA. Algo que não é seu? Pare
 ```
+
+> 🔴 **O `git fetch` não é formalidade: as sessões NÃO compartilham o mesmo ponteiro.** Outra
+> sessão pode ter commitado e enviado sem que o seu `HEAD` tenha andado — e aí você está
+> escrevendo sobre uma base velha sem saber.
+>
+> Medido em 26/08/2026: quatro commits da outra sessão entraram no meio de uma tarefa, em
+> arquivos que esta sessão também tocava. O sintoma quando isso acontece é enganoso — os tipos
+> pularam de 35 para 40 e o build quebrou, porque um arquivo puxado do commit novo referenciava
+> componentes que ainda não existiam nesta árvore.
+>
+> **Puxe ANTES de aplicar, nunca depois.**
 
 **3. Avaliar conflito.** Se apareceu commit novo, veja se ele toca os mesmos arquivos que
 você. Se tocar, **pare e avise o Lucas antes de tentar juntar** — não resolva conflito em
@@ -619,6 +633,27 @@ produção por conta própria.
 > arquivos um a um, e confira a fila (`git status --short`) num comando SEPARADO do commit
 > — arquivo que a outra sessão já deixou estagiado entra no seu commit mesmo sem você ter
 > adicionado. Já aconteceu duas vezes.
+
+> 🔴 **Nunca restaure arquivo compartilhado de backup privado.** Copiar um `.bak` que você
+> fez "para poder voltar atrás" por cima de um arquivo do projeto APAGA o que a outra sessão
+> escreveu nele nesse meio-tempo — e o `git status` mostra só um `M`, igual a qualquer outra
+> alteração sua.
+>
+> Aconteceu em 26/08/2026: um backup de `Obras.tsx`, feito minutos antes, desfez a
+> funcionalidade de vincular contatos à obra que a outra sessão acabara de entregar. Foi
+> pego ao conferir a fila antes do commit, e só não virou perda porque o trabalho dela já
+> estava commitado.
+>
+> Para desfazer o SEU trabalho, use o git, que sabe o que é seu e o que não é:
+>
+> ```sh
+> git diff arquivo.tsx            # veja o que você mudou, antes de descartar
+> git checkout HEAD -- arquivo.tsx  # volta ao commitado, preservando o de todo mundo
+> ```
+>
+> E se precisar mesmo de um arquivo de outro commit, **puxe o commit inteiro** (`git pull
+> --rebase`), nunca um arquivo solto: arquivo novo costuma depender de outros que vieram
+> junto, e sozinho ele só quebra a compilação.
 
 ```sh
 git status --short                      # a fila INTEIRA. Algo que não é seu? Pare.

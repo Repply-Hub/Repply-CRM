@@ -1,0 +1,214 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, FolderOpen, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { FilePreviewDialog, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
+import { supabase } from '@/integrations/supabase/client';
+import { enderecoDoObjeto } from '@/lib/arquivo-privado';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
+import { useIsGestor } from '@/hooks/use-novo-pedido';
+import { useMinhaPermissao } from '@/hooks/use-minha-permissao';
+import {
+  useArquivosDaFabrica, useExcluirArquivo, BALDE,
+  type ArquivoDaFabrica,
+} from '@/hooks/use-fabricante-arquivos';
+import { CartaoDeArquivo } from './CartaoDeArquivo';
+import { AnexarArquivoDialog } from './AnexarArquivoDialog';
+import { EnviarCatalogoDialog } from './EnviarCatalogoDialog';
+import { useQuery } from '@tanstack/react-query';
+
+/**
+ * O drive de catálogos da fábrica — a grade de cartões dentro da ficha do fabricante.
+ *
+ * Substitui o cartão "Catálogo de Produtos", removido em 26/08/2026 junto com o módulo de
+ * cadastro de produto (commit acbcb415), que nunca teve dado real em nenhuma empresa.
+ *
+ * Desenho: docs/superpowers/specs/2026-08-26-drive-de-catalogos-design.md
+ *
+ * 🔴 O BALDE É PRIVADO. Nenhum endereço daqui existe sem assinatura, e a assinatura vence.
+ * Por isso os links são pedidos ao montar a lista e refeitos quando a lista muda — nunca
+ * guardados no banco nem montados à mão.
+ */
+
+interface Props {
+  fabricanteId: string;
+  empresaId: string;
+}
+
+export function DriveDaFabrica({ fabricanteId }: Props) {
+  const { data: arquivos, isLoading } = useArquivosDaFabrica(fabricanteId);
+  const excluir = useExcluirArquivo();
+  const { data: isGestor } = useIsGestor();
+  const { permitido: temPermissaoExcluir } = useMinhaPermissao('fabricantes', 'excluir');
+  const podeExcluir = !!isGestor || temPermissaoExcluir;
+
+  const [anexarAberto, setAnexarAberto] = useState(false);
+  const [previa, setPrevia] = useState<FilePreviewTarget | null>(null);
+  const [aExcluir, setAExcluir] = useState<ArquivoDaFabrica | null>(null);
+  const [capas, setCapas] = useState<Record<string, string>>({});
+  const [aEnviar, setAEnviar] = useState<ArquivoDaFabrica | null>(null);
+
+  // O botão de enviar só existe para quem tem WhatsApp vinculado. É a MESMA consulta que a
+  // função de servidor faz para descobrir de qual número o envio sai — se ela não achar
+  // nada, o envio seria recusado com "seu WhatsApp não está vinculado", e mostrar um botão
+  // que só serve para dar esse recado é pior que não mostrar botão.
+  const { data: temWhatsapp } = useQuery({
+    queryKey: ['tem-whatsapp-vinculado'],
+    queryFn: async () => {
+      const { data: sessao } = await supabase.auth.getUser();
+      if (!sessao?.user) return false;
+      const { count } = await supabase
+        .from('wapi_instancia_usuarios')
+        .select('instancia_id', { count: 'exact', head: true })
+        .eq('usuario_auth_id', sessao.user.id);
+      return (count ?? 0) > 0;
+    },
+  });
+
+  // As capas, TODAS DE UMA VEZ. Pedir uma assinatura por cartão faria vinte chamadas em
+  // paralelo cada vez que alguém abrisse uma fábrica.
+  const comCapa = useMemo(
+    () => (arquivos ?? []).filter((a) => a.capa_caminho),
+    [arquivos],
+  );
+
+  useEffect(() => {
+    let vivo = true;
+    if (comCapa.length === 0) { setCapas({}); return; }
+    void (async () => {
+      const pares = await Promise.all(
+        comCapa.map(async (a) => [a.id, await enderecoDoObjeto(BALDE, a.capa_caminho!)] as const),
+      );
+      if (!vivo) return;
+      // Assinatura que falhou entra como ausente: o cartão mostra o ícone do formato. Uma
+      // imagem quebrada seria pior que nenhuma imagem.
+      setCapas(Object.fromEntries(pares.filter(([, url]) => !!url) as [string, string][]));
+    })();
+    return () => { vivo = false; };
+  }, [comCapa]);
+
+  const abrirPrevia = async (a: ArquivoDaFabrica) => {
+    const url = await enderecoDoObjeto(BALDE, a.caminho);
+    if (!url) { toast.error('Não foi possível abrir este arquivo agora. Tente de novo.'); return; }
+    setPrevia({ url, nome: a.nome, mime: a.mime });
+  };
+
+  const baixar = async (a: ArquivoDaFabrica) => {
+    const url = await enderecoDoObjeto(BALDE, a.caminho);
+    if (!url) { toast.error('Não foi possível baixar este arquivo agora. Tente de novo.'); return; }
+    // `window.open` e não `<a download>`: o endereço assinado é de outro domínio, e o atributo
+    // `download` é ignorado entre domínios — o arquivo abriria na aba em vez de baixar.
+    window.open(url, '_blank', 'noopener');
+  };
+
+  const confirmarExclusao = async () => {
+    if (!aExcluir) return;
+    try {
+      await excluir.mutateAsync({ ...aExcluir, fabricanteId });
+      toast.success('Arquivo excluído.');
+      setAExcluir(null);
+    } catch (e) {
+      toast.error(`Não foi possível excluir: ${mensagemDeErro(e)}`);
+    }
+  };
+
+  return (
+    <div className="flex flex-1 flex-col min-h-0 rounded-xl border border-border bg-card">
+      <div className="flex flex-none flex-wrap items-center justify-between gap-3 border-b border-border p-4">
+        <div className="min-w-0">
+          <h3 className="flex items-center gap-2 text-base font-bold text-card-foreground">
+            <FolderOpen className="h-4 w-4 shrink-0 text-primary" />
+            Catálogos, folders e materiais
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Visível para toda a equipe. A edição mais nova aparece primeiro.
+          </p>
+        </div>
+        <Button size="sm" className="gap-1.5" onClick={() => setAnexarAberto(true)}>
+          <Plus className="h-4 w-4" /> Anexar
+        </Button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {isLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-56 w-full rounded-xl" />)}
+          </div>
+        ) : (arquivos ?? []).length === 0 ? (
+          // O vazio CONVIDA. Espaço em branco onde havia conteúdo lê-se como "quebrou".
+          <div className="flex h-full flex-col items-center justify-center gap-3 py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <FolderOpen className="h-6 w-6 text-primary" />
+            </div>
+            <div className="max-w-sm">
+              <p className="text-sm font-medium text-card-foreground">Nenhum material ainda</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Anexe o catálogo, o folder ou a tabela desta fábrica. Todo mundo da equipe passa
+                a ver e usar.
+              </p>
+            </div>
+            <Button size="sm" className="gap-1.5" onClick={() => setAnexarAberto(true)}>
+              <Plus className="h-4 w-4" /> Anexar o primeiro
+            </Button>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {arquivos!.map((a) => (
+              <CartaoDeArquivo
+                key={a.id}
+                arquivo={a}
+                capaUrl={capas[a.id] ?? null}
+                podeExcluir={podeExcluir}
+                ocupado={excluir.isPending}
+                aoVer={() => void abrirPrevia(a)}
+                aoBaixar={() => void baixar(a)}
+                aoExcluir={() => setAExcluir(a)}
+                aoEnviar={temWhatsapp ? () => setAEnviar(a) : undefined}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <AnexarArquivoDialog
+        open={anexarAberto}
+        onOpenChange={setAnexarAberto}
+        fabricanteId={fabricanteId}
+      />
+
+      <EnviarCatalogoDialog
+        open={!!aEnviar}
+        onOpenChange={(o) => !o && setAEnviar(null)}
+        arquivo={aEnviar}
+      />
+
+      <FilePreviewDialog file={previa} onClose={() => setPrevia(null)} />
+
+      <AlertDialog open={!!aExcluir} onOpenChange={(o) => !o && setAExcluir(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir "{aExcluir?.nome}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O arquivo sai para toda a equipe, não só para você. Não dá para desfazer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={excluir.isPending}
+              onClick={(e) => { e.preventDefault(); void confirmarExclusao(); }}
+            >
+              {excluir.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

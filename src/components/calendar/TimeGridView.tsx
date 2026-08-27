@@ -13,6 +13,7 @@ import {
   yPxToDate,
 } from './calendarUtils';
 import type { CalendarEvent } from './types';
+import { distribuirEmColunas } from '@/lib/sobreposicao-de-eventos';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const GUTTER_WIDTH = 44;
@@ -36,12 +37,28 @@ interface DragState {
 function EventBlock({
   event,
   onClick,
+  coluna = 0,
+  colunas = 1,
 }: {
   event: CalendarEvent;
   onClick: (e: CalendarEvent) => void;
+  /** Qual fatia da largura, quando há choque de horário. Ver `sobreposicao-de-eventos.ts`. */
+  coluna?: number;
+  colunas?: number;
 }) {
   const top = getEventTopPx(event.inicio);
   const height = getEventHeightPx(event.inicio, event.fim);
+
+  // 🔴 Antes era `left-0.5 right-0.5` para TODO bloco, sem cálculo nenhum: dois compromissos
+  // no mesmo horário ficavam um exatamente SOBRE o outro, e o de baixo não recebia nem
+  // clique. Agora quem disputa o horário divide a largura.
+  //
+  // Os blocos se sobrepõem DE PROPÓSITO em 6% da largura, e o de cima ganha um recorte mais
+  // alto: é o que deixa ver que existe algo atrás quando a coluna fica estreita. Sem essa
+  // pitada de sobreposição, três colunas viram três tirinhas iguais e ilegíveis.
+  const larguraDaFatia = 100 / colunas;
+  const esquerda = coluna * larguraDaFatia;
+  const largura = colunas === 1 ? 100 : larguraDaFatia * 1.06;
 
   return (
     <div
@@ -51,8 +68,18 @@ function EventBlock({
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => { e.stopPropagation(); onClick(event); }}
       onKeyDown={(e) => e.key === 'Enter' && onClick(event)}
-      className="absolute left-0.5 right-0.5 rounded px-1 sm:px-1.5 py-0.5 text-white text-[10px] sm:text-[11px] font-medium overflow-hidden cursor-pointer hover:brightness-90 transition-all z-10"
-      style={{ top, height, backgroundColor: event.cor }}
+      title={`${event.titulo} — ${format(event.inicio, 'HH:mm')} às ${format(event.fim, 'HH:mm')}`}
+      className="absolute rounded px-1 sm:px-1.5 py-0.5 text-white text-[10px] sm:text-[11px] font-medium overflow-hidden cursor-pointer hover:brightness-90 hover:z-20 transition-all"
+      style={{
+        top,
+        height,
+        backgroundColor: event.cor,
+        left: `calc(${esquerda}% + 2px)`,
+        width: `calc(${Math.min(largura, 100 - esquerda)}% - 4px)`,
+        // Empilhamento: quem está mais à direita fica por cima, para a borda do vizinho
+        // aparecer por baixo em vez de sumir.
+        zIndex: 10 + coluna,
+      }}
     >
       <p className="truncate leading-tight">
         {event.obraId && <HardHat className="inline h-2.5 w-2.5 mr-0.5 -mt-0.5" />}
@@ -230,8 +257,13 @@ export function TimeGridView({ days, events, onClickSlot, onCreateRange, onClick
 
       {/* Linha de eventos de dia inteiro */}
       {days.some((d) => allDayEvents(eventsForDay(events, d)).length > 0) && (
+        // 🔴 TETO DE ALTURA. A faixa era `shrink-0` sem limite nenhum, e cada negócio com data
+        // de fechamento vira um item aqui (`use-eventos.ts`). O pior dia da base (31/07/2024)
+        // tem 458 — uns 7.800px de faixa, que empurravam a grade de horas para fora da tela.
+        // Era essa a causa de "não dá para rolar": não é que a rolagem travasse, é que não
+        // sobrava grade para rolar. Com teto, a faixa rola dentro de si e nada some.
         <div
-          className="border-b bg-muted/20 shrink-0"
+          className="border-b bg-muted/20 shrink-0 max-h-[22dvh] overflow-y-auto"
           style={{ display: 'grid', gridTemplateColumns: colTemplate }}
         >
           <div className="text-[8px] text-muted-foreground flex items-center justify-end pr-1.5">
@@ -303,8 +335,8 @@ export function TimeGridView({ days, events, onClickSlot, onCreateRange, onClick
                   />
                 ))}
                 {/* Eventos do dia */}
-                {timedEvents(eventsForDay(events, day)).map((ev) => (
-                  <EventBlock key={ev.id} event={ev} onClick={onClickEvent} />
+                {distribuirEmColunas(timedEvents(eventsForDay(events, day))).map(({ evento: ev, coluna, colunas }) => (
+                  <EventBlock key={ev.id} event={ev} onClick={onClickEvent} coluna={coluna} colunas={colunas} />
                 ))}
                 {/* Preview do drag-to-create */}
                 {isDragDay && dragPreview && (

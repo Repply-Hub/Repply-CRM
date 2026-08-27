@@ -34,6 +34,7 @@ import {
   matchPedidoStatusToColuna,
   type FieldKey,
 } from '@/components/import-pedidos/importPedidosUtils';
+import { LinkAnexoPrivado } from '@/components/shared/LinkAnexoPrivado';
 
 const VISIBLE_FIELDS: FieldDef[] = FIELDS.map(f => ({ key: f.key, label: f.label, required: f.required }));
 
@@ -841,15 +842,13 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                       <TableCell className="text-xs whitespace-nowrap max-w-[150px] truncate">{r.observacoes || '-'}</TableCell>
                       <TableCell className="text-xs whitespace-nowrap">
                         {r.pdf_url ? (
-                          <a
-                            href={r.pdf_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <LinkAnexoPrivado
+                            url={r.pdf_url}
                             className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
                             title={r.pdf_url}
                           >
                             <Paperclip className="h-3.5 w-3.5" />
-                          </a>
+                          </LinkAnexoPrivado>
                         ) : '-'}
                       </TableCell>
                       {extraFieldInfos.map(info => (

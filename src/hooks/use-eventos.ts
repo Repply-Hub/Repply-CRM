@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { PeriodoDoCalendario } from '@/lib/periodo-do-calendario';
 import { useAuth } from './use-auth';
 import type { CalendarEvent, CalendarType, EventoForm } from '@/components/calendar/types';
 import { CALENDAR_COLORS } from '@/components/calendar/types';
@@ -46,7 +47,19 @@ interface ContatoCalendario {
 
 // --- Queries ---
 
-export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
+/**
+ * 🔴 O PERÍODO NÃO É OPCIONAL, e a razão está medida.
+ *
+ * Até 27/08/2026 as duas consultas de baixo buscavam a base inteira, sem recorte e sem
+ * limite. Em produção: 11.906 negócios com data de fechamento, contra o teto de mil linhas do
+ * PostgREST — o calendário mostrava **um em cada doze prazos, em silêncio**, e sem `order` as
+ * mil nem eram as mais recentes.
+ *
+ * Era também a causa de "não dá para rolar": cada prazo vira um item na faixa de dia inteiro,
+ * que não tem teto de altura. O pior dia da base (31/07/2024) tem 458 prazos — uma faixa de
+ * uns 7.800px, que esmaga a grade de horas até não sobrar o que rolar.
+ */
+export function useCalendarEvents(visibleCalendars: Set<CalendarType>, periodo: PeriodoDoCalendario) {
   const { user } = useAuth();
 
   const { data: eventos } = useQuery({
@@ -102,24 +115,30 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>) {
   });
 
   const { data: pedidos } = useQuery({
-    queryKey: ['pedidos-calendario'],
+    // O período entra na CHAVE: sem isso, navegar de agosto para setembro reaproveitaria o
+    // resultado de agosto e a tela mostraria o mês errado.
+    queryKey: ['pedidos-calendario', periodo.deTexto, periodo.ateTexto],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pedidos')
         .select('id, status, prazo_resposta, valor_total, clientes(empresa), fabricantes(nome)')
-        .not('prazo_resposta', 'is', null);
+        .not('prazo_resposta', 'is', null)
+        .gte('prazo_resposta', periodo.deTexto)
+        .lte('prazo_resposta', periodo.ateTexto);
       if (error) throw error;
       return data;
     },
   });
 
   const { data: contatos } = useQuery({
-    queryKey: ['contatos-calendario'],
+    queryKey: ['contatos-calendario', periodo.deTexto, periodo.ateTexto],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('historico_contatos')
         .select('id, tipo, descricao, proximo_contato_em, pedidos(clientes(empresa))')
-        .not('proximo_contato_em', 'is', null);
+        .not('proximo_contato_em', 'is', null)
+        .gte('proximo_contato_em', periodo.deTexto)
+        .lte('proximo_contato_em', periodo.ateTexto);
       if (error) throw error;
       return data;
     },

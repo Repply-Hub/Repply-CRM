@@ -213,6 +213,7 @@ import {
 import { ptBR } from "date-fns/locale";
 import { cn, autoResizeTextarea, slugify } from "@/lib/utils";
 import { downloadFile } from "@/lib/download-file";
+import { useArquivosPrivados } from "@/hooks/use-arquivo-privado";
 import { linkifyText } from "@/lib/linkify";
 import {
   CLASSE_BADGE_INSTANCIA_SEM_COR,
@@ -1781,14 +1782,27 @@ function MessageContent({
   onImageClick,
   onPreviewFile,
   conversaAtiva,
+  enderecoDe,
 }: {
   msg: WaMensagem;
   isSaida: boolean;
   onImageClick?: (url: string, msgId?: string) => void;
   onPreviewFile?: (file: FilePreviewTarget) => void;
   conversaAtiva: WaConversa;
+  /** Traduz o endereço gravado no endereço a usar. Ver `use-arquivo-privado`. */
+  enderecoDe: (url: string | null | undefined) => string | null;
 }) {
   const textCls = isSaida ? "text-white" : "text-foreground";
+
+  // O endereço da mídia — Passo 2 do plano dos baldes privados, módulo 3.
+  //
+  // Calculado UMA vez aqui em cima porque a mesma mídia é usada em até três lugares no mesmo
+  // ramo (a tag, o clique que amplia e o que abre em outra aba), e é justamente aí que uma
+  // passa despercebida.
+  //
+  // As CONDIÇÕES abaixo continuam olhando `msg.media_url`: elas perguntam "existe mídia?", e
+  // a resposta não pode depender de a assinatura já ter chegado.
+  const midiaUrl = enderecoDe(msg.media_url);
 
   if (msg.apagada_para_todos) {
     return (
@@ -1808,14 +1822,14 @@ function MessageContent({
     return (
       <div className="flex flex-col -mx-2 -mt-1 -mb-1 max-w-[240px] sm:max-w-[280px]">
         <img
-          src={msg.media_url}
+          src={midiaUrl!}
           alt="imagem"
           className="w-full rounded-[14px] cursor-pointer hover:opacity-90 transition-opacity object-cover shadow-sm"
           onClick={() => {
             if (onImageClick) {
-              onImageClick(msg.media_url!, msg.id);
+              onImageClick(midiaUrl!, msg.id);
             } else {
-              window.open(msg.media_url!, "_blank");
+              window.open(midiaUrl!, "_blank");
             }
           }}
         />
@@ -1832,14 +1846,14 @@ function MessageContent({
     return (
       <div className="flex flex-col -mx-2 -mt-1 -mb-1">
         <img
-          src={msg.media_url}
+          src={midiaUrl!}
           alt="figurinha"
           className="w-[128px] h-[128px] object-contain cursor-pointer hover:opacity-90 transition-opacity"
           onClick={() => {
             if (onImageClick) {
-              onImageClick(msg.media_url!, msg.id);
+              onImageClick(midiaUrl!, msg.id);
             } else {
-              window.open(msg.media_url!, "_blank");
+              window.open(midiaUrl!, "_blank");
             }
           }}
         />
@@ -1850,7 +1864,7 @@ function MessageContent({
   if (msg.tipo === "audio" && msg.media_url) {
     return (
       <WaAudioPlayer
-        src={msg.media_url}
+        src={midiaUrl!}
         isSaida={isSaida}
         conversaAtiva={conversaAtiva}
         msg={msg}
@@ -1863,7 +1877,7 @@ function MessageContent({
       <div className="flex flex-col -mx-2 -mt-1 -mb-1 max-w-[240px] sm:max-w-[280px]">
         <video
           controls
-          src={msg.media_url}
+          src={midiaUrl!}
           className="w-full rounded-[14px] shadow-sm bg-black/10"
         />
         {msg.conteudo && !MENSAGEM_PLACEHOLDERS.includes(msg.conteudo) && (
@@ -1939,7 +1953,7 @@ function MessageContent({
     const label = !MENSAGEM_PLACEHOLDERS.includes(msg.conteudo)
       ? msg.conteudo
       : "Documento anexado";
-    return renderFileChip(label, msg.media_url, msg.media_mime);
+    return renderFileChip(label, midiaUrl!, msg.media_mime);
   }
 
   // Anexo com URL cujo tipo não bateu em nenhum caso específico acima (ex.: tipo
@@ -1949,7 +1963,7 @@ function MessageContent({
     const label = !MENSAGEM_PLACEHOLDERS.includes(msg.conteudo)
       ? msg.conteudo
       : "Arquivo anexado";
-    return renderFileChip(label, msg.media_url, msg.media_mime);
+    return renderFileChip(label, midiaUrl!, msg.media_mime);
   }
 
   // Tipo indica anexo de mídia, mas o download/descriptografia falhou no webhook
@@ -2543,6 +2557,9 @@ function LeadSheet({
     setEditarNomeOpen(false);
   }
   const { data: mensagens = [] } = useWaMensagens(conversa.id);
+  // A galeria da ficha desenha dezenas de miniaturas de uma vez: um pedido em lote, não um
+  // por arquivo. Ver `docs/operacao/plano-baldes-privados.md`.
+  const { enderecoDe } = useArquivosPrivados(mensagens.map((m) => m.media_url));
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportRange, setExportRange] = useState<DateRange>(() => ({
     from: new Date(2000, 0, 1),
@@ -2765,13 +2782,13 @@ function LeadSheet({
           key={m.id}
           type="button"
           className="aspect-square rounded-md overflow-hidden border border-border hover:opacity-80 transition-opacity"
-          onClick={() => onImageClick(m.media_url!, m.id)}
+          onClick={() => onImageClick(enderecoDe(m.media_url)!, m.id)}
           title={format(new Date(m.created_at), "dd/MM/yyyy HH:mm", {
             locale: ptBR,
           })}
         >
           <img
-            src={m.media_url!}
+            src={enderecoDe(m.media_url)!}
             alt="imagem"
             className="h-full w-full object-cover"
           />
@@ -2788,14 +2805,14 @@ function LeadSheet({
           type="button"
           className="relative aspect-square rounded-md overflow-hidden border border-border bg-black/5 hover:opacity-80 transition-opacity"
           onClick={() =>
-            window.open(m.media_url!, "_blank", "noopener,noreferrer")
+            window.open(enderecoDe(m.media_url)!, "_blank", "noopener,noreferrer")
           }
           title={format(new Date(m.created_at), "dd/MM/yyyy HH:mm", {
             locale: ptBR,
           })}
         >
           <video
-            src={m.media_url!}
+            src={enderecoDe(m.media_url)!}
             className="h-full w-full object-cover"
             muted
           />
@@ -2825,7 +2842,7 @@ function LeadSheet({
                 previewable
                   ? () =>
                       onPreviewFile({
-                        url: m.media_url!,
+                        url: enderecoDe(m.media_url)!,
                         nome: label,
                         mime: m.media_mime,
                         msgId: m.id,
@@ -2866,7 +2883,7 @@ function LeadSheet({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  downloadFile(m.media_url!, label);
+                  downloadFile(enderecoDe(m.media_url)!, label);
                 }}
                 className="p-1.5 rounded-full hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors shrink-0"
               >
@@ -4008,6 +4025,12 @@ export default function WhatsAppInbox() {
     hasOlderMensagens,
     loadingOlderMensagens,
   } = useWaMensagens(conversaAtiva?.id ?? null);
+  // Os endereços da conversa aberta, assinados de uma vez só — um pedido por balde, não um
+  // por mídia. A conversa desenha 50 mensagens de uma vez, e 50 chamadas separadas somariam
+  // meio segundo antes de a primeira imagem aparecer.
+  const { enderecoDe: enderecoDaMidia } = useArquivosPrivados(
+    mensagens.map((m) => m.media_url),
+  );
   // Lookup de wamid -> id da mensagem, usado para rolar até a mensagem original ao
   // clicar em uma citação (reply).
   const idPorWamid = useMemo(() => {
@@ -7939,6 +7962,7 @@ export default function WhatsAppInbox() {
                                             }
                                             onPreviewFile={setPreviewFile}
                                             conversaAtiva={conversaAtiva}
+                                            enderecoDe={enderecoDaMidia}
                                           />
                                           <ReactionBadge
                                             reacoes={msg.reacoes ?? []}

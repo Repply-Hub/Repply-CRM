@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Search, HardHat } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { periodoDoCalendario } from '@/lib/periodo-do-calendario';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -124,7 +125,16 @@ export default function Calendario() {
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const isMobile = useIsMobile();
-  const events = useCalendarEvents(visibleCalendars);
+
+  // Só o período que a tela está mostrando é buscado. Antes a consulta trazia a base inteira e
+  // esbarrava no teto de mil linhas do servidor, mostrando um em cada doze prazos em silêncio —
+  // ver o comentário de `periodo-do-calendario.ts`.
+  const periodo = useMemo(
+    () => periodoDoCalendario(viewMode, currentDate),
+    [viewMode, currentDate],
+  );
+
+  const events = useCalendarEvents(visibleCalendars, periodo);
 
   const filteredEvents = useMemo(() => {
     if (!searchQuery.trim()) return events;

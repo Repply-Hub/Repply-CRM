@@ -45,15 +45,26 @@ export function useCreateContato() {
       campos_extras?: Record<string, string>;
     }) => {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
-      const { error } = await supabase.from('contatos').insert({
-        ...data,
-        data_criacao: new Date().toISOString().slice(0, 10),
-        usuario_id: vid,
-        criado_por_usuario_id: vid,
-      });
+      // `.select().single()` para devolver o contato criado: quem cria contato de
+      // dentro da obra precisa do id na hora, para já marcá-lo no vínculo.
+      const { data: criado, error } = await supabase
+        .from('contatos')
+        .insert({
+          ...data,
+          data_criacao: new Date().toISOString().slice(0, 10),
+          usuario_id: vid,
+          criado_por_usuario_id: vid,
+        })
+        .select('id')
+        .single();
       if (error) throw error;
+      return criado;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contatos'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contatos'] });
+      qc.invalidateQueries({ queryKey: ['contatos_do_cliente'] });
+      qc.invalidateQueries({ queryKey: ['clientes'] });
+    },
   });
 }
 
@@ -111,7 +122,14 @@ export function useDeleteContato() {
       const { error } = await supabase.from('contatos').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contatos'] }),
+    onSuccess: () => {
+      // O banco apaga o vínculo junto (cascade), mas o cache não sabe disso: sem
+      // invalidar as chaves do vínculo, o contato excluído continua listado na ficha
+      // da obra e o clique cai numa página de contato que não existe mais.
+      ['contatos', 'contatos_do_cliente', 'obra_contatos', 'contato_obras', 'clientes'].forEach(
+        (chave) => qc.invalidateQueries({ queryKey: [chave] })
+      );
+    },
   });
 }
 export function useUpdateContato() {
@@ -131,7 +149,16 @@ export function useUpdateContato() {
       const { error } = await supabase.from('contatos').update(data).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contatos'] }),
+    onSuccess: () => {
+      // A ficha da obra mostra os contatos vinculados: sem invalidar as chaves do
+      // vínculo, editar o nome ou o cargo de um contato deixava a seção da obra
+      // exibindo o dado velho até recarregar a página.
+      qc.invalidateQueries({ queryKey: ['contatos'] });
+      qc.invalidateQueries({ queryKey: ['contatos_do_cliente'] });
+      qc.invalidateQueries({ queryKey: ['obra_contatos'] });
+      qc.invalidateQueries({ queryKey: ['contato_obras'] });
+      qc.invalidateQueries({ queryKey: ['clientes'] });
+    },
   });
 }
 export function useCreatePedido() {
@@ -192,8 +219,16 @@ export function useCreateObra() {
       // ('em_andamento'), e o Postgres só aplica o default quando a coluna é OMITIDA do
       // insert. Mandá-la explicitamente, mesmo vazia, é o que anulava o default — foi assim
       // que obra entrava no banco com status em branco.
-      const { error } = await supabase.from('obras').insert(data);
+      // `.select().single()` para devolver a obra criada: o cadastro pode trazer
+      // contatos já marcados, e o vínculo só pode ser gravado depois que a obra
+      // existe e tem id. Os outros três chamadores ignoram o retorno.
+      const { data: criada, error } = await supabase
+        .from('obras')
+        .insert(data)
+        .select('id')
+        .single();
       if (error) throw error;
+      return criada;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['obras'] });
@@ -231,6 +266,9 @@ export function useUpdateObra() {
       // então invalidar só ['obras'] deixaria a tela do cliente com o dado velho.
       qc.invalidateQueries({ queryKey: ['obras'] });
       qc.invalidateQueries({ queryKey: ['clientes'] });
+      // A ficha do contato mostra o NOME das obras vinculadas: renomear a obra sem
+      // isto deixaria o nome velho lá até recarregar a página.
+      qc.invalidateQueries({ queryKey: ['contato_obras'] });
     },
   });
 }
@@ -264,6 +302,10 @@ export function useDeleteObra() {
       }
       qc.invalidateQueries({ queryKey: ['obras'] });
       qc.invalidateQueries({ queryKey: ['clientes'] });
+      // O vínculo com contatos cai junto no banco (cascade); as telas que o mostram
+      // precisam saber disso sem esperar recarregar.
+      qc.invalidateQueries({ queryKey: ['obra_contatos'] });
+      qc.invalidateQueries({ queryKey: ['contato_obras'] });
     },
   });
 }
@@ -304,6 +346,8 @@ export function useDeleteObrasBulk() {
       }
       qc.invalidateQueries({ queryKey: ['obras'] });
       qc.invalidateQueries({ queryKey: ['clientes'] });
+      qc.invalidateQueries({ queryKey: ['obra_contatos'] });
+      qc.invalidateQueries({ queryKey: ['contato_obras'] });
     },
   });
 }

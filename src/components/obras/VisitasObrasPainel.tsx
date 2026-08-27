@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { format, isSameDay } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Loader2, CheckCircle2, Circle, MapPin, Building2, HardHat } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +38,21 @@ export function VisitasObrasPainel({ searchTerm, onSelectObra }: VisitasObrasPai
     );
   }, [visitas, searchTerm]);
 
+  // Agrupa por DIA preservando a ordem que veio do banco (mais recente primeiro). A chave é
+  // `yyyy-MM-dd` e não o objeto Date: duas datas do mesmo dia são objetos diferentes, e
+  // agrupar por objeto criaria um bloco por visita.
+  const porDia = useMemo(() => {
+    const mapa = new Map<string, { chave: string; dia: Date; visitasDoDia: typeof filtradas }>();
+    for (const v of filtradas) {
+      const dia = new Date(v.inicio);
+      const chave = format(dia, 'yyyy-MM-dd');
+      const grupo = mapa.get(chave);
+      if (grupo) grupo.visitasDoDia.push(v);
+      else mapa.set(chave, { chave, dia, visitasDoDia: [v] });
+    }
+    return [...mapa.values()];
+  }, [filtradas]);
+
   const nomePor = (userId: string) => usuarios.find((u) => u.user_id === userId)?.nome || 'Alguém da equipe';
 
   if (isLoading) {
@@ -61,41 +76,64 @@ export function VisitasObrasPainel({ searchTerm, onSelectObra }: VisitasObrasPai
   }
 
   return (
-    <div className="space-y-5">
-      {filtradas.map((visita, index) => {
-        const anterior = filtradas[index - 1];
-        const novoDia = !anterior || !isSameDay(new Date(anterior.inicio), new Date(visita.inicio));
-        return (
-          <div key={visita.id}>
-            {novoDia && (
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                {format(new Date(visita.inicio), "EEEE, d 'de' MMMM", { locale: ptBR })}
-              </p>
-            )}
-            <VisitaCard
-              visita={visita}
-              podeMarcar={profile?.user_id === visita.criadoPor}
-              editando={editandoId === visita.id}
-              observacaoRascunho={observacaoRascunho}
-              onObservacaoChange={setObservacaoRascunho}
-              nomeCriador={nomePor(visita.criadoPor)}
-              onSelectObra={onSelectObra}
-              onIniciarEdicao={() => {
-                setObservacaoRascunho(visita.visitaObservacao || '');
-                setEditandoId(visita.id);
-              }}
-              onCancelarEdicao={() => setEditandoId(null)}
-              onSalvar={() =>
-                marcarRealizada.mutate(
-                  { grupoId: visita.grupoId, obraId: visita.obraId, realizada: true, observacao: observacaoRascunho },
-                  { onSuccess: () => setEditandoId(null) },
-                )
-              }
-              salvando={marcarRealizada.isPending}
-            />
+    // 🔴 BLOCOS DE DIA LADO A LADO, e não uma lista corrida.
+    //
+    // Antes era um `space-y-5` com um cabeçalho de dia inserido no meio quando a data mudava:
+    // o dia não era um container, era um rótulo solto. Numa tela larga isso dava uma coluna
+    // estreita de cartões e metade da largura em branco, e quem queria comparar "o que tem na
+    // quinta" com "o que tem na sexta" precisava rolar de um até o outro.
+    //
+    // Cada dia virou um cartão próprio, e os cartões se arrumam em grade — mesma ideia do
+    // drive de catálogos das fábricas. Pedido do Lucas em 27/08/2026.
+    <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {porDia.map(({ chave, dia, visitasDoDia }) => (
+        <section key={chave} className="rounded-xl border border-border bg-card">
+          <header className="flex items-baseline justify-between gap-2 border-b border-border px-4 py-2.5">
+            <h3 className="text-sm font-semibold capitalize text-card-foreground">
+              {format(dia, "EEEE, d 'de' MMM", { locale: ptBR })}
+            </h3>
+            <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+              {visitasDoDia.length} {visitasDoDia.length === 1 ? 'visita' : 'visitas'}
+            </span>
+          </header>
+
+          <div className="space-y-3 p-3">
+            {visitasDoDia.map((visita) => (
+              <VisitaCard
+                key={visita.id}
+                visita={visita}
+                podeMarcar={profile?.user_id === visita.criadoPor}
+                editando={editandoId === visita.id}
+                observacaoRascunho={observacaoRascunho}
+                onObservacaoChange={setObservacaoRascunho}
+                nomeCriador={nomePor(visita.criadoPor)}
+                onSelectObra={onSelectObra}
+                onIniciarEdicao={() => {
+                  setObservacaoRascunho(visita.visitaObservacao || '');
+                  setEditandoId(visita.id);
+                }}
+                onCancelarEdicao={() => setEditandoId(null)}
+                onSalvar={() =>
+                  marcarRealizada.mutate(
+                    { grupoId: visita.grupoId, obraId: visita.obraId, realizada: true, observacao: observacaoRascunho },
+                    { onSuccess: () => setEditandoId(null) },
+                  )
+                }
+                podeAlternar={profile?.user_id === visita.criadoPor}
+                onAlternarStatus={() =>
+                  marcarRealizada.mutate({
+                    grupoId: visita.grupoId,
+                    obraId: visita.obraId,
+                    realizada: !visita.visitaRealizada,
+                    observacao: visita.visitaObservacao ?? '',
+                  })
+                }
+                salvando={marcarRealizada.isPending}
+              />
+            ))}
           </div>
-        );
-      })}
+        </section>
+      ))}
     </div>
   );
 }
@@ -111,6 +149,8 @@ function VisitaCard({
   onIniciarEdicao,
   onCancelarEdicao,
   onSalvar,
+  onAlternarStatus,
+  podeAlternar,
   salvando,
 }: {
   visita: VisitaObraListagem;
@@ -123,6 +163,10 @@ function VisitaCard({
   onIniciarEdicao: () => void;
   onCancelarEdicao: () => void;
   onSalvar: () => void;
+  /** Alterna Planejada <-> Realizada direto pelo selo, sem passar pela observação. */
+  onAlternarStatus: () => void;
+  /** Só quem registrou a visita alterna. Para os outros o selo é leitura. */
+  podeAlternar: boolean;
   salvando: boolean;
 }) {
   return (
@@ -150,10 +194,33 @@ function VisitaCard({
             Registrado por {nomeCriador}
           </p>
         </div>
-        <Badge variant={visita.visitaRealizada ? 'default' : 'outline'} className="shrink-0 gap-1 text-[10px]">
-          {visita.visitaRealizada ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
-          {visita.visitaRealizada ? 'Realizada' : 'Planejada'}
-        </Badge>
+        {/* 🔴 O SELO ALTERNA NOS DOIS SENTIDOS. Antes ele era só enfeite: dava para marcar
+            como realizada pelo botão de baixo, e NÃO havia caminho nenhum na tela para
+            desmarcar — quem clicasse por engano ficava com a visita realizada para sempre.
+            A gravação já aceitava `realizada: false`; faltava a porta.
+
+            Só quem registrou a visita alterna (`podeAlternar`); para os outros continua
+            sendo um selo de leitura, com o mesmo desenho. */}
+        {podeAlternar ? (
+          <button
+            type="button"
+            disabled={salvando}
+            onClick={onAlternarStatus}
+            title={visita.visitaRealizada ? 'Marcar como planejada' : 'Marcar como realizada'}
+            aria-label={visita.visitaRealizada ? 'Marcar como planejada' : 'Marcar como realizada'}
+            className="shrink-0 rounded-full transition-opacity hover:opacity-80 disabled:opacity-50"
+          >
+            <Badge variant={visita.visitaRealizada ? 'default' : 'outline'} className="cursor-pointer gap-1 text-[10px]">
+              {visita.visitaRealizada ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+              {visita.visitaRealizada ? 'Realizada' : 'Planejada'}
+            </Badge>
+          </button>
+        ) : (
+          <Badge variant={visita.visitaRealizada ? 'default' : 'outline'} className="shrink-0 gap-1 text-[10px]">
+            {visita.visitaRealizada ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+            {visita.visitaRealizada ? 'Realizada' : 'Planejada'}
+          </Badge>
+        )}
       </div>
 
       {visita.visitaObservacao && !editando && (

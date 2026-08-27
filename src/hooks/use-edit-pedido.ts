@@ -19,14 +19,10 @@ export function usePedidoCompleto(pedidoId: string | null) {
         .single();
       if (pErr) throw pErr;
 
-      const { data: itens, error: iErr } = await supabase
-        .from('itens_pedido')
-        .select('*')
-        .eq('pedido_id', pedidoId!)
-        .order('descricao_material');
-      if (iErr) throw iErr;
-
-      return { pedido, itens };
+      // Sem buscar `itens_pedido`: o módulo de catálogo de produtos saiu em 26/08/2026 e a
+      // tela de edição não mostra mais item nenhum. O valor do negócio vive em
+      // `pedidos.valor_total` e vem no `select` acima.
+      return { pedido };
     },
   });
 }
@@ -48,18 +44,8 @@ export interface UpdatePedidoPayload {
   observacoes?: string;
   pdf_url?: string;
   campos_extras?: Record<string, string>;
-  /** Valor de negociação digitado à mão. Ausente = deixa o valor por conta do gatilho
-   * do banco (soma dos itens). Ver o passo 4 da mutação: precisa ser gravado DEPOIS
-   * dos itens, senão `trg_recalcular_valor_total` sobrescreve. */
+  /** Valor de negociação. Ausente = não mexe no que está gravado. */
   valor_total?: number;
-  itens: {
-    id?: string;
-    descricao_material: string;
-    referencia_fabricante?: string;
-    quantidade: number;
-    unidade?: string;
-    preco_unitario: number;
-  }[];
 }
 
 export function useUpdatePedidoCompleto() {
@@ -100,76 +86,27 @@ export function useUpdatePedidoCompleto() {
           observacoes: payload.observacoes || null,
           ...(payload.pdf_url !== undefined ? { pdf_url: payload.pdf_url || null } : {}),
           ...(payload.campos_extras ? { campos_extras: payload.campos_extras } : {}),
+          ...(payload.valor_total !== undefined ? { valor_total: payload.valor_total } : {}),
         })
         .eq('id', payload.pedido_id);
       if (pedidoErr) throw pedidoErr;
 
-      // 2. Upsert items: update existing (with id) and insert new ones (without id)
-      const itensExistentes = payload.itens.filter(i => i.id);
-      const itensNovos = payload.itens.filter(i => !i.id);
-
-      if (itensExistentes.length > 0) {
-        const { error: upsertErr } = await supabase.from('itens_pedido').upsert(
-          itensExistentes.map(item => ({
-            id: item.id!,
-            pedido_id: payload.pedido_id,
-            descricao_material: item.descricao_material,
-            referencia_fabricante: item.referencia_fabricante || null,
-            quantidade: item.quantidade,
-            unidade: item.unidade || null,
-            preco_unitario: item.preco_unitario,
-          }))
-        );
-        if (upsertErr) throw upsertErr;
-      }
-
-      if (itensNovos.length > 0) {
-        const { error: insertErr } = await supabase.from('itens_pedido').insert(
-          itensNovos.map(item => ({
-            pedido_id: payload.pedido_id,
-            descricao_material: item.descricao_material,
-            referencia_fabricante: item.referencia_fabricante || null,
-            quantidade: item.quantidade,
-            unidade: item.unidade || null,
-            preco_unitario: item.preco_unitario,
-          }))
-        );
-        if (insertErr) throw insertErr;
-      }
-
-      // 3. Delete only items that were removed (not present in payload)
-      // Inserts/upserts above must succeed first — only then we remove old items
-      const idsManutidos = payload.itens.filter(i => i.id).map(i => i.id!);
-      const deleteQuery = supabase
-        .from('itens_pedido')
-        .delete()
-        .eq('pedido_id', payload.pedido_id);
-
-      const { error: delErr } = idsManutidos.length > 0
-        ? await deleteQuery.not('id', 'in', `(${idsManutidos.join(',')})`)
-        : await deleteQuery;
-      if (delErr) throw delErr;
-
-      // 4. Valor de negociação — gravado por último DE PROPÓSITO.
-      // O gatilho `trg_recalcular_valor_total` (AFTER INSERT/UPDATE/DELETE em
-      // itens_pedido) reescreve pedidos.valor_total com a soma dos itens. Se este
-      // update fosse junto com o passo 1, os passos 2 e 3 o apagariam.
+      // 🔴 NÃO existe mais passo de itens, e isso APAGOU UMA ARMADILHA.
       //
-      // LIMITE CONHECIDO: isso preserva o valor digitado em toda alteração feita por
-      // esta tela e pelo cadastro novo — os únicos caminhos que hoje mexem em
-      // itens_pedido. Se um dia surgir outro caminho que altere itens sem regravar o
-      // valor, o gatilho volta a mandar. A alternativa seria uma coluna marcando
-      // "valor digitado à mão" e um gatilho que a respeitasse; foi descartada por
-      // exigir cirurgia num gatilho de que importação, kanban e painéis dependem.
+      // Até 26/08/2026 esta mutação tinha três passos a mais: gravar os itens, apagar os que
+      // sumiram, e só ENTÃO gravar o valor. A ordem era obrigatória por causa do gatilho
+      // `trg_recalcular_valor_total` (AFTER INSERT/UPDATE/DELETE em `itens_pedido`), que
+      // reescreve `pedidos.valor_total` com a soma dos itens — gravar o valor antes fazia os
+      // passos seguintes o apagarem.
       //
-      // Sem `valor_total` no payload, nada é gravado aqui e o gatilho segue mandando.
-      if (payload.valor_total !== undefined) {
-        const { error: valorErr } = await supabase
-          .from('pedidos')
-          .update({ valor_total: payload.valor_total })
-          .eq('id', payload.pedido_id);
-        if (valorErr) throw valorErr;
-      }
+      // O catálogo de produtos saiu e esta tela não mexe mais em `itens_pedido`. Como o
+      // gatilho só dispara por escrita naquela tabela, ele nunca mais roda por aqui, e o valor
+      // pôde voltar para o passo 1, junto com o resto.
+      //
+      // ⚠️ O GATILHO CONTINUA EXISTINDO no banco, junto com a tabela e a 1 linha real que ela
+      // guarda. Quem um dia voltar a escrever em `itens_pedido` reata a corrida — e vai
+      // encontrar, ao apagar item, o valor do negócio virando a soma dos itens restantes.
+      // Ver docs/operacao/catalogo-de-produtos-removido.md.
 
       return { id: payload.pedido_id };
     },

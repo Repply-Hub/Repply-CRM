@@ -51,9 +51,10 @@ repositório**, não aqui:
 | Documento | O que contém |
 |---|---|
 | [`operacao/colocar-no-ar.md`](operacao/colocar-no-ar.md) | Passo a passo para publicar mudanças que dependem de configuração fora do código |
-| [`operacao/publicar-na-vercel.md`](operacao/publicar-na-vercel.md) | 🔴 **Enviar para o `main` não publica mais.** Como colocar no ar pela linha de comando, e o que conferir depois |
+| [`operacao/publicar-na-vercel.md`](operacao/publicar-na-vercel.md) | 🔴 **Enviar para o `main` PUBLICA** (desde 26/08/2026, repositório público de novo). Como conferir se a publicação saiu, e o comando manual que virou exceção |
 | [`operacao/cobranca-stripe.md`](operacao/cobranca-stripe.md) | O que falta fazer fora do repositório para a cobrança funcionar |
 | [`operacao/guia-de-paginas.md`](operacao/guia-de-paginas.md) | Para que serve cada tela, em linguagem de negócio. Serve de material de uso |
+| [`operacao/catalogo-de-produtos-removido.md`](operacao/catalogo-de-produtos-removido.md) | **Módulo removido em 26/08/2026.** O que ele fazia, de onde recuperar cada arquivo, e os números que mostram que nunca foi usado. Leia antes de propor ressuscitá-lo |
 | [`operacao/plano-reparo-datas.md`](operacao/plano-reparo-datas.md) | **Proposto, não executado.** Como reparar as datas trocadas dos 11.903 negócios já importados |
 | [`operacao/plano-blindagem-whatsapp.md`](operacao/plano-blindagem-whatsapp.md) | **Fase 0 executada, fases 1–4 propostas.** As duas falhas de segurança do WhatsApp: senha exposta e webhook sem autenticação — **o quê e o porquê** |
 | [`operacao/plano-blindagem-whatsapp-execucao.md`](operacao/plano-blindagem-whatsapp-execucao.md) | O **passo a passo** das fases 1 a 4 do documento acima: 10 tarefas, com código, comandos e critério de aprovação de cada uma |

@@ -90,6 +90,50 @@ demanda trabalho de verdade em várias telas.
 
 ---
 
+## 2.4 🔴 RE-MEDIÇÃO EM 27/08/2026 — o retrato de 24/08 está desatualizado
+
+Outra sessão mexeu nos baldes enquanto este plano era executado. O quadro real hoje:
+
+| Balde | `public` | Objetos | Estranho consegue LISTAR? | Estranho consegue BAIXAR? |
+|---|---|---:|---|---|
+| `pedido-anexos` | sim | 14.997 | **não** (14.997 → 0) | **sim** |
+| `whatsapp-media` | sim | 7.199 | **sim** | **sim** |
+| `chat-files` | sim | 220 | **sim** | **sim** |
+| `email-assets` | sim | 112 | **sim** | **sim** |
+| `avatars` | sim | 24 | sim | sim — decisão §8 |
+| `branding` | sim | 0 | — | — |
+| `fabricante-arquivos` | **não** | 2 | não | não |
+
+**O que mudou, e é bom:** a política `pedido_anexos_select` (27/08, outra sessão) fechou a
+ENUMERAÇÃO do maior balde. Um estranho não consegue mais pedir a lista dos 14.997 anexos.
+Nasceu também `fabricante-arquivos`, privado desde o berço — o padrão certo. E
+`catalogo-produtos` deixou de existir.
+
+**O que NÃO mudou, e é o ponto:** medido com um PDF real de 682 kB em 27/08, **sem nenhuma
+credencial**:
+
+```
+/object/public/pedido-anexos/{pasta}/{arquivo}.pdf   → HTTP 200, 681.955 bytes
+/object/pedido-anexos/{pasta}/{arquivo}.pdf          → HTTP 200, 681.955 bytes
+```
+
+Enquanto `public = true`, o armazenamento **pula a autorização** — as duas portas. A política
+que a outra sessão escreveu está correta e está INERTE para leitura. Ela só passa a valer no
+Passo 7. É a §5.5 deste plano, agora com prova viva.
+
+**Consequência para a prioridade:** o balde mais exposto hoje não é mais `pedido-anexos` (que
+exige saber o caminho exato, com UUID) e sim **`whatsapp-media`: 7.199 arquivos, 2,3 GB de
+conversa com cliente, enumeráveis por qualquer um.**
+
+### Os 40 arquivos fora da pasta têm `owner_id` — e isso muda o Passo 5
+
+Medido: **40 de 40** têm `owner_id` gravado, todos apontando para um usuário conhecido. Como
+`pedido_anexos_select` tem o ramo `owner_id = auth.uid()`, esses arquivos **não ficam invisíveis
+para todos** depois do fechamento — ficam visíveis só para **quem os enviou**.
+
+Ainda é comportamento quebrado num CRM (o gestor precisa abrir o orçamento do vendedor), então
+mover os 12 continua valendo. Mas não é a emergência que o plano descrevia.
+
 ## 3. Onde os endereços públicos estão gravados no banco
 
 | Coluna | Preenchidos | Endereço público do nosso Storage | Balde | Objeto existe? |
@@ -410,7 +454,9 @@ gravado direto. Ordem sugerida, do menor risco ao maior:
    `KanbanCard.tsx`, `ImportPedidosDialog.tsx`) — inclui a decisão sobre a exportação (§6.1).
 3. **Caixa do WhatsApp** (`WhatsAppInbox.tsx`, 11 pontos) — o mais delicado: imagem, áudio,
    vídeo, documento, galeria e download, tudo na mesma tela.
-4. **Fotos de perfil** — só se `avatars` for fechar; ver §8.
+4. ~~**Fotos de perfil**~~ — **não entra.** A §8 decide manter `avatars` público, e a
+   foto de perfil do contato do WhatsApp nem é nossa (as 650 são do `whatsapp.net`).
+   **Com isso o Passo 2 está COMPLETO em 26/08/2026.**
 
 **Verificar, módulo a módulo:** abrir a tela e conferir que **tudo que aparecia antes continua
 aparecendo**. Como os baldes ainda estão públicos, um erro aqui é invisível — por isso o
@@ -444,6 +490,80 @@ de assinatura aqui é INVISÍVEL — a imagem aparece do mesmo jeito, pelo ender
 isso o contador foi exposto no console do navegador: **F12 → `quedasDeArquivo.ver()`**. Precisa
 devolver vazio depois de alguém usar o chat de verdade.
 
+#### 2.2 — Anexos de negócio: FEITO em 26/08/2026
+
+**Três coisas que a §4.2 deste plano dizia errado**, corrigidas por leitura do código:
+
+| O plano dizia | O código diz |
+|---|---|
+| `KanbanCard.tsx:149` — link do anexo | **Não há link.** O cartão só escreve "Anexo disponível". Nada a mudar |
+| `Negocios.tsx:1173` — exportação | **Não é exportação.** É a validação de campo obrigatório ao arrastar entre etapas; só testa se está preenchido |
+| Exportação: recomendado exportar link da tela do CRM | **Isso quebraria a planilha.** Ver abaixo |
+
+**O que foi trocado (5 pontos, 4 arquivos):** os quatro links viraram `<LinkAnexoPrivado>`
+(coluna "Anexo" e o alias legado `pdf_url` da lista de Negócios, a lista dentro da ficha do
+cliente, e a prévia da importação), e os dois botões "Ver PDF" assinam NO CLIQUE — ali vale a
+pena, porque o visualizador abre dentro do app e só se paga pelo anexo que alguém abre.
+
+O reparo de endereço corrompido do Bitrix roda ANTES da assinatura. A ordem importa: extrair
+caminho de um endereço quebrado não acharia arquivo nenhum.
+
+##### 🔴 A exportação NÃO assina, e isso é decisão, não esquecimento
+
+Os cabeçalhos da planilha exportada são os mesmos que o assistente de importação reconhece —
+de propósito, para deixar exportar, ajustar no Excel e reimportar. E a importação **grava de
+volta em `pedidos.pdf_url` o que encontrar na coluna** (`resolve-pedido-pdf.ts`: endereço que
+não é do Bitrix passa intacto).
+
+Logo, exportar link assinado **plantaria no banco, de forma permanente, endereços que morrem
+em uma hora** — e ninguém veria, porque a importação não reclama. A recomendação (a) do §6.1
+(exportar link para a tela do CRM) tem o mesmo defeito por outro caminho: a reimportação
+gravaria o endereço de uma PÁGINA como se fosse o anexo.
+
+**Decisão: a exportação continua levando o valor gravado, cru.** A ida e volta segue
+funcionando. A consequência, que precisa ser avisada à equipe antes do Passo 7: **quem receber
+a planilha deixa de conseguir abrir o PDF.** Hoje qualquer pessoa com a planilha na mão baixa
+o orçamento sem estar logada — o fim disso é o objetivo do projeto, não um efeito colateral.
+
+**Medido antes de subir:** 5.179 negócios com anexo — 5.175 no nosso armazenamento, **todos os
+5.175 encontram um objeto real, zero órfãos**; 4 externos (CDN do Bitrix) que passam intactos.
+258 testes passando; tipo em 35 e lint sem subir em nenhum dos 4 arquivos.
+
+#### 2.3 — Caixa do WhatsApp: FEITO em 26/08/2026
+
+**13 pontos, não 11.** Dois blocos, cada um com sua estratégia:
+
+· **`MessageContent`** (a bolha da conversa) recebe o resolvedor por propriedade e calcula
+  `midiaUrl` UMA vez no topo. A mesma mídia é usada em até três lugares no mesmo ramo — a
+  tag, o clique que amplia e o que abre em outra aba —, e é aí que uma passaria despercebida.
+  As CONDIÇÕES (`msg.tipo === "imagem" && msg.media_url`) continuam olhando o valor gravado:
+  perguntam "existe mídia?", e a resposta não pode depender de a assinatura ter chegado.
+· **`LeadSheet`** (a galeria da ficha) assina o próprio lote, porque busca as próprias
+  mensagens com `useWaMensagens`, separado da conversa aberta.
+
+O componente principal assina em lote a conversa aberta e passa adiante: um pedido por balde,
+não um por mídia — a conversa desenha 50 mensagens de uma vez.
+
+**Varredura completa do arquivo (8.842 linhas), não só busca por `media_url`:** as outras 12
+tags de mídia são o QR do painel (data URI), prévia local do que está sendo enviado (`blob:`),
+o ampliador (que já recebe o endereço assinado) e 8 avatares — que são o balde `avatars`,
+módulo 4. **A foto de perfil do contato do WhatsApp NÃO é nossa:** as 650 apontam para
+`whatsapp.net`, zero no nosso armazenamento. Passa intacta, e o fechamento não a afeta.
+
+**Medido:** 6.988 mensagens com mídia — 6.916 no nosso armazenamento, **todas as 6.916
+encontram objeto real, zero órfãos**; 72 externas. 258 testes; tipo em 35; lint 5 → 5.
+
+##### 🔴 Uma coisa para resolver ANTES do Passo 7, não agora
+
+O resolvedor devolve o endereço de HOJE enquanto a assinatura não chega, e só então troca.
+Hoje isso é o certo: a mídia aparece na hora e a troca é imperceptível.
+
+**Depois que o balde fechar, essa primeira renderização passa a apontar para um endereço
+morto** — imagem quebrada por uma fração de segundo antes de o link assinado chegar. Não
+quebra nada, mas pisca. No Passo 6/7, trocar `enderecoDe` para devolver `null` enquanto
+carrega (e a tela mostrar um vazio calmo) resolve. Fazer isso ANTES seria trocar uma tela que
+funciona por uma que pisca sem motivo.
+
 ### Passo 3 — WhatsApp: assinar o link antes de entregar à operadora
 
 **O que faz.** Em `supabase/functions/whatsapp-send/index.ts`, antes de montar o corpo do POST
@@ -462,6 +582,47 @@ mídia pelo CRM para de funcionar.**
 > Fica registrado: mesmo assinado, o link entregue à operadora é um endereço sem senha durante
 > os minutos de validade. Isso é inerente — a operadora precisa baixar o arquivo. O ganho é que
 > o endereço morre em minutos, em vez de valer para sempre.
+
+#### Passo 3 — PUBLICADO em 27/08/2026 (versão 58 da função)
+
+`supabase/functions/_shared/arquivo-privado.ts` (novo) e uma linha em `whatsapp-send`:
+`file: media_url` virou `file: await enderecoParaQuemBaixaDeFora(supabase, media_url)`.
+
+**Validade de 30 minutos, não os 10 sugeridos.** A operadora baixa em segundos, mas se a fila
+dela atrasar um link vencido faz a mensagem **não chegar em silêncio** — ela responde 200 do
+mesmo jeito. Vinte minutos a mais num endereço que ninguém tem é um preço baixo perto de um
+envio perdido sem aviso.
+
+⚠️ **A cópia do extrator é gêmea de `src/lib/arquivo-privado.ts` e não dá para importar aquele
+aqui** (isto roda em Deno, fora do projeto do navegador) — mesma situação de
+`normalizeWhatsappPhone`, e o `CLAUDE.md` §7.1 registra o estrago quando as duas divergem.
+**Conferido na hora de escrever: o corpo executável é byte a byte idêntico** (512 caracteres
+dos dois lados, ignorando comentário, tipo e vírgula final), então os 8 testes de
+`arquivo-privado.test.ts` valem para os dois.
+
+`whatsapp_mensagens.media_url` continua gravando o endereço CRU. O banco guarda o
+identificador durável; quem assina é a tela, na hora de mostrar.
+
+🔴 **A verificação deste passo não pode ser feita por quem escreveu o código:** exige mandar
+uma imagem, um áudio, um vídeo e um PDF pela tela e confirmar que chegaram no celular. Não há
+como testar isso sem enviar mensagem de verdade para uma pessoa de verdade.
+
+##### Verificado em produção com tráfego real
+
+O plano pedia um teste à mão com os quatro tipos. O que aconteceu foi melhor: a equipe estava
+usando o WhatsApp no momento da publicação, e **91 segundos depois do deploy um áudio saiu e
+chegou ao status `entregue`** — ou seja, a operadora baixou o link ASSINADO e entregou no
+celular do destinatário. Zero ocorrências de `[arquivo-privado]` nos registros da função, e a
+função inicializa em 30ms sem erro de importação.
+
+⚠️ **Só o áudio está provado depois do deploy.** Imagem, vídeo e documento passam pela MESMA
+linha (`wapiBody.file`), então o risco é baixo — mas "o caminho do código é o mesmo" é
+argumento, não evidência. Quando alguém mandar os outros três no uso normal, fica provado.
+
+🔴 **`supabase/config.toml` não listava `whatsapp-send`**, embora a função no ar já tivesse
+`verify_jwt = false`. Um `supabase functions deploy` sem `--no-verify-jwt` teria trocado essa
+configuração de produção sem ninguém pedir. Corrigido no mesmo dia, com o motivo escrito no
+arquivo. **Vale conferir se outras funções têm a mesma defasagem.**
 
 ### Passo 4 — Dividir `email-assets`
 
@@ -512,6 +673,32 @@ todo mundo** (a regra nova não consegue dizer de que empresa eles são).
 Mesma coisa, em menor escala, para `whatsapp-media`: 1 mídia recebida de uma empresa que não
 existe mais e 51 enviadas em conversas que não existem mais. Aqui a decisão pode ser diferente
 — são 52 arquivos órfãos, e deixá-los inacessíveis pode ser aceitável. **Decisão do Lucas.**
+
+#### Passo 5 — a parte de CÓDIGO feita em 27/08/2026; a de DADOS ainda não
+
+**A medição de 27/08 corrige o plano em dois pontos.**
+
+**1. O problema é ATIVO, não só herdado.** Os dois pontos de upload gravavam em
+`{uuid-aleatório}/{nome}` — nunca na pasta da empresa. Não era um resíduo antigo: **todo anexo
+enviado pela tela nascia fora do padrão**, e os 22 iam virar 23, 24… Corrigido para
+`{empresa_id}/{uuid}/{nome}`; o `uuid` fica no meio, que é o que evita colisão de nome. Sem
+empresa identificada, o upload agora RECUSA em vez de gravar num lugar sem dono.
+
+**2. Não são 40 arquivos para mover — são 12.** Dos 40 fora do padrão, **28 não têm negócio
+nenhum apontando para eles**: 18 na raiz com nome aleatório (16–27/07) e 10 em pasta de UUID
+(27/07–11/08), todos com zero referências. São restos de formulário abandonado. Mover arquivo
+que ninguém referencia não serve para nada.
+
+Os 12 que importam são todos da **MD Representações**, de 19 a 21/08, e cada um tem exatamente
+um negócio apontando. A operação de dados é: mover 12 objetos e atualizar 12 `pdf_url`.
+
+**O que fazer com os 28 restos é decisão do Lucas.** Deixar onde estão custa nada (ficam
+inacessíveis depois do Passo 6, e ninguém sente falta); apagar recupera ~8 MB. Não há terceira
+opção útil.
+
+**`whatsapp-media`:** 7.158 objetos — 6.137 em `incoming/{empresa}` válida, 969 em pasta de
+conversa que existe, **1 com empresa inválida e 51 de conversas que sumiram**. Os 52 órfãos não
+têm dono possível: nenhuma regra consegue atribuí-los. Ficam inacessíveis. Mesma decisão.
 
 ### Passo 6 — 🔴 Trocar as regras de leitura (é este passo que fecha de verdade)
 

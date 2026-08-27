@@ -12,6 +12,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { NovoNegocioDialog } from '@/components/pedidos/NovoNegocioDialog';
 import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra, useUpdateContato } from '@/hooks/use-mutations';
+import { useSalvarObrasDoContato } from '@/hooks/use-obra-contatos';
+import { Checkbox } from '@/components/ui/checkbox';
 import { SeletorMarcadorObra } from '@/components/obras/SeletorMarcadorObra';
 import { CampoCnpj } from '@/components/shared/CampoCnpj';
 import { validarCnpjDaObra } from '@/lib/obra-cnpj';
@@ -38,10 +40,10 @@ import { ColumnSettings, type ColumnDefinition } from '@/components/shared/Colum
 import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
 import { parseMoedaBRL } from '@/lib/moeda';
 import { useTableSettings } from '@/hooks/use-table-settings';
-import { repairCorruptedBitrixUrl } from '@/lib/repair-bitrix-url';
 import { CargoSelect } from '@/components/shared/CargoSelect';
 import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEmailDialog';
 import { slugify } from '@/lib/utils';
+import { LinkAnexoPrivado } from '@/components/shared/LinkAnexoPrivado';
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
 const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física', condominio: 'Condomínio', hospital: 'Hospital', distribuidor: 'Distribuidor', hotel: 'Hotel', escola: 'Escola', instalador: 'Instalador' };
@@ -312,6 +314,7 @@ const ClienteDetalhe = () => {
   const updateCliente = useUpdateCliente();
   const deleteCliente = useDeleteCliente();
   const createContato = useCreateContato();
+  const salvarObrasDoContato = useSalvarObrasDoContato();
   const deleteContato = useDeleteContato();
   const { data: contatos } = useContatos();
   const [editOpen, setEditOpen] = useState(false);
@@ -553,7 +556,7 @@ const ClienteDetalhe = () => {
   const { data: camposConfigContatos } = useConfiguracoesCampos('contatos', empresaId);
 
   // Novo contato extra
-  const [novoContato, setNovoContato] = useState({ nome_contato: '', cargo: '', email: '', telefone: '', obraId: '' });
+  const [novoContato, setNovoContato] = useState({ nome_contato: '', cargo: '', email: '', telefone: '', obraIds: [] as string[] });
   const [novoContatoCamposExtras, setNovoContatoCamposExtras] = useState<Record<string, string>>({});
   const handleAddContato = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -579,18 +582,25 @@ const ClienteDetalhe = () => {
       }
     }
     try {
-      await createContato.mutateAsync({
+      const criado = await createContato.mutateAsync({
         empresa: cliente.empresa,
         cliente_id: cliente.id,
         nome_contato: novoContato.nome_contato.trim(),
         cargo: novoContato.cargo.trim() || undefined,
         email: novoContato.email.trim() || undefined,
         telefone: novoContato.telefone.trim() || undefined,
-        obra_id: novoContato.obraId || null,
         campos_extras: novoContatoCamposExtras,
       });
+      // O vínculo com obras é gravado depois, na tabela própria — só existe id agora.
+      if (criado?.id && novoContato.obraIds.length > 0) {
+        try {
+          await salvarObrasDoContato.mutateAsync({ contatoId: criado.id, obraIds: novoContato.obraIds });
+        } catch {
+          toast.warning('Contato criado, mas não deu para vincular as obras.');
+        }
+      }
       toast.success('Contato adicionado!');
-      setNovoContato({ nome_contato: '', cargo: '', email: '', telefone: '', obraId: '' });
+      setNovoContato({ nome_contato: '', cargo: '', email: '', telefone: '', obraIds: [] });
       setNovoContatoCamposExtras({});
       setAddContatoOpen(false);
     } catch (err: any) {
@@ -747,14 +757,7 @@ const ClienteDetalhe = () => {
         return (
           <TableCell key={colId} onClick={e => e.stopPropagation()}>
             {p.pdf_url ? (
-              <a
-                href={repairCorruptedBitrixUrl(p.pdf_url)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-primary hover:underline"
-              >
-                <FileText className="h-3.5 w-3.5" /> PDF
-              </a>
+              <LinkAnexoPrivado url={p.pdf_url} />
             ) : '—'}
           </TableCell>
         );
@@ -1378,7 +1381,11 @@ const ClienteDetalhe = () => {
                             {c.cargo ? <Badge variant="outline">{c.cargo}</Badge> : <span className="text-muted-foreground text-xs">-</span>}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm" onClick={e => e.stopPropagation()}>
-                            {c.obra?.nome_obra || '-'}
+                            {/* Lista: o contato pode responder por mais de uma obra. */}
+                            {(c.vinculos_obra as { obra?: { nome_obra?: string | null } }[] | undefined ?? [])
+                              .map((v) => v.obra?.nome_obra)
+                              .filter(Boolean)
+                              .join(', ') || '-'}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm" onClick={e => e.stopPropagation()}>{c.email || '-'}</TableCell>
                           <TableCell className="text-muted-foreground text-sm" onClick={e => e.stopPropagation()}>{c.telefone || '-'}</TableCell>
@@ -1428,25 +1435,37 @@ const ClienteDetalhe = () => {
                         onValueChange={v => setNovoContato(c => ({ ...c, cargo: v }))}
                       />
                     </div>
+                    {/* Marcação múltipla: uma pessoa pode responder por vários canteiros
+                        (decisão de 27/08/2026). Nenhuma marcada = contato da empresa toda. */}
                     {cliente.obras && cliente.obras.length > 0 && (
                       <div className="space-y-2">
-                        <Label>Obra</Label>
-                        <Select
-                          value={novoContato.obraId || '__nenhuma__'}
-                          onValueChange={v => setNovoContato(c => ({ ...c, obraId: v === '__nenhuma__' ? '' : v }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Contato da empresa toda" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__nenhuma__">Contato da empresa toda</SelectItem>
-                            {cliente.obras.map((obra) => (
-                              <SelectItem key={obra.id} value={obra.id}>{obra.nome_obra || 'Obra sem nome'}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Label>Obras deste contato</Label>
+                        <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-border p-2">
+                          {cliente.obras.map((obra) => {
+                            const marcada = novoContato.obraIds.includes(obra.id);
+                            return (
+                              <label
+                                key={obra.id}
+                                className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm transition-colors hover:bg-accent/50"
+                              >
+                                <Checkbox
+                                  checked={marcada}
+                                  onCheckedChange={() =>
+                                    setNovoContato(c => ({
+                                      ...c,
+                                      obraIds: marcada
+                                        ? c.obraIds.filter(x => x !== obra.id)
+                                        : [...c.obraIds, obra.id],
+                                    }))
+                                  }
+                                />
+                                <span className="min-w-0 truncate">{obra.nome_obra || 'Obra sem nome'}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
                         <p className="text-xs text-muted-foreground">
-                          Opcional. Vincule quando este contato falar especificamente por uma obra, não pela empresa toda.
+                          Opcional. Marque quando este contato falar por obras específicas, não pela empresa toda.
                         </p>
                       </div>
                     )}
@@ -1517,7 +1536,11 @@ const ClienteDetalhe = () => {
                           try {
                             await updateContato.mutateAsync({
                               id: selectedContatoId,
-                              empresa: cliente.empresa
+                              empresa: cliente.empresa,
+                              // Grava a CHAVE junto com o nome: vincular só pelo texto
+                              // deixava o contato de fora de qualquer consulta que
+                              // filtra por `cliente_id` — inclusive o seletor da obra.
+                              cliente_id: cliente.id,
                             });
                             toast.success('Contato vinculado com sucesso!');
                             setVincularContatoOpen(false);

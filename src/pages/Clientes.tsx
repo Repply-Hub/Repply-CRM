@@ -1555,7 +1555,22 @@ const Clientes = () => {
               })}
             </div>
             <div className="hidden md:block rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-auto flex-1 min-h-0">
-              <table className="w-full text-sm table-fixed" style={{ width: clientesTableTotalWidth }}>
+                {/* 🔴 `minWidth: '100%'` — as colunas repartem o espaço que sobra.
+                    A largura em pixels continua sendo a soma das colunas (é ela que faz o
+                    redimensionar funcionar), mas o `min-width` obriga a tabela a ocupar a
+                    caixa inteira quando essa soma é MENOR que a tela. O navegador então
+                    distribui a sobra entre as colunas, na proporção da largura de cada uma.
+
+                    Vale para as DUAS tabelas desta tela, e o efeito é diferente em cada uma:
+
+                    • Contatos tem 7 colunas. Antes de 26/08/2026 elas somavam 1.090px numa
+                      caixa de 1.600 e sobravam 509px de branco à direita — era o defeito.
+                      Medido no navegador, com a tabela reproduzida isolada.
+
+                    • Empresas tem 17 colunas, que já passam da largura da tela. Ali o
+                      `min-width` não faz nada e a tabela rola como sempre rolou. Por isso o
+                      vão só aparecia em Contatos. */}
+              <table className="text-sm table-fixed" style={{ width: clientesTableTotalWidth, minWidth: '100%' }}>
                 <colgroup>
                   <col style={{ width: CLIENTES_CHECKBOX_COL_WIDTH }} />
                   {visibleColumns.map((colId, i) => (
@@ -1744,7 +1759,7 @@ const Clientes = () => {
               ))}
             </div>
             <div className="hidden md:block rounded-lg border border-border/60 border-b-0 rounded-b-none overflow-auto flex-1 min-h-0">
-              <table className="w-full text-sm table-fixed" style={{ width: clientesTableTotalWidth }}>
+              <table className="text-sm table-fixed" style={{ width: clientesTableTotalWidth, minWidth: '100%' }}>
                 <colgroup>
                   <col style={{ width: CLIENTES_CHECKBOX_COL_WIDTH }} />
                   {visibleColumns.map((colId, i) => (

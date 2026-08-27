@@ -57,7 +57,12 @@ async function fetchAllContatos() {
   while (hasMore) {
     const query = supabase
       .from('contatos')
-      .select('*, cliente:clientes!cliente_id(id, empresa), criado_por_usuario:usuarios!criado_por_usuario_id(nome), obra:obras!obra_id(id, nome_obra)')
+      // As obras do contato vêm pela tabela de vínculo (`obra_contatos`), não mais
+      // pelo embed `obra:obras!obra_id`. Ler a coluna antiga aqui seria pior que
+      // inútil: além de mostrar só o vínculo legado, o PostgREST recusaria a consulta
+      // INTEIRA quando `contatos.obra_id` for derrubada — e a lista de contatos do
+      // sistema pararia de carregar junto.
+      .select('*, cliente:clientes!cliente_id(id, empresa), criado_por_usuario:usuarios!criado_por_usuario_id(nome), vinculos_obra:obra_contatos(obra:obras!obra_id(id, nome_obra))')
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
 

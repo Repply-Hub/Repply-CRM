@@ -18,6 +18,16 @@ verify_jwt = false
 [functions.whatsapp-webhook]
 verify_jwt = false
 
+# 🔴 Estava FALTANDO aqui até 26/08/2026, embora a função no ar já tivesse
+# verify_jwt = false desde sempre. Sem esta entrada, um `supabase functions deploy`
+# aplicaria o padrão (true) e trocaria a configuração de produção sem ninguém pedir.
+#
+# Ficar em false é seguro aqui porque a função confere a sessão no próprio corpo:
+# sem cabeçalho Authorization devolve 401, com JWT inválido devolve 401, e usuário
+# que não existe na tabela `usuarios` devolve 404.
+[functions.whatsapp-send]
+verify_jwt = false
+
 # O Stripe chama este endpoint sem JWT do Supabase: a autenticidade vem da
 # assinatura no header stripe-signature, conferida dentro da função.
 # stripe-checkout e stripe-portal NÃO entram aqui — exigem sessão do usuário.

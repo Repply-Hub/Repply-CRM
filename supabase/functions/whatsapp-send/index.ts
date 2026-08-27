@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeWhatsappPhone, varianteDoNumero } from "../_shared/whatsapp.ts";
+import { enderecoParaQuemBaixaDeFora } from "../_shared/arquivo-privado.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -330,9 +331,14 @@ serve(async (req) => {
         documento: 'document',
       };
       wapiUrl = `${baseUrl}/send/media`;
+      // O que a operadora recebe é um LINK que ela vai baixar — não o arquivo. Por isso o
+      // endereço precisa ser alcançável de fora, e por isso ele é assinado com validade curta
+      // em vez de ser o endereço público eterno de hoje. Ver Passo 3 do plano dos baldes
+      // privados. Endereço que não é do nosso armazenamento passa intacto.
+      const arquivoParaOperadora = await enderecoParaQuemBaixaDeFora(supabase, media_url);
       const wapiBody: Record<string, unknown> = {
         type: typeMap[tipo] ?? 'document',
-        file: media_url,
+        file: arquivoParaOperadora,
       };
       if (mensagem) wapiBody.text = assinarRemetente ? withRemetente(userData.nome, mensagem) : mensagem;
       if (tipo === 'documento' && nome_arquivo) wapiBody.docName = nome_arquivo;
