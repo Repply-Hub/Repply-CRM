@@ -161,6 +161,44 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
+    // A function grava com service_role (ignora RLS), então o único cadeado contra
+    // gravar no espaço de OUTRA empresa é conferir aqui que o empresaId pedido bate
+    // com a empresa real de quem está autenticado — sem isto, qualquer usuário logado
+    // podia mandar um empresaId alheio e a function gravava lá.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Não autenticado" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.replace("Bearer ", ""),
+    );
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Sessão inválida" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: caller } = await supabase
+      .from("usuarios")
+      .select("empresa_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!caller?.empresa_id || caller.empresa_id !== empresaId) {
+      console.warn(
+        `[resolve-pedido-anexo] empresaId divergente: usuario_id=${user.id} empresa_real=${caller?.empresa_id ?? "nenhuma"} empresa_pedida=${empresaId}`,
+      );
+      return new Response(
+        JSON.stringify({ error: "empresaId não corresponde ao usuário autenticado" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const results = await resolveBatch(supabase, urls, empresaId);
 
     return new Response(JSON.stringify({ results }), {

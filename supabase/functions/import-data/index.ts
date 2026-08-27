@@ -200,6 +200,51 @@ Deno.serve(async (req) => {
       );
     }
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceRoleKey) throw new Error('Variáveis SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY não configuradas');
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // A function grava com service_role (ignora RLS), então o único cadeado contra
+    // gravar no espaço de OUTRA empresa é conferir aqui que o empresaId pedido bate
+    // com a empresa real de quem está autenticado — sem isto, qualquer usuário logado
+    // podia mandar um empresaId alheio e a function gravava lá. Mesmo padrão de
+    // resolve-pedido-anexo.
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Não autenticado' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', ''),
+    );
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Sessão inválida' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: caller } = await supabase
+      .from('usuarios')
+      .select('empresa_id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!caller?.empresa_id || caller.empresa_id !== empresaId) {
+      console.warn(
+        `[import-data] empresaId divergente: usuario_id=${user.id} empresa_real=${caller?.empresa_id ?? 'nenhuma'} empresa_pedida=${empresaId}`,
+      );
+      return new Response(
+        JSON.stringify({ error: 'empresaId não corresponde ao usuário autenticado' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     console.log(`[import-data] início — importType=${importType}, empresaId=${empresaId}, tamanho do conteúdo=${fileContent.length} bytes`);
 
     const geminiKey = Deno.env.get('GEMINI_API_KEY');
@@ -238,12 +283,6 @@ Deno.serve(async (req) => {
       ...row,
       empresa_id: empresaId,
     }));
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    if (!supabaseUrl || !serviceRoleKey) throw new Error('Variáveis SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY não configuradas');
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const INSERT_BATCH_SIZE = 500;
     let totalInserted = 0;

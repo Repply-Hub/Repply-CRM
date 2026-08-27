@@ -32,6 +32,46 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    // A function grava com service_role (ignora RLS). Sem chamador algum hoje (nem em
+    // src/, nem em docs/ nem em workflow de automação — conferido por grep), então o
+    // conserto é exigir sessão válida e o mesmo papel que a RLS de escrita já pede
+    // (licencas_extremoz_write: empresa_tem_secao('portal') AND is_gestor()) — sem isto,
+    // qualquer requisição sem login conseguia inserir ou apagar a tabela inteira.
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ success: false, error: 'Não autenticado' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', ''),
+    );
+    if (authError || !user) {
+      return new Response(JSON.stringify({ success: false, error: 'Sessão inválida' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const GESTOR_ROLES = ['gestor', 'admin', 'empresa'];
+    const { data: caller } = await supabase
+      .from('usuarios')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!caller?.role || !GESTOR_ROLES.includes(caller.role)) {
+      console.warn(
+        `[import-licencas] papel insuficiente: usuario_id=${user.id} role=${caller?.role ?? 'nenhum'}`,
+      );
+      return new Response(
+        JSON.stringify({ success: false, error: 'Apenas gestores podem importar licenças' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     const { rows, clear_existing } = await req.json() as { rows: LicencaRow[]; clear_existing?: boolean };
 
     if (!rows || !Array.isArray(rows) || rows.length === 0) {
