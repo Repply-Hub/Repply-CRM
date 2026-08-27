@@ -483,6 +483,41 @@ o orçamento sem estar logada — o fim disso é o objetivo do projeto, não um 
 5.175 encontram um objeto real, zero órfãos**; 4 externos (CDN do Bitrix) que passam intactos.
 258 testes passando; tipo em 35 e lint sem subir em nenhum dos 4 arquivos.
 
+#### 2.3 — Caixa do WhatsApp: FEITO em 26/08/2026
+
+**13 pontos, não 11.** Dois blocos, cada um com sua estratégia:
+
+· **`MessageContent`** (a bolha da conversa) recebe o resolvedor por propriedade e calcula
+  `midiaUrl` UMA vez no topo. A mesma mídia é usada em até três lugares no mesmo ramo — a
+  tag, o clique que amplia e o que abre em outra aba —, e é aí que uma passaria despercebida.
+  As CONDIÇÕES (`msg.tipo === "imagem" && msg.media_url`) continuam olhando o valor gravado:
+  perguntam "existe mídia?", e a resposta não pode depender de a assinatura ter chegado.
+· **`LeadSheet`** (a galeria da ficha) assina o próprio lote, porque busca as próprias
+  mensagens com `useWaMensagens`, separado da conversa aberta.
+
+O componente principal assina em lote a conversa aberta e passa adiante: um pedido por balde,
+não um por mídia — a conversa desenha 50 mensagens de uma vez.
+
+**Varredura completa do arquivo (8.842 linhas), não só busca por `media_url`:** as outras 12
+tags de mídia são o QR do painel (data URI), prévia local do que está sendo enviado (`blob:`),
+o ampliador (que já recebe o endereço assinado) e 8 avatares — que são o balde `avatars`,
+módulo 4. **A foto de perfil do contato do WhatsApp NÃO é nossa:** as 650 apontam para
+`whatsapp.net`, zero no nosso armazenamento. Passa intacta, e o fechamento não a afeta.
+
+**Medido:** 6.988 mensagens com mídia — 6.916 no nosso armazenamento, **todas as 6.916
+encontram objeto real, zero órfãos**; 72 externas. 258 testes; tipo em 35; lint 5 → 5.
+
+##### 🔴 Uma coisa para resolver ANTES do Passo 7, não agora
+
+O resolvedor devolve o endereço de HOJE enquanto a assinatura não chega, e só então troca.
+Hoje isso é o certo: a mídia aparece na hora e a troca é imperceptível.
+
+**Depois que o balde fechar, essa primeira renderização passa a apontar para um endereço
+morto** — imagem quebrada por uma fração de segundo antes de o link assinado chegar. Não
+quebra nada, mas pisca. No Passo 6/7, trocar `enderecoDe` para devolver `null` enquanto
+carrega (e a tela mostrar um vazio calmo) resolve. Fazer isso ANTES seria trocar uma tela que
+funciona por uma que pisca sem motivo.
+
 ### Passo 3 — WhatsApp: assinar o link antes de entregar à operadora
 
 **O que faz.** Em `supabase/functions/whatsapp-send/index.ts`, antes de montar o corpo do POST
