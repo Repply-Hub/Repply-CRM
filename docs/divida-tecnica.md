@@ -27,7 +27,7 @@ acrescentados em 21/08/2026.
 | 10 | [Resend preparado e nunca concluído](#10-resend-preparado-e-nunca-concluído) | Baixa | Não |
 | 11 | [Apelidos de `vendedor`](#11-apelidos-de-vendedor) | Baixa | Não |
 | 12 | [TypeScript configurado frouxo](#12-typescript-configurado-frouxo) | Baixa | Não |
-| 13 | [Duas gerações de política em `clientes`](#13-duas-gerações-de-política-em-clientes) | **Alta** | Não |
+| 13 | [Duas gerações de política em `clientes`](#13-duas-gerações-de-política-em-clientes) | ✅ Resolvida | Corrigido na migration `20260826120000` |
 | 14 | [Coluna `import_hash` sem migration](#14-coluna-import_hash-sem-migration) | Média | Não |
 | 15 | [Código morto em `Negocios.tsx`](#15-código-morto-em-negociostsx) | Baixa | Não |
 | 16 | [Webhook do WhatsApp aceita qualquer um](#16-o-webhook-do-whatsapp-aceita-qualquer-um) | **Crítica** | Não |
@@ -47,6 +47,9 @@ acrescentados em 21/08/2026.
 | 30 | [Miudezas do módulo Calendário](#30-miudezas-do-módulo-calendário) | Baixa | Não |
 | 31 | [Exceções da seleção em massa viajam na URL](#31-a-lista-de-exceções-da-seleção-em-massa-viaja-na-url-e-trava-em-800) | Média | Trava a operação acima de ~800 e não explica por quê |
 | 32 | [Cópia sem uso da chave do Resend no Vault](#32-cópia-sem-uso-da-chave-do-resend-no-vault) | Baixa | Não — higiene de credencial |
+| 33 | [O WhatsApp não tem contagem de envio nenhuma](#33-o-whatsapp-não-tem-contagem-de-envio-nenhuma) | **Alta** | Não hoje — mas um número da MD é compartilhado por 13 pessoas, sem trava |
+| 34 | [A etapa da configuração não é verificada contra a tela](#34-a-etapa-gravada-na-configuração-não-é-verificada-contra-a-tela) | Média | Já travou o Novo Negócio 3 vezes — campo obrigatório sem onde preencher |
+| 35 | [Logo de e-mail é um arquivo único para todas as empresas](#35-logo-de-e-mail-é-um-arquivo-único-para-todas-as-empresas) | Média | Não hoje (só 1 empresa paga usa) — mas quebra a próxima |
 
 ---
 
@@ -444,7 +447,14 @@ caminho é apertar por arquivo, à medida que os arquivos forem tocados por outr
 
 ## 13. Duas gerações de política em `clientes`
 
-**Gravidade: alta. É segurança, não organização.**
+**Gravidade: alta. ✅ CORRIGIDO em 26/08/2026, migration
+`20260826120000_fase2_gaps_criticos_permissao.sql`.**
+
+É o gêmeo exato do bug corrigido em `pedidos` pela migration
+`20260824143000_pedidos_rls_fase_zero.sql` — aquela migration, ao corrigir `pedidos`, já
+apontava que faltava fazer o mesmo aqui. `clientes_select/insert/update/delete` (abril/2026)
+já eram as regras corretas; o conserto foi só apagar a política antiga que convivia com elas
+(texto original do achado abaixo, mantido como registro).
 
 Coexistem duas políticas de acesso multi-empresa na tabela `clientes`:
 
@@ -1262,6 +1272,143 @@ achando que é a que vale. Nada quebra hoje.
 **Conserto:** apagar `RESEND_API_KEY` do Vault e `Resend_api_key` dos secrets das Edge
 Functions. Depois **republicar a função** — segredo trocado não afeta instância já morna — e
 conferir que `aviso_nome_do_segredo` sumiu do registro em `automation_logs`.
+
+---
+
+## 33. O WhatsApp não tem contagem de envio nenhuma
+
+**Gravidade: alta. Não bloqueia nada hoje — e é por sorte, não por desenho.**
+
+**Medido em 26/08/2026:**
+
+```
+limite de frequência em supabase/functions/whatsapp-send   ->  NÃO EXISTE
+                                     para texto            ->  nenhum
+                                     para mídia            ->  nenhum
+
+MD Representações  ->  número 1: 13 pessoas ligadas   (conectado)
+                       número 2: 12 pessoas ligadas   (conectado)
+```
+
+A conexão com o WhatsApp é por **API não oficial**. Número que dispara muita mensagem em pouco
+tempo é derrubado, e perder o número é perder operação — não funcionalidade.
+
+**Por que ninguém sentiu ainda:** todo envio é hoje um humano digitando na caixa de entrada, um
+de cada vez. O ritmo humano é a única trava que existe. Qualquer código novo que mande mensagem
+em laço, ou qualquer pessoa com acesso ao console do navegador, passa por cima disso sem
+encontrar nada.
+
+🔴 **O teto tem que ser por NÚMERO, não por pessoa.** Treze pessoas com dez envios cada dão 130
+disparos de um único aparelho — e quem o WhatsApp bane é o aparelho. Foi essa conta que corrigiu
+o desenho do drive de catálogos, e é o erro que qualquer trava por usuário vai repetir.
+
+### Por que não foi corrigido junto com o drive de catálogos
+
+`whatsapp-send` é o **caminho crítico do atendimento**. Um representante numa conversa rápida
+manda muitas mensagens em pouco tempo, de forma inteiramente legítima — uma trava genérica ali
+quebraria o atendimento para proteger o catálogo. O envio de catálogo ganhou trava própria, no
+seu próprio caminho.
+
+### O conserto, quando for a hora
+
+O mecanismo desenhado para o catálogo serve inteiro:
+[`superpowers/specs/2026-08-26-drive-de-catalogos-design.md`](superpowers/specs/2026-08-26-drive-de-catalogos-design.md) §8.
+
+1. Registrar cada envio com `instancia_id`, `usuario_id` e a hora
+2. Contar **no servidor**, dentro da função — botão desabilitado não protege de nada
+3. Dois tetos: por número (o que protege o ativo) e por pessoa (o que limita abuso)
+4. A mensagem de recusa diz **quando libera** e **de quem é o limite** — aviso sem horário faz a
+   pessoa clicar de novo, e "você atingiu seu limite" para quem mandou duas mensagens parece bug
+
+---
+
+## 34. A etapa gravada na configuração não é verificada contra a tela
+
+**Gravidade: média. Já travou o assistente de Novo Negócio TRÊS vezes.**
+
+A aba **Campos** das Configurações deixa cada empresa marcar um campo como obrigatório e
+dizer em que **etapa** do assistente ele vive (`configuracoes_campos.etapa`). A tela, por
+outro lado, decide onde desenhar cada campo **no código**.
+
+🔴 **Nada liga as duas coisas.** Elas combinam por acordo tácito, e quando desencontram o
+resultado é sempre o mesmo: **um campo obrigatório sem lugar onde ser preenchido**. O botão
+some, sem mensagem, e não há como sair do passo.
+
+### As três vezes
+
+| quando | o quê | como foi resolvido |
+|---|---|---|
+| antes de 08/2026 | `proximo_contato` saiu da tela; a linha de configuração ficou | exceção escrita à mão em `NovoNegocioDialog` |
+| — | `obra_id` não é desenhado quando a seção Obras está desligada | segunda exceção à mão |
+| **26/08/2026** | `anexo_pdf` foi movido para o passo 2; a configuração continuou dizendo passo 1 | migration `20260826234500`, e mais dois consertos no código (commit `841c7d63`) |
+
+O terceiro caso mostra por que exceção à mão não é conserto: o campo **existia** e **devia**
+continuar obrigatório — só tinha mudado de passo. Uma exceção teria escondido o problema em
+vez de alinhar as duas verdades.
+
+E ele veio acompanhado de dois defeitos DORMENTES que a mudança acordou: o botão "Próximo" e o
+`handleNext` exigiam o passo 2 completo para sair do passo 1. Eram inofensivos enquanto o
+passo 2 não tinha campo obrigatório nenhum.
+
+### O estado hoje: consistente, mas sem rede
+
+Medido em 26/08/2026, depois dos consertos — as 12 chaves configuradas são todas conhecidas
+pelo código, e cada uma é desenhada no passo que a configuração declara:
+
+```
+obrigatórios do PASSO 1 ... cliente_id, data_pedido, fabricante_id, vendedor_id
+obrigatórios do PASSO 2 ... anexo_pdf
+```
+
+**Não há incêndio aberto.** O que não existe é o que impede o próximo desencontro — e ele vem
+de graça no dia em que alguém mover um campo de passo, esconder um por seção, ou acrescentar
+uma chave em `configuracoes_campos` que a tela não conhece.
+
+### O conserto, por ordem de custo
+
+1. **Uma fonte só para "que campo vive em que passo".** Hoje isso está em dois lugares: a
+   ordem do JSX e a coluna `etapa`. Declarar um mapa em código e usá-lo tanto para desenhar
+   quanto para validar acaba com a classe inteira de bug — as duas verdades viram uma.
+2. **Um aviso em desenvolvimento** quando chega configuração com `campo_key` que o mapa não
+   conhece. Barato, e transforma "o botão não habilita" em "este campo não existe na tela".
+3. **Enquanto nenhum dos dois existir:** ao mover um campo de passo, mover a linha de
+   `configuracoes_campos` na MESMA entrega, e conferir com
+
+   ```sql
+   select campo_key, etapa, bool_or(obrigatorio) from configuracoes_campos
+    where entidade = 'pedidos' and origem = 'padrao' group by 1,2 order by 1;
+   ```
+
+---
+
+## 35. Logo de e-mail é um arquivo único para todas as empresas
+
+**Gravidade: média. Achado em 26/08/2026, durante a correção dos gaps de permissão da
+Fase 2 (auditoria de RLS/Storage). Não é um dos 4 itens daquela fase — registrado à parte.**
+
+O bucket `email-assets` guarda a logo usada na assinatura de e-mail sob um caminho **fixo e
+único**, sem `empresa_id` nenhum: `logo-email.png`. A referência é uma constante
+(`LOGO_EMAIL_URL` em `src/lib/assinatura-email.ts`), não uma função de `empresa_id` — usada
+igual em `Configuracoes.tsx` e `Emails.tsx`.
+
+Na prática: é o **mesmo arquivo** para qualquer empresa que use o Repply CRM. Se a empresa B
+trocar a logo do e-mail dela, a logo de todo mundo muda junto — inclusive a da MD
+Representações — porque é o mesmo objeto no Storage. Um comentário do próprio código
+(`Configuracoes.tsx`, função `uploadEmailLogo`) já registra a intenção errada: *"o path é
+fixo de propósito (uma logo por empresa hoje)"* — a frase descreve o que deveria acontecer,
+não o que o caminho do arquivo realmente permite.
+
+**Por que não foi mexido agora:** hoje só a MD Representações usa a função de verdade, então
+o sintoma (logo de uma empresa vazando pra outra) ainda não apareceu. Mas é o tipo de bug que
+só aparece quando a segunda empresa paga mexe nessa tela — e aí já é incidente visível pro
+cliente, não achado de auditoria. Resolver direito não é só política de RLS: exige mudar o
+caminho para algo como `{empresa_id}/logo-email.png`, migrar a logo já cadastrada da MD para
+o novo caminho, e trocar `LOGO_EMAIL_URL` de constante para função de `empresa_id` em todo
+lugar que a usa (achado por enquanto em `assinatura-email.ts`, `Configuracoes.tsx` e
+`Emails.tsx`) — maior que uma migration de RLS, por isso ficou de fora da Fase 2.
+
+**Como conferir:** `supabase.storage.from('email-assets').list()` mostra um único
+`logo-email.png` na raiz do bucket, sem pasta por empresa.
 
 ---
 
