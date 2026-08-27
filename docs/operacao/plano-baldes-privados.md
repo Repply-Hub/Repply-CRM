@@ -90,6 +90,50 @@ demanda trabalho de verdade em várias telas.
 
 ---
 
+## 2.4 🔴 RE-MEDIÇÃO EM 27/08/2026 — o retrato de 24/08 está desatualizado
+
+Outra sessão mexeu nos baldes enquanto este plano era executado. O quadro real hoje:
+
+| Balde | `public` | Objetos | Estranho consegue LISTAR? | Estranho consegue BAIXAR? |
+|---|---|---:|---|---|
+| `pedido-anexos` | sim | 14.997 | **não** (14.997 → 0) | **sim** |
+| `whatsapp-media` | sim | 7.199 | **sim** | **sim** |
+| `chat-files` | sim | 220 | **sim** | **sim** |
+| `email-assets` | sim | 112 | **sim** | **sim** |
+| `avatars` | sim | 24 | sim | sim — decisão §8 |
+| `branding` | sim | 0 | — | — |
+| `fabricante-arquivos` | **não** | 2 | não | não |
+
+**O que mudou, e é bom:** a política `pedido_anexos_select` (27/08, outra sessão) fechou a
+ENUMERAÇÃO do maior balde. Um estranho não consegue mais pedir a lista dos 14.997 anexos.
+Nasceu também `fabricante-arquivos`, privado desde o berço — o padrão certo. E
+`catalogo-produtos` deixou de existir.
+
+**O que NÃO mudou, e é o ponto:** medido com um PDF real de 682 kB em 27/08, **sem nenhuma
+credencial**:
+
+```
+/object/public/pedido-anexos/{pasta}/{arquivo}.pdf   → HTTP 200, 681.955 bytes
+/object/pedido-anexos/{pasta}/{arquivo}.pdf          → HTTP 200, 681.955 bytes
+```
+
+Enquanto `public = true`, o armazenamento **pula a autorização** — as duas portas. A política
+que a outra sessão escreveu está correta e está INERTE para leitura. Ela só passa a valer no
+Passo 7. É a §5.5 deste plano, agora com prova viva.
+
+**Consequência para a prioridade:** o balde mais exposto hoje não é mais `pedido-anexos` (que
+exige saber o caminho exato, com UUID) e sim **`whatsapp-media`: 7.199 arquivos, 2,3 GB de
+conversa com cliente, enumeráveis por qualquer um.**
+
+### Os 40 arquivos fora da pasta têm `owner_id` — e isso muda o Passo 5
+
+Medido: **40 de 40** têm `owner_id` gravado, todos apontando para um usuário conhecido. Como
+`pedido_anexos_select` tem o ramo `owner_id = auth.uid()`, esses arquivos **não ficam invisíveis
+para todos** depois do fechamento — ficam visíveis só para **quem os enviou**.
+
+Ainda é comportamento quebrado num CRM (o gestor precisa abrir o orçamento do vendedor), então
+mover os 12 continua valendo. Mas não é a emergência que o plano descrevia.
+
 ## 3. Onde os endereços públicos estão gravados no banco
 
 | Coluna | Preenchidos | Endereço público do nosso Storage | Balde | Objeto existe? |
