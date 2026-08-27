@@ -585,8 +585,21 @@ function conversaNaoLida(
   return conv.nao_lidas_forcada || conv.nao_lidas > 0;
 }
 
-// Uma conversa sem responsável só entra na fila "Não atribuídos" quando
-// `precisa_atribuicao` está marcada. Não usar ultima_mensagem_direcao aqui: o
+// 🔴 CONSERTO DE 27/08/2026 — antes, esta função exigia TAMBÉM `precisa_atribuicao`, e
+// conversa sem responsável com a marca baixa não entrava em grupo NENHUM: nem "Não
+// atribuídos", nem "Atribuídos a mim", nem "Outros atendentes". Ela simplesmente sumia da
+// caixa, e só a busca achava (a busca não passa por este filtro).
+//
+// Medido no dia: 17 conversas escondidas, 79 mensagens não lidas, em DOIS clientes pagantes
+// — o pior caso com 6 mensagens paradas havia 23 horas. A marca agora é levantada pelo
+// webhook em todo caminho (inclusive chamada de voz), mas a tela deixou de DEPENDER dela
+// para existir: nenhuma conversa pode sumir em silêncio por causa de uma marca que falhou.
+//
+// A marca `precisa_atribuicao` continua existindo e sendo levantada pelo webhook — ela
+// alimenta o contador de "quem já olhou" (`wa_registrar_visualizacao`). O que mudou é que
+// ela deixou de decidir se a conversa APARECE.
+//
+// Não usar ultima_mensagem_direcao aqui: o
 // webhook seta "saida" tanto pra mensagem enviada pelo CRM (aí sim resolvido,
 // mas nesse caso whatsapp-send já garante um responsável) quanto pra mensagem
 // refletida do celular físico/WhatsApp Web reabrindo uma conversa fechada —
@@ -596,10 +609,9 @@ function conversaNaoLida(
 // em supabase/functions/whatsapp-webhook/index.ts) e volta a false assim que
 // alguém assume (useWaSetResponsaveis).
 function precisaAssumir(conv: WaConversa): boolean {
-  return (
-    (conv.responsaveis ?? []).length === 0 && conv.precisa_atribuicao === true
-  );
+  return (conv.responsaveis ?? []).length === 0;
 }
+
 
 // Badge de não lidas. Quando a conversa está aberta (`ativa`) o contador não
 // zera mais sozinho — só some quando o usuário envia uma resposta — então aqui
@@ -5390,10 +5402,10 @@ export default function WhatsAppInbox() {
     for (const c of conversasFiltradas) {
       const responsaveis = c.responsaveis ?? [];
       if (responsaveis.length === 0) {
-        // Já respondida por fora do CRM: não tem responsável pra cair em
-        // "meus"/"outros", mas também não é mais um "Não atribuídos" que
-        // precisa de alguém assumindo — ver `precisaAssumir`.
-        if (precisaAssumir(c)) naoAtribuidos.push(c);
+        // Sem responsável entra SEMPRE em "Não atribuídos". Aqui morava o defeito: um
+        // `if (precisaAssumir(c))` que dependia da marca do banco e, quando ela estava
+        // baixa, deixava a conversa cair fora dos três grupos — invisível na tela.
+        naoAtribuidos.push(c);
       } else if (responsaveis.some((r) => r.id === profile.id)) meus.push(c);
       else outros.push(c);
     }

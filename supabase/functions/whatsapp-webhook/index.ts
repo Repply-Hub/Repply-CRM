@@ -563,6 +563,51 @@ async function downloadAndStoreMedia(
 // vinculados à instância (wapi_instancia_usuarios): isso inflava a lista de
 // responsáveis a cada mensagem nova, mesmo em conversas já atribuídas a outra pessoa.
 
+/**
+ * Levanta o alarme "precisa que alguém assuma" quando a conversa está sem responsável.
+ *
+ * 🔴 É O CONSERTO DE UM DEFEITO QUE ESCONDIA CLIENTE. A tela só põe uma conversa em
+ * "Não atribuídos" quando ela está sem responsável E com esta marca. Sem a marca, ela não
+ * entra em grupo NENHUM — some da caixa, e só a busca acha. Medido em 27/08/2026: 17
+ * conversas nesse estado, 79 mensagens não lidas, em dois clientes pagantes.
+ *
+ * Chamar isto DEPOIS de gravar a conversa, em todo caminho que faz uma conversa existir ou
+ * reaparecer. Antes, a marca só subia quando a conversa estava ARQUIVADA — o que deixava de
+ * fora dois casos comuns:
+ *
+ *   · chamada de voz recebida, que reabre a conversa por outro caminho (`handleCallEvent`);
+ *   · mensagem em conversa que JÁ estava aberta e sem dono.
+ *
+ * Fechar uma conversa REMOVE os responsáveis (`trg_wa_conversa_remove_responsaveis_ao_fechar`)
+ * sem baixar a marca — por isso "sem responsável" é a pergunta certa, e não "estava fechada?".
+ *
+ * Custa uma consulta só quando não há responsável; com responsável, sai na primeira.
+ * Errar para cima é seguro: no pior caso a conversa aparece em "Não atribuídos" sem precisar.
+ * Errar para baixo é o que esconde cliente esperando.
+ */
+async function alarmarSeSemResponsavel(supabase: any, conversaId: string | null) {
+  if (!conversaId) return;
+  try {
+    const { count, error } = await supabase
+      .from("whatsapp_conversa_responsaveis")
+      .select("usuario_id", { count: "exact", head: true })
+      .eq("conversa_id", conversaId);
+    if (error) {
+      console.error("[webhook] nao consegui conferir responsaveis:", error);
+      return;
+    }
+    if ((count ?? 0) > 0) return;
+    const { error: erroMarca } = await supabase
+      .from("whatsapp_conversas")
+      .update({ precisa_atribuicao: true })
+      .eq("id", conversaId);
+    if (erroMarca) console.error("[webhook] nao consegui levantar o alarme:", erroMarca);
+  } catch (e) {
+    // Nunca derruba o processamento da mensagem por causa do alarme.
+    console.error("[webhook] falha inesperada ao levantar o alarme:", e);
+  }
+}
+
 async function handleIncomingMessage(
   supabase: any,
   empresaId: string,
@@ -1023,6 +1068,11 @@ async function handleIncomingMessage(
     conversa = data;
   }
 
+  // A conversa existe e está aberta; se ninguém é dono dela, acende o alarme.
+  // Cobre a mensagem que chega em conversa JÁ ABERTA — caso que o código antigo
+  // deixava passar, porque só olhava `existente.arquivada === true`.
+  await alarmarSeSemResponsavel(supabase, conversa?.id ?? null);
+
   // Mesma regra usada no frontend (quotedNomeFor em WhatsAppInbox.tsx): citação de
   // saída sempre foi "Você"; citação de entrada usa quem mandou dentro do grupo
   // (remetente_nome) ou, faltando isso — sempre o caso em conversa individual —,
@@ -1205,6 +1255,12 @@ async function handleCallEvent(supabase: any, empresaId: string, instanciaId: st
     conversaId = data?.id ?? null;
   }
   if (!conversaId) return;
+
+  // 🔴 Chamada de voz REABRE a conversa (`arquivada: false`, logo acima) e some com
+  // ela da caixa se ninguém for dono: era este o caminho que escondia 3 das 6
+  // conversas invisíveis da MD em 27/08/2026, todas com "Chamada de voz recebida"
+  // como última coisa que aconteceu.
+  await alarmarSeSemResponsavel(supabase, conversaId);
 
   const { error: msgError } = await supabase.from("whatsapp_mensagens").upsert(
     {
