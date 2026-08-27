@@ -269,7 +269,13 @@ function NovoNegocioFormContent({
   };
 
   const handleNext = () => {
-    if (validateStep1() && validateStep2()) setStep(2);
+    // 🔴 SÓ o passo 1, pelo mesmo motivo do botão: os campos do passo 2 só aparecem depois
+    // deste clique. Validá-los aqui trocava o botão apagado por um aviso pedindo um campo
+    // que ainda não existe na tela — o mesmo beco, com outra porta.
+    //
+    // Quem garante o passo 2 é o `handleSubmit`, que valida os DOIS antes de gravar. É lá
+    // que a checagem final tem que estar, e está.
+    if (validateStep1()) setStep(2);
   };
 
   const handleSubmit = async () => {
@@ -798,7 +804,17 @@ function NovoNegocioFormContent({
           ) : undefined}
         >
           {step === 1 ? (
-            <Button onClick={handleNext} disabled={!isStep1Complete || !isStep2Complete}>
+            /* 🔴 SÓ o passo 1. Exigir `isStep2Complete` aqui é um beco sem saída: os campos
+               do passo 2 só aparecem DEPOIS deste botão, então cobrá-los para sair do passo 1
+               é pedir o que ninguém consegue dar.
+
+               Ficou inofensivo por um tempo porque o passo 2 não tinha campo obrigatório
+               nenhum. Em 26/08/2026 o anexo do PDF passou a ser exigido lá, e o assistente
+               travou no passo 1 — sem mensagem, só o botão apagado.
+
+               A tela de editar negócio (EditarPedido.tsx) sempre fez o certo: o "Próximo"
+               dela valida só o passo 1. */
+            <Button onClick={handleNext} disabled={!isStep1Complete}>
               Próximo <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
