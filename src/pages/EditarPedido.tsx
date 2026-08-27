@@ -18,6 +18,8 @@ import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { useMarcadores } from '@/hooks/use-marcadores';
 import { useObrasByCliente, useIsGestor } from '@/hooks/use-novo-pedido';
+import { useObras } from '@/hooks/use-obras';
+import { opcoesDeObra, avisoDaListaDeObras } from '@/lib/opcoes-de-obra';
 import { useCreateObra } from '@/hooks/use-mutations';
 import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-pedido';
 import { usePedidoHistoricoStatus } from '@/hooks/use-pedidos';
@@ -178,7 +180,18 @@ const EditarPedido = () => {
 
   // Derived
   const selectedCliente = useMemo(() => clientes?.find(c => c.id === clienteId), [clientes, clienteId]);
-  const { data: obras } = useObrasByCliente(clienteId || null);
+  // Mesma composição do NovoNegocioDialog: as obras do cliente primeiro, as demais logo
+  // abaixo e marcadas com o dono. As duas telas contam a mesma história sobre o mesmo campo.
+  const {
+    data: obras,
+    isLoading: carregandoObrasDoCliente,
+    isError: erroObrasDoCliente,
+  } = useObrasByCliente(clienteId || null);
+  const { data: todasAsObras } = useObras();
+  const opcoesDeObraDoCampo = useMemo(
+    () => opcoesDeObra(obras, todasAsObras as never, clienteId || null),
+    [obras, todasAsObras, clienteId],
+  );
   const selectedObra = useMemo(() => obras?.find(o => o.id === obraId), [obras, obraId]);
   const selectedFabricante = useMemo(() => fabricantes?.find(f => f.id === fabricanteId), [fabricantes, fabricanteId]);
   const nomeAutomaticoPreview = useMemo(
@@ -556,10 +569,16 @@ const EditarPedido = () => {
                     <div className="space-y-2">
                       <Label>Obra</Label>
                       <SearchableSelect
-                        options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
+                        options={opcoesDeObraDoCampo}
                         value={obraId}
                         onValueChange={handleObraChange}
                         placeholder="Selecionar obra"
+                        emptyMessage={avisoDaListaDeObras({
+                          temCliente: !!clienteId,
+                          temAlguma: opcoesDeObraDoCampo.length > 0,
+                          carregando: carregandoObrasDoCliente,
+                          erro: erroObrasDoCliente,
+                        })}
                         onActionClick={() => setObraDialogOpen(true)}
                         actionLabel="Nova Obra"
                       />

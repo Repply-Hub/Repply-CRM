@@ -190,7 +190,9 @@ export default function Obras() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [page, setPage] = useState(1);
   const [selectedObra, setSelectedObra] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState('lista');
+  // Abre no MAPA, não na lista (Lucas, 27/08/2026). Quem chega em Obras quer ver onde elas
+  // estão; quem procura um cadastro específico usa a busca, que vale nas três abas.
+  const [activeTab, setActiveTab] = useState('mapa');
   // Obra selecionada NA ABA MAPA (cartão flutuante + destaque do pino). Independente do
   // `selectedObra` acima, que abre o Sheet lateral de detalhes. O `focoTick` cresce a cada
   // clique de seleção para o mapa refocar até quando o id clicado é o mesmo (reclicar a
@@ -533,19 +535,29 @@ export default function Obras() {
       subtitle="Gerencie e acompanhe todas as obras cadastradas"
       mainClassName="flex-1 overflow-hidden flex flex-col"
     >
-      <div className="p-4 md:p-6 space-y-6 flex-1 flex flex-col min-h-0">
+      <div className="p-4 md:p-6 flex-1 flex min-h-0 gap-4">
+        {/* 🔴 O painel de rota é IRMÃO do conteúdo, não uma janela por cima dele.
+            Assim a lista filtrada continua visível e utilizável enquanto a rota é montada —
+            que é o motivo de o Lucas ter pedido menu suspenso em vez de pop-up em 27/08/2026.
+            Por isso esta div virou `flex` em linha: o `min-w-0` no filho é o que permite ao
+            conteúdo encolher quando o painel abre, em vez de empurrar tudo para fora. */}
+        <div className="flex min-w-0 flex-1 flex-col gap-6 min-h-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 flex-1 flex flex-col min-h-0">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex flex-1 items-center gap-3">
               <TabsList className={cn(TOGGLE_LIST_CLASS, 'shrink-0')}>
-                <TabsTrigger value="lista" className={TOGGLE_TRIGGER_CLASS}>
-                  <List className="h-4 w-4" /> Lista
-                </TabsTrigger>
+                {/* Ordem pedida pelo Lucas em 27/08/2026: Mapa primeiro, Lista por último.
+                    O mapa é onde a obra faz sentido — endereço no espaço, não linha de tabela.
+                    A lista continua existindo para quem procura um cadastro específico, mas
+                    deixou de ser o que a tela mostra ao abrir. */}
                 <TabsTrigger value="mapa" className={TOGGLE_TRIGGER_CLASS}>
                   <MapIcon className="h-4 w-4" /> Mapa
                 </TabsTrigger>
                 <TabsTrigger value="visitas" className={TOGGLE_TRIGGER_CLASS}>
                   <HardHat className="h-4 w-4" /> Visitas
+                </TabsTrigger>
+                <TabsTrigger value="lista" className={TOGGLE_TRIGGER_CLASS}>
+                  <List className="h-4 w-4" /> Lista
                 </TabsTrigger>
               </TabsList>
 
@@ -884,6 +896,16 @@ export default function Obras() {
             </div>
           </TabsContent>
         </Tabs>
+        </div>
+
+        {/* Só na tela de Obras. No Calendário o mesmo componente abre como janela — ver a
+            prop `apresentacao` em NovaRotaVisitaDialog. */}
+        <NovaRotaVisitaDialog
+          apresentacao="painel"
+          open={rotaVisitaDialogOpen}
+          onOpenChange={(v) => { setRotaVisitaDialogOpen(v); if (!v) setSelectedIds([]); }}
+          obrasIniciais={(obras ?? []).filter((o) => selectedIds.includes(o.id))}
+        />
 
         {/* Diálogo de gerenciar marcadores da obra */}
         <MarcadoresObrasDialog
@@ -1464,14 +1486,6 @@ export default function Obras() {
           </AlertDialogContent>
         </AlertDialog>
 
-        <NovaRotaVisitaDialog
-          open={rotaVisitaDialogOpen}
-          onOpenChange={(v) => {
-            setRotaVisitaDialogOpen(v);
-            if (!v) setSelectedIds([]);
-          }}
-          obrasIniciais={(obras ?? []).filter((o) => selectedIds.includes(o.id))}
-        />
       </div>
     </AppLayout>
   );

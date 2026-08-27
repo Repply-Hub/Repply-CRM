@@ -15,6 +15,8 @@ import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { useMarcadores } from '@/hooks/use-marcadores';
 import { useFunis } from '@/hooks/use-funis';
 import { useObrasByCliente, useMyVendedorId, useIsGestor, useCreatePedidoCompleto } from '@/hooks/use-novo-pedido';
+import { useObras } from '@/hooks/use-obras';
+import { opcoesDeObra, avisoDaListaDeObras } from '@/lib/opcoes-de-obra';
 import { useCreateObra } from '@/hooks/use-mutations';
 import { useAuth } from '@/hooks/use-auth';
 import { useConfiguracoesCampos, resolveFieldLabel, isCampoObrigatorioNaEtapa } from '@/hooks/use-configuracoes-campos';
@@ -152,7 +154,20 @@ function NovoNegocioFormContent({
   // Derived
   const selectedCliente = useMemo(() => clientes?.find(c => c.id === clienteId), [clientes, clienteId]);
   const isConstrutora = selectedCliente?.tipo === 'construtora' || !clienteId;
-  const { data: obras } = useObrasByCliente(clienteId || null);
+  // 🔴 DUAS consultas, de propósito. A de cima traz as obras DAQUELE cliente; a de baixo,
+  // todas as da empresa. Só a primeira quase sempre voltava vazia — 96,6% dos clientes não
+  // têm obra cadastrada, e nenhum dos 11.910 negócios tem obra vinculada. Ver
+  // src/lib/opcoes-de-obra.ts para os números e o porquê.
+  const {
+    data: obras,
+    isLoading: carregandoObrasDoCliente,
+    isError: erroObrasDoCliente,
+  } = useObrasByCliente(clienteId || null);
+  const { data: todasAsObras } = useObras();
+  const opcoesDeObraDoCampo = useMemo(
+    () => opcoesDeObra(obras, todasAsObras as never, clienteId || null),
+    [obras, todasAsObras, clienteId],
+  );
   const selectedObra = useMemo(() => obras?.find(o => o.id === obraId), [obras, obraId]);
   const selectedFabricante = useMemo(() => fabricantes?.find(f => f.id === fabricanteId), [fabricantes, fabricanteId]);
   const nomeAutomaticoPreview = useMemo(
@@ -559,10 +574,19 @@ function NovoNegocioFormContent({
                   <div className="space-y-2">
                     <Label>Obra{obrigatorio('obra_id', false) && ' *'}</Label>
                     <SearchableSelect
-                      options={(obras ?? []).map(o => ({ value: o.id, label: o.nome_obra }))}
+                      options={opcoesDeObraDoCampo}
                       value={obraId}
                       onValueChange={handleObraChange}
                       placeholder="Selecionar obra"
+                      // A frase certa para cada caso. Antes as quatro situações — sem cliente,
+                      // cliente sem obra, carregando e ERRO — mostravam a mesma "Nenhuma opção
+                      // encontrada", e nenhuma dizia o que fazer.
+                      emptyMessage={avisoDaListaDeObras({
+                        temCliente: !!clienteId,
+                        temAlguma: opcoesDeObraDoCampo.length > 0,
+                        carregando: carregandoObrasDoCliente,
+                        erro: erroObrasDoCliente,
+                      })}
                       onActionClick={() => setObraDialogOpen(true)}
                       actionLabel="Nova Obra"
                     />

@@ -50,6 +50,21 @@ interface NovaRotaVisitaDialogProps {
   obrasIniciais?: ObraOpcao[];
   /** Pré-popula a data — usado ao abrir a partir de um slot já escolhido no Calendário. */
   dataInicial?: Date;
+  /**
+   * A moldura em volta do MESMO formulário.
+   *
+   * `'modal'` (padrão) é a janela no meio da tela — é como o **Calendário** abre, e ali é o
+   * certo: quem está no calendário não tem uma lista de obras para consultar enquanto monta
+   * a rota.
+   *
+   * `'painel'` encosta o formulário na lateral e NÃO escurece o resto. É como a tela de
+   * **Obras** abre, para a pessoa ver ao lado as obras que acabou de filtrar enquanto escolhe
+   * as paradas. Pedido do Lucas em 27/08/2026.
+   *
+   * 🔴 Não use o `Sheet` deste projeto para isso: ele vem com véu preto e desfoque
+   * (`sheet.tsx:22`), que esconde exatamente a lista que a pessoa precisa ver.
+   */
+  apresentacao?: 'modal' | 'painel';
 }
 
 const DURACAO_PADRAO_MINUTOS = 60;
@@ -87,7 +102,14 @@ function somarMinutos(horario: string, minutos: number): string {
  * `useCreateRotaVisita`) — depois de criada, cada visita é editada
  * separadamente pelo Calendário ou pelo histórico da obra, não em conjunto.
  */
-export function NovaRotaVisitaDialog({ open, onOpenChange, obrasIniciais, dataInicial }: NovaRotaVisitaDialogProps) {
+export function NovaRotaVisitaDialog({
+  open,
+  onOpenChange,
+  obrasIniciais,
+  dataInicial,
+  apresentacao = 'modal',
+}: NovaRotaVisitaDialogProps) {
+  const ehPainel = apresentacao === 'painel';
   const { user } = useAuth();
   const { data: obras = [] } = useObras();
   const { data: usuarios, refetch: refetchUsuarios } = useVendedores();
@@ -232,19 +254,35 @@ export function NovaRotaVisitaDialog({ open, onOpenChange, obrasIniciais, dataIn
     criarRotaDeFato();
   };
 
-  return (
+  // O MESMO formulário para as duas molduras. Só o título e a descrição trocam de tag:
+  // `DialogTitle`/`DialogDescription` são primitivas do Radix e exigem estar dentro de um
+  // Dialog — fora dele, avisam no console e não anunciam nada para o leitor de tela.
+  const conteudo = (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <ConteudoDialogo className="sm:max-w-lg">
         <CabecalhoDialogo>
-          <DialogTitle className="flex items-center gap-2">
-            <HardHat className="h-4 w-4 text-primary" />
-            Nova rota de visita
-          </DialogTitle>
-          <DialogDescription>
-            Escolha as obras que farão parte da visita e a data. Cada obra vira um evento no
-            calendário e entra no histórico de visitas dela.
-          </DialogDescription>
+          {ehPainel ? (
+            <>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-card-foreground">
+                <HardHat className="h-4 w-4 text-primary" />
+                Nova rota de visita
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Escolha as obras que farão parte da visita e a data. Cada obra vira um evento no
+                calendário e entra no histórico de visitas dela.
+              </p>
+            </>
+          ) : (
+            <>
+              <DialogTitle className="flex items-center gap-2">
+                <HardHat className="h-4 w-4 text-primary" />
+                Nova rota de visita
+              </DialogTitle>
+              <DialogDescription>
+                Escolha as obras que farão parte da visita e a data. Cada obra vira um evento no
+                calendário e entra no histórico de visitas dela.
+              </DialogDescription>
+            </>
+          )}
         </CabecalhoDialogo>
 
         <CorpoDialogo className="space-y-4">
@@ -489,8 +527,30 @@ export function NovaRotaVisitaDialog({ open, onOpenChange, obrasIniciais, dataIn
                   : 'Criar visita'}
           </Button>
         </RodapeDialogo>
-      </ConteudoDialogo>
-    </Dialog>
+    </>
+  );
+
+  return (
+    <>
+    {ehPainel ? (
+      // 🔴 PAINEL LATERAL, sem véu. É por isso que não é `Sheet`: o do projeto escurece e
+      // desfoca a tela atrás, escondendo a lista de obras que a pessoa acabou de filtrar —
+      // que é justamente o motivo de o painel existir.
+      //
+      // Fica ao lado do conteúdo, não por cima: quem renderiza (Obras.tsx) o põe como irmão
+      // da lista, e o `flex` divide a largura entre os dois.
+      open && (
+        <aside className="flex w-full max-w-md flex-none flex-col gap-4 overflow-hidden rounded-xl border border-border bg-card p-6 lg:w-[26rem]">
+          {conteudo}
+        </aside>
+      )
+    ) : (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <ConteudoDialogo className="sm:max-w-lg">
+          {conteudo}
+        </ConteudoDialogo>
+      </Dialog>
+    )}
 
     <AlertDialog open={conflitos.length > 0} onOpenChange={(o) => !o && setConflitos([])}>
         <AlertDialogContent>
