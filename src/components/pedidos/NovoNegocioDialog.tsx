@@ -287,9 +287,22 @@ function NovoNegocioFormContent({
 
     try {
       if (pdfFile) {
-        // 1. Upload PDF (nome sanitizado — o Storage rejeita chaves com acentos/
-        // espaços — isolado numa pasta aleatória para evitar colisão entre uploads)
-        const filePath = `${crypto.randomUUID()}/${sanitizeFileName(pdfFile.name)}`;
+        // 1. Upload PDF (nome sanitizado — o Storage rejeita chaves com acentos e espaços)
+        // O anexo nasce DENTRO da pasta da empresa — Passo 5 do plano dos baldes privados.
+        //
+        // Antes era só `{uuid}/{nome}`, e a pasta aleatória não diz de quem é o arquivo. A
+        // regra de leitura que vai fechar o balde (Passo 6) lê a PRIMEIRA pasta do caminho
+        // como o dono: arquivo fora dela fica invisível para todo mundo, inclusive para quem
+        // o enviou. Medido em 27/08/2026: 22 anexos já estavam nessa situação, e o número
+        // crescia a cada upload feito pela tela.
+        //
+        // O `uuid` continua no meio, isolando cada upload — é ele que evita colisão quando
+        // duas pessoas mandam arquivos de mesmo nome.
+        //
+        // Sem empresa não há onde gravar: recusar aqui é melhor que gravar num lugar que a
+        // regra nova não vai conseguir atribuir a ninguém.
+        if (!profile?.empresa_id) throw new Error('Sua empresa não foi identificada. Recarregue a página e tente de novo.');
+        const filePath = `${profile.empresa_id}/${crypto.randomUUID()}/${sanitizeFileName(pdfFile.name)}`;
 
         const { error: uploadError } = await supabase.storage
           .from('pedido-anexos')

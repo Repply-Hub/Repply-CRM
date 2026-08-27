@@ -630,6 +630,32 @@ Mesma coisa, em menor escala, para `whatsapp-media`: 1 mídia recebida de uma em
 existe mais e 51 enviadas em conversas que não existem mais. Aqui a decisão pode ser diferente
 — são 52 arquivos órfãos, e deixá-los inacessíveis pode ser aceitável. **Decisão do Lucas.**
 
+#### Passo 5 — a parte de CÓDIGO feita em 27/08/2026; a de DADOS ainda não
+
+**A medição de 27/08 corrige o plano em dois pontos.**
+
+**1. O problema é ATIVO, não só herdado.** Os dois pontos de upload gravavam em
+`{uuid-aleatório}/{nome}` — nunca na pasta da empresa. Não era um resíduo antigo: **todo anexo
+enviado pela tela nascia fora do padrão**, e os 22 iam virar 23, 24… Corrigido para
+`{empresa_id}/{uuid}/{nome}`; o `uuid` fica no meio, que é o que evita colisão de nome. Sem
+empresa identificada, o upload agora RECUSA em vez de gravar num lugar sem dono.
+
+**2. Não são 40 arquivos para mover — são 12.** Dos 40 fora do padrão, **28 não têm negócio
+nenhum apontando para eles**: 18 na raiz com nome aleatório (16–27/07) e 10 em pasta de UUID
+(27/07–11/08), todos com zero referências. São restos de formulário abandonado. Mover arquivo
+que ninguém referencia não serve para nada.
+
+Os 12 que importam são todos da **MD Representações**, de 19 a 21/08, e cada um tem exatamente
+um negócio apontando. A operação de dados é: mover 12 objetos e atualizar 12 `pdf_url`.
+
+**O que fazer com os 28 restos é decisão do Lucas.** Deixar onde estão custa nada (ficam
+inacessíveis depois do Passo 6, e ninguém sente falta); apagar recupera ~8 MB. Não há terceira
+opção útil.
+
+**`whatsapp-media`:** 7.158 objetos — 6.137 em `incoming/{empresa}` válida, 969 em pasta de
+conversa que existe, **1 com empresa inválida e 51 de conversas que sumiram**. Os 52 órfãos não
+têm dono possível: nenhuma regra consegue atribuí-los. Ficam inacessíveis. Mesma decisão.
+
 ### Passo 6 — 🔴 Trocar as regras de leitura (é este passo que fecha de verdade)
 
 **O que faz.** Substitui, balde a balde, a regra "toda identidade pode ler" por "só quem é da
