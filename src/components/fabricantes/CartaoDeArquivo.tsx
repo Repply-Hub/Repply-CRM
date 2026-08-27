@@ -1,4 +1,4 @@
-import { FileText, FileSpreadsheet, FileImage, File as FileIcon, Eye, Download, Trash2 } from 'lucide-react';
+import { FileText, FileSpreadsheet, FileImage, File as FileIcon, Eye, Download, Trash2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { isPreviewable } from '@/components/chat/FilePreviewDialog';
@@ -29,6 +29,8 @@ interface Props {
   aoVer: () => void;
   aoBaixar: () => void;
   aoExcluir: () => void;
+  /** Ausente quando a pessoa não tem WhatsApp vinculado: aí o botão nem aparece. */
+  aoEnviar?: () => void;
   ocupado?: boolean;
 }
 
@@ -39,6 +41,7 @@ export function CartaoDeArquivo({
   aoVer,
   aoBaixar,
   aoExcluir,
+  aoEnviar,
   ocupado,
 }: Props) {
   const Icone = iconeDoFormato(arquivo.nome, arquivo.mime);
@@ -46,14 +49,37 @@ export function CartaoDeArquivo({
 
   return (
     <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/20">
-      {/* A capa. Altura fixa e `object-cover` para catálogo em retrato e em paisagem ocuparem
-          o mesmo espaço — sem isso a grade fica com degraus. */}
+      {/* 🔴 O QUADRO INTEIRO ABRE A PRÉ-VISUALIZAÇÃO, não só o botão "Ver".
+          Capa e nome são a parte que a pessoa olha e para onde ela leva o cursor; obrigar o
+          clique num botão pequeno lá embaixo é atrito sem motivo.
+
+          É `<button>` de verdade, e não uma `<div>` com onClick: assim funciona pelo teclado
+          e o leitor de tela anuncia como ação. Só existe quando há o que mostrar — para
+          formato sem visualizador, o quadro é só quadro.
+
+          `object-cover` sem `object-top`: quem escolhe a altura do recorte agora é o gerador
+          da capa (`capa-do-pdf.ts`), que procura onde a página tem conteúdo. Cortar pelo topo
+          aqui desfaria esse trabalho — foi o que transformou o catálogo da Deca, que tem uma
+          faixa preta no topo, num retângulo preto. */}
+      <button
+        type="button"
+        disabled={!podeVer}
+        onClick={podeVer ? aoVer : undefined}
+        aria-label={podeVer ? `Ver ${arquivo.nome}` : undefined}
+        className={cn(
+          // `flex-1` e `w-full`: o botão virou o corpo do cartão, e sem eles ele encolheria
+          // para o tamanho do conteúdo — cartões com nome curto ficariam mais baixos que os
+          // outros e a grade voltaria a ter degraus.
+          'group flex w-full flex-1 flex-col text-left',
+          podeVer && 'cursor-pointer',
+        )}
+      >
       <div className="relative flex h-36 items-center justify-center overflow-hidden border-b border-border bg-muted/40">
         {capaUrl ? (
           <img
             src={capaUrl}
             alt=""
-            className="h-full w-full object-cover object-top"
+            className="h-full w-full object-cover"
             loading="lazy"
           />
         ) : (
@@ -66,13 +92,17 @@ export function CartaoDeArquivo({
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1 p-3">
-        <p className="truncate text-sm font-medium leading-snug text-card-foreground" title={arquivo.nome}>
+        <p className={cn(
+          'truncate text-sm font-medium leading-snug text-card-foreground',
+          podeVer && 'group-hover:text-primary',
+        )} title={arquivo.nome}>
           {arquivo.nome}
         </p>
         <p className="font-mono text-xs tabular-nums text-muted-foreground">
           {tamanhoLegivel(arquivo.tamanho)}
         </p>
       </div>
+      </button>
 
       <div className="flex items-center gap-1 border-t border-border p-2">
         {/* "Ver" só aparece para o que o visualizador realmente abre (PDF, planilha, Word).
@@ -85,6 +115,17 @@ export function CartaoDeArquivo({
         <Button variant="ghost" size="sm" className="h-8 flex-1 gap-1.5 px-2 text-xs" onClick={aoBaixar}>
           <Download className="h-3.5 w-3.5" /> Baixar
         </Button>
+        {/* SOME para quem não tem WhatsApp vinculado, em vez de aparecer desabilitado:
+            botão que não faz nada é o defeito que a aba Automação acabou de perder. */}
+        {aoEnviar && (
+          <Button
+            variant="ghost" size="sm"
+            className="h-8 flex-1 gap-1.5 px-2 text-xs text-primary hover:text-primary"
+            disabled={ocupado} onClick={aoEnviar}
+          >
+            <Send className="h-3.5 w-3.5" /> Enviar
+          </Button>
+        )}
         {/* O botão de excluir some para quem não pode — mas quem protege é a regra do banco:
             a política de DELETE exige gestor ou permissão em "fabricantes". Esconder botão é
             conveniência, não segurança (CLAUDE.md §6.1). */}

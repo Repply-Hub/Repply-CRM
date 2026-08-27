@@ -8,6 +8,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { FilePreviewDialog, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
+import { supabase } from '@/integrations/supabase/client';
 import { enderecoDoObjeto } from '@/lib/arquivo-privado';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { useIsGestor } from '@/hooks/use-novo-pedido';
@@ -18,6 +19,8 @@ import {
 } from '@/hooks/use-fabricante-arquivos';
 import { CartaoDeArquivo } from './CartaoDeArquivo';
 import { AnexarArquivoDialog } from './AnexarArquivoDialog';
+import { EnviarCatalogoDialog } from './EnviarCatalogoDialog';
+import { useQuery } from '@tanstack/react-query';
 
 /**
  * O drive de catálogos da fábrica — a grade de cartões dentro da ficha do fabricante.
@@ -48,6 +51,24 @@ export function DriveDaFabrica({ fabricanteId }: Props) {
   const [previa, setPrevia] = useState<FilePreviewTarget | null>(null);
   const [aExcluir, setAExcluir] = useState<ArquivoDaFabrica | null>(null);
   const [capas, setCapas] = useState<Record<string, string>>({});
+  const [aEnviar, setAEnviar] = useState<ArquivoDaFabrica | null>(null);
+
+  // O botão de enviar só existe para quem tem WhatsApp vinculado. É a MESMA consulta que a
+  // função de servidor faz para descobrir de qual número o envio sai — se ela não achar
+  // nada, o envio seria recusado com "seu WhatsApp não está vinculado", e mostrar um botão
+  // que só serve para dar esse recado é pior que não mostrar botão.
+  const { data: temWhatsapp } = useQuery({
+    queryKey: ['tem-whatsapp-vinculado'],
+    queryFn: async () => {
+      const { data: sessao } = await supabase.auth.getUser();
+      if (!sessao?.user) return false;
+      const { count } = await supabase
+        .from('wapi_instancia_usuarios')
+        .select('instancia_id', { count: 'exact', head: true })
+        .eq('usuario_auth_id', sessao.user.id);
+      return (count ?? 0) > 0;
+    },
+  });
 
   // As capas, TODAS DE UMA VEZ. Pedir uma assinatura por cartão faria vinte chamadas em
   // paralelo cada vez que alguém abrisse uma fábrica.
@@ -147,6 +168,7 @@ export function DriveDaFabrica({ fabricanteId }: Props) {
                 aoVer={() => void abrirPrevia(a)}
                 aoBaixar={() => void baixar(a)}
                 aoExcluir={() => setAExcluir(a)}
+                aoEnviar={temWhatsapp ? () => setAEnviar(a) : undefined}
               />
             ))}
           </div>
@@ -157,6 +179,12 @@ export function DriveDaFabrica({ fabricanteId }: Props) {
         open={anexarAberto}
         onOpenChange={setAnexarAberto}
         fabricanteId={fabricanteId}
+      />
+
+      <EnviarCatalogoDialog
+        open={!!aEnviar}
+        onOpenChange={(o) => !o && setAEnviar(null)}
+        arquivo={aEnviar}
       />
 
       <FilePreviewDialog file={previa} onClose={() => setPrevia(null)} />
