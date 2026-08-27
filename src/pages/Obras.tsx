@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useObras } from '@/hooks/use-obras';
@@ -50,6 +50,8 @@ import { VendasDaObra } from '@/components/obras/VendasDaObra';
 import { HistoricoVisitasObra } from '@/components/obras/HistoricoVisitasObra';
 import { VisitasObrasPainel } from '@/components/obras/VisitasObrasPainel';
 import { ContatosDaObra } from '@/components/obras/ContatosDaObra';
+import { SeletorContatosObra } from '@/components/obras/SeletorContatosObra';
+import { useContatosDaObra, useSalvarContatosDaObra } from '@/hooks/use-obra-contatos';
 import { NovaRotaVisitaDialog } from '@/components/obras/NovaRotaVisitaDialog';
 import { cn, hasTextSelection } from '@/lib/utils';
 import { FilterButton } from '@/components/shared/FilterButton';
@@ -244,6 +246,36 @@ export default function Obras() {
 
   const [newObraCnpjError, setNewObraCnpjError] = useState('');
   const [editObraCnpjError, setEditObraCnpjError] = useState('');
+
+  // Contatos marcados nos modais. Ficam fora de `newObra`/`editObra` de propósito:
+  // esses dois objetos viram o payload do insert/update da tabela `obras`, e o
+  // vínculo mora em outra tabela — misturar faria a coluna inexistente ir junto.
+  const [newObraContatos, setNewObraContatos] = useState<string[]>([]);
+  const salvarContatosDaObra = useSalvarContatosDaObra();
+
+  // 🔴 `null` (e não `[]`) enquanto os vínculos da obra não chegaram do banco.
+  // A diferença não é estética: a gravação recebe a lista COMPLETA e apaga o que
+  // não está nela. Com `[]` como valor inicial, abrir a obra B logo depois da A e
+  // salvar antes da consulta voltar gravaria em B os contatos de A — ou apagaria
+  // todos os de B. `null` significa "ainda não sei", e nesse estado não se grava.
+  const [editObraContatos, setEditObraContatos] = useState<string[] | null>(null);
+
+  // Vínculos atuais da obra em edição, para o modal abrir com eles já marcados.
+  const { data: contatosDaObraEmEdicao } = useContatosDaObra(editDialogOpen ? editObra.id : null);
+  // A marcação é copiada UMA vez por abertura. Sem essa trava, um refetch da lista
+  // (invalidação disparada por outra ação) reescreveria a seleção por cima do que a
+  // pessoa acabou de marcar, no meio da edição.
+  const marcacaoIniciadaRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!editDialogOpen) {
+      marcacaoIniciadaRef.current = null;
+      setEditObraContatos(null);
+      return;
+    }
+    if (!contatosDaObraEmEdicao || marcacaoIniciadaRef.current === editObra.id) return;
+    marcacaoIniciadaRef.current = editObra.id;
+    setEditObraContatos(contatosDaObraEmEdicao.map((c) => c.id));
+  }, [editDialogOpen, contatosDaObraEmEdicao, editObra.id]);
 
   // O endereço que a última consulta de CNPJ devolveu. Guarda o TEXTO, e não um "sim/não":
   // assim o aviso "isso é o endereço da sede" aparece só enquanto o campo continuar igual ao
@@ -938,7 +970,11 @@ export default function Obras() {
 
                 <div className="border-t pt-6">
                   <h3 className="mb-3 text-sm font-semibold">Contatos desta obra</h3>
-                  <ContatosDaObra obraId={selectedObra.id} />
+                  <ContatosDaObra
+                    obraId={selectedObra.id}
+                    clienteId={selectedObra.cliente_id}
+                    clienteEmpresa={selectedObra.clientes?.empresa}
+                  />
                 </div>
               </div>
 
@@ -1021,7 +1057,20 @@ export default function Obras() {
                   : {}),
               };
               updateObra.mutate(payload, {
-                onSuccess: () => {
+                onSuccess: async () => {
+                  // Só grava o vínculo se a lista chegou a ser carregada (ver o
+                  // comentário do estado): `null` = não sei quem está vinculado, e
+                  // gravar nesse estado apagaria vínculo que existe.
+                  if (editObraContatos !== null) {
+                    try {
+                      await salvarContatosDaObra.mutateAsync({
+                        obraId: editObra.id,
+                        contatoIds: editObraContatos,
+                      });
+                    } catch {
+                      toast.warning('Obra salva, mas não deu para atualizar os contatos vinculados.');
+                    }
+                  }
                   setEditDialogOpen(false);
                   toast.success("Obra atualizada com sucesso!");
                   setEditObraCnpjError('');
@@ -1062,9 +1111,38 @@ export default function Obras() {
                   <Label>Cliente Responsável</Label>
                   <EmpresaSelector
                     value={editObra.cliente_id}
-                    onValueChange={(v) => setEditObra(prev => ({ ...prev, cliente_id: v }))}
+                    onValueChange={(v) => {
+                      // 🔴 Sai fora se o cliente é o mesmo. O seletor dispara a troca até
+                      // quando se clica no item JÁ selecionado — e sem esta guarda esse
+                      // clique inocente zeraria a lista e o Salvar desvincularia todos os
+                      // contatos da obra, sem ninguém ter pedido.
+                      if (v === editObra.cliente_id) return;
+                      setEditObra(prev => ({ ...prev, cliente_id: v }));
+                      // Contato é do cliente: trocar de cliente invalida a escolha.
+                      // Marcar a ref impede que a resposta atrasada da consulta (que traz os
+                      // contatos do cliente ANTIGO) reescreva por cima desta decisão.
+                      marcacaoIniciadaRef.current = editObra.id;
+                      setEditObraContatos([]);
+                    }}
                     placeholder="Selecione o cliente"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Contatos desta obra</Label>
+                  {editObraContatos === null ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-border p-3 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Carregando os contatos vinculados...
+                    </div>
+                  ) : (
+                    <SeletorContatosObra
+                      clienteId={editObra.cliente_id || null}
+                      clienteEmpresa={clientes?.find(c => c.id === editObra.cliente_id)?.empresa}
+                      value={editObraContatos}
+                      onChange={setEditObraContatos}
+                    />
+                  )}
                 </div>
 
                 <SeletorMarcadorObra
@@ -1131,12 +1209,33 @@ export default function Obras() {
                 campos_extras: camposExtrasObra,
               };
               createObra.mutate(payload, {
-                onSuccess: () => {
+                onSuccess: async (criada) => {
+                  // 🔴 FECHAR PRIMEIRO, gravar o vínculo depois. O botão de salvar é
+                  // liberado assim que a criação da obra termina — antes deste callback
+                  // rodar. Se o modal continuasse aberto durante o `await` do vínculo,
+                  // um segundo clique criaria uma SEGUNDA obra igual, e nada no banco
+                  // barra isso. Os valores de que o vínculo precisa já estão no closure.
+                  const contatosParaVincular = newObraContatos;
                   setDialogOpen(false);
                   setNewObra({ nome_obra: '', cliente_id: '', endereco_entrega: '', marcador_id: '', spe_cnpj: '' });
                   setCamposExtrasObra({});
+                  setNewObraContatos([]);
                   setNewObraCnpjError('');
                   setNewObraEnderecoDaReceita('');
+
+                  // Se o vínculo falhar, a obra já está salva: avisa e segue, em vez de
+                  // deixar o usuário achando que perdeu o cadastro inteiro. Os contatos
+                  // podem ser vinculados pela ficha da obra.
+                  if (criada?.id && contatosParaVincular.length > 0) {
+                    try {
+                      await salvarContatosDaObra.mutateAsync({
+                        obraId: criada.id,
+                        contatoIds: contatosParaVincular,
+                      });
+                    } catch {
+                      toast.warning('Obra criada, mas não deu para vincular os contatos. Faça isso pela ficha da obra.');
+                    }
+                  }
                 }
               });
             }} className="flex min-h-0 flex-1 flex-col gap-4">
@@ -1175,8 +1274,30 @@ export default function Obras() {
                   <Label>Cliente Responsável{obraObrigatorio('cliente_id', true) && ' *'}</Label>
                   <EmpresaSelector
                     value={newObra.cliente_id}
-                    onValueChange={(v) => setNewObra(prev => ({ ...prev, cliente_id: v }))}
+                    onValueChange={(v) => {
+                      // Mesma guarda da edição: reclicar o cliente já escolhido não pode
+                      // apagar os contatos que a pessoa acabou de marcar.
+                      if (v === newObra.cliente_id) return;
+                      setNewObra(prev => ({ ...prev, cliente_id: v }));
+                      // Trocar o cliente zera os contatos marcados: eles eram do cliente
+                      // anterior, e vincular pessoa de outra construtora a esta obra é
+                      // exatamente o dado errado que a lista filtrada existe para evitar.
+                      setNewObraContatos([]);
+                    }}
                     placeholder="Selecione um cliente"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Contatos desta obra</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Quem responde por este canteiro. A mesma pessoa pode responder por várias obras.
+                  </p>
+                  <SeletorContatosObra
+                    clienteId={newObra.cliente_id || null}
+                    clienteEmpresa={clientes?.find(c => c.id === newObra.cliente_id)?.empresa}
+                    value={newObraContatos}
+                    onChange={setNewObraContatos}
                   />
                 </div>
 
@@ -1214,7 +1335,8 @@ export default function Obras() {
 
               <RodapeDialogo>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={createObra.isPending}>
+                {/* Também trava enquanto o vínculo dos contatos está sendo gravado. */}
+                <Button type="submit" disabled={createObra.isPending || salvarContatosDaObra.isPending}>
                   {createObra.isPending ? "Salvando..." : "Criar Obra"}
                 </Button>
               </RodapeDialogo>

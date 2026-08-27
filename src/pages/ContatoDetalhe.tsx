@@ -30,6 +30,19 @@ import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { CargoSelect } from '@/components/shared/CargoSelect';
 import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEmailDialog';
+import { useObrasDoContato, useSalvarObrasDoContato } from '@/hooks/use-obra-contatos';
+import { Checkbox } from '@/components/ui/checkbox';
+
+/**
+ * Os ids das obras que já vieram embutidos no próprio contato (`useContatos`), como
+ * rede para a consulta dedicada que pode não ter voltado ainda. Devolve `null` quando
+ * o embed não veio — que é diferente de "veio e está vazio".
+ */
+function obrasDoEmbed(contato: unknown): string[] | null {
+  const vinculos = (contato as { vinculos_obra?: { obra?: { id?: string } }[] } | undefined)?.vinculos_obra;
+  if (!Array.isArray(vinculos)) return null;
+  return vinculos.map((v) => v.obra?.id).filter((id): id is string => !!id);
+}
 
 const TAREFAS_PAGE_SIZE = 5;
 
@@ -64,7 +77,10 @@ const ContatoDetalhe = () => {
 
   const contato = contatos?.find(c => c.id === id);
   const clienteVinculado = clientes?.find(c => c.empresa === contato?.empresa);
-  const obraVinculada = clienteVinculado?.obras?.find((o) => o.id === contato?.obra_id);
+  // As obras vêm da tabela de vínculo, não mais de `contatos.obra_id` (que virou
+  // coluna órfã em 27/08/2026) — ver `use-obra-contatos.ts`.
+  const { data: obrasDoContato } = useObrasDoContato(contato?.id);
+  const salvarObrasDoContato = useSalvarObrasDoContato();
   const [vincularOpen, setVincularOpen] = useState(false);
   const [selectedEmpresaId, setSelectedEmpresaId] = useState('');
 
@@ -76,6 +92,9 @@ const ContatoDetalhe = () => {
   const { data: tarefas, isLoading: loadingTarefas } = useTarefas();
   const { ligada: temTarefas } = useSecaoLigada('tarefas');
   const { ligada: temEmails } = useSecaoLigada('emails');
+  // Empresa que não contratou a seção Obras não deve ver o cartão de obras nem o
+  // campo de vínculo na edição — o mesmo gate que ClienteDetalhe já aplica.
+  const { ligada: temObras } = useSecaoLigada('obras');
   const { data: tarefasKanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
   const tarefaKanbanStages = useMemo(
     () => tarefasKanbanColunas.map(c => ({ key: c.slug, label: c.nome })),
@@ -109,7 +128,10 @@ const ContatoDetalhe = () => {
     telefone: '',
     cargo: '',
     empresa: '',
-    obraId: '',
+    // Lista, e não mais um id só: o vínculo virou N:N em 27/08/2026. `null` enquanto
+    // as obras não chegaram — gravar a lista completa com `[]` apagaria os vínculos
+    // existentes de quem abrisse e salvasse antes da consulta voltar.
+    obraIds: null as string[] | null,
   });
 
   const openEdit = () => {
@@ -120,7 +142,15 @@ const ContatoDetalhe = () => {
       telefone: contato.telefone ?? '',
       cargo: (contato as any).cargo ?? '',
       empresa: contato.empresa ?? '',
-      obraId: contato.obra_id ?? '',
+      // A marcação sai de uma foto tirada no clique de "Editar" — e não há efeito que
+      // a atualize depois. Se a consulta dedicada ainda não voltou, cai no vínculo que
+      // JÁ veio junto com o contato (o embed da lista, que é o que libera esta página):
+      // sem essa rede, o campo ficaria eternamente "carregando" e o salvar pularia os
+      // vínculos em silêncio. `null` só sobra quando nenhuma das duas fontes tem dado —
+      // e aí a gravação do vínculo é pulada de propósito, para não apagar nada.
+      obraIds: obrasDoContato
+        ? obrasDoContato.map((o) => o.id)
+        : obrasDoEmbed(contato) ?? null,
     });
     setEditOpen(true);
   };
@@ -136,8 +166,16 @@ const ContatoDetalhe = () => {
         telefone: editData.telefone || undefined,
         cargo: editData.cargo || undefined,
         empresa: editData.empresa || undefined,
-        obra_id: editData.obraId || null,
       });
+      // O vínculo com obras mora em outra tabela: grava em seguida, e um erro aqui
+      // não pode fazer parecer que a edição do contato inteira falhou.
+      if (editData.obraIds !== null) {
+        try {
+          await salvarObrasDoContato.mutateAsync({ contatoId: id, obraIds: editData.obraIds });
+        } catch {
+          toast.warning('Contato salvo, mas não deu para atualizar as obras vinculadas.');
+        }
+      }
       toast.success('Contato atualizado com sucesso!');
       setEditOpen(false);
     } catch (err: any) {
@@ -264,19 +302,31 @@ const ContatoDetalhe = () => {
                   </Button>
                 )}
               </div>
-              {obraVinculada && (
+              {/* LISTA de obras, não uma só: desde 27/08/2026 a mesma pessoa pode
+                  responder por vários canteiros do mesmo cliente. Quem cria e desfaz o
+                  vínculo é a ficha da OBRA — aqui é a visão de leitura, com atalho. */}
+              {temObras !== false && obrasDoContato && obrasDoContato.length > 0 && (
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
-                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-                    <HardHat className="h-3.5 w-3.5" /> Obra
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+                    <HardHat className="h-3.5 w-3.5" />
+                    {obrasDoContato.length === 1 ? 'Obra' : `Obras (${obrasDoContato.length})`}
                   </p>
-                  <p className="text-base font-bold text-foreground truncate">{obraVinculada.nome_obra || 'Obra sem nome'}</p>
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-xs text-primary font-semibold mt-2 hover:no-underline"
-                    onClick={() => navigate('/obras', { state: { selectedObraId: obraVinculada.id } })}
-                  >
-                    Ver obra →
-                  </Button>
+                  <div className="space-y-2">
+                    {obrasDoContato.map((o) => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        // Abre a FICHA da obra, igual ao que a ficha do cliente e a de
+                        // negócios já fazem — a mesma ação tem que levar ao mesmo lugar.
+                        onClick={() => navigate('/obras', { state: { selectedObraId: o.id } })}
+                        className="block w-full text-left group"
+                      >
+                        <span className="text-sm font-bold text-foreground truncate block group-hover:text-primary transition-colors">
+                          {o.nomeObra || 'Obra sem nome'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               <div className="space-y-3 pt-2">
@@ -531,7 +581,12 @@ const ContatoDetalhe = () => {
                     try {
                       await updateContato.mutateAsync({
                         id,
-                        empresa: emp.empresa
+                        empresa: emp.empresa,
+                        // Grava também a CHAVE, não só o nome em texto. Vincular só pelo
+                        // texto era o que deixava o contato invisível em toda consulta
+                        // que filtra por `cliente_id` — inclusive o seletor de contatos
+                        // da obra, onde a pessoa some e acaba recadastrada em duplicata.
+                        cliente_id: emp.id,
                       });
                       toast.success('Empresa vinculada com sucesso!');
                       setVincularOpen(false);
@@ -569,23 +624,45 @@ const ContatoDetalhe = () => {
                   onValueChange={v => setEditData(d => ({ ...d, cargo: v }))}
                 />
               </div>
-              {clienteVinculado?.obras && clienteVinculado.obras.length > 0 && (
+              {/* Marcação múltipla no lugar do seletor de obra única: a mesma pessoa
+                  pode responder por vários canteiros. Nenhuma marcada = contato da
+                  empresa toda, que continua sendo o estado normal. */}
+              {temObras !== false && clienteVinculado?.obras && clienteVinculado.obras.length > 0 && (
                 <div>
-                  <Label>Obra</Label>
-                  <Select
-                    value={editData.obraId || '__nenhuma__'}
-                    onValueChange={v => setEditData(d => ({ ...d, obraId: v === '__nenhuma__' ? '' : v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Contato da empresa toda" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__nenhuma__">Contato da empresa toda</SelectItem>
-                      {clienteVinculado.obras.map((obra) => (
-                        <SelectItem key={obra.id} value={obra.id}>{obra.nome_obra || 'Obra sem nome'}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Obras deste contato</Label>
+                  <div className="mt-1 max-h-40 space-y-1 overflow-y-auto rounded-md border border-border p-2">
+                    {editData.obraIds === null && (
+                      <p className="px-1.5 py-1 text-xs text-muted-foreground">
+                        Não foi possível carregar os vínculos. Feche e abra a edição de novo — nada
+                        será alterado nas obras deste contato.
+                      </p>
+                    )}
+                    {editData.obraIds !== null && clienteVinculado.obras.map((obra) => {
+                      const marcada = editData.obraIds!.includes(obra.id);
+                      return (
+                        <label
+                          key={obra.id}
+                          className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm transition-colors hover:bg-accent/50"
+                        >
+                          <Checkbox
+                            checked={marcada}
+                            onCheckedChange={() =>
+                              setEditData(d => ({
+                                ...d,
+                                obraIds: marcada
+                                  ? (d.obraIds ?? []).filter(x => x !== obra.id)
+                                  : [...(d.obraIds ?? []), obra.id],
+                              }))
+                            }
+                          />
+                          <span className="min-w-0 truncate">{obra.nome_obra || 'Obra sem nome'}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Sem nenhuma marcada, o contato vale para a empresa toda.
+                  </p>
                 </div>
               )}
               <div>

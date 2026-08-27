@@ -2641,6 +2641,42 @@ export type Database = {
           },
         ]
       }
+      obra_contatos: {
+        Row: {
+          contato_id: string
+          created_at: string
+          id: string
+          obra_id: string
+        }
+        Insert: {
+          contato_id: string
+          created_at?: string
+          id?: string
+          obra_id: string
+        }
+        Update: {
+          contato_id?: string
+          created_at?: string
+          id?: string
+          obra_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "obra_contatos_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "obra_contatos_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       obras: {
         Row: {
           campos_extras: Json
@@ -4367,6 +4403,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      pode_acessar_obra: { Args: { _obra_id: string }; Returns: boolean }
       usuario_in_my_empresa: { Args: { _usuario_id: string }; Returns: boolean }
       validar_codigo_empresa: { Args: { p_codigo: string }; Returns: Json }
       vendedor_in_my_empresa: {
