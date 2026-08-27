@@ -23,6 +23,16 @@ interface MapaObrasPainelProps {
    *  senão escolher um chip zeraria os números de todos os outros. */
   contagemPorMarcador: Map<string, number>;
   totalBusca: number;
+  /**
+   * Quantas obras o serviço de endereço NÃO conseguiu localizar.
+   *
+   * 🔴 São justamente as que NÃO aparecem no mapa — e por isso quem só olha o mapa nunca as
+   * encontra para corrigir. O filtro existe para dar um caminho até elas. Medido em 27/08/2026:
+   * 8 das 82 obras da MD estão assim.
+   */
+  totalSemEndereco: number;
+  soSemEndereco: boolean;
+  onSoSemEndereco: (ligado: boolean) => void;
   selectedObraId: string | null;
   onSelectObra: (id: string) => void;
 }
@@ -35,6 +45,9 @@ export function MapaObrasPainel({
   onMarcadorFilter,
   contagemPorMarcador,
   totalBusca,
+  totalSemEndereco,
+  soSemEndereco,
+  onSoSemEndereco,
   selectedObraId,
   onSelectObra,
 }: MapaObrasPainelProps) {
@@ -69,6 +82,24 @@ export function MapaObrasPainel({
             <span className="tabular-nums opacity-80">{contagemPorMarcador.get(m.id) ?? 0}</span>
           </button>
         ))}
+
+        {/* Só aparece quando há alguma: um filtro que sempre devolve zero é ruído na barra. */}
+        {totalSemEndereco > 0 && (
+          <button
+            type="button"
+            className={cn(
+              TOGGLE_BUTTON_CLASS,
+              'h-7 px-2.5 text-xs',
+              soSemEndereco ? TOGGLE_BUTTON_ACTIVE : TOGGLE_BUTTON_INACTIVE,
+            )}
+            onClick={() => onSoSemEndereco(!soSemEndereco)}
+            title="Obras que o serviço de endereço não conseguiu localizar — elas não aparecem no mapa"
+          >
+            <MapPinOff className="h-3 w-3 shrink-0" />
+            Sem endereço
+            <span className="tabular-nums opacity-80">{totalSemEndereco}</span>
+          </button>
+        )}
       </div>
 
       {/* div com overflow em vez do <ScrollArea> do Radix: o Viewport dele embrulha o

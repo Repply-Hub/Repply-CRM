@@ -29,6 +29,16 @@ import { format, startOfDay } from 'date-fns';
 
 export interface VisitaParaRota {
   id: string;
+  /**
+   * O `grupo_id` da parada — o que identifica ESTA parada no banco.
+   *
+   * 🔴 NÃO é o `id`. Uma parada com participantes é uma LINHA POR PESSOA, todas com o mesmo
+   * `grupo_id`; o `id` é o de uma cópia só. Excluir ou editar pelo `id` mexe na agenda de uma
+   * pessoa e deixa as outras intactas — medido em 27/08/2026: 17 compromissos têm mais de uma
+   * cópia, e o maior tem 11. Quem organiza cancela, some da agenda dele, e os outros 10 vão à
+   * visita cancelada.
+   */
+  grupoId?: string | null;
   obraId: string;
   obraNome: string | null;
   inicio: Date;
@@ -41,6 +51,12 @@ export interface VisitaParaRota {
    * nenhum para investigar, os números só não fecham.
    */
   criadoPor: string | null;
+  /**
+   * Se a visita já aconteceu. Não entra em nenhum cálculo de rota — está aqui porque a
+   * confirmação de exclusão precisa avisar que visita realizada leva junto a observação escrita
+   * no campo, que é a única parte da exclusão que apaga TRABALHO e não só agendamento.
+   */
+  visitaRealizada?: boolean;
   latitude?: number | null;
   longitude?: number | null;
 }

@@ -4,6 +4,9 @@ import { ptBR } from 'date-fns/locale';
 import { AlertTriangle, CalendarIcon, ChevronDown, GripVertical, HardHat, Users, X, Check } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
+import { diferencaDaRota } from '@/lib/rota-em-edicao';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
+import type { RotaDoDia } from '@/lib/rota-do-dia';
 import {
   Dialog, DialogTitle, DialogDescription,
   ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo,
@@ -28,7 +31,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useObras } from '@/hooks/use-obras';
-import { useCreateRotaVisita, buscarConflitosDeVisita, type ConflitoVisita } from '@/hooks/use-eventos';
+import { useCreateRotaVisita, useEditarRotaDeVisita, useEventoParticipantes, buscarConflitosDeVisita, type ConflitoVisita } from '@/hooks/use-eventos';
 
 interface ObraOpcao {
   id: string;
@@ -37,6 +40,14 @@ interface ObraOpcao {
 }
 
 interface Parada {
+  /**
+   * O `grupo_id` desta parada no banco. Só existe quando a parada VEIO de uma rota já gravada.
+   *
+   * 🔴 É o que separa "mudar esta parada" de "criar outra": sem ele, salvar uma edição
+   * inseriria tudo de novo e a rota apareceria em dobro. E como cada parada tem um grupo
+   * próprio, é por ele que a alteração alcança as cópias de todos os participantes.
+   */
+  grupoId?: string | null;
   obraId: string;
   nomeObra: string;
   observacao: string;
@@ -65,6 +76,13 @@ interface NovaRotaVisitaDialogProps {
    * (`sheet.tsx:22`), que esconde exatamente a lista que a pessoa precisa ver.
    */
   apresentacao?: 'modal' | 'painel';
+  /**
+   * A rota que está sendo EDITADA. Ausente = está criando uma nova.
+   *
+   * Quando presente, o formulário abre preenchido com as paradas dela, e salvar aplica a
+   * DIFERENÇA em vez de inserir tudo de novo — ver `useEditarRotaDeVisita`.
+   */
+  rotaParaEditar?: RotaDoDia | null;
 }
 
 const DURACAO_PADRAO_MINUTOS = 60;
@@ -108,12 +126,21 @@ export function NovaRotaVisitaDialog({
   obrasIniciais,
   dataInicial,
   apresentacao = 'modal',
+  rotaParaEditar = null,
 }: NovaRotaVisitaDialogProps) {
   const ehPainel = apresentacao === 'painel';
+  const editando = !!rotaParaEditar;
   const { user } = useAuth();
   const { data: obras = [] } = useObras();
   const { data: usuarios, refetch: refetchUsuarios } = useVendedores();
   const criarRota = useCreateRotaVisita();
+  const editarRota = useEditarRotaDeVisita();
+
+  // Os participantes da rota vêm da PRIMEIRA parada: a rota inteira é criada de uma vez, com a
+  // mesma gente em todas. Ler de uma só evita uma consulta por parada para chegar à mesma lista.
+  const { data: participantesDaRota } = useEventoParticipantes(
+    rotaParaEditar?.paradas[0]?.grupoId ?? null,
+  );
 
   const [data, setData] = useState<Date>(new Date());
   const [paradas, setParadas] = useState<Parada[]>([]);
@@ -139,6 +166,26 @@ export function NovaRotaVisitaDialog({
   useEffect(() => {
     if (!open) return;
     refetchUsuarios();
+
+    if (rotaParaEditar) {
+      // Editando: o formulário abre com o que está gravado. `jaRealizada` fica FALSO de
+      // propósito — ele é o atalho de "essas visitas já aconteceram" do momento da criação, e
+      // ligá-lo aqui marcaria como realizada uma rota que talvez não seja, de uma vez só.
+      // Marcar visita feita continua sendo gesto individual, na lista.
+      setData(rotaParaEditar.data);
+      setJaRealizada(false);
+      setParadas(
+        rotaParaEditar.paradas.map((p) => ({
+          grupoId: p.grupoId,
+          obraId: p.obraId,
+          nomeObra: p.obraNome || 'Obra sem nome',
+          observacao: '',
+          horario: format(p.inicio, 'HH:mm'),
+        })),
+      );
+      return;
+    }
+
     setData(dataInicial ?? new Date());
     setJaRealizada(false);
     setParticipantes(user?.id ? [user.id] : []);
@@ -150,7 +197,13 @@ export function NovaRotaVisitaDialog({
         horario: somarMinutos('09:00', idx * DURACAO_PADRAO_MINUTOS),
       })),
     );
-  }, [open, obrasIniciais, dataInicial, user?.id, refetchUsuarios]);
+  }, [open, obrasIniciais, dataInicial, user?.id, refetchUsuarios, rotaParaEditar]);
+
+  // Os participantes chegam depois da rota (é outra consulta), então entram num efeito próprio.
+  useEffect(() => {
+    if (!open || !editando || !participantesDaRota) return;
+    setParticipantes(participantesDaRota);
+  }, [open, editando, participantesDaRota]);
 
   const toggleParticipante = (userId: string) => {
     setParticipantes((prev) =>
@@ -199,7 +252,65 @@ export function NovaRotaVisitaDialog({
     return { inicio: inicio.toISOString(), fim: fim.toISOString() };
   };
 
+  const salvarEdicao = () => {
+    if (!rotaParaEditar) return;
+
+    const diferenca = diferencaDaRota(
+      rotaParaEditar.paradas
+        .filter((p) => p.grupoId)
+        .map((p) => ({
+          grupoId: p.grupoId!,
+          obraId: p.obraId,
+          inicio: p.inicio,
+          visitaRealizada: !!p.visitaRealizada,
+          visitaObservacao: null,
+        })),
+      paradas.map((p) => ({ grupoId: p.grupoId, obraId: p.obraId, horario: p.horario })),
+      format(data, 'yyyy-MM-dd'),
+      DURACAO_PADRAO_MINUTOS,
+    );
+
+    if (diferenca.semMudanca) {
+      // Nada mudou: fechar em silêncio seria pior que dizer, porque a pessoa ficaria sem saber
+      // se salvou ou se a tela ignorou o clique.
+      toast.info('Nada mudou nesta rota.');
+      onOpenChange(false);
+      return;
+    }
+
+    editarRota.mutate(
+      {
+        diferenca,
+        participantes,
+        nomeDaObraPorId: (obraId) =>
+          paradas.find((p) => p.obraId === obraId)?.nomeObra ?? 'Obra sem nome',
+      },
+      {
+        onSuccess: (r) => {
+          toast.success(
+            r.mudou
+              ? `Rota atualizada: ${[
+                  r.alteradas ? `${r.alteradas} ${r.alteradas === 1 ? 'parada alterada' : 'paradas alteradas'}` : null,
+                  r.inseridas ? `${r.inseridas} ${r.inseridas === 1 ? 'acrescentada' : 'acrescentadas'}` : null,
+                  r.removidas ? `${r.removidas} ${r.removidas === 1 ? 'removida' : 'removidas'}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(', ')}.`
+              : 'Rota atualizada.',
+          );
+          onOpenChange(false);
+        },
+        onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível salvar a rota.')),
+      },
+    );
+  };
+
   const criarRotaDeFato = () => {
+    if (editando) {
+      salvarEdicao();
+      return;
+    }
+
     criarRota.mutate(
       {
         data: format(data, 'yyyy-MM-dd'),

@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { TracadoDaRota, type ParadaNoTracado } from './TracadoDaRota';
-import type { RotaCalculada } from '@/lib/osrm';
 import { Loader2, MapPin, Maximize2, Minimize2, WifiOff, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -341,13 +339,6 @@ function CartaoObraSelecionada({ obra, onFechar, onVerDetalhes }: CartaoObraSele
   );
 }
 
-/** A rota de visita a desenhar por cima do mapa, quando houver uma escolhida. */
-export interface RotaNoMapa {
-  chave: string;
-  paradas: ParadaNoTracado[];
-  rota: RotaCalculada | null | undefined;
-}
-
 interface MapaObrasProps {
   obras: ObraComCoordenada[] | undefined;
   isLoading: boolean;
@@ -359,8 +350,6 @@ interface MapaObrasProps {
   onPontoBusca: (p: PontoBusca | null) => void;
   onSelectObra: (id: string | null) => void;
   onVerDetalhes: (id: string) => void;
-  /** Trajeto da rota de visita escolhida. Ausente = mapa comum, sem traçado. */
-  rotaNoMapa?: RotaNoMapa | null;
 }
 
 export function MapaObras({
@@ -373,7 +362,6 @@ export function MapaObras({
   onPontoBusca,
   onSelectObra,
   onVerDetalhes,
-  rotaNoMapa,
 }: MapaObrasProps) {
   const { items, carregando, progresso } = useGeocodeObras(obras);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -476,16 +464,6 @@ export function MapaObras({
             </Tooltip>
           </Marker>
         ))}
-
-        {/* O traçado vem DEPOIS das bolinhas para ficar por cima delas, e os pinos numerados
-            ainda usam zIndexOffset — a rota é o que a pessoa foi ali olhar. */}
-        {rotaNoMapa && (
-          <TracadoDaRota
-            chave={rotaNoMapa.chave}
-            paradas={rotaNoMapa.paradas}
-            rota={rotaNoMapa.rota}
-          />
-        )}
 
         {/* Pino do endereço buscado: gota na cor primária, distinta das bolinhas das obras. */}
         {pontoBusca && (

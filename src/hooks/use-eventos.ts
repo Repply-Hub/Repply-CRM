@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { DiferencaDaRota } from '@/lib/rota-em-edicao';
 import type { PeriodoDoCalendario } from '@/lib/periodo-do-calendario';
 import { useAuth } from './use-auth';
 import type { CalendarEvent, CalendarType, EventoForm } from '@/components/calendar/types';
@@ -436,6 +437,115 @@ export function useCreateRotaVisita() {
   });
 }
 
+/**
+ * Editar uma rota de visita já criada.
+ *
+ * 🔴 NÃO APAGA E RECRIA. O caminho curto — limpar a rota e gravar de novo — perderia
+ * `visita_realizada` e `visita_observacao` de toda parada que já tinha sido visitada. Essa
+ * observação é escrita NO CAMPO, depois da visita ("cliente pediu orçamento de porcelanato"), e
+ * é a única coisa aqui que é trabalho e não agendamento. Alguém corrigir o horário de UMA parada
+ * e apagar em silêncio a anotação de OUTRA é o tipo de perda que só se descobre semanas depois.
+ *
+ * Por isso a edição é uma DIFERENÇA (`src/lib/rota-em-edicao.ts`): quem continua é ALTERADO —
+ * e a alteração toca só `inicio` e `fim` —, quem saiu é removido, quem chegou é inserido.
+ *
+ * 🔴 A ORDEM É INSERIR → ALTERAR → REMOVER, e não é arbitrária. O cliente do Supabase não abre
+ * transação: são três idas ao banco, e uma pode falhar no meio. Removendo por ÚLTIMO, uma falha
+ * deixa paradas A MAIS — visíveis na tela, e a pessoa apaga. Na ordem inversa, a mesma falha
+ * deixaria paradas A MENOS, ou seja apagaria compromisso sem colocar o substituto. Sobrar é
+ * conserto de um clique; faltar é perda silenciosa.
+ *
+ * (O certo mesmo seria uma função de banco fazendo as três numa transação só. Fica anotado: é
+ * mudança de banco, e mudança de banco passa pelo Lucas.)
+ */
+export function useEditarRotaDeVisita() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      diferenca,
+      participantes,
+      nomeDaObraPorId,
+    }: {
+      diferenca: DiferencaDaRota;
+      /** user_ids (auth) das paradas NOVAS. Vazio cai para o próprio criador. */
+      participantes?: string[];
+      /** Para montar o título das paradas novas ("Visita: <obra>"). */
+      nomeDaObraPorId: (obraId: string) => string;
+    }) => {
+      if (diferenca.semMudanca) return { mudou: false as const };
+
+      const alvos = new Set<string>(
+        participantes && participantes.length > 0 ? participantes : [user!.id],
+      );
+
+      // ── 1. INSERIR ────────────────────────────────────────────────────────
+      if (diferenca.inserir.length > 0) {
+        const linhas = diferenca.inserir.flatMap((nova) => {
+          const grupoId = crypto.randomUUID();
+          return Array.from(alvos).map((uid) => ({
+            user_id: uid,
+            grupo_id: grupoId,
+            criado_por: user!.id,
+            titulo: `Visita: ${nomeDaObraPorId(nova.obraId)}`,
+            descricao: null,
+            inicio: nova.inicio.toISOString(),
+            fim: nova.fim.toISOString(),
+            dia_inteiro: false,
+            tipo_calendario: 'empresa',
+            cor: CALENDAR_COLORS.empresa,
+            lembrete_minutos: null,
+            obra_id: nova.obraId,
+            // Parada nova nasce não realizada. Marcar como feita é gesto separado, na lista.
+            visita_realizada: false,
+            visita_observacao: null,
+          }));
+        });
+        const { error } = await supabase.from('eventos').insert(linhas);
+        if (error) throw error;
+      }
+
+      // ── 2. ALTERAR ────────────────────────────────────────────────────────
+      //
+      // 🔴 SÓ `inicio` e `fim`. `visita_realizada` e `visita_observacao` não aparecem aqui de
+      // propósito: a preservação acontece por NÃO tocar nesses campos. Se um dia alguém
+      // acrescentar um deles neste update "para deixar consistente", apaga a anotação de campo
+      // de toda parada já visitada, e nada na tela vai indicar isso.
+      for (const parada of diferenca.alterar) {
+        const { error } = await supabase
+          .from('eventos')
+          .update({ inicio: parada.inicio.toISOString(), fim: parada.fim.toISOString() })
+          // Por GRUPO: uma parada com participantes é uma linha por pessoa, e mudar só uma
+          // deixaria os colegas com o horário velho.
+          .eq('grupo_id', parada.grupoId);
+        if (error) throw error;
+      }
+
+      // ── 3. REMOVER ────────────────────────────────────────────────────────
+      if (diferenca.remover.length > 0) {
+        const { error } = await supabase
+          .from('eventos')
+          .delete()
+          .in('grupo_id', diferenca.remover);
+        if (error) throw error;
+      }
+
+      return {
+        mudou: true as const,
+        inseridas: diferenca.inserir.length,
+        alteradas: diferenca.alterar.length,
+        removidas: diferenca.remover.length,
+      };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['eventos'] });
+      qc.invalidateQueries({ queryKey: ['obra_visitas'] });
+      qc.invalidateQueries({ queryKey: ['obra_visitas_todas'] });
+    },
+  });
+}
+
 export function useBulkCreateEventos() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -574,14 +684,98 @@ export function useUpdateEvento() {
   });
 }
 
+/**
+ * Excluir um compromisso.
+ *
+ * 🔴 UM COMPROMISSO PODE SER VÁRIAS LINHAS. Quando há participantes, existe uma linha por
+ * pessoa, todas com o mesmo `grupo_id` — todo o resto deste arquivo já opera por grupo
+ * (`:237`, `:538`, `:545`, `:553`). Só a exclusão apagava pelo `id`, ou seja UMA cópia.
+ *
+ * Medido na base em 27/08/2026: 251 linhas para 160 compromissos de verdade; **17 têm mais de
+ * uma cópia, e o maior tem 11**. Quem organizava esse compromisso de 11 pessoas clicava em
+ * excluir, ele sumia da agenda dela — e as outras 10 continuavam com ele marcado. Iam à reunião
+ * cancelada, sem nada em lugar nenhum indicando o que houve.
+ *
+ * A regra agora distingue os dois gestos, que são coisas diferentes:
+ *
+ *   QUEM ORGANIZOU  -> cancela para TODO MUNDO (apaga o grupo).
+ *   QUEM PARTICIPA  -> sai do compromisso (apaga só a própria linha), e ele continua de pé
+ *                      para os demais.
+ *
+ * A RLS já sustenta exatamente isso — `user_id = auth.uid() OR criado_por = auth.uid()` —, então
+ * a decisão daqui é sobre o que a pessoa QUIS fazer, não sobre o que ela PODE fazer. Sem essa
+ * distinção, a exclusão de um participante apagaria a reunião da empresa inteira.
+ */
 export function useDeleteEvento() {
+  const { user } = useAuth();
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('eventos').delete().eq('id', id);
+    mutationFn: async (alvo: string | { id: string; grupoId?: string | null; criadoPor?: string | null }) => {
+      // Assinatura antiga (só o id) continua aceita: apaga a linha, como sempre fez.
+      const evento = typeof alvo === 'string' ? { id: alvo } : alvo;
+      const organizou = !!evento.criadoPor && evento.criadoPor === user?.id;
+
+      const consulta = organizou && evento.grupoId
+        ? supabase.from('eventos').delete().eq('grupo_id', evento.grupoId)
+        : supabase.from('eventos').delete().eq('id', evento.id);
+
+      const { error } = await consulta;
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['eventos'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['eventos'] });
+      qc.invalidateQueries({ queryKey: ['obra_visitas'] });
+      qc.invalidateQueries({ queryKey: ['obra_visitas_todas'] });
+    },
+  });
+}
+
+/**
+ * Excluir uma ROTA DE VISITA inteira — todas as paradas do dia.
+ *
+ * 🔴 ISSO JÁ TIRA DO CALENDÁRIO, e não por acaso: a visita de obra E o compromisso do
+ * calendário são A MESMA LINHA da tabela `eventos` (uma visita é um evento com `obra_id`
+ * preenchido). Não existe uma segunda gravação a limpar — apagar aqui é apagar lá.
+ *
+ * Recebe os `grupo_id` das paradas porque não existe tabela de rota: a rota é o conjunto de
+ * paradas do mesmo dia da mesma pessoa (ver `src/lib/rota-do-dia.ts`).
+ *
+ * 🔴 CONFERE O QUE FOI DE FATO APAGADO. A RLS permite apagar onde `user_id = auth.uid() OR
+ * criado_por = auth.uid()`: quem NÃO organizou a rota consegue apagar só as próprias linhas, e
+ * o `delete` volta SEM ERRO tendo removido menos do que devia — a tela diria "rota excluída" e
+ * metade dela continuaria na agenda dos colegas. Por isso o `select()` e a contagem.
+ */
+export function useExcluirRotaDeVisita() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ grupoIds }: { grupoIds: string[] }) => {
+      if (!grupoIds.length) throw new Error('Nenhuma parada para excluir.');
+
+      const { data, error } = await supabase
+        .from('eventos')
+        .delete()
+        .in('grupo_id', grupoIds)
+        .select('grupo_id');
+      if (error) throw error;
+
+      const apagados = new Set((data ?? []).map((linha) => linha.grupo_id));
+      const faltaram = grupoIds.filter((g) => !apagados.has(g));
+      if (faltaram.length > 0) {
+        throw new Error(
+          faltaram.length === grupoIds.length
+            ? 'Você não pode excluir esta rota — ela foi criada por outra pessoa.'
+            : `Só parte da rota foi excluída: ${faltaram.length} de ${grupoIds.length} paradas não saíram, porque foram criadas por outra pessoa.`,
+        );
+      }
+
+      return { paradas: grupoIds.length };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['eventos'] });
+      qc.invalidateQueries({ queryKey: ['obra_visitas'] });
+      qc.invalidateQueries({ queryKey: ['obra_visitas_todas'] });
+    },
   });
 }

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Search, HardHat } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { periodoDoCalendario } from '@/lib/periodo-do-calendario';
+import { useAuth } from '@/hooks/use-auth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -107,6 +108,11 @@ function parseICS(content: string, calendarType: CalendarType = "empresa"): Even
 }
 
 export default function Calendario() {
+  // 🔴 `user.id` (o login), não `profile.id`: `eventos.criado_por` aponta para `auth.users`.
+  // São identificadores diferentes da mesma pessoa, e trocar um pelo outro não dá erro — quem
+  // organizou passaria a ser tratado como mero participante, e "excluir" deixaria o compromisso
+  // de pé na agenda de todo mundo (CLAUDE.md §4.5).
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>("semana");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [month, setMonth] = useState(new Date());
@@ -236,11 +242,18 @@ export default function Calendario() {
     }
   };
 
-  const handleDelete = (id: string) => {
-    deleteEvento(id, {
-      onSuccess: () => toast.success("Evento excluído"),
-      onError: () => toast.error("Erro ao excluir evento"),
-    });
+  const handleDelete = (evento: CalendarEvent) => {
+    // Quem organizou cancela para todo mundo; quem só participa sai do compromisso. A conta é
+    // de `useDeleteEvento` — aqui só a mensagem muda, para a pessoa saber o que aconteceu.
+    const organizou = !!evento.criadoPor && evento.criadoPor === user?.id;
+    deleteEvento(
+      { id: evento.id, grupoId: evento.grupoId, criadoPor: evento.criadoPor },
+      {
+        onSuccess: () =>
+          toast.success(organizou ? "Evento excluído para todos os participantes" : "Você saiu deste evento"),
+        onError: () => toast.error("Erro ao excluir evento"),
+      },
+    );
   };
 
   // --- Importar ICS ---

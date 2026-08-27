@@ -26,7 +26,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import {
   Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon,
   Tag, Table as TableIcon, Plus, Settings2, Filter, ChevronDown, X, Trash2,
-  FileText, Route
+  FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -49,10 +49,8 @@ import { MarcadoresObrasDialog } from '@/components/obras/MarcadoresObrasDialog'
 import { VendasDaObra } from '@/components/obras/VendasDaObra';
 import { HistoricoVisitasObra } from '@/components/obras/HistoricoVisitasObra';
 import { VisitasObrasPainel } from '@/components/obras/VisitasObrasPainel';
-import type { RotaNoMapa } from '@/components/obras/MapaObras';
 import type { RotaDoDia } from '@/lib/rota-do-dia';
-import { useRotaOsrm } from '@/hooks/use-rota-osrm';
-import { distanciaLegivel, duracaoLegivel } from '@/lib/osrm';
+import { filtrarObrasPorBusca, obraSemEnderecoNoMapa, type ObraParaBusca } from '@/lib/busca-de-obras';
 import { ContatosDaObra } from '@/components/obras/ContatosDaObra';
 import { SeletorContatosObra } from '@/components/obras/SeletorContatosObra';
 import { useContatosDaObra, useSalvarContatosDaObra } from '@/hooks/use-obra-contatos';
@@ -199,42 +197,16 @@ export default function Obras() {
   const [activeTab, setActiveTab] = useState('mapa');
 
   /**
-   * A rota de visita que está desenhada no mapa, escolhida na aba "Visitas".
+   * A rota que a pessoa mandou EDITAR, vinda da aba "Visitas".
    *
-   * Fica AQUI e não dentro do mapa porque quem escolhe é a outra aba: a página é o único lugar
-   * que enxerga as duas.
+   * 🔴 O trajeto NÃO mora mais aqui. Até 27/08/2026 clicar em "ver no mapa" trocava a aba e
+   * desenhava a rota por cima do mapa geral; o Lucas pediu o contrário, e o motivo é bom — o
+   * mapa geral tem 74 pinos e a rota do dia tem três, então procurar o traçado no meio deles é
+   * trabalho, e trocar de aba ainda fazia perder o filtro e a rolagem da lista de visitas.
+   * Agora a rota abre em janela própria (`RotaNoMapaDialog`), com SÓ as obras dela.
    */
-  const [rotaEscolhida, setRotaEscolhida] = useState<RotaDoDia | null>(null);
-
-  // Só as paradas COM localização vão para o cálculo do trajeto — obra sem coordenada não tem
-  // como entrar numa rota de carro. Quantas ficaram de fora já é dito na aba "Visitas".
-  const pontosDaRota = useMemo(
-    () =>
-      rotaEscolhida?.podeDesenhar
-        ? rotaEscolhida.comPonto.map((p) => ({ lat: p.latitude!, lng: p.longitude! }))
-        : null,
-    [rotaEscolhida],
-  );
-
-  const { data: trajeto, isLoading: buscandoTrajeto, isError: trajetoFalhou } =
-    useRotaOsrm(pontosDaRota);
-
-  const rotaNoMapa: RotaNoMapa | null = useMemo(() => {
-    if (!rotaEscolhida?.podeDesenhar) return null;
-    return {
-      chave: rotaEscolhida.chave,
-      paradas: rotaEscolhida.comPonto.map((p) => ({
-        id: p.id,
-        nome: p.obraNome,
-        lat: p.latitude!,
-        lng: p.longitude!,
-        horario: p.inicio,
-      })),
-      // `undefined` enquanto busca, `null` quando não veio: o traçado cai na linha reta
-      // tracejada nos dois casos, e a barra acima do mapa é quem explica qual é qual.
-      rota: trajetoFalhou ? null : trajeto,
-    };
-  }, [rotaEscolhida, trajeto, trajetoFalhou]);
+  const [rotaEmEdicao, setRotaEmEdicao] = useState<RotaDoDia | null>(null);
+  const [soSemEndereco, setSoSemEndereco] = useState(false);
   // Obra selecionada NA ABA MAPA (cartão flutuante + destaque do pino). Independente do
   // `selectedObra` acima, que abre o Sheet lateral de detalhes. O `focoTick` cresce a cada
   // clique de seleção para o mapa refocar até quando o id clicado é o mesmo (reclicar a
@@ -423,18 +395,46 @@ export default function Obras() {
 
   // Separado do `filtered` para os contadores dos chips do mapa: eles devem refletir a
   // BUSCA, mas não o chip ativo — senão escolher um marcador zeraria os números dos outros.
-  const filtradasPorBusca = useMemo(() => {
-    if (!obras) return [];
-    if (!search) return obras;
-    const q = search.toLowerCase();
-    return obras.filter(
-      (o) =>
-        (o.nome_obra || '').toLowerCase().includes(q) ||
-        (o.endereco_entrega || '').toLowerCase().includes(q) ||
-        ((o.clientes as any)?.empresa || '').toLowerCase().includes(q) ||
-        ((o as ObraNaLista).marcador?.nome || '').toLowerCase().includes(q)
-    );
-  }, [obras, search]);
+  /**
+   * As chaves de campo personalizado que ESTA empresa configurou.
+   *
+   * 🔴 Só elas são varridas na busca. `obras.campos_extras` guarda também o registro de
+   * migração escrito pelo próprio sistema — medido em 27/08/2026: 80 das 82 obras têm isso, com
+   * o nome do cliente de ORIGEM do cadastro lá dentro. Varrer o objeto inteiro faria buscar
+   * "Casapop" devolver obras que não são da Casapop, e ainda exporia anotação interna como se
+   * fosse dado da obra.
+   */
+  const chavesPersonalizadas = useMemo(
+    () =>
+      (camposConfigObras ?? [])
+        .filter((c) => c.origem === 'customizado')
+        .map((c) => c.campo_key),
+    [camposConfigObras],
+  );
+
+  // A busca em si mora em `src/lib/busca-de-obras.ts`, com testes. Até 27/08/2026 ela era feita
+  // aqui, olhava quatro campos e comparava texto cru — então o CNPJ ficava de fora, e quem
+  // digitasse "Sao Jose" não achava "São José". Pedido do Lucas: cobrir endereço, CNPJ e o
+  // resto.
+  const filtradasPorBusca = useMemo(
+    // Sem molde: a função é genérica (`<T extends ObraParaBusca>`) e devolve o MESMO tipo que
+    // recebeu. Amoldar para `ObraParaBusca[]` faria a lista voltar sem `id` nem `marcador_id`,
+    // e a tela inteira depois daqui pararia de compilar.
+    () => filtrarObrasPorBusca(obras ?? [], search, chavesPersonalizadas),
+    [obras, search, chavesPersonalizadas],
+  );
+
+  /**
+   * Quantas obras o serviço de endereço NÃO conseguiu localizar.
+   *
+   * 🔴 Conta sobre TODAS as obras, não sobre as filtradas: é o número que o chip mostra, e ele
+   * precisa dizer quantas existem para achar, não quantas sobraram do filtro anterior — senão
+   * ligar o filtro mudaria o próprio número que convidou a ligá-lo.
+   */
+  const totalSemEndereco = useMemo(
+    () => (obras ?? []).filter((o) => obraSemEnderecoNoMapa(o as ObraParaBusca)).length,
+    [obras],
+  );
 
   const contagemPorMarcador = useMemo(() => {
     const m = new Map<string, number>();
@@ -450,6 +450,13 @@ export default function Obras() {
 
     if (marcadorFilter !== 'todos') {
       list = list.filter((o) => (o as ObraNaLista).marcador_id === marcadorFilter);
+    }
+
+    // 🔴 Estas obras NÃO aparecem no mapa — é a definição delas. O filtro serve para a LISTA e
+    // para o painel lateral, que é onde dá para abrir a obra e corrigir o endereço. Sem um
+    // caminho até elas, quem olha só o mapa nunca as encontra: elas simplesmente não estão lá.
+    if (soSemEndereco) {
+      list = list.filter((o) => obraSemEnderecoNoMapa(o as ObraParaBusca));
     }
 
     const getSortValue = (o: any) => {
@@ -489,7 +496,7 @@ export default function Obras() {
     });
 
     return list;
-  }, [filtradasPorBusca, marcadorFilter, sortColumn, sortDirection, columns]);
+  }, [filtradasPorBusca, marcadorFilter, soSemEndereco, sortColumn, sortDirection, columns]);
 
   const obrasParaMapa = useMemo(
     () =>
@@ -899,42 +906,6 @@ export default function Obras() {
               altura explícita resolve para "auto" e deixava o conjunto encolhido no rodapé.
               O lg:grid-rows-1 (linha de 1fr) é o que estica painel e mapa na vertical. */}
           <TabsContent value="mapa" className="mt-0 flex-1 min-h-0 data-[state=active]:flex flex-col">
-            {/* Barra da rota. Só existe quando há uma escolhida, e é ela que dá a saída — sem
-                isso a rota ficaria presa no mapa, sem nada dizendo como voltar ao mapa comum. */}
-            {rotaEscolhida && (
-              <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
-                <Route className="h-4 w-4 shrink-0 text-primary" />
-                <span className="text-sm font-medium capitalize text-card-foreground">
-                  Rota de {format(rotaEscolhida.data, "EEEE, d 'de' MMM", { locale: ptBR })}
-                </span>
-                <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                  {rotaEscolhida.comPonto.length} paradas
-                  {trajeto
-                    ? ` · ${distanciaLegivel(trajeto.distanciaM)} · cerca de ${duracaoLegivel(trajeto.duracaoS)}`
-                    : ''}
-                </span>
-                {buscandoTrajeto && (
-                  <span className="text-xs text-muted-foreground">calculando o trajeto…</span>
-                )}
-                {trajetoFalhou && (
-                  // Dizer o que a linha reta significa é o que evita a pessoa achar que o
-                  // sistema está mostrando um caminho que não existe.
-                  <span className="text-xs text-muted-foreground">
-                    o serviço de rotas não respondeu — as linhas mostram a ordem das visitas, não
-                    o caminho pelas ruas
-                  </span>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="ml-auto h-7 px-2 text-xs"
-                  onClick={() => setRotaEscolhida(null)}
-                >
-                  Sair da rota
-                </Button>
-              </div>
-            )}
-
             <div className="flex-1 min-h-0 flex flex-col gap-4 lg:grid lg:grid-cols-[360px_1fr] lg:grid-rows-1">
               <Card className="flex flex-col min-h-0 overflow-hidden max-h-[40dvh] lg:max-h-none p-0">
                 <MapaObrasPainel
@@ -945,6 +916,9 @@ export default function Obras() {
                   onMarcadorFilter={setMarcadorFilter}
                   contagemPorMarcador={contagemPorMarcador}
                   totalBusca={filtradasPorBusca.length}
+                  totalSemEndereco={totalSemEndereco}
+                  soSemEndereco={soSemEndereco}
+                  onSoSemEndereco={setSoSemEndereco}
                   selectedObraId={obraSelecionadaMapa}
                   onSelectObra={selecionarObraMapa}
                 />
@@ -960,7 +934,6 @@ export default function Obras() {
                   onPontoBusca={setPontoBusca}
                   onSelectObra={selecionarObraMapa}
                   onVerDetalhes={(id) => setSelectedObra(obras?.find(o => o.id === id) ?? null)}
-                  rotaNoMapa={rotaNoMapa}
                 />
               </div>
             </div>
@@ -971,12 +944,7 @@ export default function Obras() {
               <VisitasObrasPainel
                 searchTerm={search}
                 onSelectObra={(obraId) => setSelectedObra(obras?.find((o) => o.id === obraId) ?? null)}
-                onVerRotaNoMapa={(rota) => {
-                  setRotaEscolhida(rota);
-                  // Sem trocar de aba, clicar em "Ver no mapa" não faria nada visível — a
-                  // pessoa continuaria olhando a lista de visitas.
-                  setActiveTab('mapa');
-                }}
+                onEditarRota={setRotaEmEdicao}
               />
             </div>
           </TabsContent>
@@ -990,6 +958,19 @@ export default function Obras() {
           open={rotaVisitaDialogOpen}
           onOpenChange={(v) => { setRotaVisitaDialogOpen(v); if (!v) setSelectedIds([]); }}
           obrasIniciais={(obras ?? []).filter((o) => selectedIds.includes(o.id))}
+        />
+
+        {/* Edição de rota: montagem SEPARADA da de criação, e em janela no meio da tela.
+            Duas razões. A primeira é de tela: quem edita veio da aba "Visitas", onde não há
+            lista de obras filtrada ao lado para consultar — o painel lateral existe para não
+            tapar essa lista, e aqui ela não existe.
+            A segunda é de estado: o formulário se preenche quando `open` vira verdadeiro, e um
+            mesmo componente servindo os dois casos abriria com as paradas do gesto anterior. */}
+        <NovaRotaVisitaDialog
+          apresentacao="modal"
+          open={!!rotaEmEdicao}
+          onOpenChange={(v) => { if (!v) setRotaEmEdicao(null); }}
+          rotaParaEditar={rotaEmEdicao}
         />
 
         {/* Diálogo de gerenciar marcadores da obra */}

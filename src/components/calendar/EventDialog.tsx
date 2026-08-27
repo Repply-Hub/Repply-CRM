@@ -44,7 +44,12 @@ interface EventDialogProps {
   editingEvent?: CalendarEvent | null;
   onClose: () => void;
   onSave: (form: EventoForm) => void;
-  onDelete?: (id: string) => void;
+  /**
+   * 🔴 Recebe o EVENTO, não o id. Um compromisso com participantes é uma linha por pessoa, e
+   * quem exclui precisa saber se organizou (cancela para todos) ou só participa (sai dele) —
+   * decisão que mora em `useDeleteEvento` e depende de `grupoId` e `criadoPor`.
+   */
+  onDelete?: (evento: CalendarEvent) => void;
   /**
    * Aba "Visita a obra" do tablist não cria a visita aqui dentro — entrega
    * para o mesmo diálogo de rota de visita usado em Obras/Calendário, que já
@@ -516,7 +521,7 @@ export function EventDialog({
                   variant="ghost"
                   size="sm"
                   className="mr-auto text-destructive hover:text-destructive"
-                  onClick={() => { onDelete(editingEvent.id); onClose(); }}
+                  onClick={() => { onDelete(editingEvent); onClose(); }}
                 >
                   <Trash2 className="h-4 w-4 mr-1.5" />
                   Excluir

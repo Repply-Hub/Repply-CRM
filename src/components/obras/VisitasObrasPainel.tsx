@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Loader2, CheckCircle2, Circle, MapPin, Building2, HardHat, Route, Send } from 'lucide-react';
+import { toast } from 'sonner';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
+import { Loader2, CheckCircle2, Circle, MapPin, Building2, HardHat, Route, Send, Trash2, Pencil } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,12 +13,15 @@ import { useTodasVisitasObras, useMarcarVisitaRealizada, type VisitaObraListagem
 import { agruparEmRotasDoDia, type RotaDoDia } from '@/lib/rota-do-dia';
 import { linkDoGoogleMaps, mensagemDaRota } from '@/lib/rota-no-whatsapp';
 import { EnviarRotaDialog } from './EnviarRotaDialog';
+import { RotaNoMapaDialog } from './RotaNoMapaDialog';
+import { useExcluirRotaDeVisita } from '@/hooks/use-eventos';
+import { ConfirmarExclusaoRota } from './ConfirmarExclusaoRota';
 
 interface VisitasObrasPainelProps {
   searchTerm: string;
   onSelectObra: (obraId: string) => void;
-  /** Mostrar o trajeto daquele dia no mapa. Sem isto, os botões de rota não aparecem. */
-  onVerRotaNoMapa?: (rota: RotaDoDia) => void;
+  /** Reabrir a rota para edição. Sem isto, o botão de editar não aparece. */
+  onEditarRota?: (rota: RotaDoDia) => void;
 }
 
 /**
@@ -29,7 +34,7 @@ interface VisitasObrasPainelProps {
 export function VisitasObrasPainel({
   searchTerm,
   onSelectObra,
-  onVerRotaNoMapa,
+  onEditarRota,
 }: VisitasObrasPainelProps) {
   const { profile } = useAuth();
   const { data: visitas, isLoading } = useTodasVisitasObras();
@@ -38,6 +43,12 @@ export function VisitasObrasPainel({
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [observacaoRascunho, setObservacaoRascunho] = useState('');
   const [rotaParaEnviar, setRotaParaEnviar] = useState<RotaDoDia | null>(null);
+  // 🔴 A rota abre em JANELA PRÓPRIA, não no mapa geral de obras. O mapa geral tem 74 pinos e a
+  // rota do dia tem três: procurar o trajeto no meio deles é trabalho, e trocar de aba ainda
+  // faria a pessoa perder o filtro e a rolagem em que ela estava aqui. Pedido do Lucas.
+  const [rotaNoMapa, setRotaNoMapa] = useState<RotaDoDia | null>(null);
+  const [rotaParaExcluir, setRotaParaExcluir] = useState<RotaDoDia | null>(null);
+  const excluirRota = useExcluirRotaDeVisita();
 
   const filtradas = useMemo(() => {
     const lista = visitas ?? [];
@@ -76,10 +87,14 @@ export function VisitasObrasPainel({
     for (const rota of agruparEmRotasDoDia(
       filtradas.map((v) => ({
         id: v.id,
+        // O que identifica a parada no banco. O `id` é o de UMA cópia; excluir por ele deixaria
+        // a visita de pé na agenda dos outros participantes.
+        grupoId: v.grupoId,
         obraId: v.obraId,
         obraNome: v.nomeObra,
         inicio: new Date(v.inicio),
         criadoPor: v.criadoPor,
+        visitaRealizada: v.visitaRealizada,
         latitude: v.latitude,
         longitude: v.longitude,
       })),
@@ -157,24 +172,28 @@ export function VisitasObrasPainel({
               não há trajeto, e sem localização não há o que desenhar. */}
           {rotasDoDia.length > 0 && (
             <div className="space-y-1.5 border-b border-border bg-muted/30 px-3 py-2">
-              {rotasDoDia.map((rota) => (
+              {rotasDoDia.map((rota) => {
+                // Só quem montou a rota mexe nela. Não é preciosismo de tela: a regra do banco
+                // deixa cada pessoa apagar apenas as SUAS linhas, então um colega clicando em
+                // excluir apagaria metade da rota e deixaria o resto na agenda de todo mundo.
+                const eDono = !!profile?.user_id && profile.user_id === rota.criadoPor;
+
+                return (
                 <div key={rota.chave} className="flex flex-wrap items-center gap-1.5">
                   {precisaNomear && (
                     <span className="mr-auto truncate text-xs text-muted-foreground">
                       {nomePor(rota.criadoPor ?? '')}
                     </span>
                   )}
-                  {onVerRotaNoMapa && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 gap-1.5 px-2 text-xs"
-                      onClick={() => onVerRotaNoMapa(rota)}
-                    >
-                      <Route className="h-3.5 w-3.5" />
-                      Ver no mapa
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 px-2 text-xs"
+                    onClick={() => setRotaNoMapa(rota)}
+                  >
+                    <Route className="h-3.5 w-3.5" />
+                    Ver no mapa
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -184,6 +203,28 @@ export function VisitasObrasPainel({
                     <Send className="h-3.5 w-3.5" />
                     Enviar
                   </Button>
+                  {eDono && onEditarRota && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 gap-1.5 px-2 text-xs"
+                      onClick={() => onEditarRota(rota)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Editar
+                    </Button>
+                  )}
+                  {eDono && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 gap-1.5 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => setRotaParaExcluir(rota)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Excluir
+                    </Button>
+                  )}
                   {rota.semPonto.length > 0 && (
                     // Dizer o que ficou de fora é o que impede a pessoa de achar que a rota tem
                     // menos paradas do que ela cadastrou.
@@ -195,7 +236,8 @@ export function VisitasObrasPainel({
                     </span>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -237,6 +279,35 @@ export function VisitasObrasPainel({
         </section>
         );
       })}
+
+      <RotaNoMapaDialog
+        rota={rotaNoMapa}
+        onFechar={() => setRotaNoMapa(null)}
+        onEnviar={(rota) => {
+          setRotaNoMapa(null);
+          setRotaParaEnviar(rota);
+        }}
+      />
+
+      <ConfirmarExclusaoRota
+        rota={rotaParaExcluir}
+        excluindo={excluirRota.isPending}
+        onCancelar={() => setRotaParaExcluir(null)}
+        onConfirmar={() => {
+          const alvo = rotaParaExcluir;
+          if (!alvo) return;
+          excluirRota.mutate(
+            { grupoIds: alvo.paradas.map((p) => p.grupoId).filter(Boolean) as string[] },
+            {
+              onSuccess: () => {
+                toast.success('Rota excluída. As visitas saíram do calendário também.');
+                setRotaParaExcluir(null);
+              },
+              onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível excluir a rota.')),
+            },
+          );
+        }}
+      />
 
       <EnviarRotaDialog
         open={!!rotaParaEnviar}
