@@ -100,6 +100,41 @@ export function zerarQuedas() {
  * baldes fecharem, o original deixa de funcionar — e é por isso que o contador acima precisa
  * estar zerado antes disso.
  */
+/**
+ * Link temporário para um objeto de balde PRIVADO, a partir do balde e do caminho.
+ *
+ * Diferente de `enderecoDoArquivo`, logo abaixo, que parte de uma URL já gravada no banco:
+ * aqui não existe URL de origem, porque o balde nasceu privado e nunca teve endereço público
+ * para converter. Quem guarda só o caminho — como `fabricante_arquivos` — entra por aqui.
+ *
+ * 🔴 DEVOLVE `null` QUANDO FALHA, e a diferença é de propósito. O `enderecoDoArquivo` devolve
+ * a URL original como rede de proteção, o que faz sentido enquanto o balde ainda está aberto.
+ * Num balde privado essa rede não existe: endereço não assinado simplesmente não abre. Quem
+ * chama precisa tratar o `null` e mostrar o ícone do formato, em vez de uma imagem quebrada.
+ */
+export async function enderecoDoObjeto(
+  balde: string,
+  caminho: string,
+  validadeSegundos = VALIDADE_PADRAO_SEGUNDOS,
+): Promise<string | null> {
+  if (!balde || !caminho) return null;
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(balde)
+      .createSignedUrl(caminho, validadeSegundos);
+
+    if (error || !data?.signedUrl) {
+      registraQueda(balde, error?.message ?? 'sem endereço na resposta');
+      return null;
+    }
+    return data.signedUrl;
+  } catch (e) {
+    registraQueda(balde, e instanceof Error ? e.message : 'falha inesperada');
+    return null;
+  }
+}
+
 export async function enderecoDoArquivo(
   url: string | null | undefined,
   validadeSegundos = VALIDADE_PADRAO_SEGUNDOS,

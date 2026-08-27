@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { DriveDaFabrica } from '@/components/fabricantes/DriveDaFabrica';
 import {
   Card,
   CardContent,
@@ -542,23 +543,9 @@ const Fabricantes = () => {
 
                 {/* Aqui ficava o cartão "Catálogo de Produtos" — a tabela de preços, com
                     filtro de categoria, seleção em massa e dois importadores por planilha.
-                    O módulo saiu em 26/08/2026 e o drive de catálogos entra neste lugar na
-                    entrega seguinte (docs/superpowers/specs/2026-08-26-drive-de-catalogos-design.md).
-
-                    🔴 Este aviso NÃO é enfeite. Sem ele o gestor abre uma fábrica e encontra
-                    um buraco onde antes havia conteúdo, e a primeira leitura de quem vê isso é
-                    "quebrou" — não "ainda não chegou". */}
-                <div className="flex-1 flex items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 p-10 text-center">
-                  <div className="max-w-sm">
-                    <p className="text-sm font-medium text-card-foreground">
-                      Catálogos e materiais desta fábrica
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Em breve você anexa aqui os catálogos, folders e tabelas da fábrica — e
-                      envia direto no WhatsApp do cliente.
-                    </p>
-                  </div>
-                </div>
+                    O módulo saiu em 26/08/2026 (commit acbcb415) e nunca teve dado real:
+                    0 linhas em tabela_precos nas 8 empresas. O drive ocupou o lugar. */}
+                <DriveDaFabrica fabricanteId={selectedFab.id} empresaId={selectedFab.empresa_id} />
               </>
             ) : (
               <Card className="rounded-xl border-border/60 flex-1 flex flex-col min-h-0 overflow-hidden">
