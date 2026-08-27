@@ -50,6 +50,7 @@ import { VendasDaObra } from '@/components/obras/VendasDaObra';
 import { HistoricoVisitasObra } from '@/components/obras/HistoricoVisitasObra';
 import { VisitasObrasPainel } from '@/components/obras/VisitasObrasPainel';
 import type { RotaDoDia } from '@/lib/rota-do-dia';
+import { ConteudoDoPainel, CabecalhoDoPainel, CorpoDoPainel, RodapeDoPainel } from '@/components/shared/PainelDeDetalhes';
 import { filtrarObrasPorBusca, obraSemEnderecoNoMapa, type ObraParaBusca } from '@/lib/busca-de-obras';
 import { ContatosDaObra } from '@/components/obras/ContatosDaObra';
 import { SeletorContatosObra } from '@/components/obras/SeletorContatosObra';
@@ -982,8 +983,8 @@ export default function Obras() {
         {/* Obra Details Sheet (Lateral) */}
         <Sheet open={!!selectedObra} onOpenChange={(open) => !open && setSelectedObra(null)}>
           {selectedObra && (
-            <SheetContent className="sm:max-w-xl overflow-y-auto">
-              <SheetHeader className="pb-6 border-b">
+            <ConteudoDoPainel className="sm:max-w-xl">
+              <CabecalhoDoPainel className="border-b pb-4">
                 <div className="flex items-center justify-between gap-4">
                   <div className="space-y-1">
                     <SheetTitle className="flex items-center gap-2">
@@ -995,9 +996,9 @@ export default function Obras() {
                     </SheetDescription>
                   </div>
                 </div>
-              </SheetHeader>
+              </CabecalhoDoPainel>
 
-              <div className="py-6 space-y-8">
+              <CorpoDoPainel className="space-y-8 pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                   <div className="space-y-1">
                     <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -1077,23 +1078,14 @@ export default function Obras() {
                     clienteEmpresa={selectedObra.clientes?.empresa}
                   />
                 </div>
-              </div>
+              </CorpoDoPainel>
 
-              <SheetFooter className="border-t pt-6 gap-3 sm:gap-0 mt-8">
-                <div className="flex w-full justify-between items-center">
-                  <Button 
-                    variant="ghost" 
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-2"
-                    onClick={() => {
-                      setConfirmDeleteId(selectedObra.id);
-                      setSelectedObra(null);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Excluir
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setSelectedObra(null)}>Fechar</Button>
+              {/* Rodapé CONGELADO, e os lados trocados a pedido do Lucas: à esquerda o que se
+                  usa todo dia (Editar, Fechar), à direita a exclusão — sozinha, longe do caminho
+                  do dedo de quem só queria editar. */}
+              <RodapeDoPainel
+                esquerda={
+                  <>
                     <Button onClick={() => {
                       setEditObra({
                         id: selectedObra.id,
@@ -1114,10 +1106,23 @@ export default function Obras() {
                       setEditDialogOpen(true);
                       setSelectedObra(null);
                     }}>Editar</Button>
-                  </div>
-                </div>
-              </SheetFooter>
-            </SheetContent>
+                    <Button variant="outline" onClick={() => setSelectedObra(null)}>Fechar</Button>
+                  </>
+                }
+              >
+                <Button
+                  variant="ghost"
+                  className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => {
+                    setConfirmDeleteId(selectedObra.id);
+                    setSelectedObra(null);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Excluir
+                </Button>
+              </RodapeDoPainel>
+            </ConteudoDoPainel>
           )}
         </Sheet>
 

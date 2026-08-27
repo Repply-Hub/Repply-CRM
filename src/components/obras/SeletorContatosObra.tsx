@@ -9,6 +9,12 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useCreateContato } from '@/hooks/use-mutations';
 import { useContatosDoCliente } from '@/hooks/use-obra-contatos';
+import { useContatos } from '@/hooks/use-clientes';
+import {
+  opcoesDeContato,
+  filtrarOpcoesDeContato,
+  avisoDaListaDeContatos,
+} from '@/lib/opcoes-de-contato';
 
 interface SeletorContatosObraProps {
   /** Cliente dono da obra. Sem ele não há lista: obra sem cliente não tem de quem puxar contato. */
@@ -41,23 +47,48 @@ export function SeletorContatosObra({
   onChange,
   className,
 }: SeletorContatosObraProps) {
-  const { data: contatos, isLoading } = useContatosDoCliente(clienteId, clienteEmpresa);
+  const { data: contatos, isLoading, isError } = useContatosDoCliente(clienteId, clienteEmpresa);
+  // 🔴 A SEGUNDA FONTE. Medido em 27/08/2026: em 32 das 82 obras o cliente não tem contato
+  // nenhum, e 428 dos 1.092 contatos não têm cliente amarrado — sem isto, quatro em cada dez
+  // obras abrem a lista VAZIA e 428 pessoas não podem ser vinculadas a obra alguma.
+  const { data: todosOsContatos, isLoading: carregandoTodos } = useContatos();
   const createContato = useCreateContato();
   const [busca, setBusca] = useState('');
   const [criando, setCriando] = useState(false);
   const [novo, setNovo] = useState({ nome_contato: '', cargo: '', email: '', telefone: '' });
 
-  const filtrados = useMemo(() => {
-    const lista = contatos ?? [];
-    const q = busca.trim().toLowerCase();
-    if (!q) return lista;
-    return lista.filter(
-      (c) =>
-        (c.nomeContato || '').toLowerCase().includes(q) ||
-        (c.cargo || '').toLowerCase().includes(q) ||
-        (c.email || '').toLowerCase().includes(q)
-    );
-  }, [contatos, busca]);
+  // Os do cliente primeiro, os demais alcançáveis logo abaixo e MARCADOS com a empresa deles.
+  // A composição é pura e testada — ver `src/lib/opcoes-de-contato.ts`.
+  const opcoes = useMemo(
+    () =>
+      opcoesDeContato(
+        (contatos ?? []).map((c) => ({
+          id: c.id,
+          nome_contato: c.nomeContato,
+          cargo: c.cargo,
+          email: c.email,
+          telefone: c.telefone,
+        })),
+        (todosOsContatos ?? []).map((c: Record<string, unknown>) => ({
+          id: String(c.id),
+          nome_contato: (c.nome_contato as string) ?? null,
+          cargo: (c.cargo as string) ?? null,
+          email: (c.email as string) ?? null,
+          telefone: (c.telefone as string) ?? null,
+          // 🔴 O nome da empresa tem DUAS moradas, e o selo precisa das duas: quem tem cliente
+          // amarrado traz o nome pelo vínculo (`cliente.empresa`); o cadastro antigo tem só o
+          // texto solto em `contatos.empresa`. Ler só uma delas deixaria metade dos contatos
+          // sem selo — e contato sem selo se parece com contato do cliente desta obra.
+          empresa:
+            ((c.cliente as { empresa?: string } | null)?.empresa) ??
+            (c.empresa as string) ??
+            null,
+        })),
+      ),
+    [contatos, todosOsContatos],
+  );
+
+  const filtrados = useMemo(() => filtrarOpcoesDeContato(opcoes, busca), [opcoes, busca]);
 
   const alternar = (id: string) => {
     onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
@@ -88,15 +119,10 @@ export function SeletorContatosObra({
     }
   };
 
-  if (!clienteId) {
-    return (
-      <div className={cn('rounded-lg border border-dashed border-border bg-muted/30 p-3', className)}>
-        <p className="text-xs text-muted-foreground">
-          Escolha o cliente da obra primeiro — os contatos que aparecem aqui são os dele.
-        </p>
-      </div>
-    );
-  }
+  // 🔴 Sem cliente escolhido a lista NÃO é mais bloqueada. Antes havia um corte aqui que
+  // devolvia só o aviso "escolha o cliente primeiro" — e junto com ele sumia o botão "Novo
+  // contato", que era o único caminho restante. Agora a lista mostra todos os contatos da
+  // empresa, marcados, e o aviso vira uma frase acima dela.
 
   return (
     <div className={cn('rounded-lg border border-border', className)}>
@@ -208,7 +234,12 @@ export function SeletorContatosObra({
           <p className="p-3 text-xs text-muted-foreground">
             {busca
               ? 'Nenhum contato com esse nome.'
-              : 'Este cliente ainda não tem contatos cadastrados. Use "Novo contato" acima.'}
+              : avisoDaListaDeContatos({
+                  temCliente: !!clienteId,
+                  temAlgum: false,
+                  carregando: isLoading || carregandoTodos,
+                  erro: isError,
+                })}
           </p>
         ) : (
           filtrados.map((c) => {
@@ -224,9 +255,19 @@ export function SeletorContatosObra({
                 <Checkbox checked={marcado} onCheckedChange={() => alternar(c.id)} />
                 <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-sm">
-                  {c.nomeContato || 'Contato sem nome'}
-                  {c.cargo && <span className="ml-1.5 text-xs text-muted-foreground">· {c.cargo}</span>}
+                  {c.nome}
+                  {c.detalhe && (
+                    <span className="ml-1.5 text-xs text-muted-foreground">· {c.detalhe}</span>
+                  )}
                 </span>
+                {/* 🔴 O SELO É O QUE TORNA ACEITÁVEL MOSTRAR TODOS: sem ele alguém vincula ao
+                    canteiro o comprador de OUTRA construtora sem perceber, e o erro só aparece
+                    quando essa pessoa recebe ligação sobre uma obra que não é dela. */}
+                {c.selo && (
+                  <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                    {c.selo}
+                  </span>
+                )}
               </label>
             );
           })

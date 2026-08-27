@@ -2,13 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertTriangle, CalendarDays, Trash2, Users, Check, ChevronDown, HardHat } from 'lucide-react';
+import { Dialog, DialogTitle } from '@/components/ui/dialog';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  ConteudoDialogo,
+  CabecalhoDialogo,
+  CorpoDialogo,
+  RodapeDialogo,
+} from '@/components/shared/DialogoResponsivo';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -243,15 +243,18 @@ export function EventDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-[560px] max-h-[90vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
+      {/* 🔴 `ConteudoDialogo` e não `DialogContent` cru — CLAUDE.md §7.11. A moldura da casa
+          traz teto de altura em `dvh` (no celular `vh` mede a tela com a barra de endereço
+          escondida) e a corrente de flex que prende cabeçalho e rodapé. */}
+      <ConteudoDialogo className="sm:max-w-[560px] p-0 gap-0">
+        <CabecalhoDialogo className="px-6 pt-6 pb-2">
           <DialogTitle>{isEditing ? 'Editar evento' : 'Novo evento'}</DialogTitle>
           {somenteLeitura && (
             <p className="text-xs text-muted-foreground">
               Evento visível para toda a empresa. Somente o organizador pode editá-lo ou excluí-lo.
             </p>
           )}
-        </DialogHeader>
+        </CabecalhoDialogo>
 
         {/* Tablist só na criação: ao editar, o tipo (evento comum ou visita a
             obra) já foi decidido na criação e não muda mais por aqui.
@@ -284,7 +287,27 @@ export function EventDialog({
           </div>
         )}
 
-        <fieldset disabled={somenteLeitura} className="space-y-4 py-2 px-6 overflow-y-auto flex-1 min-h-0 border-0 m-0 min-w-0">
+        {/* 🔴 QUEM ROLA É O `<div>` DO `CorpoDialogo`, NUNCA O `<fieldset>`.
+            Até 27/08/2026 as classes de rolagem (`overflow-y-auto flex-1 min-h-0`) estavam no
+            próprio `<fieldset>`, e ele NÃO as respeita. Medido no site publicado, no navegador
+            do Lucas:
+
+              mandei rolar ....... scrollTop 0 -> 0      não rola
+              conteúdo 664px / altura visível 433px      sem barra de rolagem
+              último campo ("Descrição") ................ 222px FORA da caixa do fieldset,
+                                                          e fora do modal
+
+            Ou seja: o fieldset ANUNCIA rolagem (`overflow: auto`, `scrollHeight > clientHeight`)
+            e não rola nem recorta — o conteúdo vaza por baixo e os botões do rodapé aparecem
+            por cima dos campos. Era este o "calendário bugado" do print.
+
+            Provado que a tag é a culpada, e não o `disabled`: no mesmo modal, tirar o `disabled`
+            NÃO fez rolar; trocar a tag por `<div>` fez rolar 231px na hora, e nada mais vazou.
+
+            O `<fieldset>` continua aqui — é ele que desativa todos os campos de uma vez quando
+            a pessoa não é a organizadora —, só que agora por dentro, sem papel de layout. */}
+        <CorpoDialogo className="px-6 py-2">
+        <fieldset disabled={somenteLeitura} className="space-y-4 border-0 m-0 p-0 min-w-0">
           {isEditing && isVisita && (
             <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
               <HardHat className="h-4 w-4 shrink-0 text-primary" />
@@ -510,8 +533,9 @@ export function EventDialog({
             />
           </div>
         </fieldset>
+        </CorpoDialogo>
 
-        <DialogFooter className="gap-2 px-6 py-4 border-t shrink-0">
+        <RodapeDialogo className="gap-2 px-6 py-4 border-t">
           {somenteLeitura ? (
             <Button variant="outline" size="sm" className="ml-auto" onClick={onClose}>Fechar</Button>
           ) : (
@@ -537,8 +561,8 @@ export function EventDialog({
               </Button>
             </>
           )}
-        </DialogFooter>
-      </DialogContent>
+        </RodapeDialogo>
+      </ConteudoDialogo>
     </Dialog>
 
     <AlertDialog open={conflitos.length > 0} onOpenChange={(o) => !o && setConflitos([])}>

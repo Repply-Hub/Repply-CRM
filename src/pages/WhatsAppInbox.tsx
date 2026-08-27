@@ -54,6 +54,7 @@ import { ProjetoSelect } from "@/components/tarefas/ProjetoSelect";
 import { ParticipantesMultiSelect } from "@/components/tarefas/ParticipantesMultiSelect";
 import { MarcadoresMultiSelect } from "@/components/tarefas/MarcadoresMultiSelect";
 import { useAuth } from "@/hooks/use-auth";
+import { CriarContatoDaConversaDialog } from "@/components/whatsapp/CriarContatoDaConversaDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -2559,6 +2560,7 @@ function LeadSheet({
   const renomearContato = useWaRenomearContato();
   const [editarNomeOpen, setEditarNomeOpen] = useState(false);
   const [nomeEditado, setNomeEditado] = useState("");
+  const [criarContatoAberto, setCriarContatoAberto] = useState(false);
   function handleSalvarNomeContato() {
     const nome = nomeEditado.trim();
     if (!nome || nome === conversa.nome_contato) {
@@ -3138,6 +3140,43 @@ function LeadSheet({
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
           {/* Dados do cliente/contato vinculado */}
+          {/* 🔴 O CAMINHO PARA O CADASTRO, quando ele ainda não existe.
+              Medido em 27/08/2026: das 779 conversas de WhatsApp da MD, ZERO estão ligadas a um
+              contato ou cliente — não por descuido, mas porque NÃO HAVIA TELA que gravasse esse
+              vínculo. O bloco "Dados do lead" logo abaixo só é desenhado quando já há um dos
+              dois, então na prática ele nunca aparecia, e cadastrar significava sair do
+              WhatsApp, ir em Contatos, redigitar nome e telefone e voltar. Pedido do Lucas. */}
+          {!cliente && !contato && !conversa.is_group && (
+            <div className="space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Cadastro
+              </p>
+              <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                <p className="text-sm font-medium text-card-foreground">
+                  Esta pessoa não está no CRM
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Cadastre para ela aparecer na busca de contatos, nos negócios e nas obras.
+                </p>
+                <Button
+                  size="sm"
+                  className="mt-2.5 gap-1.5"
+                  onClick={() => setCriarContatoAberto(true)}
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Cadastrar como contato
+                </Button>
+              </div>
+              <Separator />
+            </div>
+          )}
+
+          <CriarContatoDaConversaDialog
+            aberto={criarContatoAberto}
+            onFechar={() => setCriarContatoAberto(false)}
+            conversa={conversa}
+          />
+
           {(cliente || contato) && (
             <div className="space-y-4">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">

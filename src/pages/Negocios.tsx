@@ -40,6 +40,7 @@ import {
   ListChecks, ArrowRight
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
+import { ConteudoDoPainel, CabecalhoDoPainel, CorpoDoPainel, RodapeDoPainel } from '@/components/shared/PainelDeDetalhes';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -2080,8 +2081,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         }
       }}
     >
-      <SheetContent className="sm:max-w-xl overflow-y-auto">
-        <SheetHeader className="pb-6 border-b">
+      <ConteudoDoPainel className="sm:max-w-xl">
+        <CabecalhoDoPainel className="border-b pb-4">
           <div className="flex items-center justify-between gap-4">
             <div className="space-y-1">
               <SheetTitle className="text-foreground font-bold text-lg">
@@ -2101,10 +2102,11 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </Badge>
             )}
           </div>
-        </SheetHeader>
+        </CabecalhoDoPainel>
 
+        <CorpoDoPainel className="pt-6">
         {selectedViewOrder ? (
-          <div className="py-6 space-y-8">
+          <div className="space-y-8">
             {/* Grid de Dados */}
             <div className="grid grid-cols-2 gap-x-8 gap-y-6">
               <div className="space-y-1">
@@ -2368,23 +2370,35 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         )}
+        </CorpoDoPainel>
 
-        <SheetFooter className="border-t pt-6 gap-3 sm:gap-0 mt-8">
-          <div className="flex flex-1 gap-2">
-            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => openExportDialog(viewOrderId || undefined)}>
-              <FileDown className="h-4 w-4 mr-2" /> Exportar
-            </Button>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate(`/pedidos/${viewOrderId}/editar`)}>
-              <Pencil className="h-4 w-4 mr-2" /> Editar
-            </Button>
-            <Button variant="destructive" onClick={() => { setViewOrderId(null); setDeleteAllFilteredMode(false); setSelected(new Set([viewOrderId!])); setConfirmDeleteOpen(true); }}>
-              <Trash2 className="h-4 w-4 mr-2" /> Excluir
-            </Button>
-          </div>
-        </SheetFooter>
-      </SheetContent>
+        {/* Rodapé CONGELADO e no MESMO padrão do painel de Obras, a pedido do Lucas: à esquerda
+            o que se usa todo dia (Editar, Fechar), à direita a exclusão, sozinha.
+
+            O botão "Exportar" saiu. Ele abria a exportação de UM negócio, coisa que a tela de
+            Negócios já faz pela seleção da lista — e ficava colado nas duas ações que a pessoa
+            de fato usa aqui. */}
+        <RodapeDoPainel
+          esquerda={
+            <>
+              <Button onClick={() => navigate(`/pedidos/${viewOrderId}/editar`)}>
+                <Pencil className="mr-2 h-4 w-4" /> Editar
+              </Button>
+              <Button variant="outline" onClick={() => setViewOrderId(null)}>
+                Fechar
+              </Button>
+            </>
+          }
+        >
+          <Button
+            variant="ghost"
+            className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => { setViewOrderId(null); setDeleteAllFilteredMode(false); setSelected(new Set([viewOrderId!])); setConfirmDeleteOpen(true); }}
+          >
+            <Trash2 className="h-4 w-4" /> Excluir
+          </Button>
+        </RodapeDoPainel>
+      </ConteudoDoPainel>
     </Sheet>
   );
 
