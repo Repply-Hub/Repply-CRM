@@ -539,7 +539,7 @@ mídia pelo CRM para de funcionar.**
 > os minutos de validade. Isso é inerente — a operadora precisa baixar o arquivo. O ganho é que
 > o endereço morre em minutos, em vez de valer para sempre.
 
-#### Passo 3 — ESCRITO em 26/08/2026, **ainda não publicado**
+#### Passo 3 — PUBLICADO em 27/08/2026 (versão 58 da função)
 
 `supabase/functions/_shared/arquivo-privado.ts` (novo) e uma linha em `whatsapp-send`:
 `file: media_url` virou `file: await enderecoParaQuemBaixaDeFora(supabase, media_url)`.
@@ -562,6 +562,23 @@ identificador durável; quem assina é a tela, na hora de mostrar.
 🔴 **A verificação deste passo não pode ser feita por quem escreveu o código:** exige mandar
 uma imagem, um áudio, um vídeo e um PDF pela tela e confirmar que chegaram no celular. Não há
 como testar isso sem enviar mensagem de verdade para uma pessoa de verdade.
+
+##### Verificado em produção com tráfego real
+
+O plano pedia um teste à mão com os quatro tipos. O que aconteceu foi melhor: a equipe estava
+usando o WhatsApp no momento da publicação, e **91 segundos depois do deploy um áudio saiu e
+chegou ao status `entregue`** — ou seja, a operadora baixou o link ASSINADO e entregou no
+celular do destinatário. Zero ocorrências de `[arquivo-privado]` nos registros da função, e a
+função inicializa em 30ms sem erro de importação.
+
+⚠️ **Só o áudio está provado depois do deploy.** Imagem, vídeo e documento passam pela MESMA
+linha (`wapiBody.file`), então o risco é baixo — mas "o caminho do código é o mesmo" é
+argumento, não evidência. Quando alguém mandar os outros três no uso normal, fica provado.
+
+🔴 **`supabase/config.toml` não listava `whatsapp-send`**, embora a função no ar já tivesse
+`verify_jwt = false`. Um `supabase functions deploy` sem `--no-verify-jwt` teria trocado essa
+configuração de produção sem ninguém pedir. Corrigido no mesmo dia, com o motivo escrito no
+arquivo. **Vale conferir se outras funções têm a mesma defasagem.**
 
 ### Passo 4 — Dividir `email-assets`
 
