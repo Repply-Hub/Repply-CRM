@@ -1,4 +1,4 @@
-import { FileText, FileSpreadsheet, FileImage, File as FileIcon, Eye, Download, Trash2, Send } from 'lucide-react';
+import { FileText, FileSpreadsheet, FileImage, File as FileIcon, Download, Trash2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { isPreviewable } from '@/components/chat/FilePreviewDialog';
@@ -105,13 +105,9 @@ export function CartaoDeArquivo({
       </button>
 
       <div className="flex items-center gap-1 border-t border-border p-2">
-        {/* "Ver" só aparece para o que o visualizador realmente abre (PDF, planilha, Word).
-            Botão que abre uma tela dizendo "não dá para mostrar" é pior que botão nenhum. */}
-        {podeVer && (
-          <Button variant="ghost" size="sm" className="h-8 flex-1 gap-1.5 px-2 text-xs" onClick={aoVer}>
-            <Eye className="h-3.5 w-3.5" /> Ver
-          </Button>
-        )}
+        {/* Não há botão "Ver" aqui: quem abre a pré-visualização é o QUADRO inteiro, acima.
+            Ter os dois seria oferecer o mesmo caminho duas vezes e roubar espaço de Baixar e
+            Enviar, que são ações que o quadro não faz. */}
         <Button variant="ghost" size="sm" className="h-8 flex-1 gap-1.5 px-2 text-xs" onClick={aoBaixar}>
           <Download className="h-3.5 w-3.5" /> Baixar
         </Button>
