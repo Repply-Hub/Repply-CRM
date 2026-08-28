@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Upload, FileText, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog } from '@/components/ui/dialog';
@@ -28,9 +28,15 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   fabricanteId: string;
+  /**
+   * Arquivo que já veio escolhido — o caso de quem ARRASTOU para cima do drive em vez de
+   * clicar em "Anexar". O diálogo abre com ele carregado e o nome já sugerido, para o gesto
+   * terminar onde a pessoa esperava: com o arquivo dentro.
+   */
+  arquivoInicial?: File | null;
 }
 
-export function AnexarArquivoDialog({ open, onOpenChange, fabricanteId }: Props) {
+export function AnexarArquivoDialog({ open, onOpenChange, fabricanteId, arquivoInicial }: Props) {
   const anexar = useAnexarArquivo();
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [nome, setNome] = useState('');
@@ -42,6 +48,18 @@ export function AnexarArquivoDialog({ open, onOpenChange, fabricanteId }: Props)
     setArquivo(null); setNome('');
     setAno(String(new Date().getFullYear())); setMes(ANO_INTEIRO);
   };
+
+  // 🔴 O arquivo arrastado entra por aqui, e passa pela MESMA porta do clique (`escolher`):
+  // é ela que recusa acima de 50 MB e sugere o nome. Atribuir direto no estado pularia as
+  // duas coisas, e um arquivo grande demais só falharia lá na frente, depois da espera.
+  //
+  // Depende de `open` também porque o diálogo fica montado o tempo todo: sem isso, arrastar
+  // um segundo arquivo com o mesmo objeto `File` não recarregaria nada.
+  useEffect(() => {
+    if (open && arquivoInicial) escolher(arquivoInicial);
+    // `escolher` é recriada a cada render e entrar aqui reabriria o efeito sem parar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, arquivoInicial]);
 
   const escolher = (f: File | null) => {
     if (!f) return;

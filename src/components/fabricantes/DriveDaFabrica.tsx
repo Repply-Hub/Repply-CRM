@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Plus, FolderOpen, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState, useRef } from 'react';
+import { Plus, FolderOpen, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,6 +11,7 @@ import { FilePreviewDialog, type FilePreviewTarget } from '@/components/chat/Fil
 import { supabase } from '@/integrations/supabase/client';
 import { enderecoDoObjeto } from '@/lib/arquivo-privado';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
+import { cn } from '@/lib/utils';
 import { useIsGestor } from '@/hooks/use-novo-pedido';
 import { useMinhaPermissao } from '@/hooks/use-minha-permissao';
 import {
@@ -61,6 +62,66 @@ export function DriveDaFabrica({ fabricanteId }: Props) {
   const podeEditar = !!isGestor || temPermissaoEditar;
 
   const [anexarAberto, setAnexarAberto] = useState(false);
+  /**
+   * Arrastar um arquivo para QUALQUER lugar do drive abre o diálogo com ele dentro.
+   *
+   * Antes só funcionava depois de abrir "Anexar" — e não era código nosso: é o
+   * `<input type="file">` que aceita solta por conta própria. Quem arrastava para o drive
+   * fechado via o navegador ABRIR o arquivo e a página do CRM sumir. Pedido do Lucas em
+   * 28/08/2026.
+   */
+  const [arquivoArrastado, setArquivoArrastado] = useState<File | null>(null);
+  const [arrastando, setArrastando] = useState(false);
+  // 🔴 CONTADOR, e não booleano. `dragleave` dispara toda vez que o ponteiro cruza a borda de
+  // um FILHO — e o drive é uma grade de cartões. Com booleano, o destaque pisca a cada cartão
+  // que o arquivo sobrevoa. O contador só zera quando o arrasto sai do container de verdade.
+  const profundidadeDoArrasto = useRef(0);
+
+  const temArquivo = (e: React.DragEvent) =>
+    Array.from(e.dataTransfer?.types ?? []).includes('Files');
+
+  const aoEntrarArrastando = (e: React.DragEvent) => {
+    if (!temArquivo(e)) return;
+    profundidadeDoArrasto.current += 1;
+    setArrastando(true);
+  };
+
+  const aoSairArrastando = (e: React.DragEvent) => {
+    if (!temArquivo(e)) return;
+    profundidadeDoArrasto.current -= 1;
+    if (profundidadeDoArrasto.current <= 0) {
+      profundidadeDoArrasto.current = 0;
+      setArrastando(false);
+    }
+  };
+
+  const aoArrastarPorCima = (e: React.DragEvent) => {
+    if (!temArquivo(e)) return;
+    // 🔴 SEM ESTE `preventDefault` o navegador ABRE o arquivo e a pessoa perde a tela do CRM
+    // — com o que estivesse preenchido junto. É o comportamento padrão de soltar arquivo
+    // numa página, e ele vale mesmo que o `drop` abaixo exista.
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const aoSoltar = (e: React.DragEvent) => {
+    if (!temArquivo(e)) return;
+    e.preventDefault();
+    profundidadeDoArrasto.current = 0;
+    setArrastando(false);
+
+    const arquivos = Array.from(e.dataTransfer.files);
+    if (arquivos.length === 0) return; // pasta ou item sem arquivo de verdade
+
+    // O cadastro é de um material por vez — cada um tem nome, mês e ano próprios. Dizer que
+    // só o primeiro entrou é melhor que aceitar em silêncio e a pessoa descobrir depois que
+    // faltaram três.
+    if (arquivos.length > 1) {
+      toast.info(`Vai um material por vez. Comecei por "${arquivos[0].name}".`);
+    }
+    setArquivoArrastado(arquivos[0]);
+    setAnexarAberto(true);
+  };
   const [aEditar, setAEditar] = useState<ArquivoDaFabrica | null>(null);
   const [previa, setPrevia] = useState<FilePreviewTarget | null>(null);
   const [aExcluir, setAExcluir] = useState<ArquivoDaFabrica | null>(null);
@@ -132,7 +193,28 @@ export function DriveDaFabrica({ fabricanteId }: Props) {
   };
 
   return (
-    <div className="flex flex-1 flex-col min-h-0 rounded-xl border border-border bg-card">
+    <div
+      onDragEnter={aoEntrarArrastando}
+      onDragOver={aoArrastarPorCima}
+      onDragLeave={aoSairArrastando}
+      onDrop={aoSoltar}
+      className={cn(
+        'relative flex flex-1 flex-col min-h-0 rounded-xl border bg-card transition-colors',
+        arrastando ? 'border-primary border-dashed bg-primary/5' : 'border-border',
+      )}
+    >
+      {/* 🔴 `pointer-events-none` é o que faz o aviso funcionar. Um painel por cima da área de
+          solta ROUBARIA o `drop` — o arquivo cairia no aviso, não no container que tem o
+          handler, e o arrasto morreria em silêncio bem quando a pessoa vê "pode soltar". */}
+      {arrastando && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/80">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <Upload className="h-8 w-8 text-primary" />
+            <p className="text-sm font-medium text-card-foreground">Solte para anexar</p>
+            <p className="text-xs text-muted-foreground">Abre o cadastro com o arquivo já dentro</p>
+          </div>
+        </div>
+      )}
       <div className="flex flex-none flex-wrap items-center justify-between gap-3 border-b border-border p-4">
         <div className="min-w-0">
           <h3 className="flex items-center gap-2 text-base font-bold text-card-foreground">
@@ -193,8 +275,14 @@ export function DriveDaFabrica({ fabricanteId }: Props) {
 
       <AnexarArquivoDialog
         open={anexarAberto}
-        onOpenChange={setAnexarAberto}
+        // Esquece o arrastado ao fechar: sem isto, clicar em "Anexar" depois abriria com o
+        // arquivo da vez anterior já dentro.
+        onOpenChange={(aberto) => {
+          setAnexarAberto(aberto);
+          if (!aberto) setArquivoArrastado(null);
+        }}
         fabricanteId={fabricanteId}
+        arquivoInicial={arquivoArrastado}
       />
 
       {/* Fica montado o tempo todo, como os outros diálogos daqui: quem manda é o `open`.

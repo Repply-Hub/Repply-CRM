@@ -26,7 +26,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import {
   Building2, MapPin, Search, Loader2, HardHat, Calendar, List, Map as MapIcon,
   Tag, Table as TableIcon, Plus, Settings2, Filter, ChevronDown, X, Trash2,
-  FileText
+  FileText, CalendarRange,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -52,6 +52,7 @@ import { VisitasObrasPainel } from '@/components/obras/VisitasObrasPainel';
 import type { RotaDoDia } from '@/lib/rota-do-dia';
 import { ConteudoDoPainel, CabecalhoDoPainel, CorpoDoPainel, RodapeDoPainel } from '@/components/shared/PainelDeDetalhes';
 import { filtrarObrasPorBusca, obraSemEnderecoNoMapa, type ObraParaBusca } from '@/lib/busca-de-obras';
+import { DateRangePicker, type DateRange } from '@/components/shared/DateRangePicker';
 import { ContatosDaObra } from '@/components/obras/ContatosDaObra';
 import { SeletorContatosObra } from '@/components/obras/SeletorContatosObra';
 import { useContatosDaObra, useSalvarContatosDaObra } from '@/hooks/use-obra-contatos';
@@ -174,6 +175,18 @@ function AvisoEnderecoDaReceita() {
   );
 }
 
+/**
+ * As bordas que o seletor de período recebe enquanto NENHUM período está escolhido.
+ *
+ * 🔴 O fim é no FUTURO de propósito. O `DateRangePicker` exige um valor, e o preset "Todos"
+ * dele termina em `new Date()` — hoje. A aba Visitas mostra visitas PLANEJADAS, que são
+ * justamente as futuras: adotar "hoje" como borda esconderia a agenda que a pessoa abriu a
+ * tela para ver. Estas duas datas nunca filtram nada; existem só para o seletor abrir com
+ * algo coerente enquanto o filtro está desligado.
+ */
+const INICIO_DOS_TEMPOS = new Date(2000, 0, 1);
+const FIM_DOS_TEMPOS = new Date(2100, 11, 31);
+
 export default function Obras() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -196,6 +209,17 @@ export default function Obras() {
   // Abre no MAPA, não na lista (Lucas, 27/08/2026). Quem chega em Obras quer ver onde elas
   // estão; quem procura um cadastro específico usa a busca, que vale nas três abas.
   const [activeTab, setActiveTab] = useState('mapa');
+  /**
+   * Recorte de período das VISITAS. Mora aqui, no cabeçalho da página, e não dentro da aba:
+   * pedido do Lucas em 28/08/2026 — a página já tem um botão "Filtros", e um segundo lugar de
+   * filtrar ao lado dele é confusão, não conveniência.
+   *
+   * 🔴 Só é OFERECIDO na aba Visitas, e isso não é economia de tela. Obra não tem data para
+   * recortar (só `created_at`, que é data de cadastro e ninguém pediu). Um filtro que aparece
+   * nas outras abas e não muda nada seria pior que não existir — é o defeito que a própria
+   * tela de Negócios tem hoje com o filtro "Etapa", registrado no item 49 da dívida técnica.
+   */
+  const [periodoVisitas, setPeriodoVisitas] = useState<DateRange | null>(null);
 
   /**
    * A rota que a pessoa mandou EDITAR, vinda da aba "Visitas".
@@ -541,9 +565,11 @@ export default function Obras() {
   }, [search, marcadorFilter]);
 
   const isDefaultSort = sortColumn === 'created_at' && sortDirection === 'desc';
-  const hasFilters = marcadorFilter !== 'todos' || !isDefaultSort;
+  const filtroDePeriodoAtivo = activeTab === 'visitas' && periodoVisitas !== null;
+  const hasFilters = marcadorFilter !== 'todos' || !isDefaultSort || filtroDePeriodoAtivo;
   // Se este contador esquecer um filtro, o botão "Limpar" mente sobre o que está filtrado.
-  const activeFilterCount = (marcadorFilter !== 'todos' ? 1 : 0) + (!isDefaultSort ? 1 : 0);
+  const activeFilterCount =
+    (marcadorFilter !== 'todos' ? 1 : 0) + (!isDefaultSort ? 1 : 0) + (filtroDePeriodoAtivo ? 1 : 0);
 
   const paginatedObras = useMemo(() => {
     const startIndex = (page - 1) * pageSize;
@@ -648,11 +674,46 @@ export default function Obras() {
                   setMarcadorFilter('todos');
                   setSortColumn('created_at');
                   setSortDirection('desc');
+                  // Sem esta linha, "Limpar filtros" apagaria o marcador e deixaria o período
+                  // preso — com o selo do botão zerado, e visitas sumidas sem explicação.
+                  setPeriodoVisitas(null);
                 }}
                 popoverClassName="w-64"
                 align="end"
               >
                 <div className="flex flex-col gap-1">
+                  {/* 🔴 Período — SÓ na aba Visitas, que é a única com data para recortar.
+                      Ver o comentário do estado `periodoVisitas`. */}
+                  {activeTab === 'visitas' && (
+                    <StandardPopoverMenu
+                      label="Período"
+                      icon={CalendarRange}
+                      badge={periodoVisitas ? 1 : undefined}
+                      side="left"
+                      align="start"
+                      sideOffset={10}
+                      popoverClassName="w-auto"
+                    >
+                      <div className="space-y-2 p-2">
+                        <DateRangePicker
+                          value={periodoVisitas ?? { from: INICIO_DOS_TEMPOS, to: FIM_DOS_TEMPOS }}
+                          onChange={setPeriodoVisitas}
+                        />
+                        {periodoVisitas && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-full justify-start gap-1.5 text-xs"
+                            onClick={() => setPeriodoVisitas(null)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            Limpar período
+                          </Button>
+                        )}
+                      </div>
+                    </StandardPopoverMenu>
+                  )}
+
                   {/* Submenu Marcador */}
                   <StandardPopoverMenu
                     label="Marcador"
@@ -948,6 +1009,7 @@ export default function Obras() {
             <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-border/60 bg-card p-4">
               <VisitasObrasPainel
                 searchTerm={search}
+                periodo={periodoVisitas}
                 onSelectObra={(obraId) => setSelectedObra(obras?.find((o) => o.id === obraId) ?? null)}
                 onEditarRota={setRotaEmEdicao}
               />

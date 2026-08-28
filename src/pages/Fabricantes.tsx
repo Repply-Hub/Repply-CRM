@@ -485,10 +485,14 @@ const Fabricantes = () => {
 
   // Subtítulo descreve a tela, como no resto do sistema. Era a contagem de
   // representadas — número que a própria lista da esquerda já mostra.
+  //
+  // 🔴 O nome perdeu "& Tabelas de Preço" em 28/08/2026. O módulo de tabela de preços saiu
+  // em 26/08 e a tabela nem existe mais no banco — o título continuava prometendo uma tela
+  // que não abre em lugar nenhum, e quem procurasse preço aqui não acharia nada.
   return (
     <AppLayout
-      title="Fabricantes & Tabelas de Preço"
-      subtitle="Representadas, seus contatos e a tabela de preços de cada uma"
+      title="Fabricantes"
+      subtitle="Representadas, seus contatos e os arquivos de cada uma"
       mainClassName="flex-1 overflow-hidden flex flex-col"
     >
       <div className="p-4 md:p-6 w-full flex-1 flex flex-col min-h-0 h-full">
@@ -618,10 +622,9 @@ const Fabricantes = () => {
                   />
                 </div>
 
-                {/* Aqui ficava o cartão "Catálogo de Produtos" — a tabela de preços, com
-                    filtro de categoria, seleção em massa e dois importadores por planilha.
-                    O módulo saiu em 26/08/2026 (commit acbcb415) e nunca teve dado real:
-                    0 linhas em tabela_precos nas 8 empresas. O drive ocupou o lugar. */}
+                {/* O drive ocupa o lugar do antigo cartão "Catálogo de Produtos", que saiu
+                    em 26/08/2026 (commit acbcb415) sem nunca ter tido dado real — zero linhas
+                    nas 8 empresas. A tabela nem existe mais no banco. */}
                 <DriveDaFabrica fabricanteId={selectedFab.id} empresaId={selectedFab.empresa_id} />
               </>
             ) : (
@@ -634,8 +637,8 @@ const Fabricantes = () => {
                     Selecione um fabricante
                   </p>
                   <p className="text-sm text-muted-foreground/60 mt-1 max-w-sm">
-                    Escolha um fabricante na lista ao lado para visualizar seus
-                    detalhes e tabela de preços
+                    Escolha um fabricante na lista ao lado para ver os dados dele e os
+                    arquivos do drive
                   </p>
                 </CardContent>
               </Card>

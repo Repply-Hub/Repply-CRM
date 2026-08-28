@@ -138,15 +138,18 @@ const MODULOS: ModuloDescricao[] = [
     key: 'fabricantes',
     label: 'Fabricantes',
     descricoes: {
-      ver: 'Visualizar fabricantes e tabelas de preços',
+      ver: 'Visualizar fabricantes e seus arquivos',
       criar: 'Cadastrar novos fabricantes',
       editar: 'Alterar dados de fabricantes',
       excluir: 'Remover fabricantes do sistema',
     },
-    funcionalidades: [
-      { key: 'importar_precos', label: 'Importar Preços', descricao: 'Importar tabela de preços via planilha', icon: 'prices' },
-      { key: 'gerenciar_precos', label: 'Gerenciar Preços', descricao: 'Editar e remover itens da tabela de preços', icon: 'prices' },
-    ],
+    // 🔴 SEM FUNCIONALIDADES desde 28/08/2026. Havia "Importar Preços" e "Gerenciar Preços",
+    // as duas da tabela de preços — módulo removido em 26/08, e a tabela nem existe mais no
+    // banco. Elas continuavam aparecendo na tela de permissões, e o gestor podia ligar e
+    // desligar um acesso a uma tela que não abre. Nenhum código conferia as duas; só a
+    // migration de presets (20260727130000) as semeia, e migration não se edita — as linhas
+    // já gravadas ficam onde estão, sem efeito.
+    funcionalidades: [],
   },
   {
     key: 'portal',

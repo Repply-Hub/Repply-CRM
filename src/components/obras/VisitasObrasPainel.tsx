@@ -3,11 +3,11 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
-import { Loader2, CheckCircle2, Circle, MapPin, Building2, HardHat, Route, Send, Trash2, Pencil, CalendarRange, X } from 'lucide-react';
+import { Loader2, CheckCircle2, Circle, MapPin, Building2, HardHat, Route, Send, Trash2, Pencil } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { DateRangePicker, type DateRange } from '@/components/shared/DateRangePicker';
+import { type DateRange } from '@/components/shared/DateRangePicker';
 import { useAuth } from '@/hooks/use-auth';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useTodasVisitasObras, useMarcarVisitaRealizada, type VisitaObraListagem } from '@/hooks/use-obra-visitas';
@@ -19,23 +19,19 @@ import { RotaNoMapaDialog } from './RotaNoMapaDialog';
 import { useExcluirRotaDeVisita } from '@/hooks/use-eventos';
 import { ConfirmarExclusaoRota } from './ConfirmarExclusaoRota';
 
-/**
- * As bordas que o seletor de período recebe quando NENHUM período está escolhido.
- *
- * 🔴 O fim é no FUTURO de propósito. O `DateRangePicker` exige um valor e o preset "Todos"
- * dele termina em `new Date()` — hoje. Esta lista mostra visitas PLANEJADAS, que são
- * justamente as futuras: adotar "hoje" como borda esconderia a agenda que a pessoa abriu a
- * tela para ver. Estas duas datas nunca filtram nada; existem só para o seletor abrir com
- * algo coerente enquanto `periodo` é nulo.
- */
-const PRIMEIRA_VISITA_POSSIVEL = new Date(2000, 0, 1);
-const ULTIMA_VISITA_POSSIVEL = new Date(2100, 11, 31);
-
 interface VisitasObrasPainelProps {
   searchTerm: string;
   onSelectObra: (obraId: string) => void;
   /** Reabrir a rota para edição. Sem isto, o botão de editar não aparece. */
   onEditarRota?: (rota: RotaDoDia) => void;
+  /**
+   * Recorte de período, vindo do botão "Filtros" do cabeçalho da página.
+   *
+   * 🔴 MORA LÁ EM CIMA, e não aqui dentro, por pedido do dono do produto em 28/08/2026. A
+   * primeira versão punha uma barra própria dentro desta aba: virava um segundo lugar de
+   * filtrar, ao lado do botão que já existe para isso. `null` = sem recorte.
+   */
+  periodo?: DateRange | null;
 }
 
 /**
@@ -49,6 +45,7 @@ export function VisitasObrasPainel({
   searchTerm,
   onSelectObra,
   onEditarRota,
+  periodo = null,
 }: VisitasObrasPainelProps) {
   const { profile } = useAuth();
   const { data: visitas, isLoading } = useTodasVisitasObras();
@@ -63,18 +60,6 @@ export function VisitasObrasPainel({
   const [rotaNoMapa, setRotaNoMapa] = useState<RotaDoDia | null>(null);
   const [rotaParaExcluir, setRotaParaExcluir] = useState<RotaDoDia | null>(null);
   const excluirRota = useExcluirRotaDeVisita();
-
-  /**
-   * Filtro por período. Pedido do Lucas em 28/08/2026 — até aqui a aba Visitas tinha um filtro
-   * só, a busca por texto.
-   *
-   * 🔴 COMEÇA NULO, e isso é o desenho, não preguiça. Esta lista mostra visitas PLANEJADAS,
-   * que são futuras. O preset "Todos" do `DateRangePicker` vai de 2000 até HOJE (linha 35
-   * daquele arquivo), então adotá-lo como padrão esconderia justamente a agenda que a pessoa
-   * abriu a tela para ver. Nulo = sem recorte, tudo aparece; o filtro só existe quando alguém
-   * pede.
-   */
-  const [periodo, setPeriodo] = useState<DateRange | null>(null);
 
   const filtradas = useMemo(() => {
     let lista = visitas ?? [];
@@ -201,62 +186,23 @@ export function VisitasObrasPainel({
     );
   }
 
-  /**
-   * A barra de filtro da aba.
-   *
-   * 🔴 ELA APARECE TAMBÉM QUANDO A LISTA FICA VAZIA, e essa é a parte que importa. Um filtro
-   * que some junto com o resultado é uma armadilha: a pessoa recorta um período sem visita,
-   * a tela fica em branco, e o controle que desfaria isso desapareceu com ela. Por isso a
-   * barra é montada aqui e usada nos dois caminhos abaixo.
-   */
-  const barraDeFiltros = (
-    <div className="mb-3 flex flex-wrap items-center gap-2">
-      <CalendarRange className="h-4 w-4 shrink-0 text-muted-foreground" />
-      <DateRangePicker
-        value={periodo ?? { from: PRIMEIRA_VISITA_POSSIVEL, to: ULTIMA_VISITA_POSSIVEL }}
-        onChange={setPeriodo}
-      />
-      {periodo && (
-        <>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 px-2 text-xs"
-            onClick={() => setPeriodo(null)}
-          >
-            <X className="h-3.5 w-3.5" />
-            Limpar período
-          </Button>
-          <span className="font-mono text-xs tabular-nums text-muted-foreground">
-            {filtradas.length} {filtradas.length === 1 ? 'visita' : 'visitas'}
-          </span>
-        </>
-      )}
-    </div>
-  );
-
   if (filtradas.length === 0) {
     return (
-      <div>
-        {barraDeFiltros}
-        <div className="text-center py-20 text-muted-foreground">
-          <HardHat className="h-12 w-12 mx-auto mb-3 opacity-40" />
-          <p className="font-medium">Nenhuma visita encontrada</p>
-          <p className="text-sm mt-1">
-            {periodo
-              ? 'Nenhuma visita neste período. Limpe o período para ver todas.'
-              : searchTerm
-                ? 'Ajuste a busca.'
-                : 'Crie uma rota de visita para começar.'}
-          </p>
-        </div>
+      <div className="text-center py-20 text-muted-foreground">
+        <HardHat className="h-12 w-12 mx-auto mb-3 opacity-40" />
+        <p className="font-medium">Nenhuma visita encontrada</p>
+        <p className="text-sm mt-1">
+          {periodo
+            ? 'Nenhuma visita neste período. Ajuste o período em Filtros.'
+            : searchTerm
+              ? 'Ajuste a busca.'
+              : 'Crie uma rota de visita para começar.'}
+        </p>
       </div>
     );
   }
 
   return (
-    <div>
-    {barraDeFiltros}
     // 🔴 BLOCOS DE DIA LADO A LADO, e não uma lista corrida.
     //
     // Antes era um `space-y-5` com um cabeçalho de dia inserido no meio quando a data mudava:
@@ -312,15 +258,21 @@ export function VisitasObrasPainel({
 
                 return (
                 <div key={rota.chave} className="flex flex-wrap items-center gap-1.5">
-                  {(precisaNomear || rota.titulo) && (
+                  {/* 🔴 SÓ QUANDO HÁ MAIS DE UMA ROTA NO DIA — o título e o nome de quem
+                      montou vivem aqui apenas porque, com duas rotas, o cabeçalho do dia não
+                      pode carregar os dois.
+
+                      Com uma rota só, o cabeçalho já mostra "Título, sexta-feira 28 de ago"
+                      (linha 233), e repetir aqui dava o mesmo texto duas vezes na mesma
+                      caixa, a poucos pixels de distância. Foi o que o Lucas viu em
+                      28/08/2026. */}
+                  {precisaNomear && (
                     <span className="mr-auto min-w-0 truncate text-xs text-muted-foreground">
-                      {/* O título da rota, quando a pessoa deu um. Junto do nome de quem
-                          montou, quando há mais de uma rota no dia. */}
                       {rota.titulo && (
                         <span className="font-medium text-foreground">{rota.titulo}</span>
                       )}
-                      {rota.titulo && precisaNomear && ' · '}
-                      {precisaNomear && nomePor(rota.criadoPor ?? '')}
+                      {rota.titulo && ' · '}
+                      {nomePor(rota.criadoPor ?? '')}
                     </span>
                   )}
                   <Button
@@ -488,7 +440,6 @@ export function VisitasObrasPainel({
         mensagem={rotaParaEnviar ? textoDaRota(rotaParaEnviar) : ''}
         totalDeParadas={rotaParaEnviar?.paradas.length ?? 0}
       />
-    </div>
     </div>
   );
 }
