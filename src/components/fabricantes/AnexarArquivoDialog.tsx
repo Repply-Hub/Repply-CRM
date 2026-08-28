@@ -5,31 +5,24 @@ import { Dialog } from '@/components/ui/dialog';
 import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
 import { DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { tamanhoLegivel } from '@/lib/fabricante-arquivos';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { gerarCapaDoPdf } from '@/lib/capa-do-pdf';
 import { useAnexarArquivo, TETO_BYTES } from '@/hooks/use-fabricante-arquivos';
+import { CamposDaEdicao } from './CamposDaEdicao';
+import { ANO_INTEIRO, selectParaMes } from './mes-da-edicao';
 
 /**
  * Anexar um catálogo, folder ou planilha ao drive da fábrica.
  *
  * Não pergunta o TIPO do arquivo: a seção se chama "Catálogos, folders e materiais" e aceita
  * o que vier. Cada pergunta a mais na hora de anexar é uma chance a mais de a pessoa desistir.
+ *
+ * Nome, mês e ano moram em `CamposDaEdicao`, compartilhados com o "Editar material": as duas
+ * telas perguntam a mesma coisa, e deixá-las divergir permitiria consertar a edição num lugar
+ * e continuar errando no outro.
  */
-
-const MESES = [
-  { v: '1', l: 'Janeiro' }, { v: '2', l: 'Fevereiro' }, { v: '3', l: 'Março' },
-  { v: '4', l: 'Abril' }, { v: '5', l: 'Maio' }, { v: '6', l: 'Junho' },
-  { v: '7', l: 'Julho' }, { v: '8', l: 'Agosto' }, { v: '9', l: 'Setembro' },
-  { v: '10', l: 'Outubro' }, { v: '11', l: 'Novembro' }, { v: '12', l: 'Dezembro' },
-];
-
-/** O valor do Select para "sem mês". Radix não aceita item com valor vazio. */
-const ANO_INTEIRO = 'ano-inteiro';
 
 interface Props {
   open: boolean;
@@ -64,11 +57,9 @@ export function AnexarArquivoDialog({ open, onOpenChange, fabricanteId }: Props)
 
   const salvar = async () => {
     if (!arquivo) { toast.error('Escolha um arquivo.'); return; }
+    // O ano vem de uma lista fechada desde 28/08/2026, então não há mais o que validar aqui:
+    // `anosDeEdicao` só oferece anos que a restrição do banco aceita.
     const anoNum = Number.parseInt(ano, 10);
-    if (!Number.isFinite(anoNum) || anoNum < 2000 || anoNum > 2100) {
-      toast.error('Informe um ano entre 2000 e 2100.');
-      return;
-    }
 
     try {
       // A capa é opcional e não pode travar o anexo: PDF protegido devolve null e o cartão
@@ -82,7 +73,7 @@ export function AnexarArquivoDialog({ open, onOpenChange, fabricanteId }: Props)
         arquivo,
         nome,
         edicaoAno: anoNum,
-        edicaoMes: mes === ANO_INTEIRO ? null : Number.parseInt(mes, 10),
+        edicaoMes: selectParaMes(mes),
         capa,
       });
       toast.success('Arquivo anexado.');
@@ -147,35 +138,12 @@ export function AnexarArquivoDialog({ open, onOpenChange, fabricanteId }: Props)
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Nome</Label>
-            <Input
-              value={nome} onChange={(e) => setNome(e.target.value)} disabled={ocupado}
-              placeholder="Como aparece no cartão"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Mês da edição</Label>
-              {/* Opcional de propósito: há fábrica que faz catálogo anual, e obrigá-la a
-                  inventar um mês criaria uma data que ninguém consegue justificar. */}
-              <Select value={mes} onValueChange={setMes} disabled={ocupado}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANO_INTEIRO}>O ano inteiro</SelectItem>
-                  {MESES.map((m) => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Ano</Label>
-              <Input
-                type="text" inputMode="numeric" value={ano}
-                onChange={(e) => setAno(e.target.value)} disabled={ocupado}
-              />
-            </div>
-          </div>
+          <CamposDaEdicao
+            nome={nome} aoMudarNome={setNome}
+            ano={ano} aoMudarAno={setAno}
+            mes={mes} aoMudarMes={setMes}
+            desabilitado={ocupado}
+          />
         </CorpoDialogo>
 
         <RodapeDialogo>

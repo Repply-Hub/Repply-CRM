@@ -9,15 +9,58 @@ import { supabase } from '@/integrations/supabase/client';
 
 /** Remove uma categoria: seta categoria=NULL em todos os produtos que a usam. */
 
+/**
+ * Campos que a tela de fabricante grava. `ativo` é o status "Ativa / Inativa": marca
+ * inativa é aquela que a empresa não representa mais.
+ *
+ * 🔴 Inativa NÃO é excluída. A linha continua no banco, ligada aos negócios antigos, ao
+ * faturamento histórico e aos relatórios — o que muda é a posição dela nas listas de
+ * escolha (ver src/lib/ordem-de-fabricantes.ts). Quem quer remover de verdade usa
+ * `useDeleteFabricante` abaixo, e aí o banco recusa se houver negócio apontando para ela.
+ */
+export interface DadosDeFabricante {
+  nome?: string;
+  cnpj?: string;
+  nome_contato?: string;
+  telefone?: string;
+  ativo?: boolean;
+}
+
+/**
+ * Cadastro de fabricante. Existe aqui, e não em `use-mutations.ts`, porque este é o
+ * arquivo do domínio (§5.3 do CLAUDE.md) e porque a criação e a edição precisam aceitar
+ * exatamente os mesmos campos — inclusive `ativo`.
+ *
+ * O banco já tem `default true` na coluna, então omitir `ativo` cadastra uma marca Ativa.
+ */
+export function useCreateFabricante() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: DadosDeFabricante) => {
+      const { error } = await supabase.from('fabricantes').insert(data);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fabricantes'] });
+      qc.invalidateQueries({ queryKey: ['fabricantes_filtro'] });
+    },
+  });
+}
+
 export function useUpdateFabricante() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; nome?: string; cnpj?: string; nome_contato?: string; telefone?: string }) => {
+    mutationFn: async ({ id, ...data }: DadosDeFabricante & { id: string }) => {
       const { error } = await supabase.from('fabricantes').update(data).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fabricantes'] });
+      // A consulta do Dashboard é uma SEGUNDA lista de fabricantes, com chave própria
+      // (`fabricantes_filtro`) — ela alimenta o filtro do topo e o Plano de Vendas
+      // inteiro. Sem invalidá-la, desativar uma marca não mexia em nenhum dos dois até
+      // a página ser recarregada.
+      qc.invalidateQueries({ queryKey: ['fabricantes_filtro'] });
     },
   });
 }
@@ -42,6 +85,7 @@ export function useDeleteFabricante() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fabricantes'] });
+      qc.invalidateQueries({ queryKey: ['fabricantes_filtro'] });
     },
   });
 }

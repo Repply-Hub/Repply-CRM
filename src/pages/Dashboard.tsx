@@ -86,9 +86,13 @@ const Dashboard = () => {
       // Removido filtro de empresa_id pois a coluna não existe na tabela fabricantes
       const { data, error } = await (supabase as any)
         .from('fabricantes')
-        .select('id, nome')
+        .select('id, nome, ativo')
+        // Marca que a empresa não representa mais desce para o fim do filtro — e do
+        // Plano de Vendas inteiro, que recebe esta mesma lista por propriedade abaixo.
+        // `ascending: false` porque em Postgres `true > false`: as ativas vêm primeiro.
+        .order('ativo', { ascending: false })
         .order('nome');
-      
+
       if (error) {
         console.error('Erro ao buscar fabricantes:', error);
         return [];
@@ -96,7 +100,7 @@ const Dashboard = () => {
       return data || [];
     },
   });
-  const fabricantes = useMemo(() => (fabricantesRaw || []) as { id: string; nome: string }[], [fabricantesRaw]);
+  const fabricantes = useMemo(() => (fabricantesRaw || []) as { id: string; nome: string; ativo?: boolean }[], [fabricantesRaw]);
 
 
   // KPIs, segmentação e rendimento por fábrica/vendedor vêm agregados do servidor
@@ -312,8 +316,18 @@ const Dashboard = () => {
         <div className="static xl:sticky xl:top-0 xl:z-20 -mx-6 px-6 py-4 mb-8 border-b border-border/60 bg-background/95 backdrop-blur-sm flex flex-col sm:flex-row flex-wrap gap-4 justify-start items-end">
           <div className="w-full sm:w-44 xl:w-56">
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 ml-1">Fabricante</p>
+            {/* A lista já chega ordenada com as inativas por último (ver a consulta
+                `fabricantes_filtro`). O sufixo "(Inativa)" no rótulo é o que explica POR QUE
+                elas estão lá embaixo — sem ele, a marca só está no fim e ninguém sabe o
+                motivo. Vai no texto e não num selo porque o MultiSelectSearch é peça
+                compartilhada (src/components/shared) e não tem casa para selo.
+                Marca inativa continua SELECIONÁVEL: filtro salvo que aponte para ela
+                precisa seguir funcionando. */}
             <MultiSelectSearch
-              options={fabricantes.map((f) => ({ value: f.id, label: f.nome }))}
+              options={fabricantes.map((f) => ({
+                value: f.id,
+                label: f.ativo === false ? `${f.nome} (Inativa)` : f.nome,
+              }))}
               value={fabricanteIds}
               onValueChange={setFabricanteIds}
               placeholder="Todos"

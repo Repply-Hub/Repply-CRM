@@ -26,6 +26,7 @@ import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { mapPedidoToOrder } from '@/lib/pedido-to-order';
 import { getNomeNegocio } from '@/lib/nome-negocio';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
+import { fabricanteEstaAtivo } from '@/lib/ordem-de-fabricantes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StandardPopoverMenu, StandardMenuItem } from '@/components/ui/standard-popover-menu';
@@ -216,7 +217,9 @@ function FilterCheckboxList({
   emptyMessage = 'Nenhuma opção disponível.',
   searchPlaceholder = 'Buscar...',
 }: {
-  options: { value: string; label: string }[];
+  /** `selo`: texto curto mostrado à direita da opção (ex: "Inativa"). Não entra na busca
+   *  nem na seleção — é só o aviso de por que aquela opção está no fim da lista. */
+  options: { value: string; label: string; selo?: string }[];
   selected: string[];
   onToggle: (value: string) => void;
   emptyMessage?: string;
@@ -250,6 +253,11 @@ function FilterCheckboxList({
               <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer text-sm">
                 <Checkbox checked={selected.includes(opt.value)} onCheckedChange={() => onToggle(opt.value)} />
                 <span className="truncate">{opt.label}</span>
+                {opt.selo && (
+                  <span className="ml-auto shrink-0 rounded border border-border px-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {opt.selo}
+                  </span>
+                )}
               </label>
             ))}
           </div>
@@ -1897,8 +1905,16 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           sideOffset={10}
           popoverClassName="w-60"
         >
+          {/* A lista já chega do hook com as marcas inativas por último (`useFabricantes`
+              ordena por `ativo desc, nome`) e o `map` preserva essa ordem. Marca inativa
+              continua marcável: filtro salvo na URL apontando para ela tem de seguir
+              funcionando — os negócios antigos dela não sumiram. */}
           <FilterCheckboxList
-            options={(fabricantes ?? []).map(f => ({ value: f.id, label: f.nome }))}
+            options={(fabricantes ?? []).map(f => ({
+              value: f.id,
+              label: f.nome,
+              selo: fabricanteEstaAtivo(f) ? undefined : 'Inativa',
+            }))}
             selected={selectedFabricantes}
             onToggle={(id) => toggleFilter(selectedFabricantes, setSelectedFabricantes, id)}
             searchPlaceholder="Buscar fabricante..."

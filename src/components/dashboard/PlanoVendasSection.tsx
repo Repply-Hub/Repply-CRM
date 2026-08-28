@@ -50,6 +50,11 @@ import {
   useReorderFabricantesPlanoVendas,
 } from '@/hooks/use-plano-vendas';
 import { usePodeFazer } from '@/hooks/use-permissoes';
+import {
+  compararNomeDeFabricante,
+  compararStatusDeFabricante,
+  fabricanteEstaAtivo,
+} from '@/lib/ordem-de-fabricantes';
 
 const MESES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -99,6 +104,9 @@ interface Vendedor {
 interface Fabricante {
   id: string;
   nome: string;
+  /** Status "Ativa / Inativa" — marca que a empresa não representa mais. Opcional porque
+   *  as RPCs desta seção devolvem fabricante sem essa coluna; ausente conta como ativa. */
+  ativo?: boolean;
 }
 
 interface PlanoVendasSectionProps {
@@ -132,6 +140,19 @@ interface PlanoVendasSectionProps {
   // pede a troca e recebe o novo período de volta por dateFrom/dateTo. Sem esta
   // propriedade, as setas simplesmente não aparecem.
   onPeriodoChange?: (range: { from: Date; to: Date }) => void;
+}
+
+/**
+ * As RPCs desta seção devolvem `fabricante_id`/`fabricante_nome`, sem o status
+ * Ativa/Inativa. Isto embrulha o id no formato que os comparadores de
+ * `src/lib/ordem-de-fabricantes.ts` esperam, consultando o índice montado a partir da
+ * lista que o Dashboard passa por propriedade.
+ *
+ * Marca ausente do índice conta como ATIVA — pode ser uma fábrica que a lista do filtro
+ * ainda não trouxe, e ausência de informação não desativa ninguém.
+ */
+function statusDoFabricante(indice: Map<string, boolean> | undefined, fabricanteId: string) {
+  return { ativo: indice?.get(fabricanteId) ?? true };
 }
 
 function progressoCor(pct: number) {
@@ -238,6 +259,29 @@ export function PlanoVendasSection({ empresaId, currentUsuarioId, vendedorIds, f
 
   const temMetas = !!progresso && progresso.length > 0;
 
+  // As duas RPCs desta seção devolvem `fabricante_id` e `fabricante_nome`, sem o status
+  // Ativa/Inativa. Quem sabe o status é a lista que o Dashboard passa por propriedade —
+  // daí este índice, para as ordenações abaixo consultarem por id.
+  const fabricanteAtivoPorId = useMemo(
+    () => new Map(fabricantes.map(f => [f.id, fabricanteEstaAtivo(f)])),
+    [fabricantes],
+  );
+
+  // A RPC `plano_vendas_progresso` ordena por meta desc / vendido desc — ela NÃO usa a
+  // ordem arrastada à mão (`fo.ordem`), diferente da RPC "por vendedor". Aqui só se
+  // acrescenta o status na frente: `sort` é estável, então tudo que tem o mesmo status
+  // mantém exatamente a ordem que o servidor mandou. É a única forma de a marca
+  // desativada não abrir o Plano de Vendas só porque tinha a maior meta.
+  const progressoOrdenado = useMemo(() => {
+    if (!progresso) return progresso;
+    return [...progresso].sort((a, b) =>
+      compararStatusDeFabricante(
+        statusDoFabricante(fabricanteAtivoPorId, a.fabricante_id),
+        statusDoFabricante(fabricanteAtivoPorId, b.fabricante_id),
+      ),
+    );
+  }, [progresso, fabricanteAtivoPorId]);
+
   const totalMeta = useMemo(() => (progresso ?? []).reduce((acc, p) => acc + p.meta_valor, 0), [progresso]);
   const totalVendido = useMemo(() => (progresso ?? []).reduce((acc, p) => acc + p.vendido_valor, 0), [progresso]);
   const totalPct = totalMeta > 0 ? (totalVendido / totalMeta) * 100 : 0;
@@ -299,12 +343,19 @@ export function PlanoVendasSection({ empresaId, currentUsuarioId, vendedorIds, f
     }
     const resultado = Array.from(porId.values());
     resultado.forEach(v => v.fabricas.sort((a, b) => {
+      // 🔴 O status vem ANTES da ordem arrastada à mão: uma marca que alguém arrastou
+      // para o topo e só depois deixou de representar continuaria no topo para sempre.
+      const porStatus = compararStatusDeFabricante(
+        statusDoFabricante(fabricanteAtivoPorId, a.fabricante_id),
+        statusDoFabricante(fabricanteAtivoPorId, b.fabricante_id),
+      );
+      if (porStatus !== 0) return porStatus;
       const oa = fabricantesOrdemMap?.get(a.fabricante_id) ?? Number.MAX_SAFE_INTEGER;
       const ob = fabricantesOrdemMap?.get(b.fabricante_id) ?? Number.MAX_SAFE_INTEGER;
       return oa !== ob ? oa - ob : b.meta_valor - a.meta_valor;
     }));
     return resultado.sort((a, b) => b.vendido_valor - a.vendido_valor);
-  }, [progressoPorVendedorRaw, fabricantesOrdemMap]);
+  }, [progressoPorVendedorRaw, fabricantesOrdemMap, fabricanteAtivoPorId]);
 
   return (
     <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300 mb-8">
@@ -435,8 +486,9 @@ export function PlanoVendasSection({ empresaId, currentUsuarioId, vendedorIds, f
 
             {mostrarDetalhado && podeVerMetasFabrica && (!mostrarPorVendedor || visualizacao === 'fabricante') && (
               <div className="space-y-4">
-                {progresso.map(p => {
+                {progressoOrdenado.map(p => {
                   const temMeta = p.meta_valor > 0;
+                  const marcaInativa = fabricanteAtivoPorId.get(p.fabricante_id) === false;
                   const pct = temMeta ? (p.vendido_valor / p.meta_valor) * 100 : 0;
                   // Só faz sentido distinguir "meta da equipe" de "minha fatia" numa
                   // visão de 1 pessoa só — o card do usuário comum (travado nele mesmo)
@@ -449,7 +501,16 @@ export function PlanoVendasSection({ empresaId, currentUsuarioId, vendedorIds, f
                   return (
                     <div key={p.fabricante_id} className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-card-foreground">{p.fabricante_nome}</span>
+                        <span className="font-semibold text-card-foreground flex items-center gap-1.5">
+                          {p.fabricante_nome}
+                          {/* A meta e o vendido dela continuam contando no total — o selo
+                              explica só por que ela caiu para o fim da lista. */}
+                          {marcaInativa && (
+                            <span className="rounded border border-border px-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                              Inativa
+                            </span>
+                          )}
+                        </span>
                         <span className="text-muted-foreground">
                           {formatCurrency(p.vendido_valor)}
                           {temMeta ? (
@@ -528,7 +589,14 @@ export function PlanoVendasSection({ empresaId, currentUsuarioId, vendedorIds, f
                             return (
                               <div key={f.fabricante_id} className="space-y-1">
                                 <div className="flex items-center justify-between text-[11px]">
-                                  <span className="text-muted-foreground">{f.fabricante_nome}</span>
+                                  <span className="text-muted-foreground flex items-center gap-1.5">
+                                    {f.fabricante_nome}
+                                    {fabricanteAtivoPorId.get(f.fabricante_id) === false && (
+                                      <span className="rounded border border-border px-1 text-[9px] font-medium uppercase tracking-wide">
+                                        Inativa
+                                      </span>
+                                    )}
+                                  </span>
                                   <span className="text-muted-foreground">
                                     {formatCurrency(f.vendido_valor)} / {formatCurrency(f.meta_valor)}{' '}
                                     <span className={`font-semibold ${progressoCor(fPct)}`}>({fPct.toFixed(0)}%)</span>
@@ -680,9 +748,15 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
   // diálogo (sem meta neste escopo/período) mantêm a posição relativa.
   const fabricantesOrdenados = useMemo(() => {
     return [...fabricantes].sort((a, b) => {
+      // 🔴 O status vem ANTES de `fo.ordem`. A ordem arrastada é uma escolha antiga: uma
+      // marca que alguém colocou na primeira posição e só depois deixou de representar
+      // continuaria abrindo a lista, e nem reordenar resolveria — a inativa voltaria ao
+      // topo na próxima vez que a ordem fosse salva.
+      const porStatus = compararStatusDeFabricante(a, b);
+      if (porStatus !== 0) return porStatus;
       const oa = fabricantesOrdemMap?.get(a.id) ?? Number.MAX_SAFE_INTEGER;
       const ob = fabricantesOrdemMap?.get(b.id) ?? Number.MAX_SAFE_INTEGER;
-      return oa !== ob ? oa - ob : a.nome.localeCompare(b.nome);
+      return oa !== ob ? oa - ob : compararNomeDeFabricante(a, b);
     });
   }, [fabricantes, fabricantesOrdemMap]);
   const posicaoFabricante = useMemo(
@@ -1138,7 +1212,15 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
           <div className="flex items-center gap-2">
             <SearchableSelect
               className="h-9 flex-1 text-sm"
-              options={fabricantesDisponiveis.map(f => ({ value: f.id, label: f.nome }))}
+              // A lista já chega do Dashboard com as inativas por último (a consulta
+              // ordena por `ativo desc, nome`), e `filter` não reordena. O selo é o que
+              // avisa que aquela marca não é mais representada — dá para definir meta
+              // para ela, mas de olho aberto.
+              options={fabricantesDisponiveis.map(f => ({
+                value: f.id,
+                label: f.nome,
+                badge: fabricanteEstaAtivo(f) ? undefined : 'Inativa',
+              }))}
               value={novoFabricanteId}
               onValueChange={setNovoFabricanteId}
               placeholder="Novo fabricante"
@@ -1262,7 +1344,17 @@ function EditarMetasDialog({ open, onOpenChange, empresaId, vendedores, initialU
                             >
                               <GripVertical className="h-4 w-4" />
                             </div>
-                            <span className="flex-1 text-sm truncate">{fabricante?.nome ?? '—'}</span>
+                            <span className="flex-1 flex items-center gap-1.5 text-sm truncate">
+                              <span className="truncate">{fabricante?.nome ?? '—'}</span>
+                              {/* Sem o selo, a marca desativada só apareceria no fim de uma
+                                  lista que a pessoa acabou de arrastar à mão — e ela
+                                  concluiria que a própria ordem dela foi desfeita. */}
+                              {fabricante && !fabricanteEstaAtivo(fabricante) && (
+                                <span className="shrink-0 rounded border border-border px-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  Inativa
+                                </span>
+                              )}
+                            </span>
                             {/* Encolhem em tela estreita em vez de sumirem: escondidas,
                                 o gestor digitava no escuro e ainda levava a recusa
                                 "não pode ser maior que a meta geral (R$ X)" citando

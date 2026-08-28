@@ -138,6 +138,66 @@ export function useAnexarArquivo() {
   });
 }
 
+export interface EdicaoDeArquivo {
+  id: string;
+  fabricanteId: string;
+  nome: string;
+  edicaoAno: number;
+  edicaoMes: number | null;
+}
+
+/**
+ * Corrigir o que foi escrito no anexo: nome e edição. **O arquivo em si não muda.**
+ *
+ * Até 28/08/2026 nada era editável depois de anexado, e um mês errado não tinha conserto —
+ * só excluir e anexar de novo, o que significa subir os 40 MB outra vez e perder o registro
+ * de quem enviou. E o mês errado não é detalhe cosmético: é ele que ordena a prateleira
+ * (`useArquivosDaFabrica` acima), então errá-lo esconde a edição vigente embaixo das velhas.
+ *
+ * 🔴 O `caminho` FICA DE FORA de propósito. Ele é UNIQUE e aponta para um objeto no balde;
+ * trocá-lo exigiria subir o novo, apagar o velho — que depende de outra política de Storage,
+ * a de exclusão — e desfazer os dois lados se qualquer passo falhasse. Quem quer outro
+ * arquivo exclui e anexa de novo, e o diálogo diz isso com todas as letras.
+ */
+export function useEditarArquivo() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (args: EdicaoDeArquivo) => {
+      const nome = args.nome.trim();
+      if (!nome) throw new Error('O nome não pode ficar vazio.');
+
+      const { data, error } = await supabase
+        .from('fabricante_arquivos' as never)
+        .update({
+          nome,
+          edicao_ano: args.edicaoAno,
+          edicao_mes: args.edicaoMes,
+        } as never)
+        .eq('id', args.id)
+        .select('id');
+
+      if (error) throw error;
+
+      // 🔴 `.select('id')` NÃO É ENFEITE. No PostgREST, um update que não casa nenhuma linha
+      // volta com sucesso e zero linhas — a tela diria "salvo" com o registro intacto. É o
+      // que acontece quando a regra de segurança do banco recusa (arquivo de outra empresa)
+      // ou quando alguém excluiu o material enquanto o diálogo estava aberto. Defeito
+      // repetido do projeto, item 47 de docs/divida-tecnica.md; o padrão certo a copiar é o
+      // `useDeleteFabricante` (src/hooks/use-fabricantes.ts).
+      const linhas = (data ?? []) as unknown as { id: string }[];
+      if (linhas.length === 0) {
+        throw new Error(
+          'Não foi possível salvar: este material já não existe, ou a regra de segurança do banco recusou a alteração.',
+        );
+      }
+    },
+    onSuccess: (_d, args) => {
+      qc.invalidateQueries({ queryKey: chave(args.fabricanteId) });
+    },
+  });
+}
+
 export function useExcluirArquivo() {
   const qc = useQueryClient();
 

@@ -98,10 +98,16 @@ export interface VisitaObraListagem extends ObraVisita {
    */
   latitude: number | null;
   longitude: number | null;
+  /** A rota a que esta parada pertence. Nula nas paradas anteriores a 28/08/2026. */
+  rotaId: string | null;
+  /** O título da rota, repetido em todas as paradas dela. */
+  rotaTitulo: string | null;
 }
 
 interface EventoVisitaComObraRow extends EventoVisitaRow {
   obra_id: string;
+  rota_id: string | null;
+  rota_titulo: string | null;
   obras: {
     nome_obra: string | null;
     latitude: number | null;
@@ -125,7 +131,7 @@ export function useTodasVisitasObras() {
         .select(
           // `latitude`/`longitude` vêm daqui para o traçado da rota no mapa não precisar de uma
           // segunda consulta só para descobrir onde cada obra fica.
-          'id, grupo_id, user_id, titulo, inicio, fim, dia_inteiro, visita_realizada, visita_observacao, criado_por, obra_id, obras(nome_obra, latitude, longitude, clientes(empresa))',
+          'id, grupo_id, user_id, titulo, inicio, fim, dia_inteiro, visita_realizada, visita_observacao, criado_por, obra_id, rota_id, rota_titulo, obras(nome_obra, latitude, longitude, clientes(empresa))',
         )
         .not('obra_id', 'is', null)
         .order('inicio', { ascending: false });
@@ -141,6 +147,10 @@ export function useTodasVisitasObras() {
         visitaObservacao: e.visita_observacao,
         criadoPor: e.criado_por,
         obraId: e.obra_id,
+        // A identidade e o título da rota (28/08/2026). Nulos nas paradas antigas — a tela
+        // cai no agrupamento por (dia, criador), que continua valendo para elas.
+        rotaId: e.rota_id ?? null,
+        rotaTitulo: e.rota_titulo ?? null,
         nomeObra: e.obras?.nome_obra || 'Obra sem nome',
         clienteEmpresa: e.obras?.clientes?.empresa ?? null,
         // `?? null` e não `|| 0`: ver o comentário do tipo.

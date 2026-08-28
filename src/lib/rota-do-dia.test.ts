@@ -309,3 +309,96 @@ describe('rotaDaChave', () => {
     expect(rotaDaChave([], `2026-08-27__${FABIOLA}`)).toBeUndefined();
   });
 });
+
+describe('identidade e título da rota (28/08/2026)', () => {
+  it('🔴 duas rotas no MESMO dia, da MESMA pessoa, deixam de virar uma só', () => {
+    // Era o defeito que a coluna `rota_id` veio consertar: a manhã na Zona Norte e a tarde na
+    // Zona Sul eram deduzidas como uma rota, e o traçado costurava os dois lados da cidade.
+    const rotas = agruparEmRotasDoDia([
+      visita('a', 10, 9, 0, { rotaId: 'manha', rotaTitulo: 'Zona Norte' }),
+      visita('b', 10, 10, 0, { rotaId: 'manha', rotaTitulo: 'Zona Norte' }),
+      visita('c', 10, 14, 0, { rotaId: 'tarde', rotaTitulo: 'Zona Sul', ...PARNAMIRIM }),
+      visita('d', 10, 15, 0, { rotaId: 'tarde', rotaTitulo: 'Zona Sul', ...PARNAMIRIM }),
+    ]);
+
+    expect(rotas).toHaveLength(2);
+    expect(rotas.map((r) => r.titulo).sort()).toEqual(['Zona Norte', 'Zona Sul']);
+    expect(rotas.every((r) => r.paradas.length === 2)).toBe(true);
+  });
+
+  it('parada sem `rota_id` continua agrupando por dia e criador, como antes', () => {
+    // As paradas anteriores a 28/08/2026 não têm identidade e não houve backfill — de
+    // propósito, porque inventar um id por (dia, criador) congelaria a fusão no banco.
+    const rotas = agruparEmRotasDoDia([visita('a', 11, 9), visita('b', 11, 10)]);
+
+    expect(rotas).toHaveLength(1);
+    expect(rotas[0].rotaId).toBeNull();
+    expect(rotas[0].titulo).toBeNull();
+    expect(rotas[0].chave).toBe(`2026-08-11__${FABIOLA}`);
+  });
+
+  it('rota com identidade e rota sem identidade no mesmo dia não se misturam', () => {
+    const rotas = agruparEmRotasDoDia([
+      visita('velha', 12, 9),
+      visita('nova', 12, 14, 0, { rotaId: 'r1', rotaTitulo: 'Rota nova' }),
+    ]);
+
+    expect(rotas).toHaveLength(2);
+    expect(rotas.find((r) => r.rotaId === 'r1')?.titulo).toBe('Rota nova');
+    expect(rotas.find((r) => r.rotaId === null)?.titulo).toBeNull();
+  });
+
+  it('título em branco ou só espaço vale como sem título', () => {
+    // A tela mostra só a data quando não há título; string vazia tem de cair no mesmo caminho,
+    // senão o cabeçalho vira ", quinta-feira 28 de ago".
+    const rotas = agruparEmRotasDoDia([
+      visita('a', 13, 9, 0, { rotaId: 'r', rotaTitulo: '   ' }),
+      visita('b', 13, 10, 0, { rotaId: 'r', rotaTitulo: '   ' }),
+    ]);
+
+    expect(rotas[0].titulo).toBeNull();
+  });
+
+  it('título é aparado dos espaços das pontas', () => {
+    const rotas = agruparEmRotasDoDia([
+      visita('a', 14, 9, 0, { rotaId: 'r', rotaTitulo: '  Zona Norte  ' }),
+    ]);
+
+    expect(rotas[0].titulo).toBe('Zona Norte');
+  });
+
+  it('🔴 uma parada sem título não deixa a rota anônima', () => {
+    // Rede de segurança para edição antiga que só reescreveu parte das linhas: basta uma
+    // parada trazer o título para a rota inteira ter nome. O contrário deixaria a rota sem
+    // nome por causa da linha que a consulta devolveu primeiro.
+    const rotas = agruparEmRotasDoDia([
+      visita('a', 15, 9, 0, { rotaId: 'r', rotaTitulo: null }),
+      visita('b', 15, 10, 0, { rotaId: 'r', rotaTitulo: 'Zona Norte' }),
+    ]);
+
+    expect(rotas).toHaveLength(1);
+    expect(rotas[0].titulo).toBe('Zona Norte');
+  });
+
+  it('a mesma rota atravessando a virada do dia continua sendo UMA rota', () => {
+    // Com o agrupamento por (dia, criador) isto virava duas. Com `rota_id`, a parada das 23h
+    // e a da 1h da manhã seguinte continuam juntas — e a data da rota é a da primeira parada.
+    const rotas = agruparEmRotasDoDia([
+      visita('a', 16, 23, 0, { rotaId: 'madrugada' }),
+      visita('b', 17, 1, 0, { rotaId: 'madrugada' }),
+    ]);
+
+    expect(rotas).toHaveLength(1);
+    expect(rotas[0].paradas.map((p) => p.id)).toEqual(['a', 'b']);
+  });
+
+  it('rota de UMA parada existe e não pode ser desenhada — as duas coisas ao mesmo tempo', () => {
+    // É o par que o painel usa: a rota aparece com os botões de editar e excluir, e o
+    // "Ver no mapa" é que sabe que não há trajeto.
+    const rotas = agruparEmRotasDoDia([visita('so-uma', 18, 9, 0, { rotaId: 'r' })]);
+
+    expect(rotas).toHaveLength(1);
+    expect(rotas[0].podeDesenhar).toBe(false);
+    expect(rotas[0].comPonto).toHaveLength(1);
+  });
+});

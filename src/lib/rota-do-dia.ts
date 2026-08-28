@@ -59,11 +59,35 @@ export interface VisitaParaRota {
   visitaRealizada?: boolean;
   latitude?: number | null;
   longitude?: number | null;
+  /**
+   * A identidade da rota, quando ela tem uma (`eventos.rota_id`, criada em 28/08/2026).
+   *
+   * 🔴 É ELA QUE DESFAZ A FUSÃO. Sem este campo a rota era deduzida por (dia, criador), e duas
+   * rotas montadas pela mesma pessoa no mesmo dia — a manhã na Zona Norte e a tarde na Zona
+   * Sul — viravam UMA, com o traçado costurando os dois lados da cidade. Com `rota_id`, cada
+   * uma é ela mesma.
+   *
+   * Nulo nas paradas anteriores a 28/08/2026: elas caem no agrupamento antigo, que continua
+   * valendo. Não houve backfill de propósito — inventar um id por (dia, criador) para o
+   * passado CONGELARIA no banco exatamente a fusão que isto veio desfazer.
+   */
+  rotaId?: string | null;
+  /** O título que a pessoa deu à rota. Repetido em todas as paradas dela. */
+  rotaTitulo?: string | null;
 }
 
 export interface RotaDoDia {
-  /** Identificador estável: data + criador. Serve de `key` de lista e de âncora de URL. */
+  /**
+   * Identificador estável. Serve de `key` de lista e de âncora de URL.
+   *
+   * Vem do `rota_id` quando a rota tem um; cai em `data__criador` para as paradas anteriores a
+   * 28/08/2026. Os dois formatos convivem, e é por isso que a chave é string e não uuid.
+   */
   chave: string;
+  /** O `eventos.rota_id`, quando existe. Nulo nas rotas remontadas pelo dia. */
+  rotaId: string | null;
+  /** O título que a pessoa deu. Nulo ou vazio = a tela mostra só a data, como antes. */
+  titulo: string | null;
   /** Meia-noite do dia, no fuso LOCAL. */
   data: Date;
   criadoPor: string | null;
@@ -133,12 +157,25 @@ export function agruparEmRotasDoDia(visitas: VisitaParaRota[]): RotaDoDia[] {
     // a visita para o dia SEGUINTE — a parada das 22h sairia da rota que a pessoa dirigiu.
     const dia = format(visita.inicio, 'yyyy-MM-dd');
     const autor = visita.criadoPor ?? SEM_AUTOR;
-    const chave = `${dia}__${autor}`;
+
+    // 🔴 A IDENTIDADE VEM DA ROTA QUANDO ELA TEM UMA. O par (dia, criador) continua valendo
+    // para tudo que foi criado antes de 28/08/2026 — e continua sendo a resposta certa para
+    // essas linhas, porque não há outra informação. Para o que nasce daqui em diante, `rota_id`
+    // é o que separa duas rotas do mesmo dia da mesma pessoa.
+    //
+    // O prefixo `rota__` existe para as duas famílias de chave nunca colidirem: sem ele, um
+    // uuid e um `2026-08-28__<uuid>` são as duas strings, e um dia alguém geraria uma igual à
+    // outra por acidente.
+    const chave = visita.rotaId ? `rota__${visita.rotaId}` : `${dia}__${autor}`;
 
     let rota = porChave.get(chave);
     if (!rota) {
       rota = {
         chave,
+        rotaId: visita.rotaId ?? null,
+        // O título é o da primeira parada que o traz. Ele fica repetido em todas as paradas da
+        // rota, então qualquer uma serve; ler da primeira evita depender da ordem da consulta.
+        titulo: visita.rotaTitulo?.trim() || null,
         data: startOfDay(visita.inicio),
         criadoPor: visita.criadoPor ?? null,
         paradas: [],
@@ -147,6 +184,11 @@ export function agruparEmRotasDoDia(visitas: VisitaParaRota[]): RotaDoDia[] {
         podeDesenhar: false,
       };
       porChave.set(chave, rota);
+    } else if (!rota.titulo && visita.rotaTitulo?.trim()) {
+      // Rede de segurança: se a primeira parada tiver vindo sem título (edição antiga que só
+      // reescreveu parte das linhas), a próxima que tiver preenche. Melhor um título do que
+      // nenhum — o contrário deixaria a rota anônima por causa de uma linha desatualizada.
+      rota.titulo = visita.rotaTitulo.trim();
     }
 
     rota.paradas.push(visita);

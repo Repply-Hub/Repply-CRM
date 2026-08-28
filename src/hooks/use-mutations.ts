@@ -352,15 +352,13 @@ export function useDeleteObrasBulk() {
   });
 }
 
-export function useCreateFabricante() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (data: { nome?: string; cnpj?: string; nome_contato?: string; telefone?: string }) => {
-      const { error } = await supabase.from('fabricantes').insert(data);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['fabricantes'] });
-    },
-  });
-}
+// 🔴 `useCreateFabricante` SAIU DAQUI em 28/08/2026 — está em `src/hooks/use-fabricantes.ts`.
+//
+// O que existia aqui aceitava só `{ nome, cnpj, nome_contato, telefone }` e invalidava apenas
+// a chave `['fabricantes']`. Quando o fabricante ganhou `ativo`, esta versão passou a ser uma
+// armadilha em duas frentes: descartaria o status EM SILÊNCIO (o objeto extra simplesmente não
+// entra no insert) e não mexeria no filtro do Dashboard nem no Plano de Vendas, que leem pela
+// chave `['fabricantes_filtro']`.
+//
+// Ficar aqui sem chamador nenhum era pior que não existir: o próximo autocompletar ofereceria
+// as duas, e a diferença entre elas não aparece na assinatura.

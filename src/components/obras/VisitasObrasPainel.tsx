@@ -3,19 +3,33 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
-import { Loader2, CheckCircle2, Circle, MapPin, Building2, HardHat, Route, Send, Trash2, Pencil } from 'lucide-react';
+import { Loader2, CheckCircle2, Circle, MapPin, Building2, HardHat, Route, Send, Trash2, Pencil, CalendarRange, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { DateRangePicker, type DateRange } from '@/components/shared/DateRangePicker';
 import { useAuth } from '@/hooks/use-auth';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useTodasVisitasObras, useMarcarVisitaRealizada, type VisitaObraListagem } from '@/hooks/use-obra-visitas';
 import { agruparEmRotasDoDia, type RotaDoDia } from '@/lib/rota-do-dia';
+import { normalizarTexto } from '@/lib/busca-de-obras';
 import { linkDoGoogleMaps, mensagemDaRota } from '@/lib/rota-no-whatsapp';
 import { EnviarRotaDialog } from './EnviarRotaDialog';
 import { RotaNoMapaDialog } from './RotaNoMapaDialog';
 import { useExcluirRotaDeVisita } from '@/hooks/use-eventos';
 import { ConfirmarExclusaoRota } from './ConfirmarExclusaoRota';
+
+/**
+ * As bordas que o seletor de período recebe quando NENHUM período está escolhido.
+ *
+ * 🔴 O fim é no FUTURO de propósito. O `DateRangePicker` exige um valor e o preset "Todos"
+ * dele termina em `new Date()` — hoje. Esta lista mostra visitas PLANEJADAS, que são
+ * justamente as futuras: adotar "hoje" como borda esconderia a agenda que a pessoa abriu a
+ * tela para ver. Estas duas datas nunca filtram nada; existem só para o seletor abrir com
+ * algo coerente enquanto `periodo` é nulo.
+ */
+const PRIMEIRA_VISITA_POSSIVEL = new Date(2000, 0, 1);
+const ULTIMA_VISITA_POSSIVEL = new Date(2100, 11, 31);
 
 interface VisitasObrasPainelProps {
   searchTerm: string;
@@ -50,14 +64,54 @@ export function VisitasObrasPainel({
   const [rotaParaExcluir, setRotaParaExcluir] = useState<RotaDoDia | null>(null);
   const excluirRota = useExcluirRotaDeVisita();
 
+  /**
+   * Filtro por período. Pedido do Lucas em 28/08/2026 — até aqui a aba Visitas tinha um filtro
+   * só, a busca por texto.
+   *
+   * 🔴 COMEÇA NULO, e isso é o desenho, não preguiça. Esta lista mostra visitas PLANEJADAS,
+   * que são futuras. O preset "Todos" do `DateRangePicker` vai de 2000 até HOJE (linha 35
+   * daquele arquivo), então adotá-lo como padrão esconderia justamente a agenda que a pessoa
+   * abriu a tela para ver. Nulo = sem recorte, tudo aparece; o filtro só existe quando alguém
+   * pede.
+   */
+  const [periodo, setPeriodo] = useState<DateRange | null>(null);
+
   const filtradas = useMemo(() => {
-    const lista = visitas ?? [];
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return lista;
-    return lista.filter(
-      (v) => v.nomeObra.toLowerCase().includes(q) || (v.clienteEmpresa ?? '').toLowerCase().includes(q),
-    );
-  }, [visitas, searchTerm]);
+    let lista = visitas ?? [];
+
+    // 🔴 A MESMA REGRA DA ABA LISTA, e não uma cópia simplificada.
+    //
+    // Aqui havia um `toLowerCase().includes()` sobre dois campos. A barra de busca é a MESMA
+    // das outras abas, então digitar "sao" achava a obra na aba Lista (que normaliza acento) e
+    // não achava a visita da mesma obra na aba ao lado. Barra que responde de dois jeitos
+    // conforme a aba é pior que barra ruim: a pessoa conclui que a visita não existe.
+    //
+    // Cada palavra precisa aparecer em ALGUM campo, podendo ser campos diferentes — mesmo
+    // critério "E" de `busca-de-obras.ts`: quem digita mais palavras quer reduzir a lista.
+    const palavras = normalizarTexto(searchTerm).split(/\s+/).filter(Boolean);
+    if (palavras.length > 0) {
+      lista = lista.filter((v) => {
+        const campos = [normalizarTexto(v.nomeObra), normalizarTexto(v.clienteEmpresa)];
+        return palavras.every((palavra) => campos.some((campo) => campo.includes(palavra)));
+      });
+    }
+
+    if (periodo) {
+      // 🔴 O dia inteiro entra nas duas pontas. Comparar `Date` cru deixaria de fora a visita
+      // das 14h do último dia escolhido, porque o `to` que o seletor entrega é a meia-noite
+      // daquele dia — e a pessoa que filtrou "até 28/08" espera ver o 28/08 completo.
+      const de = new Date(periodo.from);
+      de.setHours(0, 0, 0, 0);
+      const ate = new Date(periodo.to);
+      ate.setHours(23, 59, 59, 999);
+      lista = lista.filter((v) => {
+        const quando = new Date(v.inicio).getTime();
+        return quando >= de.getTime() && quando <= ate.getTime();
+      });
+    }
+
+    return lista;
+  }, [visitas, searchTerm, periodo]);
 
   // Agrupa por DIA preservando a ordem que veio do banco (mais recente primeiro). A chave é
   // `yyyy-MM-dd` e não o objeto Date: duas datas do mesmo dia são objetos diferentes, e
@@ -97,9 +151,28 @@ export function VisitasObrasPainel({
         visitaRealizada: v.visitaRealizada,
         latitude: v.latitude,
         longitude: v.longitude,
+        // A identidade e o título da rota. Nulos nas paradas antigas — nesse caso o
+        // agrupamento cai no par (dia, criador), como sempre foi.
+        rotaId: v.rotaId,
+        rotaTitulo: v.rotaTitulo,
       })),
     )) {
-      if (!rota.podeDesenhar) continue;
+      // 🔴 TODA rota entra, inclusive a que não dá para desenhar.
+      //
+      // Até 28/08/2026 havia aqui um `if (!rota.podeDesenhar) continue`, e `podeDesenhar` é
+      // `comPonto.length >= 2` (`rota-do-dia.ts:173`). O efeito colateral não era só "sem
+      // traçado": a rota descartada nunca entrava neste mapa, e a linha de botões só é montada
+      // quando o dia tem alguma rota nele — então **a rota inteira ficava sem Editar, sem
+      // Excluir, sem Enviar e sem Ver no mapa**.
+      //
+      // Isso derrubava dois casos que não têm nada de excepcional:
+      //   - rota de UMA parada — quem visita uma obra só no dia não conseguia mexer nela por
+      //     aqui, e o único caminho restante era achá-la no Calendário;
+      //   - rota de várias paradas em que só uma obra tem coordenada — hoje 8 das 82 obras da
+      //     MD estão sem geocodificação, então isso acontece de verdade.
+      //
+      // Desenhar o trajeto e poder mexer na rota são coisas diferentes, e agora estão
+      // separadas: `podeDesenhar` continua mandando no traçado, e só nele. Pedido do Lucas.
       const chave = format(rota.data, 'yyyy-MM-dd');
       const lista = mapa.get(chave);
       if (lista) lista.push(rota);
@@ -128,19 +201,62 @@ export function VisitasObrasPainel({
     );
   }
 
+  /**
+   * A barra de filtro da aba.
+   *
+   * 🔴 ELA APARECE TAMBÉM QUANDO A LISTA FICA VAZIA, e essa é a parte que importa. Um filtro
+   * que some junto com o resultado é uma armadilha: a pessoa recorta um período sem visita,
+   * a tela fica em branco, e o controle que desfaria isso desapareceu com ela. Por isso a
+   * barra é montada aqui e usada nos dois caminhos abaixo.
+   */
+  const barraDeFiltros = (
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <CalendarRange className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <DateRangePicker
+        value={periodo ?? { from: PRIMEIRA_VISITA_POSSIVEL, to: ULTIMA_VISITA_POSSIVEL }}
+        onChange={setPeriodo}
+      />
+      {periodo && (
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 px-2 text-xs"
+            onClick={() => setPeriodo(null)}
+          >
+            <X className="h-3.5 w-3.5" />
+            Limpar período
+          </Button>
+          <span className="font-mono text-xs tabular-nums text-muted-foreground">
+            {filtradas.length} {filtradas.length === 1 ? 'visita' : 'visitas'}
+          </span>
+        </>
+      )}
+    </div>
+  );
+
   if (filtradas.length === 0) {
     return (
-      <div className="text-center py-20 text-muted-foreground">
-        <HardHat className="h-12 w-12 mx-auto mb-3 opacity-40" />
-        <p className="font-medium">Nenhuma visita encontrada</p>
-        <p className="text-sm mt-1">
-          {searchTerm ? 'Ajuste a busca.' : 'Crie uma rota de visita para começar.'}
-        </p>
+      <div>
+        {barraDeFiltros}
+        <div className="text-center py-20 text-muted-foreground">
+          <HardHat className="h-12 w-12 mx-auto mb-3 opacity-40" />
+          <p className="font-medium">Nenhuma visita encontrada</p>
+          <p className="text-sm mt-1">
+            {periodo
+              ? 'Nenhuma visita neste período. Limpe o período para ver todas.'
+              : searchTerm
+                ? 'Ajuste a busca.'
+                : 'Crie uma rota de visita para começar.'}
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
+    <div>
+    {barraDeFiltros}
     // 🔴 BLOCOS DE DIA LADO A LADO, e não uma lista corrida.
     //
     // Antes era um `space-y-5` com um cabeçalho de dia inserido no meio quando a data mudava:
@@ -156,11 +272,21 @@ export function VisitasObrasPainel({
         // Só nomeia a pessoa quando há mais de uma rota no dia: com uma só, dizer de quem é
         // seria ruído — é de quem está olhando, quase sempre.
         const precisaNomear = rotasDoDia.length > 1;
+        // Só há um título "do dia" quando há uma rota só. Ver o comentário no cabeçalho.
+        const tituloDoDia = rotasDoDia.length === 1 ? rotasDoDia[0].titulo : null;
 
         return (
         <section key={chave} className="rounded-xl border border-border bg-card">
           <header className="flex items-baseline justify-between gap-2 border-b border-border px-4 py-2.5">
-            <h3 className="text-sm font-semibold capitalize text-card-foreground">
+            {/* 🔴 "(título), (data)" — pedido do Lucas em 28/08/2026. O título só entra quando
+                o dia tem UMA rota: com duas, cada uma tem o seu, e escolher um para o
+                cabeçalho do dia diria que a outra não existe. Nesse caso o título de cada
+                rota aparece na linha dela, junto do nome de quem a montou. Sem título, fica
+                só a data, como sempre foi. */}
+            <h3 className="min-w-0 truncate text-sm font-semibold capitalize text-card-foreground">
+              {tituloDoDia && (
+                <span className="normal-case">{tituloDoDia}, </span>
+              )}
               {format(dia, "EEEE, d 'de' MMM", { locale: ptBR })}
             </h3>
             <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
@@ -168,8 +294,9 @@ export function VisitasObrasPainel({
             </span>
           </header>
 
-          {/* Rota do dia. Só aparece quando há 2+ paradas COM localização: com uma parada só
-              não há trajeto, e sem localização não há o que desenhar. */}
+          {/* A rota do dia, com as ações. Aparece para QUALQUER rota — inclusive a de uma
+              parada só e a que está sem localização. O que depende de ter 2+ pontos é o
+              traçado, não o direito de editar e excluir. */}
           {rotasDoDia.length > 0 && (
             <div className="space-y-1.5 border-b border-border bg-muted/30 px-3 py-2">
               {rotasDoDia.map((rota) => {
@@ -178,17 +305,34 @@ export function VisitasObrasPainel({
                 // excluir apagaria metade da rota e deixaria o resto na agenda de todo mundo.
                 const eDono = !!profile?.user_id && profile.user_id === rota.criadoPor;
 
+                // Sem NENHUMA parada geolocalizada não há o que abrir: o mapa viria vazio e a
+                // pessoa concluiria que o botão está quebrado. Com UMA já vale — o mapa mostra
+                // o pino, só não tem trajeto. É a diferença entre "não dá" e "não tem linha".
+                const temOndeMostrar = rota.comPonto.length > 0;
+
                 return (
                 <div key={rota.chave} className="flex flex-wrap items-center gap-1.5">
-                  {precisaNomear && (
-                    <span className="mr-auto truncate text-xs text-muted-foreground">
-                      {nomePor(rota.criadoPor ?? '')}
+                  {(precisaNomear || rota.titulo) && (
+                    <span className="mr-auto min-w-0 truncate text-xs text-muted-foreground">
+                      {/* O título da rota, quando a pessoa deu um. Junto do nome de quem
+                          montou, quando há mais de uma rota no dia. */}
+                      {rota.titulo && (
+                        <span className="font-medium text-foreground">{rota.titulo}</span>
+                      )}
+                      {rota.titulo && precisaNomear && ' · '}
+                      {precisaNomear && nomePor(rota.criadoPor ?? '')}
                     </span>
                   )}
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-7 gap-1.5 px-2 text-xs"
+                    disabled={!temOndeMostrar}
+                    title={
+                      temOndeMostrar
+                        ? undefined
+                        : 'Nenhuma obra desta rota tem localização — não há o que mostrar no mapa'
+                    }
                     onClick={() => setRotaNoMapa(rota)}
                   >
                     <Route className="h-3.5 w-3.5" />
@@ -225,14 +369,23 @@ export function VisitasObrasPainel({
                       Excluir
                     </Button>
                   )}
+                  {/* Dizer o que ficou de fora é o que impede a pessoa de achar que a rota tem
+                      menos paradas do que ela cadastrou — ou que o mapa está com defeito. São
+                      dois avisos diferentes e podem valer ao mesmo tempo. */}
                   {rota.semPonto.length > 0 && (
-                    // Dizer o que ficou de fora é o que impede a pessoa de achar que a rota tem
-                    // menos paradas do que ela cadastrou.
                     <span className="w-full text-[11px] text-muted-foreground">
                       {rota.semPonto.length}{' '}
                       {rota.semPonto.length === 1
                         ? 'obra sem localização fica fora do mapa'
                         : 'obras sem localização ficam fora do mapa'}
+                    </span>
+                  )}
+                  {temOndeMostrar && !rota.podeDesenhar && (
+                    // Uma parada geolocalizada só: o mapa abre e mostra o pino, mas não existe
+                    // trajeto entre uma parada e nenhuma. Sem esta frase o usuário abriria o
+                    // mapa esperando a linha e acharia que ela falhou.
+                    <span className="w-full text-[11px] text-muted-foreground">
+                      Só uma parada tem localização — o mapa mostra o ponto, sem trajeto
                     </span>
                   )}
                 </div>
@@ -264,14 +417,34 @@ export function VisitasObrasPainel({
                   )
                 }
                 podeAlternar={profile?.user_id === visita.criadoPor}
-                onAlternarStatus={() =>
-                  marcarRealizada.mutate({
-                    grupoId: visita.grupoId,
-                    obraId: visita.obraId,
-                    realizada: !visita.visitaRealizada,
-                    observacao: visita.visitaObservacao ?? '',
-                  })
-                }
+                /**
+                 * 🔴 OS DOIS SENTIDOS DO SELO NÃO SÃO SIMÉTRICOS, e é de propósito.
+                 *
+                 * Clicar em **Planejada** (marcar como realizada) abre o campo "O que você viu
+                 * na obra?", exatamente como o botão de baixo — pedido do Lucas em 28/08/2026.
+                 * A razão é que esse é o momento em que a informação existe: a pessoa acabou de
+                 * sair da obra. Gravar "realizada" e seguir em frente perde o registro, e ela
+                 * não volta depois para escrever.
+                 *
+                 * Clicar em **Realizada** (desmarcar) continua gravando na hora, sem abrir
+                 * nada. Pedir "o que você viu" para DESFAZER não faz sentido nenhum, e este é o
+                 * único caminho que existe na tela para corrigir um clique errado — pôr um
+                 * formulário no meio dele traria de volta o beco sem saída que o selo alternável
+                 * veio resolver.
+                 */
+                onAlternarStatus={() => {
+                  if (visita.visitaRealizada) {
+                    marcarRealizada.mutate({
+                      grupoId: visita.grupoId,
+                      obraId: visita.obraId,
+                      realizada: false,
+                      observacao: visita.visitaObservacao ?? '',
+                    });
+                    return;
+                  }
+                  setObservacaoRascunho(visita.visitaObservacao || '');
+                  setEditandoId(visita.id);
+                }}
                 salvando={marcarRealizada.isPending}
               />
             ))}
@@ -316,6 +489,7 @@ export function VisitasObrasPainel({
         totalDeParadas={rotaParaEnviar?.paradas.length ?? 0}
       />
     </div>
+    </div>
   );
 }
 
@@ -344,7 +518,10 @@ function VisitaCard({
   onIniciarEdicao: () => void;
   onCancelarEdicao: () => void;
   onSalvar: () => void;
-  /** Alterna Planejada <-> Realizada direto pelo selo, sem passar pela observação. */
+  /**
+   * O que o selo faz ao ser clicado. **Planejada** abre o campo de observação (o pai decide);
+   * **Realizada** desmarca na hora. Ver o comentário longo em quem passa esta propriedade.
+   */
   onAlternarStatus: () => void;
   /** Só quem registrou a visita alterna. Para os outros o selo é leitura. */
   podeAlternar: boolean;
@@ -375,10 +552,15 @@ function VisitaCard({
             Registrado por {nomeCriador}
           </p>
         </div>
-        {/* 🔴 O SELO ALTERNA NOS DOIS SENTIDOS. Antes ele era só enfeite: dava para marcar
-            como realizada pelo botão de baixo, e NÃO havia caminho nenhum na tela para
-            desmarcar — quem clicasse por engano ficava com a visita realizada para sempre.
-            A gravação já aceitava `realizada: false`; faltava a porta.
+        {/* 🔴 O SELO ALTERNA NOS DOIS SENTIDOS, com pesos diferentes.
+            Antes ele era só enfeite: dava para marcar como realizada pelo botão de baixo, e
+            NÃO havia caminho nenhum na tela para desmarcar — quem clicasse por engano ficava
+            com a visita realizada para sempre. A gravação já aceitava `realizada: false`;
+            faltava a porta.
+
+            Desde 28/08/2026 o sentido "Planejada -> Realizada" abre o campo de observação em
+            vez de gravar direto: é o pedido do Lucas, e o motivo está em quem passa
+            `onAlternarStatus`. O sentido inverso continua gravando na hora.
 
             Só quem registrou a visita alterna (`podeAlternar`); para os outros continua
             sendo um selo de leitura, com o mesmo desenho. */}
@@ -387,8 +569,16 @@ function VisitaCard({
             type="button"
             disabled={salvando}
             onClick={onAlternarStatus}
-            title={visita.visitaRealizada ? 'Marcar como planejada' : 'Marcar como realizada'}
-            aria-label={visita.visitaRealizada ? 'Marcar como planejada' : 'Marcar como realizada'}
+            title={
+              visita.visitaRealizada
+                ? 'Marcar como planejada'
+                : 'Marcar como realizada e escrever o que você viu'
+            }
+            aria-label={
+              visita.visitaRealizada
+                ? 'Marcar como planejada'
+                : 'Marcar como realizada e escrever o que você viu'
+            }
             className="shrink-0 rounded-full transition-opacity hover:opacity-80 disabled:opacity-50"
           >
             <Badge variant={visita.visitaRealizada ? 'default' : 'outline'} className="cursor-pointer gap-1 text-[10px]">

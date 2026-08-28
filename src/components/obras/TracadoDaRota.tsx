@@ -21,6 +21,16 @@ import { distanciaLegivel, duracaoLegivel, type RotaCalculada } from '@/lib/osrm
  * 2. UMA LINHA POR PERNA, e não uma linha só do começo ao fim. É o que permite acender um
  *    trecho quando o mouse passa por cima e mostrar o tempo DAQUELE trecho. Com uma linha só, o
  *    hover acenderia a rota inteira — o mesmo que não acender nada.
+ *
+ * 🔴 POR QUE A ETIQUETA DE TEMPO NÃO É FIXA NO MAPA (avaliado em 28/08/2026, e a resposta foi
+ * não). O `Tooltip permanent` do Leaflet ancora no MEIO da linha, e nada nele desvia de nada:
+ * quatro paradas dentro de Natal dão quatro caixas brancas empilhadas por cima dos pinos
+ * numerados e das ruas que a pessoa está tentando ler — sem colisão nenhuma sendo resolvida,
+ * porque o Leaflet não resolve. Numa perna longa o meio ainda cai fora do enquadramento, e a
+ * etiqueta some justamente do trecho maior. O lugar certo para uma sequência de números é uma
+ * lista, em ordem de leitura: os tempos agora ficam FIXOS entre um item e o outro da lista de
+ * paradas, logo abaixo do mapa (`RotaNoMapaDialog`). No mapa fica o hover, que serve à outra
+ * pergunta — "este traço aqui, quanto é?".
  */
 
 export interface ParadaNoTracado {
@@ -87,7 +97,12 @@ export function TracadoDaRota({ paradas, rota, chave }: TracadoDaRotaProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chave]);
 
-  if (paradas.length < 2) return null;
+  // 🔴 UMA PARADA SÓ AINDA DESENHA O PINO DELA. Antes esta linha era `< 2` e devolvia nada:
+  // quem abria uma visita solta no mapa via a janela montar, o mapa centralizar no lugar
+  // certo... e nenhum ponto em cima. A tela parecia quebrada num caso que é rotina (visita
+  // única no dia). Rota de um ponto não tem traçado — mas tem lugar, e o lugar é o que
+  // interessa nesse caso. O laço das pernas abaixo já devolve lista vazia sozinho.
+  if (paradas.length === 0) return null;
 
   const pontos = paradas.map((p) => [p.lat, p.lng] as [number, number]);
 
@@ -122,11 +137,14 @@ export function TracadoDaRota({ paradas, rota, chave }: TracadoDaRotaProps) {
             <Tooltip sticky direction="top" opacity={1}>
               {perna ? (
                 <span>
-                  {distanciaLegivel(perna.distanciaM)} ·{' '}
                   {/* 🔴 "cerca de" não é enfeite: o tempo vem de uma estimativa de trânsito
                       público, e prometer minuto exato a quem está dirigindo queima a confiança
-                      na ferramenta inteira. */}
-                  cerca de {duracaoLegivel(perna.duracaoS)}
+                      na ferramenta inteira.
+
+                      A ORDEM (tempo, depois distância) é a mesma da lista de paradas do
+                      diálogo, de propósito: são o mesmo número visto em dois lugares, e trocar
+                      a ordem entre os dois faz a pessoa reler para conferir se é o mesmo. */}
+                  cerca de {duracaoLegivel(perna.duracaoS)} · {distanciaLegivel(perna.distanciaM)}
                 </span>
               ) : (
                 <span>Trajeto pelas ruas indisponível — esta é a ordem das visitas</span>

@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { useClientes, useContatos } from '@/hooks/use-clientes';
+import { useClientes, useContatos, useFabricantes } from '@/hooks/use-clientes';
+import { compararFabricantes, fabricanteEstaAtivo } from '@/lib/ordem-de-fabricantes';
 import { usePedidosPorCliente } from '@/hooks/use-pedidos';
 import { getNomeNegocio } from '@/lib/nome-negocio';
 import { useTarefas } from '@/hooks/use-tarefas';
@@ -432,14 +433,27 @@ const ClienteDetalhe = () => {
     (pedidos ?? []).find(p => p.id === viewOrderId),
   [pedidos, viewOrderId]);
   const pedidosCliente = useMemo(() => (pedidos ?? []).filter(p => p.cliente_id === id), [pedidos, id]);
+  // O status Ativa/Inativa não vem no negócio: o embed de `pedidos` traz do fabricante só
+  // `id, nome`. Quem sabe o status é o cadastro — daí este índice. É a MESMA consulta que
+  // o resto do sistema já usa (mesma chave de cache), não uma busca a mais por causa desta
+  // tela.
+  const { data: fabricantesCadastrados } = useFabricantes();
+  const statusDoFabricante = useMemo(
+    () => new Map((fabricantesCadastrados ?? []).map(f => [f.id, f.ativo !== false])),
+    [fabricantesCadastrados],
+  );
+  // Esta lista é montada a partir dos NEGÓCIOS do cliente, então ela sempre reordenava no
+  // cliente e desfaria qualquer ordem vinda do banco. O status entra como primeiro
+  // desempate; marca sem status conhecido conta como ativa (ver ordem-de-fabricantes.ts).
   const fabricantesDoCliente = useMemo(() => {
     const mapa = new Map<string, string>();
     pedidosCliente.forEach(p => {
       const fab = comEmbeds(p).fabricante;
       if (fab?.id) mapa.set(fab.id, fab.nome);
     });
-    return Array.from(mapa, ([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [pedidosCliente]);
+    return Array.from(mapa, ([id, nome]) => ({ id, nome, ativo: statusDoFabricante.get(id) ?? true }))
+      .sort(compararFabricantes);
+  }, [pedidosCliente, statusDoFabricante]);
   const pedidosFiltrados = useMemo(() => {
     const termo = pedidosBusca.trim().toLowerCase();
     return pedidosCliente.filter(p => {
@@ -1619,8 +1633,20 @@ const ClienteDetalhe = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="todos">Todos os fabricantes</SelectItem>
+                        {/* Marca que a empresa não representa mais fica no fim da lista, mas
+                            continua aqui: os negócios antigos dela são justamente o que esta
+                            ficha guarda. O selo diz por que ela desceu. */}
                         {fabricantesDoCliente.map(f => (
-                          <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
+                          <SelectItem key={f.id} value={f.id}>
+                            <span className="flex items-center gap-1.5">
+                              {f.nome}
+                              {!fabricanteEstaAtivo(f) && (
+                                <span className="rounded border border-border px-1 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                                  Inativa
+                                </span>
+                              )}
+                            </span>
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

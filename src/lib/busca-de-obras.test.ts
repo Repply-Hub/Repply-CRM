@@ -397,3 +397,135 @@ describe('filtrarSemEndereco', () => {
     expect(filtrarSemEndereco(undefined)).toEqual([]);
   });
 });
+
+/**
+ * As duas obras desta rodada carregam o endereço no formato REAL da base — medido em
+ * 28/08/2026: o CEP mora dentro do texto do endereço, e aparece com hífen numa obra e sem
+ * hífen na outra, na mesma coluna. Não existe coluna de CEP, de cidade nem de bairro: tudo
+ * isso é pedaço de `endereco_entrega`.
+ */
+const obraCepComHifen: ObraParaBusca = {
+  nome_obra: 'Solar Sinatra',
+  spe_cnpj: '32.888.111/0001-72',
+  endereco_entrega: 'Rua Potengi, 526, Petrópolis, Natal-RN, CEP: 59020-030',
+  clientes: { empresa: 'Construtora Alfa' },
+};
+
+const obraCepSemHifen: ObraParaBusca = {
+  nome_obra: 'Edifício Sol Poente',
+  spe_cnpj: '44.777.222/0001-15',
+  endereco_entrega:
+    'Avenida Hermes da Fonseca, Petrópolis, Natal Rio Grande do Norte, 59014020, Brasil, RN',
+  clientes: { empresa: 'Beta Engenharia' },
+};
+
+describe('obraBateComBusca — o CEP, que tem máscara dos DOIS lados', () => {
+  it('CEP digitado com hífen acha o endereço que guardou o CEP sem hífen', () => {
+    // 🔴 O caso que a comparação de texto erra sozinha: nada em "...59014020, Brasil, RN"
+    // contém "59014-020". Sem esta passada, quem confere o CEP de um cadastro concluiria que
+    // a obra não existe.
+    expect(obraBateComBusca(obraCepSemHifen, '59014-020')).toBe(true);
+  });
+
+  it('CEP digitado sem hífen acha o endereço que guardou o CEP com hífen', () => {
+    expect(obraBateComBusca(obraCepComHifen, '59020030')).toBe(true);
+  });
+
+  it('CEP digitado exatamente como está gravado continua achando', () => {
+    expect(obraBateComBusca(obraCepComHifen, '59020-030')).toBe(true);
+    expect(obraBateComBusca(obraCepSemHifen, '59014020')).toBe(true);
+  });
+
+  it('pedaço de CEP acha as duas grafias sem passada nenhuma', () => {
+    // "59020" é substring literal de "59020-030" E de "59020030" — quem resolve aqui é a
+    // comparação de texto. É por isso que a passada de CEP cuida só do número inteiro: o
+    // pedaço já funcionava, e ampliar a regra só criaria falso positivo.
+    expect(obraBateComBusca(obraCepComHifen, '59020')).toBe(true);
+    expect(obraBateComBusca(obraCepSemHifen, '59014')).toBe(true);
+  });
+
+  it('CEP de outro endereço não acha', () => {
+    expect(obraBateComBusca(obraCepComHifen, '01310-100')).toBe(false);
+  });
+
+  it('🔴 número comprido no endereço não vira CEP lido no meio', () => {
+    // A fronteira de palavra é o que segura isto. Sem ela, os oito primeiros dígitos de
+    // qualquer número longo — e os 78 CNPJs desta base estão gravados como 14 dígitos
+    // seguidos — seriam lidos como um CEP, e conferir CEP passaria a trazer obra por causa
+    // do documento dela.
+    const obraComNumeroLongo: ObraParaBusca = {
+      nome_obra: 'Galpão Industrial',
+      endereco_entrega: 'Rua Sem Saída, medidor 59064430000112',
+    };
+    expect(obraBateComBusca(obraComNumeroLongo, '59064-430')).toBe(false);
+  });
+});
+
+describe('obraBateComBusca — várias palavras: é E, não OU', () => {
+  it('junta nome e cidade, que estão em campos diferentes', () => {
+    // 🔴 O caso que a comparação de texto inteiro errava: "Solar" está no nome e "Natal" no
+    // endereço, então nenhum campo sozinho contém "solar natal".
+    expect(obraBateComBusca(obraCepComHifen, 'solar natal')).toBe(true);
+  });
+
+  it('a ordem em que as palavras foram digitadas não importa', () => {
+    expect(obraBateComBusca(obraCepComHifen, 'natal solar')).toBe(true);
+  });
+
+  it('acha bairro e cidade mesmo com o endereço escrevendo o bairro primeiro', () => {
+    expect(obraBateComBusca(obraCepComHifen, 'natal petropolis')).toBe(true);
+  });
+
+  it('acha logradouro e número juntos', () => {
+    expect(obraBateComBusca(obraCepComHifen, 'potengi 526')).toBe(true);
+  });
+
+  it('junta cliente e endereço', () => {
+    expect(obraBateComBusca(obraCepComHifen, 'alfa potengi')).toBe(true);
+  });
+
+  it('🔴 uma palavra que não bate derruba a busca inteira — é E, não OU', () => {
+    // A decisão que separa uma busca que refina de uma que incha. Com OU, acrescentar
+    // "parnamirim" devolveria MAIS obras em vez de menos: quem está tentando reduzir a lista
+    // veria o contrário do que pediu, e a busca pareceria não obedecer.
+    expect(obraBateComBusca(obraCepComHifen, 'solar parnamirim')).toBe(false);
+  });
+
+  it('espaço sobrando entre as palavras não atrapalha', () => {
+    expect(obraBateComBusca(obraCepComHifen, '  solar    natal  ')).toBe(true);
+  });
+
+  it('acento e caixa continuam valendo palavra a palavra', () => {
+    expect(obraBateComBusca(obraCepComHifen, 'PETRÓPOLIS natal')).toBe(true);
+    expect(obraBateComBusca(obraCepSemHifen, 'edifício poente')).toBe(true);
+  });
+
+  it('🔴 CNPJ colado com espaço continua sendo UM número, não cinco palavras', () => {
+    // Copiar CNPJ de PDF ou de nota fiscal traz espaço no lugar da pontuação. Se a busca
+    // quebrasse isso em palavras, "32", "888" e "0001" casariam cada uma dentro de quase
+    // qualquer CNPJ da base — e o número de UMA obra devolveria várias.
+    expect(obraBateComBusca(obraCepComHifen, '32 888 111 0001 72')).toBe(true);
+    expect(obraBateComBusca(obraCepSemHifen, '32 888 111 0001 72')).toBe(false);
+  });
+
+  it('palavra com CNPJ misturado não vira comparação por dígitos', () => {
+    // A busca tem letra, então ela é texto: o "32" não é comparado contra os dígitos do CNPJ.
+    expect(obraBateComBusca(obraCepSemHifen, 'poente 32')).toBe(false);
+  });
+});
+
+describe('filtrarObrasPorBusca — cada palavra a mais aperta o resultado', () => {
+  const lista = [obraCepComHifen, obraCepSemHifen];
+
+  it('a palavra que as duas obras têm devolve as duas; a seguinte separa', () => {
+    expect(filtrarObrasPorBusca(lista, 'natal')).toHaveLength(2);
+    expect(filtrarObrasPorBusca(lista, 'petropolis')).toHaveLength(2);
+    expect(filtrarObrasPorBusca(lista, 'natal solar')).toHaveLength(1);
+    expect(filtrarObrasPorBusca(lista, 'natal solar')[0].nome_obra).toBe('Solar Sinatra');
+  });
+
+  it('busca por CEP devolve só a obra daquele CEP', () => {
+    expect(filtrarObrasPorBusca(lista, '59014-020')).toHaveLength(1);
+    expect(filtrarObrasPorBusca(lista, '59014-020')[0].nome_obra).toBe('Edifício Sol Poente');
+  });
+});

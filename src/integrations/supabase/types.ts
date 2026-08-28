@@ -1681,6 +1681,8 @@ export type Database = {
           lembrete_enviado: boolean
           lembrete_minutos: number | null
           obra_id: string | null
+          rota_id: string | null
+          rota_titulo: string | null
           tipo_calendario: string
           titulo: string
           updated_at: string
@@ -1701,6 +1703,8 @@ export type Database = {
           lembrete_enviado?: boolean
           lembrete_minutos?: number | null
           obra_id?: string | null
+          rota_id?: string | null
+          rota_titulo?: string | null
           tipo_calendario?: string
           titulo: string
           updated_at?: string
@@ -1721,6 +1725,8 @@ export type Database = {
           lembrete_enviado?: boolean
           lembrete_minutos?: number | null
           obra_id?: string | null
+          rota_id?: string | null
+          rota_titulo?: string | null
           tipo_calendario?: string
           titulo?: string
           updated_at?: string
@@ -1740,6 +1746,7 @@ export type Database = {
       }
       fabricantes: {
         Row: {
+          ativo: boolean
           campos_extras: Json
           cnpj: string | null
           created_at: string
@@ -1751,6 +1758,7 @@ export type Database = {
           ultima_atualizacao_preco: string | null
         }
         Insert: {
+          ativo?: boolean
           campos_extras?: Json
           cnpj?: string | null
           created_at?: string
@@ -1764,6 +1772,7 @@ export type Database = {
           ultima_atualizacao_preco?: string | null
         }
         Update: {
+          ativo?: boolean
           campos_extras?: Json
           cnpj?: string | null
           created_at?: string

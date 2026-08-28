@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFabricantes } from '@/hooks/use-clientes';
 import { useCreateFabricanteCompleto } from '@/hooks/use-novo-pedido';
+import { fabricanteEstaAtivo } from '@/lib/ordem-de-fabricantes';
 import { toast } from 'sonner';
 
 interface FabricanteSelectorProps {
@@ -47,6 +48,8 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
   const { data: fabricantes, isLoading } = useFabricantes();
   const createFabricante = useCreateFabricanteCompleto();
 
+  // A lista chega do hook já com as marcas inativas por último (`useFabricantes`), e este
+  // filtro preserva a ordem — `Array.prototype.filter` não reordena nada.
   const filteredFabricantes = useMemo(() => {
     if (!fabricantes) return [];
     if (!searchTerm) return fabricantes;
@@ -90,7 +93,21 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
             aria-expanded={open}
             className="w-full justify-between font-normal"
           >
-            {selectedFab ? selectedFab.nome : placeholder}
+            {/* O negócio antigo de uma marca desativada continua abrindo com ela
+                escolhida — o selo no botão explica por que aquele nome não aparece mais no
+                topo da lista, sem sugerir que algo está errado com o negócio. */}
+            {selectedFab ? (
+              <span className="flex items-center gap-1.5 truncate">
+                <span className="truncate">{selectedFab.nome}</span>
+                {!fabricanteEstaAtivo(selectedFab) && (
+                  <span className="shrink-0 rounded border border-border px-1 text-[9px] uppercase tracking-wide text-muted-foreground">
+                    Inativa
+                  </span>
+                )}
+              </span>
+            ) : (
+              placeholder
+            )}
             <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -135,7 +152,17 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
                       )}
                     />
                     <div className="flex flex-col">
-                      <span>{fab.nome}</span>
+                      <span className="flex items-center gap-1.5">
+                        {fab.nome}
+                        {/* Marca que a empresa não representa mais. Continua escolhível —
+                            negócio antigo pode precisar ser corrigido para ela —, só está
+                            no fim da lista e avisa o porquê. */}
+                        {!fabricanteEstaAtivo(fab) && (
+                          <span className="rounded border border-border px-1 text-[9px] uppercase tracking-wide text-muted-foreground">
+                            Inativa
+                          </span>
+                        )}
+                      </span>
                       {fab.cnpj && (
                         <span className="text-[10px] text-muted-foreground">{fab.cnpj}</span>
                       )}

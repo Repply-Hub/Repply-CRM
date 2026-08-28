@@ -20,11 +20,21 @@ import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConteudoDialogo } from "@/components/shared/DialogoResponsivo";
 
 import { useFabricantes } from "@/hooks/use-clientes";
-import { useCreateFabricante } from "@/hooks/use-mutations";
+// Criar, editar e excluir fabricante vêm todos do arquivo do domínio (CLAUDE.md §5.3).
+// `use-mutations.ts` teve um `useCreateFabricante` até 28/08/2026; ele foi removido de lá
+// porque não aceitava `ativo` e descartaria o status em silêncio — criar e editar têm de
+// gravar exatamente os mesmos campos.
 import {
+  useCreateFabricante,
   useUpdateFabricante,
   useDeleteFabricante,
 } from "@/hooks/use-fabricantes";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import {
+  compararFabricantes,
+  fabricanteEstaAtivo,
+} from "@/lib/ordem-de-fabricantes";
 
 import { Plus, Loader2, CheckCircle2, Pencil, Trash2, Factory, Phone, User, ArrowLeft, Hash, X } from "lucide-react";
 import { toast } from "sonner";
@@ -62,6 +72,7 @@ function FabricanteForm({
     cnpj?: string | null;
     nome_contato?: string | null;
     telefone?: string | null;
+    ativo?: boolean | null;
   };
 }) {
   const createFabricante = useCreateFabricante();
@@ -73,6 +84,10 @@ function FabricanteForm({
   const [nome, setNome] = useState(editData?.nome ?? "");
   const [contato, setContato] = useState(editData?.nome_contato ?? "");
   const [telefone, setTelefone] = useState(editData?.telefone ?? "");
+  // Fabricante novo nasce Ativa: quem cadastra uma marca é porque acabou de passar a
+  // representá-la. `fabricanteEstaAtivo` cobre o cadastro antigo que ainda não tem o
+  // campo — ausência de informação não vira "inativa".
+  const [ativo, setAtivo] = useState(fabricanteEstaAtivo(editData));
   const sessionRef = useRef(0);
 
   const reset = () => {
@@ -82,6 +97,7 @@ function FabricanteForm({
     setNome("");
     setContato("");
     setTelefone("");
+    setAtivo(true);
   };
 
   useEffect(() => {
@@ -92,6 +108,7 @@ function FabricanteForm({
       setNome(editData?.nome ?? "");
       setContato(editData?.nome_contato ?? "");
       setTelefone(editData?.telefone ?? "");
+      setAtivo(fabricanteEstaAtivo(editData));
     }
   }, [open, editData]);
 
@@ -136,14 +153,22 @@ function FabricanteForm({
           cnpj: cnpj || undefined,
           nome_contato: contato || undefined,
           telefone: telefone || undefined,
+          ativo,
         });
-        toast.success("Fabricante atualizado!");
+        // O aviso diz o que mudou de verdade: desativar não apaga nada, e a pessoa
+        // precisa saber disso na hora, não depois de procurar a marca na lista.
+        toast.success(
+          ativo
+            ? "Fabricante atualizado!"
+            : "Marca desativada. Ela sai do topo das listas, mas continua no sistema com todos os negócios dela.",
+        );
       } else {
         await createFabricante.mutateAsync({
           nome,
           cnpj: cnpj || undefined,
           nome_contato: contato || undefined,
           telefone: telefone || undefined,
+          ativo,
         });
         toast.success("Fabricante cadastrado!");
       }
@@ -231,6 +256,31 @@ function FabricanteForm({
               placeholder="(00) 0000-0000"
             />
           </div>
+          {/* Status Ativa/Inativa. É um interruptor e não uma lista de duas opções porque
+              a pergunta é um fato do mundo — "eu represento esta marca?" —, tem resposta
+              padrão óbvia e só dois estados; uma lista obrigaria a abrir um menu para
+              escolher entre dois itens e ainda sugeriria um terceiro estado que não
+              existe. O rótulo é a pergunta; a palavra Ativa/Inativa aparece ao lado para
+              a tela do formulário usar o MESMO termo do selo da lista. */}
+          <div className="flex items-start justify-between gap-3 rounded-lg border border-border/60 p-3">
+            <div className="min-w-0">
+              <Label htmlFor="fab-ativo" className="cursor-pointer">
+                Represento esta marca
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                {ativo
+                  ? "Ativa — aparece normalmente nas listas de escolha."
+                  : "Inativa — vai para o fim das listas. Os negócios, o histórico e o faturamento dela continuam no sistema."}
+              </p>
+            </div>
+            <Switch
+              id="fab-ativo"
+              checked={ativo}
+              onCheckedChange={setAtivo}
+              aria-label="Represento esta marca"
+              className="mt-0.5 shrink-0"
+            />
+          </div>
           <Button type="submit" className="w-full" disabled={isPending}>
             {isPending ? "Salvando..." : "Salvar"}
           </Button>
@@ -268,9 +318,22 @@ function FabricanteCard({
           <Factory className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm text-foreground truncate">
-            {fab.nome}
-          </p>
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="font-semibold text-sm text-foreground truncate">
+              {fab.nome}
+            </p>
+            {/* Sem este selo a marca desativada só estaria no fim da lista, e ninguém
+                saberia por quê. `outline` e não `destructive`: inativa não é erro nem
+                alerta — é uma marca que a empresa não representa mais. */}
+            {!fabricanteEstaAtivo(fab) && (
+              <Badge
+                variant="outline"
+                className="shrink-0 text-[10px] font-medium px-1.5 py-0 text-muted-foreground border-border"
+              >
+                Inativa
+              </Badge>
+            )}
+          </div>
           <div className="flex items-center gap-2 mt-1">
             {fab.cnpj && (
               <span className="text-xs text-muted-foreground flex items-center gap-1 truncate">
@@ -311,9 +374,19 @@ function FabricanteDetailHeader({
               <Factory className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-foreground font-bold text-base sm:text-lg truncate">
-                {fab.nome}
-              </h2>
+              <div className="flex items-center gap-2 min-w-0">
+                <h2 className="text-foreground font-bold text-base sm:text-lg truncate">
+                  {fab.nome}
+                </h2>
+                {!fabricanteEstaAtivo(fab) && (
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 text-[10px] font-medium px-1.5 py-0 text-muted-foreground border-border"
+                  >
+                    Inativa
+                  </Badge>
+                )}
+              </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 sm:mt-2">
                 {fab.cnpj && (
                   <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
@@ -376,9 +449,13 @@ const Fabricantes = () => {
   const deleteFabricante = useDeleteFabricante();
 
   const selectedFab = fabricantes?.find((f) => f.id === selectedFabId);
+  // Esta reordenação no cliente DESFAZIA a ordem que a consulta já tinha montado — por
+  // isso o critério de status vem junto, como primeiro desempate (ver
+  // src/lib/ordem-de-fabricantes.ts). A busca continua alcançando marca inativa: ela não
+  // some de lugar nenhum, só desce.
   const fabricantesList = [...(fabricantes ?? [])]
     .filter((f) => (f.nome || "").toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+    .sort(compararFabricantes);
 
   const handleSearchChange = (val: string) => {
     setSearch(val);

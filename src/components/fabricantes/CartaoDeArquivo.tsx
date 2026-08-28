@@ -1,4 +1,4 @@
-import { FileText, FileSpreadsheet, FileImage, File as FileIcon, Download, Trash2, Send } from 'lucide-react';
+import { FileText, FileSpreadsheet, FileImage, File as FileIcon, Download, Trash2, Send, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { isPreviewable } from '@/components/chat/FilePreviewDialog';
@@ -25,9 +25,11 @@ interface Props {
   arquivo: ArquivoDaFabrica;
   /** Link temporário da capa. `null` quando não há capa ou a assinatura falhou. */
   capaUrl: string | null;
+  podeEditar: boolean;
   podeExcluir: boolean;
   aoVer: () => void;
   aoBaixar: () => void;
+  aoEditar: () => void;
   aoExcluir: () => void;
   /** Ausente quando a pessoa não tem WhatsApp vinculado: aí o botão nem aparece. */
   aoEnviar?: () => void;
@@ -37,9 +39,11 @@ interface Props {
 export function CartaoDeArquivo({
   arquivo,
   capaUrl,
+  podeEditar,
   podeExcluir,
   aoVer,
   aoBaixar,
+  aoEditar,
   aoExcluir,
   aoEnviar,
   ocupado,
@@ -120,6 +124,22 @@ export function CartaoDeArquivo({
             disabled={ocupado} onClick={aoEnviar}
           >
             <Send className="h-3.5 w-3.5" /> Enviar
+          </Button>
+        )}
+        {/* Editar é ÍCONE, não botão com texto: as duas ações escritas — Baixar e Enviar —
+            são as do dia a dia de quem está com o cliente na frente, e um terceiro rótulo
+            espremeria as três em cartões de 240px. Corrigir o nome ou o mês é coisa de quem
+            acabou de anexar, não de quem está usando o material. */}
+        {podeEditar && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label={`Editar ${arquivo.nome}`}
+            disabled={ocupado}
+            onClick={aoEditar}
+          >
+            <Pencil className="h-3.5 w-3.5" />
           </Button>
         )}
         {/* O botão de excluir some para quem não pode — mas quem protege é a regra do banco:

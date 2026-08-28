@@ -385,6 +385,7 @@ export function useCreateRotaVisita() {
       paradas,
       jaRealizada,
       participantes,
+      titulo,
     }: {
       data: string; // yyyy-MM-dd
       duracaoMinutos?: number;
@@ -392,6 +393,8 @@ export function useCreateRotaVisita() {
       jaRealizada: boolean;
       /** user_ids (auth) que vão participar de TODAS as paradas da rota. Vazio cai para o próprio criador. */
       participantes?: string[];
+      /** Título livre da rota. Vazio = a tela mostra só a data, como antes de 28/08/2026. */
+      titulo?: string | null;
     }) => {
       if (paradas.length === 0) {
         throw new Error('Selecione ao menos uma obra para a rota de visita.');
@@ -403,6 +406,19 @@ export function useCreateRotaVisita() {
       const alvos = new Set<string>(
         participantes && participantes.length > 0 ? participantes : [user!.id],
       );
+
+      // 🔴 UM `rota_id` PARA A ROTA INTEIRA, gerado UMA vez, fora do laço.
+      //
+      // Não confundir com o `grupo_id` logo abaixo, que é por PARADA. São duas agregações
+      // diferentes e sobrepostas: `grupo_id` junta as cópias de uma parada (uma por
+      // participante), `rota_id` junta as paradas de uma rota. Gerar o `rota_id` dentro do
+      // laço daria um por parada e a rota voltaria a não existir.
+      //
+      // É ele que desfaz a fusão de duas rotas do mesmo dia da mesma pessoa — antes de
+      // 28/08/2026 a rota era deduzida por (dia, criador), e a manhã na Zona Norte e a tarde
+      // na Zona Sul viravam uma só, com o traçado costurando a cidade.
+      const rotaId = crypto.randomUUID();
+      const rotaTitulo = titulo?.trim() || null;
 
       const rows = paradas.flatMap((parada) => {
         const inicio = new Date(`${data}T${parada.horario}:00`);
@@ -421,6 +437,10 @@ export function useCreateRotaVisita() {
           cor: CALENDAR_COLORS.empresa,
           lembrete_minutos: null,
           obra_id: parada.obraId,
+          rota_id: rotaId,
+          // Repetido em todas as paradas de propósito: evita uma tabela só para um texto, e a
+          // leitura da tela (que já traz as paradas) não ganha nenhuma junção.
+          rota_titulo: rotaTitulo,
           visita_realizada: jaRealizada,
           visita_observacao: parada.observacao || null,
         }));
@@ -467,14 +487,39 @@ export function useEditarRotaDeVisita() {
       diferenca,
       participantes,
       nomeDaObraPorId,
+      rotaId,
+      titulo,
+      tituloOriginal,
+      gruposDaRota,
     }: {
       diferenca: DiferencaDaRota;
       /** user_ids (auth) das paradas NOVAS. Vazio cai para o próprio criador. */
       participantes?: string[];
       /** Para montar o título das paradas novas ("Visita: <obra>"). */
       nomeDaObraPorId: (obraId: string) => string;
+      /**
+       * A identidade da rota que está sendo editada. Nula quando a rota é anterior a
+       * 28/08/2026 — nesse caso uma identidade é criada agora e gravada em todas as paradas.
+       */
+      rotaId?: string | null;
+      /** O título depois da edição. String vazia apaga o título. */
+      titulo?: string | null;
+      /** O título como estava antes, para saber se ele mudou. */
+      tituloOriginal?: string | null;
+      /** Os `grupo_id` de TODAS as paradas da rota — para carimbar identidade e título. */
+      gruposDaRota?: string[];
     }) => {
-      if (diferenca.semMudanca) return { mudou: false as const };
+      const rotaTitulo = titulo?.trim() || null;
+      const tituloMudou = rotaTitulo !== (tituloOriginal?.trim() || null);
+
+      // 🔴 A ROTA ANTIGA GANHA IDENTIDADE AO SER EDITADA. Antes de 28/08/2026 a rota era
+      // deduzida por (dia, criador) e não tinha `rota_id`. Editar uma dessas é a hora natural
+      // de formalizar o que a tela já mostra como uma rota — e sem isso não haveria onde
+      // pendurar o título.
+      const rotaIdEfetivo = rotaId ?? crypto.randomUUID();
+      const precisaCarimbar = !rotaId || tituloMudou;
+
+      if (diferenca.semMudanca && !tituloMudou) return { mudou: false as const };
 
       const alvos = new Set<string>(
         participantes && participantes.length > 0 ? participantes : [user!.id],
@@ -497,6 +542,8 @@ export function useEditarRotaDeVisita() {
             cor: CALENDAR_COLORS.empresa,
             lembrete_minutos: null,
             obra_id: nova.obraId,
+            rota_id: rotaIdEfetivo,
+            rota_titulo: rotaTitulo,
             // Parada nova nasce não realizada. Marcar como feita é gesto separado, na lista.
             visita_realizada: false,
             visita_observacao: null,
@@ -528,6 +575,24 @@ export function useEditarRotaDeVisita() {
           .from('eventos')
           .delete()
           .in('grupo_id', diferenca.remover);
+        if (error) throw error;
+      }
+
+      // ── 4. CARIMBAR IDENTIDADE E TÍTULO NAS PARADAS QUE FICARAM ──────────
+      //
+      // 🔴 SEPARADO do passo 2 de propósito. Aquele update toca só `inicio`/`fim` e o
+      // comentário dele avisa para não engordá-lo — quem acrescentasse um campo ali apagaria a
+      // observação de campo das visitas já realizadas. Aqui é o contrário: um update que só
+      // mexe em identidade e título, e que precisa alcançar TODAS as paradas da rota, não só
+      // as que mudaram de horário.
+      //
+      // `gruposDaRota` vem da tela porque a `diferenca` só conhece o que mudou.
+      const grupos = (gruposDaRota ?? []).filter(Boolean);
+      if (precisaCarimbar && grupos.length > 0) {
+        const { error } = await supabase
+          .from('eventos')
+          .update({ rota_id: rotaIdEfetivo, rota_titulo: rotaTitulo })
+          .in('grupo_id', grupos);
         if (error) throw error;
       }
 

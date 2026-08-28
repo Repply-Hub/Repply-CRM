@@ -101,6 +101,11 @@ export function useFabricantes() {
       const { data, error } = await supabase
         .from('fabricantes')
         .select('*')
+        // Marca que a empresa não representa mais (`ativo = false`) desce para o fim de
+        // TODA lista de escolha — ela não sai do sistema, só deixa de disputar o topo.
+        // `ascending: false` porque em Postgres `true > false`: as ativas vêm primeiro.
+        // Índice que cobre exatamente esta ordem: idx_fabricantes_ativo_nome.
+        .order('ativo', { ascending: false })
         .order('nome');
       if (error) throw error;
       return data;

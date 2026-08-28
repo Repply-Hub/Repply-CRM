@@ -142,6 +142,14 @@ export function NovaRotaVisitaDialog({
     rotaParaEditar?.paradas[0]?.grupoId ?? null,
   );
 
+  /**
+   * Título livre da rota. Pedido do Lucas em 28/08/2026.
+   *
+   * OPCIONAL de propósito: sem título o cartão continua mostrando só a data, exatamente como
+   * antes. Quem monta uma rota por dia não ganha um campo obrigatório a preencher; quem monta
+   * duas ("Zona Norte" de manhã, "Zona Sul" à tarde) ganha como distingui-las.
+   */
+  const [titulo, setTitulo] = useState('');
   const [data, setData] = useState<Date>(new Date());
   const [paradas, setParadas] = useState<Parada[]>([]);
   const [jaRealizada, setJaRealizada] = useState(false);
@@ -173,6 +181,7 @@ export function NovaRotaVisitaDialog({
       // ligá-lo aqui marcaria como realizada uma rota que talvez não seja, de uma vez só.
       // Marcar visita feita continua sendo gesto individual, na lista.
       setData(rotaParaEditar.data);
+      setTitulo(rotaParaEditar.titulo ?? '');
       setJaRealizada(false);
       setParadas(
         rotaParaEditar.paradas.map((p) => ({
@@ -187,6 +196,7 @@ export function NovaRotaVisitaDialog({
     }
 
     setData(dataInicial ?? new Date());
+    setTitulo('');
     setJaRealizada(false);
     setParticipantes(user?.id ? [user.id] : []);
     setParadas(
@@ -270,7 +280,13 @@ export function NovaRotaVisitaDialog({
       DURACAO_PADRAO_MINUTOS,
     );
 
-    if (diferenca.semMudanca) {
+    // 🔴 O TÍTULO ENTRA NA CONTA DE "MUDOU". `calcularDiferencaDaRota` só compara obra e
+    // horário — ela não conhece o título, e nem deve. Sem esta linha, quem abrisse a rota só
+    // para dar um nome a ela veria "Nada mudou nesta rota", o diálogo fecharia, e o título
+    // seria descartado sem aviso nenhum.
+    const tituloMudou = titulo.trim() !== (rotaParaEditar?.titulo ?? '').trim();
+
+    if (diferenca.semMudanca && !tituloMudou) {
       // Nada mudou: fechar em silêncio seria pior que dizer, porque a pessoa ficaria sem saber
       // se salvou ou se a tela ignorou o clique.
       toast.info('Nada mudou nesta rota.');
@@ -284,6 +300,15 @@ export function NovaRotaVisitaDialog({
         participantes,
         nomeDaObraPorId: (obraId) =>
           paradas.find((p) => p.obraId === obraId)?.nomeObra ?? 'Obra sem nome',
+        rotaId: rotaParaEditar?.rotaId ?? null,
+        titulo,
+        tituloOriginal: rotaParaEditar?.titulo ?? null,
+        // 🔴 Os grupos vêm da ROTA GRAVADA, não das paradas do formulário. O título tem de
+        // alcançar todas as paradas que ficaram, inclusive as que a pessoa não tocou — e
+        // `diferenca` só conhece o que mudou.
+        gruposDaRota: (rotaParaEditar?.paradas ?? [])
+          .map((p) => p.grupoId)
+          .filter((g): g is string => !!g),
       },
       {
         onSuccess: (r) => {
@@ -317,6 +342,7 @@ export function NovaRotaVisitaDialog({
         duracaoMinutos: DURACAO_PADRAO_MINUTOS,
         jaRealizada,
         participantes,
+        titulo,
         paradas: paradas.map((p) => ({
           obraId: p.obraId,
           nomeObra: p.nomeObra,
@@ -397,6 +423,31 @@ export function NovaRotaVisitaDialog({
         </CabecalhoDialogo>
 
         <CorpoDialogo className="space-y-4">
+          {/* O título vem ANTES da data porque é o que a pessoa tem na cabeça ao começar
+              ("a rota da Zona Norte"), e porque deixá-lo depois das obras faria com que só
+              quem rolasse até o fim descobrisse que ele existe. */}
+          <div className="space-y-1.5">
+            <Label htmlFor="titulo-da-rota">
+              Título <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+            </Label>
+            <Input
+              id="titulo-da-rota"
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Zona Norte, Obras da Construtora Alfa..."
+              maxLength={80}
+              // Este campo vive dentro do formulário do diálogo; Enter aqui salvaria a rota
+              // no meio da digitação do nome.
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.preventDefault();
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Sem título, o cartão mostra só a data. Com título, fica “{titulo.trim() || 'Título'}
+              , {format(data, 'dd/MM/yyyy')}”.
+            </p>
+          </div>
+
           <div className="space-y-1.5">
             <Label>Data</Label>
             <Popover open={dataPopoverOpen} onOpenChange={setDataPopoverOpen}>

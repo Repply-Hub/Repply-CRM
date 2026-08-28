@@ -19,6 +19,7 @@ import {
 } from '@/hooks/use-fabricante-arquivos';
 import { CartaoDeArquivo } from './CartaoDeArquivo';
 import { AnexarArquivoDialog } from './AnexarArquivoDialog';
+import { EditarArquivoDialog } from './EditarArquivoDialog';
 import { EnviarCatalogoDialog } from './EnviarCatalogoDialog';
 import { useQuery } from '@tanstack/react-query';
 
@@ -47,7 +48,20 @@ export function DriveDaFabrica({ fabricanteId }: Props) {
   const { permitido: temPermissaoExcluir } = useMinhaPermissao('fabricantes', 'excluir');
   const podeExcluir = !!isGestor || temPermissaoExcluir;
 
+  // ⚠️ EDITAR usa a permissão de EDITAR, e aqui a tela é mais rígida que o banco: a política
+  // `fabricante_arquivos_update` está aberta para qualquer pessoa da empresa, no mesmo espírito
+  // do anexar ("um sobe, todos usam"). Ou seja, esconder este botão NÃO impede ninguém — quem
+  // souber chamar o banco direto continua conseguindo.
+  //
+  // Escolhi assim mesmo assim porque o estrago de um metadado errado é coletivo: o mês manda na
+  // ordem da prateleira, e renomear o catálogo da fábrica muda o que os treze da equipe veem.
+  // Enquanto isso for só uma trava de tela, é conveniência, não segurança (CLAUDE.md §6.1) —
+  // virar regra de verdade exige mudar a política no banco, e isso é decisão do Lucas.
+  const { permitido: temPermissaoEditar } = useMinhaPermissao('fabricantes', 'editar');
+  const podeEditar = !!isGestor || temPermissaoEditar;
+
   const [anexarAberto, setAnexarAberto] = useState(false);
+  const [aEditar, setAEditar] = useState<ArquivoDaFabrica | null>(null);
   const [previa, setPrevia] = useState<FilePreviewTarget | null>(null);
   const [aExcluir, setAExcluir] = useState<ArquivoDaFabrica | null>(null);
   const [capas, setCapas] = useState<Record<string, string>>({});
@@ -163,10 +177,12 @@ export function DriveDaFabrica({ fabricanteId }: Props) {
                 key={a.id}
                 arquivo={a}
                 capaUrl={capas[a.id] ?? null}
+                podeEditar={podeEditar}
                 podeExcluir={podeExcluir}
                 ocupado={excluir.isPending}
                 aoVer={() => void abrirPrevia(a)}
                 aoBaixar={() => void baixar(a)}
+                aoEditar={() => setAEditar(a)}
                 aoExcluir={() => setAExcluir(a)}
                 aoEnviar={temWhatsapp ? () => setAEnviar(a) : undefined}
               />
@@ -178,6 +194,15 @@ export function DriveDaFabrica({ fabricanteId }: Props) {
       <AnexarArquivoDialog
         open={anexarAberto}
         onOpenChange={setAnexarAberto}
+        fabricanteId={fabricanteId}
+      />
+
+      {/* Fica montado o tempo todo, como os outros diálogos daqui: quem manda é o `open`.
+          O formulário se reconstrói a partir do arquivo escolhido — ver o efeito lá dentro. */}
+      <EditarArquivoDialog
+        open={!!aEditar}
+        onOpenChange={(o) => !o && setAEditar(null)}
+        arquivo={aEditar}
         fabricanteId={fabricanteId}
       />
 

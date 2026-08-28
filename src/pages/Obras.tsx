@@ -417,6 +417,10 @@ export default function Obras() {
   // aqui, olhava quatro campos e comparava texto cru — então o CNPJ ficava de fora, e quem
   // digitasse "Sao Jose" não achava "São José". Pedido do Lucas: cobrir endereço, CNPJ e o
   // resto.
+  // Em 28/08/2026 ela ganhou duas coisas, pelo mesmo pedido: o CEP (que no banco aparece com
+  // e sem hífen dentro do próprio endereço) e a busca por VÁRIAS PALAVRAS, em que cada palavra
+  // pode casar num campo diferente — é o que faz "solar natal" achar a obra Solar que fica em
+  // Natal. São todas as palavras, não qualquer uma: quem digita mais está refinando.
   const filtradasPorBusca = useMemo(
     // Sem molde: a função é genérica (`<T extends ObraParaBusca>`) e devolve o MESMO tipo que
     // recebeu. Amoldar para `ObraParaBusca[]` faria a lista voltar sem `id` nem `marcador_id`,
@@ -612,7 +616,7 @@ export default function Obras() {
               </TabsList>
 
               <SearchWithRecent
-                placeholder="Buscar obras..."
+                placeholder="Buscar por nome, endereço, CNPJ, cliente..."
                 value={search}
                 onValueChange={setSearch}
                 storageKey="obras_recent_searches"
