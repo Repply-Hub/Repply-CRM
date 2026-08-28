@@ -35,7 +35,7 @@ export function HeroSection() {
 
           <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-[17px]">
             O pedido que chegou por mensagem vira negócio no funil, com dono, prazo e histórico. Cliente,
-            obra, fabricante e tabela de preço no mesmo lugar — e o gestor enxergando tudo sem precisar
+            obra e fabricante no mesmo lugar — e o gestor enxergando tudo sem precisar
             pedir relatório.
           </p>
 

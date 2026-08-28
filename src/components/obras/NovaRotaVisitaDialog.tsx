@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { diferencaDaRota } from '@/lib/rota-em-edicao';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import type { RotaDoDia } from '@/lib/rota-do-dia';
+import { ordenarPorHorario, moverParadaMantendoHorarios } from '@/lib/ordem-das-paradas';
 import {
   Dialog, DialogTitle, DialogDescription,
   ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo,
@@ -183,14 +184,18 @@ export function NovaRotaVisitaDialog({
       setData(rotaParaEditar.data);
       setTitulo(rotaParaEditar.titulo ?? '');
       setJaRealizada(false);
+      // Ordena ao ABRIR: rota criada antes desta correção pode estar gravada torta (11h, 09h,
+      // 14h). Aqui ela já aparece arrumada, e salvar conserta de vez.
       setParadas(
-        rotaParaEditar.paradas.map((p) => ({
-          grupoId: p.grupoId,
-          obraId: p.obraId,
-          nomeObra: p.obraNome || 'Obra sem nome',
-          observacao: '',
-          horario: format(p.inicio, 'HH:mm'),
-        })),
+        ordenarPorHorario(
+          rotaParaEditar.paradas.map((p) => ({
+            grupoId: p.grupoId,
+            obraId: p.obraId,
+            nomeObra: p.obraNome || 'Obra sem nome',
+            observacao: '',
+            horario: format(p.inicio, 'HH:mm'),
+          })),
+        ),
       );
       return;
     }
@@ -227,7 +232,9 @@ export function NovaRotaVisitaDialog({
 
   const adicionarParada = (obra: ObraOpcao) => {
     setParadas((prev) => {
-      const ultima = prev[prev.length - 1];
+      // A parada nova entra DEPOIS da mais tarde do dia — que é a última da lista ordenada, e
+      // não necessariamente a última do array (a pessoa pode estar no meio de uma digitação).
+      const ultima = ordenarPorHorario(prev)[prev.length - 1];
       const horario = ultima ? somarMinutos(ultima.horario, DURACAO_PADRAO_MINUTOS) : '09:00';
       return [...prev, { obraId: obra.id, nomeObra: obra.nome_obra || 'Obra sem nome', observacao: '', horario }];
     });
@@ -238,14 +245,19 @@ export function NovaRotaVisitaDialog({
     setParadas((prev) => prev.filter((p) => p.obraId !== obraId));
   };
 
+  /**
+   * Arrastar muda QUEM ocupa cada faixa de horário, e não leva o horário junto.
+   *
+   * 🔴 Antes, arrastar mexia só na posição da linha: puxar a parada das 11h para o topo
+   * deixava a lista `11h, 09h, 14h` — um roteiro que ninguém dirige. E a rota GRAVADA é
+   * remontada por horário, então o que a pessoa via ao montar não era o que ela via depois
+   * de salvar. O porquê da escolha está em `ordem-das-paradas.ts`.
+   */
   const reordenarParadas = (result: DropResult) => {
     if (!result.destination) return;
-    setParadas((prev) => {
-      const copia = Array.from(prev);
-      const [movida] = copia.splice(result.source.index, 1);
-      copia.splice(result.destination!.index, 0, movida);
-      return copia;
-    });
+    setParadas((prev) =>
+      moverParadaMantendoHorarios(prev, result.source.index, result.destination!.index),
+    );
   };
 
   const atualizarObservacao = (obraId: string, observacao: string) => {
@@ -255,6 +267,32 @@ export function NovaRotaVisitaDialog({
   const atualizarHorario = (obraId: string, horario: string) => {
     setParadas((prev) => prev.map((p) => (p.obraId === obraId ? { ...p, horario } : p)));
   };
+
+  /**
+   * Recoloca a parada no lugar dela depois que a pessoa TERMINA de digitar o horário.
+   *
+   * 🔴 REORDENAR A CADA TECLA SERIA HOSTIL, e é por isso que isto está no `onBlur` e não no
+   * `onChange`. O campo é `type="time"`: quem troca 11:00 por 07:30 digita a HORA primeiro, e
+   * o navegador já dispara a mudança com `07:00` — a linha saltaria para o topo antes da
+   * pessoa chegar nos minutos, com o cursor indo junto. Ela terminaria de digitar noutro
+   * lugar da lista, ou noutra parada.
+   *
+   * Assim a lista fica fora de ordem só enquanto o campo está sendo mexido, e se acerta no
+   * instante em que ele é largado.
+   */
+  const reordenarPorHorario = () => setParadas((prev) => ordenarPorHorario(prev));
+
+  /**
+   * A lista como ela vai ser GRAVADA — cronológica, sempre.
+   *
+   * 🔴 Não é o mesmo que `paradas`. Entre digitar o horário e largar o campo existe uma
+   * fresta em que a lista está fora de ordem de propósito (ver `reordenarPorHorario`), e
+   * clicar em "Salvar" durante essa fresta é perfeitamente possível — o Safari, por exemplo,
+   * não põe o foco em botão ao clicar, então o `onBlur` pode nem chegar a acontecer.
+   *
+   * Isto é o que garante a promessa em qualquer caminho: a rota grava na ordem do relógio.
+   */
+  const paradasEmOrdem = useMemo(() => ordenarPorHorario(paradas), [paradas]);
 
   const janelaDaParada = (parada: Parada) => {
     const inicio = new Date(`${format(data, 'yyyy-MM-dd')}T${parada.horario}:00`);
@@ -275,7 +313,7 @@ export function NovaRotaVisitaDialog({
           visitaRealizada: !!p.visitaRealizada,
           visitaObservacao: null,
         })),
-      paradas.map((p) => ({ grupoId: p.grupoId, obraId: p.obraId, horario: p.horario })),
+      paradasEmOrdem.map((p) => ({ grupoId: p.grupoId, obraId: p.obraId, horario: p.horario })),
       format(data, 'yyyy-MM-dd'),
       DURACAO_PADRAO_MINUTOS,
     );
@@ -343,7 +381,7 @@ export function NovaRotaVisitaDialog({
         jaRealizada,
         participantes,
         titulo,
-        paradas: paradas.map((p) => ({
+        paradas: paradasEmOrdem.map((p) => ({
           obraId: p.obraId,
           nomeObra: p.nomeObra,
           horario: p.horario,
@@ -375,7 +413,7 @@ export function NovaRotaVisitaDialog({
       try {
         const encontrados = await buscarConflitosDeVisita({
           participantes,
-          janelas: paradas.map(janelaDaParada),
+          janelas: paradasEmOrdem.map(janelaDaParada),
         });
         if (encontrados.length > 0) {
           setConflitos(encontrados);
@@ -642,6 +680,7 @@ export function NovaRotaVisitaDialog({
                                   type="time"
                                   value={parada.horario}
                                   onChange={(e) => atualizarHorario(parada.obraId, e.target.value)}
+                                  onBlur={reordenarPorHorario}
                                   className="h-8 w-[92px] shrink-0 px-1.5 font-mono text-xs sm:w-[110px] sm:px-3"
                                 />
                                 <button

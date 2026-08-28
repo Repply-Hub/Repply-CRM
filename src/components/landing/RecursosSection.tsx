@@ -40,7 +40,7 @@ const DESTAQUES = [
 const RECURSOS = [
   { icone: Kanban, titulo: 'Funil configurável', texto: 'Etapas e funis do jeito da sua operação, com arrastar e soltar.' },
   { icone: Users, titulo: 'Clientes e contatos', texto: 'Carteira com histórico de cada visita, ligação e proposta.' },
-  { icone: Factory, titulo: 'Fabricantes e tabelas', texto: 'Catálogo com tabela de preço por fabricante, sempre à mão.' },
+  { icone: Factory, titulo: 'Fabricantes', texto: 'Catálogos, folders e materiais de cada representada, sempre à mão.' },
   { icone: Mail, titulo: 'E-mail integrado', texto: 'Gmail conectado: envie a proposta sem sair do negócio.' },
   { icone: LayoutDashboard, titulo: 'Dashboard', texto: 'Faturamento, conversão e o que ainda dá para fechar no mês.' },
   { icone: ClipboardList, titulo: 'Tarefas com prazo', texto: 'Follow-up com dono e data. O retorno não fica na memória.' },
@@ -61,7 +61,7 @@ export function RecursosSection() {
             Feito para quem vende <span className="text-primary">para obra</span>.
           </>
         }
-        apoio="Não é um CRM genérico com os nomes trocados. Aqui já existe obra, fabricante, tabela de preço e pedido — o vocabulário que seu time usa todo dia, sem precisar adaptar nada."
+        apoio="Não é um CRM genérico com os nomes trocados. Aqui já existe obra, fabricante e pedido — o vocabulário que seu time usa todo dia, sem precisar adaptar nada."
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
