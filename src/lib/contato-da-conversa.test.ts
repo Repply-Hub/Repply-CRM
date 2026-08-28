@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { sugestaoDeContato, telefoneParaCadastro, nomeParaCadastro } from './contato-da-conversa';
+import {
+  sugestaoDeContato,
+  telefoneParaCadastro,
+  nomeParaCadastro,
+  chaveDeTelefone,
+  contatosComMesmoTelefone,
+} from './contato-da-conversa';
 
 describe('telefoneParaCadastro', () => {
   it('celular com código do país vira o formato que a gente escreve', () => {
@@ -131,5 +137,87 @@ describe('sugestaoDeContato', () => {
   it('conversa nula não quebra', () => {
     expect(sugestaoDeContato(null).impedimento).toBeTruthy();
     expect(sugestaoDeContato(undefined).impedimento).toBeTruthy();
+  });
+});
+
+
+describe('chaveDeTelefone', () => {
+  it('o mesmo número em três formatos dá a MESMA chave — é o ponto do arquivo', () => {
+    const doWhatsApp = chaveDeTelefone('5584999887766');
+    expect(chaveDeTelefone('(84) 99988-7766')).toBe(doWhatsApp);
+    expect(chaveDeTelefone('84 99988-7766')).toBe(doWhatsApp);
+    expect(chaveDeTelefone('+55 84 99988-7766')).toBe(doWhatsApp);
+  });
+
+  it('🔴 o nono dígito não separa a mesma pessoa: cadastro antigo casa com o número novo', () => {
+    // A ficha foi criada antes do nono dígito; o WhatsApp reporta com ele.
+    expect(chaveDeTelefone('84 9988-7766')).toBe(chaveDeTelefone('5584999887766'));
+  });
+
+  it('🔴 DDD diferente com o mesmo final NÃO casa — foi por isso que o DDD entrou na chave', () => {
+    expect(chaveDeTelefone('5584999887766')).not.toBe(chaveDeTelefone('5511999887766'));
+  });
+
+  it('🔴 fixo com WhatsApp continua funcionando, e não ganha nono dígito', () => {
+    expect(chaveDeTelefone('8420300387')).toBe('8420300387');
+    expect(chaveDeTelefone('(84) 2030-0387')).toBe('8420300387');
+  });
+
+  it('🔴 DDD 55 (Rio Grande do Sul) não perde os dois primeiros dígitos', () => {
+    // 5599887766 tem 10 dígitos: é DDD 55 + número, não código de país.
+    expect(chaveDeTelefone('5599887766')).toBe('5599887766');
+  });
+
+  it('estrangeiro não entra na comparação', () => {
+    expect(chaveDeTelefone('+1 415 555 0123')).toBeNull();
+    expect(chaveDeTelefone('+351 912 345 678')).toBeNull();
+  });
+
+  it('🔴 identificador de grupo nunca vira chave', () => {
+    expect(chaveDeTelefone('120363123456789@g.us')).toBeNull();
+    expect(chaveDeTelefone('5584999887766-1614508733')).toBeNull();
+  });
+
+  it('vazio, curto ou sem dígito devolve nulo', () => {
+    expect(chaveDeTelefone('')).toBeNull();
+    expect(chaveDeTelefone(null)).toBeNull();
+    expect(chaveDeTelefone(undefined)).toBeNull();
+    expect(chaveDeTelefone('99887766')).toBeNull();
+    expect(chaveDeTelefone('sem número')).toBeNull();
+  });
+});
+
+describe('contatosComMesmoTelefone', () => {
+  const contatos = [
+    { id: 'a', nome_contato: 'Lucas Dutra - Macam Empreendimentos', telefone: '(84) 99988-7766' },
+    { id: 'b', nome_contato: 'Outra pessoa', telefone: '(11) 99988-7766' },
+    { id: 'c', nome_contato: 'Sem telefone', telefone: null },
+  ];
+
+  it('acha quem já está cadastrado, mesmo com o número em outro formato', () => {
+    const achados = contatosComMesmoTelefone('5584999887766', contatos);
+    expect(achados.map((c) => c.id)).toEqual(['a']);
+  });
+
+  it('🔴 devolve TODOS os casamentos: 44 telefones desta base estão repetidos entre contatos', () => {
+    const repetidos = [
+      { id: 'a', nome_contato: 'João da obra', telefone: '(84) 99988-7766' },
+      { id: 'b', nome_contato: 'Recepção da construtora', telefone: '84999887766' },
+    ];
+    expect(contatosComMesmoTelefone('5584999887766', repetidos)).toHaveLength(2);
+  });
+
+  it('🔴 não casa por engano quando só o final bate', () => {
+    expect(contatosComMesmoTelefone('5511999887766', contatos).map((c) => c.id)).toEqual(['b']);
+  });
+
+  it('grupo não casa com ninguém', () => {
+    expect(contatosComMesmoTelefone('120363123456789@g.us', contatos)).toEqual([]);
+  });
+
+  it('lista vazia, nula ou telefone ausente não quebram', () => {
+    expect(contatosComMesmoTelefone('5584999887766', [])).toEqual([]);
+    expect(contatosComMesmoTelefone('5584999887766', null)).toEqual([]);
+    expect(contatosComMesmoTelefone(null, contatos)).toEqual([]);
   });
 });

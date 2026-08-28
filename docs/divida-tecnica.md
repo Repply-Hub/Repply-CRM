@@ -17,12 +17,12 @@ acrescentados em 21/08/2026.
 |---|---|---|---|
 | 1 | [Chave do WhatsApp legível](#1-a-chave-do-whatsapp-está-legível) | **Crítica** | ⏳ Exposição fechada em 20/08. Restam 3 fases — [plano](operacao/plano-blindagem-whatsapp.md) |
 | 2 | [Titularidade dos serviços](#2-titularidade-dos-serviços) | **Crítica** | Sim — impede aplicar mudança de banco |
-| 3 | [Importação: formatação de datas](#3-importação--formatação-de-datas) | ✅ Resolvida | Código corrigido em `446779ff` |
+| 3 | [Importação: formatação de datas](#3-importação--formatação-de-datas) | **Alta** | ⚠️ o conserto não alcança a tela de Negócios — ver item 40 |
 | 4 | [Agendamentos nunca funcionaram](#4-os-agendamentos-nunca-funcionaram) | Alta | Não |
 | 5 | [Cobertura de teste quase zero](#5-cobertura-de-teste-quase-zero) | Alta | Não |
 | 6 | [Função `import-data` órfã](#6-função-import-data-órfã) | Média | Não |
 | 7 | [Arquivos grandes demais](#7-arquivos-grandes-demais) | Média | Não |
-| 8 | [Controle de seção é só cosmético](#8-controle-de-seção-é-só-cosmético) | Média | Sim — impede vender sem entregar o Portal |
+| 8 | [Controle de seção é só cosmético](#8-controle-de-seção-é-só-cosmético) | ✅ Resolvido | Já existe em produção — item desatualizado, corrigido em 28/08 |
 | 9 | [Legado do Gmail](#9-legado-do-gmail) | Baixa | Não |
 | 10 | [Resend preparado e nunca concluído](#10-resend-preparado-e-nunca-concluído) | Baixa | Não |
 | 11 | [Apelidos de `vendedor`](#11-apelidos-de-vendedor) | Baixa | Não |
@@ -50,6 +50,28 @@ acrescentados em 21/08/2026.
 | 33 | [O WhatsApp não tem contagem de envio nenhuma](#33-o-whatsapp-não-tem-contagem-de-envio-nenhuma) | **Alta** | Não hoje — mas um número da MD é compartilhado por 13 pessoas, sem trava |
 | 34 | [A etapa da configuração não é verificada contra a tela](#34-a-etapa-gravada-na-configuração-não-é-verificada-contra-a-tela) | Média | Já travou o Novo Negócio 3 vezes — campo obrigatório sem onde preencher |
 | 35 | [Logo de e-mail é um arquivo único para todas as empresas](#35-logo-de-e-mail-é-um-arquivo-único-para-todas-as-empresas) | Média | Não hoje (só 1 empresa paga usa) — mas quebra a próxima |
+| 36 | [As 8 visões `v_md_*` entregam a carteira de clientes sem login](#36-as-8-visões-v_md_-entregam-a-carteira-de-clientes-sem-login) | **Crítica** | Sim — 1.305 clientes legíveis sem login |
+| 37 | [A pré-visualização de anexo executa o HTML do arquivo](#37-a-pré-visualização-de-anexo-executa-o-html-do-arquivo-recebido) | **Crítica** | Sim — arquivo de estranho roda na sessão de quem abre |
+| 38 | [Excluir usuário não tira o acesso](#38-excluir-usuário-não-tira-o-acesso) | **Crítica** | Latente — 0 excluídos hoje, mas não há como revogar |
+| 39 | [Excluir etapa do Kanban move negócios mesmo quando o banco recusa](#39-excluir-etapa-do-kanban-move-os-negócios-mesmo-quando-o-banco-recusa) | **Crítica** | Sim — pode carimbar centenas como fechados hoje |
+| 40 | [O conserto de datas não alcança a tela de Negócios](#40--o-conserto-de-datas-da-importação-não-alcança-a-tela-de-negócios) | **Crítica** | **Sim — reabre a prioridade zero** |
+| 41 | [Duas funções do banco atravessam a fronteira entre empresas](#41-duas-funções-do-banco-atravessam-a-fronteira-entre-empresas) | Alta | Não |
+| 42 | [Funções de servidor abertas sem motivo, e duas sem conferir quem chamou](#42-seis-funções-de-servidor-abertas-sem-motivo-escrito-e-duas-sem-conferir-quem-chamou) | Alta | Não |
+| 43 | [Os 22.276 arquivos do Storage podem ser LISTADOS sem login](#43-os-22276-arquivos-do-storage-podem-ser-listados-sem-login) | Alta | Complementa o plano dos baldes |
+| 44 | [A matriz de permissões só é conferida em 2 dos 15 módulos](#44-a-matriz-de-permissões-só-é-conferida-pelo-banco-em-2-dos-15-módulos) | Alta | Não — mas a tela promete o que não entrega |
+| 45 | [Não existe conferência automática, e o `git push` publica](#45-não-existe-conferência-automática--e-agora-o-git-push-publica) | Alta | Não — protege todo o resto |
+| 46 | [`types.ts` com 21 objetos fora de sincronia, e dá para regerar](#46-typests-tem-21-objetos-fora-de-sincronia-e-pode-ser-regerado) | Alta | Não |
+| 47 | ["Salvo" quando o banco recusou — o mesmo defeito em 4 telas](#47-salvo-quando-o-banco-recusou--o-mesmo-defeito-em-quatro-telas) | Alta | Não |
+| 48 | [O Radar de Risco conta edição de campo como movimento](#48-o-radar-de-risco-conta-edição-de-campo-como-movimento) | Alta | Não — R$ 5,0 mi no lugar de R$ 14,4 mi |
+| 49 | [O filtro "Etapa" não filtra, em dois lugares](#49-o-filtro-etapa-não-filtra-em-dois-lugares) | Alta | Não — mas a Ação em massa não tem desfazer |
+| 50 | [A soma em reais do Kanban usa só os cartões carregados](#50-a-soma-em-reais-do-kanban-usa-só-os-cartões-carregados) | Alta | Não |
+| 51 | [O Calendário mostra menos de 10% dos prazos, e um dia antes](#51-o-calendário-mostra-menos-de-10-dos-prazos-e-desenha-um-dia-antes) | Alta | Não |
+| 52 | [Importar contatos cria construtoras duplicadas](#52-importar-contatos-cria-construtoras-duplicadas) | Alta | Suja a base a cada importação |
+| 53 | [Ler clientes é ~130× mais caro por linha que ler negócios](#53-ler-a-lista-de-clientes-é-130-mais-caro-por-linha-do-que-ler-negócios) | Média | Não hoje — piora sozinho |
+| 54 | [`app_erros` mistura desenvolvimento e produção](#54-app_erros-mistura-desenvolvimento-e-produção-e-ninguém-olha) | Média | Não |
+| 55 | [Coisas que deveriam ser por empresa e são globais](#55-coisas-que-deveriam-ser-por-empresa-e-são-compartilhadas-por-todas) | Média | Não |
+| 56 | [Onze pontos da documentação afirmam o que não é verdade](#56-onze-pontos-da-documentação-afirmam-coisa-que-não-é-verdade-hoje) | Média | Não |
+| 57 | [Os módulos que justificam o produto estão vazios](#57-os-módulos-que-justificam-o-produto-estão-vazios) | Produto | Decisão de produto pendente |
 
 ---
 
@@ -190,8 +212,16 @@ comprometida.**
 
 ## 3. Importação — formatação de datas
 
-**Gravidade: alta. ✅ O CÓDIGO FOI CORRIGIDO em 19/08/2026 (`446779ff`).**
-**Os dados já gravados, não — ver [item 19](#19-11903-negócios-com-data-trocada-em-produção).**
+**Gravidade: alta. ⚠️ O CONSERTO EXISTE E NÃO ESTÁ NO CAMINHO QUE A MD VAI USAR.**
+
+> 🔴 **Corrigido em 28/08/2026:** este item dizia "✅ o código foi corrigido em `446779ff`".
+> O conserto é real e está certo — mas mora em `src/lib/import/file-parser.ts`, e **a tela de
+> Negócios não chama esse arquivo**. Quatro das cinco telas de importação seguem no leitor
+> antigo. Ver **[item 40](#40--o-conserto-de-datas-da-importação-não-alcança-a-tela-de-negócios)**,
+> que é onde este assunto continua.
+>
+> Os dados já gravados também não foram reparados — ver
+> [item 19](#19-11903-negócios-com-data-trocada-em-produção).
 
 A migração da base da MD Representações do Bitrix24 para o Repply estava travada por um
 problema de formatação de datas na importação de planilha. **A causa era outra do que se
@@ -366,7 +396,19 @@ ou hook próprio. Diminui de forma incremental, sem parar a operação.
 
 ## 8. Controle de seção é só cosmético
 
-**Gravidade: média. Bloqueia venda.**
+**Gravidade: ✅ RESOLVIDO — registro histórico.**
+
+> 🔴 **Corrigido em 28/08/2026:** este item está DESATUALIZADO e o texto abaixo descreve o
+> estado de agosto. O controle de seções por empresa **existe e está em produção**:
+> `src/lib/secoes.ts`, `src/hooks/use-secoes.ts`, `src/pages/AdminSecoes.tsx`, as funções
+> `empresa_tem_secao` / `minhas_secoes` / `admin_definir_excecao_secao` e o guarda de rota em
+> `src/App.tsx`. As quatro tabelas de licença exigem `empresa_tem_secao('portal')`.
+>
+> Enquanto isto dizia o contrário, a Repply podia estar deixando de vender por acreditar que
+> entregaria o Portal junto. O `SPEC.md` §7.4 ainda repete o texto antigo — ver
+> [item 56](#56-onze-pontos-da-documentação-afirmam-coisa-que-não-é-verdade-hoje).
+
+O texto original, mantido para quem procurar pelo sintoma:
 
 `sidebar_empresa_padrao` define o **layout do menu** de cada empresa. Isso esconde o item
 da barra lateral — **e nada mais**. A rota continua acessível e os dados continuam
@@ -1409,6 +1451,562 @@ lugar que a usa (achado por enquanto em `assinatura-email.ts`, `Configuracoes.ts
 
 **Como conferir:** `supabase.storage.from('email-assets').list()` mostra um único
 `logo-email.png` na raiz do bucket, sem pasta por empresa.
+
+---
+
+## 36. As 8 visões `v_md_*` entregam a carteira de clientes sem login
+
+**Gravidade: crítica. Medido em 27/08/2026, reproduzido assumindo o papel anônimo.**
+
+Existem 8 visões no banco — `v_md_base`, `v_md_final`, `v_md_resultado`, `v_md_fatos`,
+`v_md_arestas`, `v_md_dominio`, `v_md_grupo`, `v_md_socio` — que **não aparecem em nenhuma das
+290 migrations** e que **nenhuma linha do código usa**. Nasceram à mão no painel do Supabase,
+pelo jeito durante o trabalho de relacionar obras e grupos empresariais.
+
+São `SECURITY DEFINER`, o que faz a segurança por linha deixar de valer, e o papel `anon` tem
+leitura nas oito:
+
+```sql
+set role anon;
+select count(*) from clientes;      -->     0   -- a política funciona
+select count(*) from v_md_final;    --> 1.305   -- a visão passa por cima
+```
+
+1.305 dos 1.306 clientes, com razão social, CNPJ, e-mail, telefone, cidade, contagem de
+negócios e o mapa de grupos empresariais que a MD montou. E-mail e telefone são dado pessoal —
+isto é assunto de LGPD, não só de arquitetura.
+
+**É o `webhook_debug` de novo** (item 1): objeto nascido fora de migration, sem revisão.
+
+### Conserto
+
+`revoke select on public.v_md_* from anon, authenticated;` — um comando, reversível, e **nada
+deixa de funcionar** porque nenhum arquivo do sistema as usa. Depois se decide, com calma, se
+viram migration de verdade ou se vão para o esquema `backup`, onde o resto do material de
+investigação já está corretamente guardado.
+
+---
+
+## 37. A pré-visualização de anexo executa o HTML do arquivo recebido
+
+**Gravidade: crítica.**
+
+`src/components/chat/FilePreviewDialog.tsx:57` e `:88` convertem `.xlsx`, `.xls`, `.csv` e
+`.docx` em página e injetam o resultado com `dangerouslySetInnerHTML` **sem limpar**. Célula
+com formatação mista carrega HTML próprio (o campo `h` do SheetJS), e o `mammoth` não sanitiza
+por contrato.
+
+**Quem dispara: qualquer pessoa com o número de WhatsApp da empresa.** O diálogo é usado na
+caixa (`WhatsAppInbox.tsx`), não só no chat interno. Não precisa de conta nem de link suspeito —
+precisa que alguém clique em "pré-visualizar", que é o gesto do dia.
+
+O código roda com a sessão da pessoa, e o token do Supabase vive no `localStorage`.
+
+### Conserto
+
+Duas linhas. `dompurify` já é dependência e já é usado certo em `LeitorEmail.tsx` e
+`assinatura-email.ts` — falta aqui.
+
+---
+
+## 38. Excluir usuário não tira o acesso
+
+**Gravidade: crítica. Latente: hoje há 0 usuários excluídos.**
+
+`UsuariosTab.tsx:620` só carimba `deleted_at` na linha de `usuarios`. O login em `auth.users`
+continua existindo e **não há nenhuma chamada de revogação em todo o repositório**.
+
+Pior: as quatro funções que respondem "quem é você" **não conferem a exclusão** — conferido no
+banco de produção:
+
+| função | confere `deleted_at`? |
+|---|---|
+| `get_my_usuario_id()` | não |
+| `get_my_empresa_id()` | não |
+| `is_gestor()` | não |
+| `usuario_in_my_empresa()` | não |
+
+Ou seja: o `ProtectedRoute` barra a TELA, e a política do banco continua liberando. Quem foi
+removido, com a sessão salva ou entrando de novo com a mesma senha, continua lendo e gravando
+o que o cargo dele permitia — pelo endereço direto, sem passar pela tela.
+
+**Não existe, hoje, caminho no produto para tirar o acesso de um ex-funcionário.**
+
+### Conserto, e a armadilha dele
+
+Acrescentar a checagem de exclusão **somente** às funções que respondem "quem sou eu"
+(`get_my_usuario_id`, `get_my_empresa_id`, `is_gestor`). Pôr em `usuario_in_my_empresa`
+apagaria da tela os negócios e clientes de quem já saiu — que é histórico legítimo.
+
+A revogação do login é passo à parte, e não tem tela: hoje só pelo painel do Supabase.
+
+---
+
+## 39. Excluir etapa do Kanban move os negócios mesmo quando o banco recusa
+
+**Gravidade: crítica.**
+
+`use-kanban-colunas.ts` faz duas coisas em ordem: primeiro o `update` que move os negócios para
+outra etapa, depois o `delete` da coluna. **Só a segunda é protegida por permissão**
+(`kanban_colunas_delete` exige gestor), e o `delete` não pede as linhas de volta — no PostgREST,
+apagar zero linhas **não devolve erro**.
+
+Um vendedor comum — **12 dos 26 usuários não são gestores** — abre "Gerenciar colunas Kanban",
+manda excluir uma etapa, e:
+
+1. o `update` é **aceito** para os negócios de que ele é responsável;
+2. o `delete` casa **zero** linhas e não reclama;
+3. a tela mostra "Coluna excluída e negócios remanejados" e "Alterações salvas".
+
+Depois do refetch a coluna continua lá, com os negócios dos colegas dentro e sem os dele.
+
+🔴 **E mexe no dinheiro:** se o destino for "Fechamento" ou "Perdido", o gatilho
+`fn_set_pedido_fechado_em` carimba a data de fechamento de HOJE em cada negócio movido. Eles
+passam a contar como vendas fechadas hoje no Faturamento, no Ticket Médio e no Plano de Vendas —
+podem ser centenas de uma vez.
+
+### Conserto
+
+Inverter a ordem e provar a exclusão antes de tocar em negócio: `.delete().select('id')` e, se
+vier lista vazia, lançar erro. O padrão já existe neste repositório, em
+`use-configuracoes-campos.ts:205-213`. E esconder o acesso para quem não é gestor — a página já
+usa `useMinhaPermissao` em `Negocios.tsx` para outro botão.
+
+---
+
+## 40. 🔴 O conserto de datas da importação não alcança a tela de Negócios
+
+**Gravidade: crítica. Bloqueia a prioridade zero do projeto.**
+
+O item 3 desta lista está marcado como resolvido em `446779ff`, com validação de 26.181 datas
+reais do Bitrix a 100%. **O conserto é real e está correto — e mora num arquivo que a tela de
+Negócios não chama.**
+
+```
+src/lib/import/file-parser.ts:27                     XLSX.read(buffer, { type: 'array', cellDates: true })
+src/components/pedidos/ImportPedidosDialog.tsx:185   XLSX.read(buffer, { type: 'array' })
+```
+
+`parseImportFile` (o caminho corrigido) tem **um único chamador**: `ImportDataDialog.tsx`.
+Quatro telas seguem no leitor antigo:
+
+| tela | linha |
+|---|---|
+| **Negócios** — o caminho da migração do Bitrix | `ImportPedidosDialog.tsx:185` |
+| Clientes e contatos | `ImportClientesDialog.tsx:314` |
+| Catálogo | `ImportCatalogoDialog.tsx:73` |
+| Catálogo global | `GlobalImportCatalogoDialog.tsx:101` |
+
+Sem `cellDates`, o `raw: false` manda o SheetJS formatar o número de série no padrão americano
+(`8/12/26`), e `sanitizeFieldValue` depois adivinha BR — invertendo toda data cujo dia seja de
+1 a 12. É a cadeia de dois elos que a própria mensagem do commit `446779ff` descreve.
+
+**Se a MD migrar hoje pela tela de Negócios, grava ~1 em cada 4 datas invertidas de novo** — o
+que produziu os 11.903 do item 19. E `prazo_resposta` é a coluna que sustenta todo o dinheiro.
+
+### Conserto
+
+Trocar as quatro chamadas por `parseImportFile`. E **refazer a validação das 26.181 datas pela
+tela**, não pelo módulo isolado — foi a validação pelo caminho errado que deu o falso "pronto".
+
+---
+
+## 41. Duas funções do banco atravessam a fronteira entre empresas
+
+**Gravidade: alta.**
+
+**`set_whatsapp_assinar_remetente_global`** faz `UPDATE public.empresas SET ...` **sem
+`WHERE`** — grava em todas. A permissão exigida é `is_admin() OR is_gestor()`, e `is_gestor()`
+vale para gestor, admin **e** empresa: são **14 pessoas espalhadas pelas 8 empresas**. Um
+gerente da JHS liga um botão na tela dele e muda como o WhatsApp da MD assina as mensagens.
+A migration diz que o comportamento global foi intencional — fazia sentido com uma empresa só.
+
+Varri o banco atrás do mesmo padrão: **é a única função com `UPDATE` sem `WHERE`.**
+
+**`delete_obras_bulk`** confere o cargo e **não confere de qual empresa**. Apaga obra alheia,
+com `ON DELETE CASCADE` levando os negócios ligados a ela. A única barreira hoje é adivinhar um
+identificador — isso é sorte, não controle.
+
+### Conserto
+
+Restringir a primeira a `is_admin()` (ou recortar por `get_my_empresa_id()`), e acrescentar à
+segunda a mesma condição que a política `obras_delete` já usa.
+
+---
+
+## 42. Seis funções de servidor abertas sem motivo escrito, e duas sem conferir quem chamou
+
+**Gravidade: alta.**
+
+O `supabase/config.toml` tem uma convenção boa: toda função com `verify_jwt = false` traz um
+comentário dizendo por quê. As do Stripe, do Nylas e do retorno de e-mail têm.
+**Seis não têm nenhum:** `import-licencas`, `portal-scraper`, `automacao-diaria`,
+`eventos-lembrete`, `gmail-sync-inbox`, `gmail-callback`.
+
+⚠️ **E `verify_jwt = true` não protege como parece:** ele só confere que o token foi assinado
+pelo projeto — e a chave publicável do site é um token válido, que vai dentro do JavaScript de
+`crm.repplyhub.com.br`. Toda função precisa conferir a sessão **por dentro**.
+
+Duas não conferem:
+
+- **`pauta-resumo-diario`** — `Deno.serve` na linha 94, cliente de serviço na 103, zero leitura
+  de `Authorization`. A chave pública basta para disparar o resumo das 7h às 13 pessoas da MD,
+  quantas vezes quiser.
+- **`resolve-pedido-anexo`** — sem sessão, com a chave mestra, e recebendo **`empresaId` no
+  corpo do pedido**: quem chama escolhe em qual pasta gravar. O filtro de origem é um teste de
+  substring **sem âncora**, então `servidor-do-atacante/cdn.bitrix24.com.br/x` passa. Grava em
+  balde público e devolve a URL.
+
+**`import-licencas` e `extract-natal-pdf` são órfãs** — nenhum chamador em `src/`, `scripts/`
+ou `.github/`. A primeira aceita apagar e repovoar a tabela de licenças; a segunda gasta crédito
+de IA paga. **Apagar as duas do Supabase resolve inteiro.**
+
+---
+
+## 43. Os 22.276 arquivos do Storage podem ser LISTADOS sem login
+
+**Gravidade: alta. Complementa `operacao/plano-baldes-privados.md`, não o substitui.**
+
+Aquele plano mapeou muito bem que os 7 baldes estão abertos, mas o modelo de risco dele diz
+*"qualquer pessoa **com o link** baixa o arquivo"*. **Não é preciso ter o link.**
+
+Testado em 28/08/2026 pelo caminho exato que o `.list()` do JavaScript usa
+(`storage.search`), assumindo o papel `anon`: dá para listar a raiz do balde, obter as pastas
+(que são os `empresa_id`) e enumerar os arquivos de cada uma. Cadeia completa, sem credencial.
+
+```
+set role anon;
+select count(*) from storage.objects;                            --> 22.276
+select count(*) from storage.search('', 'pedido-anexos', ...);   -->     42 pastas na raiz
+```
+
+Isso muda a natureza do problema: não é "link vazado", é **inventário completo** — 14.997
+anexos de negócio e 6.924 mídias de WhatsApp de clientes.
+
+### Consequência para o plano
+
+A listagem deveria subir para os primeiros passos: é ela que transforma o resto em algo fácil de
+explorar. Enquanto o balde for público mas não listável, é preciso ter o link; listável, basta
+querer.
+
+---
+
+## 44. A matriz de permissões só é conferida pelo banco em 2 dos 15 módulos
+
+**Gravidade: alta.**
+
+A tela de Configurações promete ver / criar / editar / excluir por módulo, e o `SPEC.md` §5.11
+descreve o controle como granular "para cada um dos 14 módulos". No banco, **só Negócios e Plano
+de Vendas têm a checagem correspondente**. Nos outros 13 as caixinhas mudam o menu, não o acesso.
+
+O risco não é técnico, é de confiança: a gestora acredita que restringiu, para de vigiar, e o
+acesso continua para quem souber o endereço direto.
+
+### Conserto
+
+**Não ligar tudo de uma vez** — isso trancaria gente que trabalha hoje. Medir antes o que as 8
+empresas de fato configuraram nas linhas de `permissoes_usuario`, e ligar módulo a módulo.
+
+---
+
+## 45. Não existe conferência automática — e agora o `git push` publica
+
+**Gravidade: alta.**
+
+A regra do projeto é sensata: como o lint e os erros de tipo já vêm com saldo herdado, o critério
+é **o número não subir**. Só que **nada confere isso**. O único robô no GitHub raspa o Diário
+Oficial de Natal.
+
+Até 26/08/2026 havia duas travas entre o commit e o cliente: a autorização do dono do produto, e
+alguém rodando o comando de publicar. **A segunda deixou de existir** quando o repositório voltou
+a ser público. Agora o "pode" solta o código direto, e a rede de proteção inteira é memória
+humana.
+
+### Conserto
+
+Um workflow que rode `npm run test`, `npx tsc --noEmit -p tsconfig.app.json` e `npm run lint` a
+cada envio, compare com um arquivo de linha de base commitado, e recuse quando o número subir. É
+a regra que o projeto já escolheu — só deixa de depender de lembrar.
+
+---
+
+## 46. `types.ts` tem 21 objetos fora de sincronia, e PODE ser regerado
+
+**Gravidade: alta.**
+
+O `README.md` e o `CLAUDE.md` §6.8 dizem que `src/integrations/supabase/types.ts` precisa ser
+mantido à mão "porque não há banco local para regenerar". **Testado em 26/08/2026: não precisa.**
+O conector do Supabase já configurado no `.mcp.json` deste repositório gera o arquivo a partir do
+projeto de produção. `supabase gen types typescript --project-id <ref>` faz o mesmo.
+
+E vale, porque o arquivo está errado:
+
+| | faltam no arquivo | sobram no arquivo |
+|---|---|---|
+| tabelas | 2 (`email_webhook_eventos`, `whatsapp_webhook_origem`) | — |
+| visões | 8 (as `v_md_*` do item 36) | — |
+| funções | 11 | 2 com a assinatura antiga |
+
+É a origem dos `as never` espalhados pelo código e de vários dos 35 erros de tipo.
+
+### 🔴 A ordem importa
+
+`plano_vendas_progresso` e `plano_vendas_progresso_por_vendedor` têm **duas assinaturas cada** no
+banco (a antiga por `p_ano/p_mes`, a nova por período). O gerador não sabe representar sobrecarga
+e **omite as duas**. Primeiro apagar as versões antigas — ninguém as chama —, depois regerar.
+Ao contrário, o problema volta e parece que a regeneração não funcionou.
+
+---
+
+## 47. "Salvo" quando o banco recusou — o mesmo defeito em quatro telas
+
+**Gravidade: alta. É padrão, não caso isolado.**
+
+No PostgREST, uma escrita que **não altera nenhuma linha não devolve erro**. Quem não pede as
+linhas de volta não distingue "gravou" de "a política recusou" — e mostra sucesso nos dois casos.
+
+| onde | o que a pessoa vê |
+|---|---|
+| Excluir etapa do Kanban (item 39) | "Alterações salvas", e a coluna continua lá |
+| Reordenar etapas do Kanban | "Alterações salvas", e a ordem volta ao recarregar |
+| Excluir / mover tarefa | Aviso de sucesso, e o item volta no refetch |
+| Excluir evento com participantes | Apaga uma linha só; o evento segue na agenda de todos |
+
+O último tem consequência de mundo real: gente aparecendo numa visita cancelada.
+
+### Conserto
+
+Vale uma **regra de projeto**, não quatro consertos: toda escrita que depende de permissão pede
+as linhas de volta (`.select('id')`) e trata "veio vazio" como recusa. O padrão já existe em
+`use-configuracoes-campos.ts:205-213` e em `use-chat.ts:797-800`.
+
+---
+
+## 48. O Radar de Risco conta edição de campo como movimento
+
+**Gravidade: alta.**
+
+A consulta de `20260824220000_dashboard_negocios_risco.sql` mede "há quanto tempo este negócio
+não anda" olhando `pedidos_historico_status` **sem separar o tipo `status`**. Corrigir uma
+observação tira o orçamento da lista de parados na hora, sem ele ter andado.
+
+Medido: **R$ 5,0 milhões no lugar de R$ 14,4 milhões** em risco. O comentário no topo da própria
+migration diz que a consulta existe justamente para evitar isso.
+
+Agravante: **toda correção em massa de dados zera o radar** — o reparo de datas de 20/08 já
+gravou 61 linhas de histórico que contam como movimento.
+
+### Conserto
+
+Migration nova com `CREATE OR REPLACE`, acrescentando a condição de tipo na cláusula da LATERAL.
+O índice existente continua servindo.
+
+---
+
+## 49. O filtro "Etapa" não filtra, em dois lugares
+
+**Gravidade: alta.**
+
+**No Kanban:** marcar uma etapa não recorta nada. `KanbanColumn.tsx:50` usa a etapa só para
+ligar/desligar o `enabled` da consulta — e, com a mesma `queryKey`, o TanStack devolve o cache.
+As colunas seguem com os cartões e as contagens de antes, enquanto a linha de resumo em cima
+(que passa por `usePedidosStats`) **obedece** ao filtro. Dois números que se contradizem na mesma
+tela, sem nada indicando qual está certo.
+
+**No modal de Ação em massa:** é inerte de ponta a ponta. `PedidosFilters.stages` está declarado
+em `use-pedidos.ts:57` e **não é lido por ninguém** — nem `montarQueryDeNegocios` (linha 418) nem
+`usePedidosStats` (806). O selo do botão mostra "1" e a lista não muda uma linha.
+
+É a única tela que altera centenas de negócios com um clique, e não tem desfazer.
+
+> `docs/modulos/negocios.md` §6 descreve a versão benigna ("renderiza vazia com contagem 0"). O
+> comportamento real é o oposto — a auditoria está desatualizada e não serve de cobertura.
+
+---
+
+## 50. A soma em reais do Kanban usa só os cartões carregados
+
+**Gravidade: alta.**
+
+`KanbanColumn.tsx:83` soma no navegador os cartões já baixados (50 por vez) e mostra o resultado
+**ao lado da contagem exata que veio do banco**. Nada indica que um é parcial.
+
+O sinal que denuncia: clicar em "Ver mais" faz o dinheiro **subir**, como se estivesse entrando
+venda. Quem olha o funil para saber quanto está represado em cada etapa pode estar vendo um valor
+muitas vezes menor.
+
+### Conserto
+
+Chamar `usePedidosStats(empresaId, [stageKey], filters)` na coluna e usar o `valor` que ela
+devolve — a assinatura já aceita `stages` e a `queryKey` já ignora paginação de propósito.
+
+---
+
+## 51. O Calendário mostra menos de 10% dos prazos, e desenha um dia antes
+
+**Gravidade: alta.**
+
+Dois defeitos somados, no mesmo arquivo:
+
+1. `use-eventos.ts:105-113` pede **todos** os 11.910 negócios de uma vez, sem `.order()` e sem
+   `.limit()`. O servidor devolve **1.000 e para**, com status de sucesso e sem aviso. Sem
+   ordenação, quais 1.000 chegam é decisão do plano do Postgres e muda entre uma abertura e
+   outra — na prática somem os fechamentos futuros.
+2. `use-eventos.ts:164` monta a data sem a âncora de meio-dia que o `CLAUDE.md` §7.12 aponta como
+   padrão. Um fechamento de 01/09 aparece na casa de 31/08 — **no mês anterior**. A ficha do
+   negócio mostra uma data e a agenda mostra outra.
+
+### Conserto
+
+Não paginar: **recortar pelo mês que está na tela** (`.gte`/`.lte` em `prazo_resposta`, com o
+período na `queryKey`) e ler com a âncora de meio-dia. Resolve o corte, o peso e o dia errado de
+uma vez.
+
+---
+
+## 52. Importar contatos cria construtoras duplicadas
+
+**Gravidade: alta.**
+
+`ImportClientesDialog.tsx:640` busca os clientes já cadastrados para não duplicar — e essa busca
+bate no teto de 1.000 do PostgREST. **A base tem 1.305.** Se a construtora estiver entre os 305
+que não vieram, o código conclui "não existe" e cria um cadastro novo. Sem ordenação, quais 1.000
+chegam muda a cada importação.
+
+Cada importação suja mais a base: a mesma construtora em duas fichas, com histórico, negócios e
+contatos divididos entre elas.
+
+### Conserto
+
+Não paginar: consultar só os nomes citados na planilha, em blocos de 50, com `buildOrFilter`. É
+o padrão que o **próprio arquivo já usa 110 linhas abaixo** (linhas 769-786) e que
+`src/lib/import/resolve-entities.ts:107-116` também usa.
+
+---
+
+## 53. Ler a lista de clientes é ~130× mais caro por linha do que ler negócios
+
+**Gravidade: média hoje, alta conforme a base cresce.**
+
+Medido no banco de produção, com a sessão de um vendedor real da MD:
+
+| consulta | linhas | tempo | plano |
+|---|---:|---:|---|
+| `select count(*) from pedidos` | 11.910 | **6,5 ms** | Index Only Scan, lista de usuários resolvida **uma vez** |
+| `select count(*) from clientes` | 1.306 | **96,5 ms** | Seq Scan, função chamada **por linha** |
+
+A diferença está na forma da política:
+
+```sql
+-- pedidos (rápida):  usuario_id IN (SELECT usuarios_da_minha_empresa())
+-- clientes (lenta):  usuario_id = get_my_usuario_id() OR usuario_in_my_empresa(usuario_id)
+```
+
+`usuario_in_my_empresa(usuario_id)` recebe a **coluna** como argumento, então o Postgres precisa
+chamá-la uma vez por linha. É a mesma causa que o `CLAUDE.md` §7.9 mede como responsável por
+transformar 4 ms em 16–31 segundos — lá foi contornada, a raiz nunca foi tratada.
+
+`obras` é pior ainda: subconsulta correlacionada que chama a mesma função por linha.
+
+O relatório de saúde do Supabase aponta **46 políticas com esse defeito em 20 tabelas**, mais
+**53 chaves estrangeiras sem índice** — inclusive `itens_pedido.pedido_id` e `obras.cliente_id`.
+
+### Conserto
+
+Copiar a forma de `pedidos`. O jeito certo já está escrito neste mesmo banco.
+
+---
+
+## 54. `app_erros` mistura desenvolvimento e produção, e ninguém olha
+
+**Gravidade: média.**
+
+343 registros. **224 vêm de máquinas de desenvolvimento** (`versao = 'local'`), porque o ambiente
+local aponta para o banco de produção. Isso torna impossível separar "o cliente travou" de "o dev
+digitou errado" — e é por isso que o registro existe e ninguém o consulta.
+
+Filtrando só produção, o quadro é **tranquilizador**: 119 registros em três semanas e **um único
+travamento real** (tela de Chat, 6 vezes, 3 pessoas). O resto — cerca de 110 — é o aviso de "saiu
+versão nova", que atingiu **13 das 26 pessoas** em 15 telas. Houve **63 versões publicadas em
+três semanas**, e cada publicação derruba quem está com a aba aberta.
+
+### Conserto
+
+Não gravar quando a origem é máquina de desenvolvimento (`import.meta.env.DEV`), e olhar o que
+sobra. O aviso de versão nova merece tratamento próprio: é o incômodo número um da operação.
+
+---
+
+## 55. Coisas que deveriam ser por empresa e são compartilhadas por todas
+
+**Gravidade: média.**
+
+- **Perfis de acesso** (`perfis_customizados`) são uma tabela global: cada assinante vê, renomeia
+  e apaga os cargos criados pelos outros. Nome de cargo entrega região e especialidade para quem
+  disputa as mesmas construtoras.
+- **As imagens de assinatura de e-mail** (balde `email-assets`) podem ser listadas e apagadas por
+  qualquer pessoa logada, de qualquer empresa. O padrão certo já foi aplicado em dois outros
+  baldes em `20260824210000` — faltou este.
+- **O `secao_preset_id` da empresa** pode ser trocado pelo próprio gestor, direto na tabela
+  `empresas` — o controle de seções que a Repply usa para vender módulo a módulo é auto-serviço.
+- **O código de acesso da empresa** é anunciado na tela (`CodigoAcessoButton.tsx:67`) como de uso
+  único e **vale para sempre**. É um convite que circula por WhatsApp e nunca expira.
+
+(O logotipo do rodapé de e-mail é o item 35, já registrado.)
+
+---
+
+## 56. Onze pontos da documentação afirmam coisa que não é verdade hoje
+
+**Gravidade: média. O próprio projeto escreve que documento que mente é pior que documento que
+não existe.**
+
+| onde | o que diz | o que é |
+|---|---|---|
+| `SPEC.md` §9 · item 3 desta lista | datas da importação resolvidas e validadas | o conserto não alcança 4 das 5 telas — item 40 |
+| `SPEC.md` §8 | "Publicação MANUAL desde 22/08 — `npx vercel --prod`" | desde 26/08 o `git push` publica |
+| `SPEC.md` §11.3 | "toda alteração vai por branch e Pull Request" | vai direto no `main`; o PR foi revertido em 19/08 |
+| `SPEC.md` §11.3 | a publicação parou por ser "repositório de organização" | era por ser **privado**; essa pista já custou dois dias |
+| `SPEC.md` §7.4 · item 8 | controle de seções por empresa "não existe" | existe, em produção, com política e painel |
+| `SPEC.md` §5.11 | permissão granular "para cada um dos 14 módulos" | o banco confere em 2 — item 44 |
+| `SPEC.md` §11.4 | repositório em conta pessoal do dev anterior | é `github.com/Repply-Hub`, e é público |
+| `CLAUDE.md` §9 · `SPEC.md` §11.3 | "152 testes em 10 arquivos, 78 mil linhas" | 568 testes, 33 arquivos, 92 mil linhas |
+| `README.md` · `CLAUDE.md` §6.8 | `types.ts` não pode ser regerado | pode — item 46 |
+| `operacao/plano-baldes-privados.md` | "qualquer pessoa **com o link**" | não precisa do link — item 43 |
+| `modulos/negocios.md` §6 | filtro de etapa "renderiza vazia com contagem 0" | mantém os cartões antigos — item 49 |
+
+O `SPEC.md` concentra a maior parte e virou o documento mais atrasado do conjunto.
+
+---
+
+## 57. Os módulos que justificam o produto estão vazios
+
+**Não é dívida técnica — é leitura de produto. Registrado aqui porque nenhum outro documento diz.**
+
+Contagem no banco de produção, 26/08/2026:
+
+| módulo | registros | o que o `SPEC.md` diz dele |
+|---|---:|---|
+| Mensagens de WhatsApp | 54.787 | "Com ressalva" |
+| Negócios | 11.910 | "Sólido" — 11.906 vieram da importação |
+| E-mails | 5.295 | "Com ressalva" |
+| Clientes | 1.306 | "Sólido" |
+| Contatos | 1.092 | "Sólido" |
+| Fabricantes | 30 | "Sólido" |
+| **Tarefas** | **3** | "Sólido", e é o embrião da cobrança de follow-up |
+| **Obras** | **1** | "O diferencial que motivou o produto a existir" |
+| **Itens de orçamento** | **1** | "As linhas do orçamento" |
+| **Tabela de preços** | **0** | um dos quatro eixos que separam o Repply de um CRM comum |
+| **Histórico de interações** | **0** | parte de "Clientes e Contatos, sólido" |
+
+Os módulos estão **construídos** — a documentação está certa quando diz "sólido", porque fala do
+código. Ninguém os **alimentou**. E de pelo menos um a causa é técnica e conhecida: **a
+importação nunca preenche `pedidos.obra_id`** (a coluna "Obra" da planilha vira texto em
+`endereco_entrega`). Como toda a base veio da planilha, o mapa de obras nasceu vazio.
+
+**A pergunta é de produto e não tem resposta técnica:** a MD não usa obras e tabela de preços
+porque nunca foram migradas, ou porque na prática não precisa delas? As duas respostas levam a
+roadmaps opostos.
 
 ---
 

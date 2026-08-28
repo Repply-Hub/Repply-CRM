@@ -55,6 +55,7 @@ import { ParticipantesMultiSelect } from "@/components/tarefas/ParticipantesMult
 import { MarcadoresMultiSelect } from "@/components/tarefas/MarcadoresMultiSelect";
 import { useAuth } from "@/hooks/use-auth";
 import { CriarContatoDaConversaDialog } from "@/components/whatsapp/CriarContatoDaConversaDialog";
+import { CadastroDoLead } from "@/components/whatsapp/CadastroDoLead";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -3140,35 +3141,23 @@ function LeadSheet({
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
           {/* Dados do cliente/contato vinculado */}
-          {/* 🔴 O CAMINHO PARA O CADASTRO, quando ele ainda não existe.
-              Medido em 27/08/2026: das 779 conversas de WhatsApp da MD, ZERO estão ligadas a um
-              contato ou cliente — não por descuido, mas porque NÃO HAVIA TELA que gravasse esse
-              vínculo. O bloco "Dados do lead" logo abaixo só é desenhado quando já há um dos
-              dois, então na prática ele nunca aparecia, e cadastrar significava sair do
-              WhatsApp, ir em Contatos, redigitar nome e telefone e voltar. Pedido do Lucas. */}
+          {/* 🔴 O BLOCO "CADASTRO", e ele agora RECONHECE quem já existe.
+              Medido em 27/08/2026: das 779 conversas, ZERO ligadas a contato ou cliente — não
+              por descuido, mas porque NÃO HAVIA TELA que gravasse esse vínculo. O bloco "Dados
+              do lead" logo abaixo só é desenhado quando há um dos dois, então nunca aparecia.
+
+              🔴 E medido de novo em 28/08/2026, depois que o dono do produto notou: das 757
+              conversas de pessoa, **54 têm o telefone JÁ CADASTRADO em `contatos`** — e a tela
+              dizia "Esta pessoa não está no CRM" para todas elas, porque decidia só por
+              `conversa.contato_id`. Aceitar o convite criava ficha repetida. Agora o
+              `CadastroDoLead` procura pelo telefone antes de afirmar qualquer coisa.
+
+              A decisão de amarrar continua sendo de gente: ver o componente. */}
           {!cliente && !contato && !conversa.is_group && (
-            <div className="space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Cadastro
-              </p>
-              <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3">
-                <p className="text-sm font-medium text-card-foreground">
-                  Esta pessoa não está no CRM
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Cadastre para ela aparecer na busca de contatos, nos negócios e nas obras.
-                </p>
-                <Button
-                  size="sm"
-                  className="mt-2.5 gap-1.5"
-                  onClick={() => setCriarContatoAberto(true)}
-                >
-                  <UserPlus className="h-3.5 w-3.5" />
-                  Cadastrar como contato
-                </Button>
-              </div>
-              <Separator />
-            </div>
+            <CadastroDoLead
+              conversa={conversa}
+              onCadastrar={() => setCriarContatoAberto(true)}
+            />
           )}
 
           <CriarContatoDaConversaDialog

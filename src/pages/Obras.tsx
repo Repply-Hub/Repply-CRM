@@ -1072,11 +1072,10 @@ export default function Obras() {
 
                 <div className="border-t pt-6">
                   <h3 className="mb-3 text-sm font-semibold">Contatos desta obra</h3>
-                  <ContatosDaObra
-                    obraId={selectedObra.id}
-                    clienteId={selectedObra.cliente_id}
-                    clienteEmpresa={selectedObra.clientes?.empresa}
-                  />
+                  {/* Somente leitura: quem vincula e desvincula é o modal de Editar Obra, pelo
+                      botão do rodapé. Por isso não passa mais `clienteId`/`clienteEmpresa` —
+                      eram para o seletor, que saiu daqui em 28/08/2026. */}
+                  <ContatosDaObra obraId={selectedObra.id} />
                 </div>
               </CorpoDoPainel>
 

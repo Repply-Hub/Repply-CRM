@@ -90,9 +90,22 @@ export const RodapeDoPainel = ({
 }: RodapeDoPainelProps) => (
   <SheetFooter
     className={cn(
-      // `sm:justify-between` é o que separa os dois lados. E `flex-row` desde o celular: o
-      // `flex-col-reverse` da primitiva empilharia os botões e desmancharia a divisão.
-      'shrink-0 flex-row items-center justify-between gap-2 border-t border-border bg-background px-6 py-4 sm:space-x-0',
+      // 🔴 PRECISA DAS DUAS: `justify-between` E `sm:justify-between`.
+      //
+      // O `SheetFooter` da primitiva traz `sm:justify-end` (ui/sheet.tsx:76). O tailwind-merge
+      // só resolve conflito DENTRO da mesma variante — `justify-between` (sem prefixo) e
+      // `sm:justify-end` são variantes diferentes, então as duas sobrevivem à mesclagem e, de
+      // 640px para cima, quem vale é a da primitiva. Resultado até 28/08/2026: os dois lados
+      // colavam no canto DIREITO em qualquer tela de desktop, e a separação só existia no
+      // celular. O comentário anterior aqui já dizia `sm:justify-between` — a classe escrita
+      // é que estava sem o prefixo.
+      //
+      // Conferido com o próprio tailwind-merge do projeto: com `sm:justify-between` o
+      // `sm:justify-end` some da saída; sem ele, permanece.
+      //
+      // `flex-row` desde o celular: o `flex-col-reverse` da primitiva empilharia os botões e
+      // desmancharia a divisão.
+      'shrink-0 flex-row items-center justify-between sm:justify-between gap-2 border-t border-border bg-background px-6 py-4 sm:space-x-0',
       className,
     )}
     {...props}

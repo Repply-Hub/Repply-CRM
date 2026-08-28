@@ -119,6 +119,21 @@ CabecalhoDialogo.displayName = "CabecalhoDialogo";
  *
  * As margens negativas fazem a barra de rolagem nascer na borda do modal, sem
  * desfazer o `p-6` que a primitiva usa no cabeçalho e no rodapé.
+ *
+ * 🔴 O `-mx-6` PRESSUPÕE QUE O PAI TENHA `p-6`. Se o `ConteudoDialogo` receber
+ * `p-0` — porque a tela quer controlar o respiro faixa a faixa —, o recuo
+ * negativo não tem o que comer e o miolo fica 24px MAIS LARGO que o modal de
+ * cada lado. Os campos passam por baixo da borda e a tela parece "com a largura
+ * bugada".
+ *
+ * Nesse caso passe `mx-0` junto com o seu `px-*`:
+ *
+ *     <ConteudoDialogo className="sm:max-w-[560px] p-0">
+ *       <CorpoDialogo className="mx-0 px-6 py-2">   // <- o `mx-0` é obrigatório
+ *
+ * Medido no navegador com o CSS do projeto (28/08/2026): modal 560px e miolo
+ * 606px sem o `mx-0`; 558px com ele. Aconteceu duas vezes — em
+ * `NovoNegocioDialog.tsx:491` (que já corrige) e em `EventDialog.tsx:309`.
  */
 export const CorpoDialogo = ({
   className,

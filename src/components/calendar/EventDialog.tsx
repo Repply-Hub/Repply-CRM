@@ -306,7 +306,21 @@ export function EventDialog({
 
             O `<fieldset>` continua aqui — é ele que desativa todos os campos de uma vez quando
             a pessoa não é a organizadora —, só que agora por dentro, sem papel de layout. */}
-        <CorpoDialogo className="px-6 py-2">
+        {/* 🔴 `mx-0` NÃO É ENFEITE — é o que cancela o `-mx-6` do `CorpoDialogo`.
+            Aquele recuo negativo existe para a barra de rolagem nascer na borda do modal
+            QUANDO O PAI TEM `p-6`. Aqui o pai é `p-0` (linha 249), então o recuo não tem
+            respiro para comer e o miolo fica mais largo que o próprio modal.
+
+            Medido no navegador, com o CSS compilado do projeto, em 28/08/2026:
+
+              modal ......... 560px
+              miolo ......... 606px      -> 23px para FORA de cada lado
+              com `mx-0` .... 558px      -> dentro, como deve ser
+
+            Era esta a "largura bugada": os campos passavam por baixo das bordas do modal.
+            `NovoNegocioDialog.tsx:491` — o outro `ConteudoDialogo` com `p-0` — já passa
+            `mx-0` pelo mesmo motivo. */}
+        <CorpoDialogo className="mx-0 px-6 py-2">
         <fieldset disabled={somenteLeitura} className="space-y-4 border-0 m-0 p-0 min-w-0">
           {isEditing && isVisita && (
             <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
