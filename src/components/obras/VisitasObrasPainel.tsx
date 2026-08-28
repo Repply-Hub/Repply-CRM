@@ -13,6 +13,7 @@ import { useVendedores } from '@/hooks/use-clientes';
 import { useTodasVisitasObras, useMarcarVisitaRealizada, type VisitaObraListagem } from '@/hooks/use-obra-visitas';
 import { agruparEmRotasDoDia, type RotaDoDia } from '@/lib/rota-do-dia';
 import { normalizarTexto } from '@/lib/busca-de-obras';
+import { agruparVisitasPorDia } from '@/lib/ordem-das-paradas';
 import { linkDoGoogleMaps, mensagemDaRota } from '@/lib/rota-no-whatsapp';
 import { EnviarRotaDialog } from './EnviarRotaDialog';
 import { RotaNoMapaDialog } from './RotaNoMapaDialog';
@@ -98,20 +99,22 @@ export function VisitasObrasPainel({
     return lista;
   }, [visitas, searchTerm, periodo]);
 
-  // Agrupa por DIA preservando a ordem que veio do banco (mais recente primeiro). A chave é
-  // `yyyy-MM-dd` e não o objeto Date: duas datas do mesmo dia são objetos diferentes, e
-  // agrupar por objeto criaria um bloco por visita.
-  const porDia = useMemo(() => {
-    const mapa = new Map<string, { chave: string; dia: Date; visitasDoDia: typeof filtradas }>();
-    for (const v of filtradas) {
-      const dia = new Date(v.inicio);
-      const chave = format(dia, 'yyyy-MM-dd');
-      const grupo = mapa.get(chave);
-      if (grupo) grupo.visitasDoDia.push(v);
-      else mapa.set(chave, { chave, dia, visitasDoDia: [v] });
-    }
-    return [...mapa.values()];
-  }, [filtradas]);
+  /**
+   * As visitas agrupadas por dia: os DIAS do mais recente para o mais antigo, as visitas
+   * DENTRO de cada dia do mais cedo para o mais tarde.
+   *
+   * 🔴 Aqui isto só agrupava, "preservando a ordem que veio do banco". E a consulta pede
+   * `inicio` DECRESCENTE — certo para os dias, e exatamente ao contrário do certo dentro do
+   * dia: o card listava a rota DE TRÁS PARA A FRENTE (`16h, 14h, 09h`), enquanto o
+   * formulário que a criou mostrava na ordem do relógio. Pedido do Lucas em 28/08/2026.
+   *
+   * A chave é `yyyy-MM-dd` e não o objeto Date: duas datas do mesmo dia são objetos
+   * diferentes, e agrupar por objeto criaria um bloco por visita.
+   */
+  const porDia = useMemo(
+    () => agruparVisitasPorDia(filtradas, (dia) => format(dia, 'yyyy-MM-dd')),
+    [filtradas],
+  );
 
   /**
    * As rotas que dá para desenhar, indexadas pelo dia.

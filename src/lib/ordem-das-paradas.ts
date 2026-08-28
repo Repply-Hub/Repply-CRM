@@ -93,6 +93,31 @@ export function moverParadaMantendoHorarios<T extends ParadaOrdenavel>(
 }
 
 /**
+ * O horário da última parada do dia — ignorando as que estão sem horário preenchido.
+ * Devolve `null` quando nenhuma parada tem horário utilizável.
+ *
+ * 🔴 EXISTE POR CAUSA DE UM DEFEITO MEU, e o sintoma era uma obra nascendo À 1 DA MANHÃ.
+ *
+ * `adicionarParada` sugere "a última + 1 hora". Quando passou a olhar a lista ORDENADA em vez
+ * do fim do array, herdou junto a regra de que parada sem horário vai para o fim — então a
+ * parada vazia virava a referência. E `somarMinutos('')` não reclama: `Number('')` é zero, a
+ * base vira meia-noite, e a obra nova nasce `01:00`.
+ *
+ * O caminho é trivial de percorrer sem querer: a pessoa apaga o horário de uma parada para
+ * redigitar, lembra de outra obra, adiciona — e a obra nova entra de madrugada, no meio de uma
+ * rota das nove às onze.
+ *
+ * Medido em 28/08/2026: com `[09:00, (vazio), 11:00]`, a parada nova nascia `01:00`. Antes da
+ * mudança nascia `12:00`, porque a referência era o fim do array.
+ */
+export function ultimoHorarioUtilizavel(paradas: readonly ParadaOrdenavel[]): string | null {
+  const comHorario = ordenarPorHorario(paradas).filter(
+    (p) => emMinutos(p.horario) !== Number.MAX_SAFE_INTEGER,
+  );
+  return comHorario.length > 0 ? comHorario[comHorario.length - 1].horario : null;
+}
+
+/**
  * A lista está em ordem crescente de horário?
  *
  * Serve de guarda: se um dia alguma tela devolver uma ordem que não respeita o relógio, é
@@ -103,4 +128,77 @@ export function estaEmOrdemCrescente(paradas: readonly ParadaOrdenavel[]): boole
     if (emMinutos(paradas[i].horario) < emMinutos(paradas[i - 1].horario)) return false;
   }
   return true;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * A MESMA REGRA, do outro lado: o CARD da aba Visitas.
+ *
+ * As funções acima cuidam do formulário (horário como texto "HH:mm", digitado pela pessoa).
+ * As de baixo cuidam da EXIBIÇÃO da rota já gravada (instante ISO, vindo do banco). São
+ * dados diferentes, mas a promessa ao Lucas é uma só: de cima para baixo, do mais cedo para
+ * o mais tarde.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+export interface VisitaAgrupavel {
+  id: string;
+  /** Instante ISO, como o banco devolve. */
+  inicio: string;
+}
+
+export interface DiaDeVisitas<T> {
+  /** `yyyy-MM-dd` — a chave do agrupamento. */
+  chave: string;
+  dia: Date;
+  visitasDoDia: T[];
+}
+
+/**
+ * Agrupa as visitas por dia: os DIAS do mais recente para o mais antigo, as visitas DENTRO
+ * de cada dia do mais cedo para o mais tarde.
+ *
+ * 🔴 AS DUAS ORDENS SÃO OPOSTAS DE PROPÓSITO, e confundi-las é o defeito que isto conserta
+ * (relatado pelo Lucas em 28/08/2026).
+ *
+ * A consulta pede `inicio` DECRESCENTE (`use-obra-visitas.ts:137`), e o painel só agrupava
+ * "preservando a ordem que veio do banco". Para os dias isso é o certo — a agenda abre no que
+ * está por vir e no que acabou de acontecer, não em agosto de 2024. Mas dentro do dia a mesma
+ * ordem lista a rota DE TRÁS PARA A FRENTE: `16h, 14h, 09h`. O card mostrava o roteiro
+ * invertido, e o formulário que o criou mostrava certo.
+ *
+ * Empate de horário cai no `id` só para a saída não variar entre duas execuções — mesmo
+ * critério de `rota-do-dia.ts:207`, que ordena as paradas do mapa.
+ *
+ * A ordem dos DIAS é cravada aqui, e não herdada da consulta. Herdar era o que estava frágil:
+ * quem um dia mexesse no `.order()` do hook remexeria as duas coisas sem perceber, e a
+ * metade visível do estrago (o dia errado no topo) esconderia a outra.
+ */
+export function agruparVisitasPorDia<T extends VisitaAgrupavel>(
+  visitas: readonly T[],
+  /** Recebe a visita e devolve a chave do dia (`yyyy-MM-dd`) — quem chama traz seu formatador. */
+  chaveDoDia: (inicio: Date) => string,
+): DiaDeVisitas<T>[] {
+  const mapa = new Map<string, DiaDeVisitas<T>>();
+
+  for (const visita of visitas ?? []) {
+    const dia = new Date(visita.inicio);
+    const chave = chaveDoDia(dia);
+    const grupo = mapa.get(chave);
+    if (grupo) grupo.visitasDoDia.push(visita);
+    else mapa.set(chave, { chave, dia, visitasDoDia: [visita] });
+  }
+
+  const dias = [...mapa.values()];
+
+  for (const grupo of dias) {
+    grupo.visitasDoDia.sort(
+      (a, b) =>
+        new Date(a.inicio).getTime() - new Date(b.inicio).getTime() || a.id.localeCompare(b.id),
+    );
+  }
+
+  // O dia mais recente primeiro. Empate é impossível (a chave é única por dia), mas a
+  // comparação por texto `yyyy-MM-dd` ordena certo e não depende de fuso.
+  dias.sort((a, b) => b.chave.localeCompare(a.chave));
+
+  return dias;
 }

@@ -3,6 +3,8 @@ import {
   ordenarPorHorario,
   moverParadaMantendoHorarios,
   estaEmOrdemCrescente,
+  agruparVisitasPorDia,
+  ultimoHorarioUtilizavel,
 } from '@/lib/ordem-das-paradas';
 
 /**
@@ -140,5 +142,133 @@ describe('🔴 contrato: nenhuma sequência de ações deixa a rota fora de orde
 
     expect(depois.map((x) => x.obraId)).toEqual(['c', 'a', 'b']);
     expect(estaEmOrdemCrescente(depois)).toBe(true);
+  });
+});
+
+describe('agruparVisitasPorDia — o card da aba Visitas', () => {
+  const chave = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  const v = (id: string, inicio: string) => ({ id, inicio });
+
+  it('🔴 o card não lista mais a rota de trás para a frente', () => {
+    // Como o banco entrega: `inicio` DECRESCENTE. Era essa ordem que ia para a tela.
+    const doBanco = [
+      v('c', '2026-08-28T16:00:00'),
+      v('b', '2026-08-28T14:00:00'),
+      v('a', '2026-08-28T09:00:00'),
+    ];
+
+    const dias = agruparVisitasPorDia(doBanco, chave);
+
+    expect(dias).toHaveLength(1);
+    expect(dias[0].visitasDoDia.map((x) => x.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('os DIAS continuam do mais recente para o mais antigo', () => {
+    const doBanco = [
+      v('hoje', '2026-08-28T09:00:00'),
+      v('ontem', '2026-08-27T15:00:00'),
+      v('semana-passada', '2026-08-21T10:00:00'),
+    ];
+
+    expect(agruparVisitasPorDia(doBanco, chave).map((d) => d.chave)).toEqual([
+      '2026-08-28',
+      '2026-08-27',
+      '2026-08-21',
+    ]);
+  });
+
+  it('🔴 as duas ordens valem ao mesmo tempo, e são opostas', () => {
+    const doBanco = [
+      v('d2-tarde', '2026-08-28T17:00:00'),
+      v('d2-cedo', '2026-08-28T08:00:00'),
+      v('d1-tarde', '2026-08-27T18:00:00'),
+      v('d1-cedo', '2026-08-27T07:30:00'),
+    ];
+
+    const dias = agruparVisitasPorDia(doBanco, chave);
+
+    expect(dias.map((d) => d.chave)).toEqual(['2026-08-28', '2026-08-27']);
+    expect(dias[0].visitasDoDia.map((x) => x.id)).toEqual(['d2-cedo', 'd2-tarde']);
+    expect(dias[1].visitasDoDia.map((x) => x.id)).toEqual(['d1-cedo', 'd1-tarde']);
+  });
+
+  it('a ordem dos dias não depende de como a consulta veio', () => {
+    // Mesmo se alguém trocar o `.order()` do hook para crescente, o topo continua o recente.
+    const crescente = [
+      v('antiga', '2026-08-21T10:00:00'),
+      v('nova', '2026-08-28T09:00:00'),
+    ];
+
+    expect(agruparVisitasPorDia(crescente, chave).map((d) => d.chave)).toEqual([
+      '2026-08-28',
+      '2026-08-21',
+    ]);
+  });
+
+  it('empate de horário cai no id, para a tela não variar entre duas aberturas', () => {
+    const empatadas = [
+      v('zeta', '2026-08-28T09:00:00'),
+      v('alfa', '2026-08-28T09:00:00'),
+    ];
+
+    expect(agruparVisitasPorDia(empatadas, chave)[0].visitasDoDia.map((x) => x.id)).toEqual([
+      'alfa',
+      'zeta',
+    ]);
+  });
+
+  it('visita futura e visita passada convivem no mesmo dia, em ordem', () => {
+    const mistas = [
+      v('planejada', '2026-08-28T15:00:00'),
+      v('realizada', '2026-08-28T08:00:00'),
+    ];
+
+    expect(agruparVisitasPorDia(mistas, chave)[0].visitasDoDia.map((x) => x.id)).toEqual([
+      'realizada',
+      'planejada',
+    ]);
+  });
+
+  it('lista vazia ou nula não explode', () => {
+    expect(agruparVisitasPorDia([], chave)).toEqual([]);
+    expect(agruparVisitasPorDia(null as never, chave)).toEqual([]);
+  });
+
+  it('não altera a lista original', () => {
+    const original = [v('c', '2026-08-28T16:00:00'), v('a', '2026-08-28T09:00:00')];
+    agruparVisitasPorDia(original, chave);
+    expect(original.map((x) => x.id)).toEqual(['c', 'a']);
+  });
+});
+
+describe('ultimoHorarioUtilizavel — a obra que nascia à 1 da manhã', () => {
+  it('🔴 parada SEM horário não pode virar a referência da próxima', () => {
+    // A pessoa apagou o horário da obra do meio para redigitar.
+    const comVazio = [p('a', '09:00'), p('b', ''), p('c', '11:00')];
+
+    // `ordenarPorHorario` joga a vazia para o FIM. Se a sugestão olhasse só a última da lista
+    // ordenada, ela pegaria a vazia — e `somarMinutos('')` conta da meia-noite: 01:00.
+    expect(ordenarPorHorario(comVazio)[comVazio.length - 1].horario).toBe('');
+    expect(ultimoHorarioUtilizavel(comVazio)).toBe('11:00');
+  });
+
+  it('devolve o horário mais tarde, mesmo com a lista fora de ordem', () => {
+    const torta = [p('c', '15:00'), p('a', '09:00'), p('b', '11:00')];
+    expect(ultimoHorarioUtilizavel(torta)).toBe('15:00');
+  });
+
+  it('devolve null quando NENHUMA parada tem horário — quem chama cai no 09:00', () => {
+    expect(ultimoHorarioUtilizavel([])).toBeNull();
+    expect(ultimoHorarioUtilizavel([p('a', ''), p('b', '')])).toBeNull();
+  });
+
+  it('horário quebrado conta como ausente, e não como meia-noite', () => {
+    expect(ultimoHorarioUtilizavel([p('a', '09:00'), p('b', 'abc')])).toBe('09:00');
+  });
+
+  it('meia-noite de verdade continua valendo — 00:00 não é ausência', () => {
+    expect(ultimoHorarioUtilizavel([p('a', '00:00')])).toBe('00:00');
   });
 });

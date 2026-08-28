@@ -7,7 +7,11 @@ import { toast } from 'sonner';
 import { diferencaDaRota } from '@/lib/rota-em-edicao';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import type { RotaDoDia } from '@/lib/rota-do-dia';
-import { ordenarPorHorario, moverParadaMantendoHorarios } from '@/lib/ordem-das-paradas';
+import {
+  ordenarPorHorario,
+  moverParadaMantendoHorarios,
+  ultimoHorarioUtilizavel,
+} from '@/lib/ordem-das-paradas';
 import {
   Dialog, DialogTitle, DialogDescription,
   ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo,
@@ -232,10 +236,14 @@ export function NovaRotaVisitaDialog({
 
   const adicionarParada = (obra: ObraOpcao) => {
     setParadas((prev) => {
-      // A parada nova entra DEPOIS da mais tarde do dia — que é a última da lista ordenada, e
-      // não necessariamente a última do array (a pessoa pode estar no meio de uma digitação).
-      const ultima = ordenarPorHorario(prev)[prev.length - 1];
-      const horario = ultima ? somarMinutos(ultima.horario, DURACAO_PADRAO_MINUTOS) : '09:00';
+      // A parada nova entra DEPOIS da mais tarde do dia — que é a última da lista ORDENADA, e
+      // não a última do array (a pessoa pode estar no meio de uma digitação).
+      //
+      // 🔴 `ultimoHorarioUtilizavel` ignora as paradas SEM horário. Sem esse filtro, a parada
+      // que a pessoa esvaziou para redigitar viraria a referência — e a obra nova nasceria à
+      // 1 DA MANHÃ, porque `somarMinutos('')` conta a partir da meia-noite sem reclamar.
+      const ultima = ultimoHorarioUtilizavel(prev);
+      const horario = ultima ? somarMinutos(ultima, DURACAO_PADRAO_MINUTOS) : '09:00';
       return [...prev, { obraId: obra.id, nomeObra: obra.nome_obra || 'Obra sem nome', observacao: '', horario }];
     });
     setBuscaOpen(false);
