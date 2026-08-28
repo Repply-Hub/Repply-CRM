@@ -42,6 +42,8 @@
 -- pendente (deixar ou apagar), não como esquecimento.
 
 drop policy if exists "public_read_whatsapp_media" on storage.objects;
+-- Também a nova, para esta migration poder rodar de novo sem erro.
+drop policy if exists "whatsapp_media_select" on storage.objects;
 
 create policy "whatsapp_media_select"
 on storage.objects for select
@@ -74,6 +76,7 @@ using (
 -- colega mandou no grupo precisa abrir para os outros.
 
 drop policy if exists "Public read access for chat files" on storage.objects;
+drop policy if exists "chat_files_select" on storage.objects;
 
 create policy "chat_files_select"
 on storage.objects for select
@@ -87,6 +90,14 @@ using (
   )
 );
 
+-- ---------------------------------------------------------------- aplicada em 28/08/2026
+--
+-- Conferido depois: enumeração por quem NÃO está logado passou a devolver vazio em
+-- whatsapp-media, chat-files e pedido-anexos. `email-assets` segue enumerável, por decisão.
+--
+-- O número do arquivo foi alinhado ao que o banco registrou (20260828120615) — sem isso, um
+-- `db push` trataria como migration nova e o `create policy` falharia por já existir.
+--
 -- ---------------------------------------------------------------- o que este arquivo NÃO faz
 --
 -- Não muda `storage.buckets.public`. Enquanto ele for `true`, a porta pública continua
