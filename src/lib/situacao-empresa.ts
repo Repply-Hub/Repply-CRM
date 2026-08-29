@@ -23,7 +23,45 @@ export interface EstadoAssinatura {
   plan_status: string | null;
   origem: string | null;
   current_period_end: string | null;
+  /**
+   * Existe cadastro no Stripe. 🔴 NÃO significa que pagou.
+   *
+   * O cadastro é criado no instante em que a pessoa ABRE o checkout
+   * (`stripe-checkout/index.ts:109`), antes de qualquer cobrança. Quem desistiu na tela do
+   * cartão tem cadastro e nunca pagou um centavo.
+   */
   tem_customer_stripe: boolean;
+  /**
+   * Existe ASSINATURA no Stripe — este é o sinal de que pagou de verdade.
+   *
+   * A RPC `admin_empresas_cs` já devolvia isto desde 04/08/2026
+   * (`20260804142445_admin_cs_datas_entrada_e_pagamento.sql:64`), e esta função é que não
+   * usava. Opcional para não quebrar quem monta o estado sem ele; ausente, cai no
+   * comportamento antigo.
+   */
+  tem_assinatura_stripe?: boolean;
+}
+
+/**
+ * Esta empresa chegou a ser cliente pagante alguma vez?
+ *
+ * 🔴 A DIFERENÇA ENTRE "ABRIU O CHECKOUT" E "PAGOU", e ela custou um rótulo mentindo na tela
+ * do admin (achado em 29/08/2026, empresa "Teste Empresa").
+ *
+ * O código antigo respondia esta pergunta com `tem_customer_stripe`, e o comentário dizia:
+ * "Já ter tido customer significa que pagou e depois caiu". Não significa. O cadastro no
+ * Stripe nasce ao ABRIR o checkout. Quem desistiu na tela do cartão aparecia como "Pagamento
+ * parado" — como se tivesse dado calote — em vez de "Cadastrou, não pagou".
+ *
+ * Não é só rótulo: é esse estado que a régua de cobrança usa para decidir quem é inadimplente.
+ * Com o sinal errado, alguém que nunca foi cliente entraria na cobrança e acabaria marcado
+ * para exclusão.
+ *
+ * Quando `tem_assinatura_stripe` não vier preenchido, cai no sinal antigo — é o comportamento
+ * anterior, e é melhor que tratar ausência como "nunca pagou".
+ */
+function jaFoiPagante(e: EstadoAssinatura): boolean {
+  return e.tem_assinatura_stripe ?? e.tem_customer_stripe;
 }
 
 export const ROTULO_SITUACAO: Record<SituacaoCS, string> = {
@@ -49,10 +87,10 @@ export function situacaoDaEmpresa(e: EstadoAssinatura): SituacaoCS {
   }
 
   if (['inactive', 'canceled', 'unpaid', 'incomplete_expired'].includes(status)) {
-    // Nunca teve customer no Stripe = cadastrou e não chegou a pagar. Já ter
-    // tido customer significa que pagou e depois caiu — são dois trabalhos de
-    // CS diferentes: um é ativação, o outro é retenção.
-    return e.tem_customer_stripe ? 'bloqueada' : 'nunca_pagou';
+    // Nunca chegou a assinar = cadastrou e não pagou. Ter assinado e caído é outra conversa:
+    // um caso é ativação, o outro é retenção. Ver `jaFoiPagante` para o porquê de não ser
+    // `tem_customer_stripe` — abrir o checkout não é pagar.
+    return jaFoiPagante(e) ? 'bloqueada' : 'nunca_pagou';
   }
 
   // 'legacy' são as empresas que já usavam antes de existir cobrança;
@@ -64,7 +102,7 @@ export function situacaoDaEmpresa(e: EstadoAssinatura): SituacaoCS {
   // uma linha `active` sem cobrança nenhuma por trás — um ajuste manual no
   // banco, uma origem inesperada — seria contada como receita. De todos os
   // rótulos, este é o que não pode estar errado.
-  return e.tem_customer_stripe ? 'pagante' : 'cortesia';
+  return jaFoiPagante(e) ? 'pagante' : 'cortesia';
 }
 
 /** Dias restantes de um teste. Negativo = venceu. `null` = não é teste com prazo. */

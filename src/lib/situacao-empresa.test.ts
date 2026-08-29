@@ -132,3 +132,67 @@ describe('diasDeTrial', () => {
     expect(diasDeTrial(estado({ plan_status: 'trialing', current_period_end: null }))).toBeNull();
   });
 });
+
+describe('🔴 abrir o checkout NÃO é pagar', () => {
+  /**
+   * O caso real que denunciou isto, em 29/08/2026: a empresa "Teste Empresa" tinha cadastro
+   * no Stripe (`stripe_customer_id`) e NENHUMA assinatura (`stripe_subscription_id` nulo).
+   * Ela aparecia no painel como "Pagamento parado" — como se tivesse dado calote.
+   *
+   * O cadastro no Stripe nasce quando a pessoa ABRE o checkout, antes de qualquer cobrança.
+   */
+  const chegouNoCheckoutEDesistiu = {
+    plan_status: 'inactive',
+    origem: 'stripe',
+    current_period_end: null,
+    tem_customer_stripe: true,
+    tem_assinatura_stripe: false,
+  };
+
+  it('quem abriu o checkout e desistiu é "cadastrou, não pagou" — não "pagamento parado"', () => {
+    expect(situacaoDaEmpresa(chegouNoCheckoutEDesistiu)).toBe('nunca_pagou');
+  });
+
+  it('quem assinou de verdade e caiu continua sendo "pagamento parado"', () => {
+    expect(
+      situacaoDaEmpresa({ ...chegouNoCheckoutEDesistiu, tem_assinatura_stripe: true }),
+    ).toBe('bloqueada');
+  });
+
+  it('active com assinatura de verdade é pagante', () => {
+    expect(
+      situacaoDaEmpresa({
+        plan_status: 'active',
+        origem: 'stripe',
+        current_period_end: null,
+        tem_customer_stripe: true,
+        tem_assinatura_stripe: true,
+      }),
+    ).toBe('pagante');
+  });
+
+  it('🔴 active com cadastro mas SEM assinatura não entra na conta de receita', () => {
+    // Antes desta correção isto seria contado como "Pagante" e inventaria receita.
+    expect(
+      situacaoDaEmpresa({
+        plan_status: 'active',
+        origem: 'stripe',
+        current_period_end: null,
+        tem_customer_stripe: true,
+        tem_assinatura_stripe: false,
+      }),
+    ).toBe('cortesia');
+  });
+
+  it('sem o sinal novo, mantém o comportamento antigo — nada quebra em quem não o envia', () => {
+    // `tem_assinatura_stripe` é opcional de propósito: ausente, vale `tem_customer_stripe`.
+    expect(
+      situacaoDaEmpresa({
+        plan_status: 'inactive',
+        origem: 'stripe',
+        current_period_end: null,
+        tem_customer_stripe: true,
+      }),
+    ).toBe('bloqueada');
+  });
+});
