@@ -8,6 +8,8 @@
  * por uma letra seriam um convite ao auto-import errado.
  */
 
+import { situacaoDaEmpresa, type SituacaoCS } from './situacao-empresa';
+
 export type StatusPlano = 'liberado' | 'bloqueado' | 'desconhecido';
 
 /**
@@ -228,6 +230,40 @@ export function motivoDoBloqueio(
     assinatura.stripe_subscription_id.trim() !== '';
 
   return { motivo: jaAssinou ? 'pagamento_parou' : 'nunca_ativou', venceuEm: null };
+}
+
+/**
+ * A situação comercial da MINHA empresa, no mesmo vocabulário do painel de admin.
+ *
+ * 🔴 REAPROVEITA `situacaoDaEmpresa`, E ISSO É O PONTO. Ela já traduz status técnico em
+ * leitura comercial (pagante / em teste / teste vencido / cortesia / cadastrou-não-pagou /
+ * pagamento parado) e tem 25 testes fixando os casos. Escrever uma segunda tradução aqui
+ * criaria a divergência clássica: a tela do cliente dizendo uma coisa e a de vocês dizendo
+ * outra sobre a mesma empresa — e ninguém descobriria até alguém comparar as duas.
+ *
+ * O que muda entre as duas é só a FONTE. O painel recebe booleanos já calculados pela função
+ * de banco `admin_empresas_cs`; o cliente recebe os identificadores crus dentro do perfil.
+ * Este adaptador faz a ponte, e é só isso que ele faz.
+ *
+ * 🔴 `tem_assinatura_stripe` vem de `stripe_subscription_id`, NUNCA de `stripe_customer_id`:
+ * o cadastro nasce quando a pessoa abre o checkout, antes de qualquer cobrança.
+ */
+export function situacaoDoMeuPlano(
+  profile: ProfileComPlano | null | undefined,
+): SituacaoCS | null {
+  const assinatura = extrairAssinatura(profile);
+  if (!assinatura) return null;
+
+  const preenchido = (v: unknown) => typeof v === 'string' && v.trim() !== '';
+
+  return situacaoDaEmpresa({
+    plan_status: typeof assinatura.plan_status === 'string' ? assinatura.plan_status : null,
+    origem: typeof assinatura.origem === 'string' ? assinatura.origem : null,
+    current_period_end:
+      typeof assinatura.current_period_end === 'string' ? assinatura.current_period_end : null,
+    tem_customer_stripe: preenchido(assinatura.stripe_customer_id),
+    tem_assinatura_stripe: preenchido(assinatura.stripe_subscription_id),
+  });
 }
 
 /** Papéis que respondem pela empresa e podem, portanto, tratar da assinatura. */

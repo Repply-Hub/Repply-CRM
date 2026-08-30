@@ -86,6 +86,48 @@ export type Database = {
           },
         ]
       }
+      assinatura_cancelamentos: {
+        Row: {
+          criado_em: string
+          detalhe: string | null
+          empresa_id: string
+          id: string
+          motivo: string | null
+          usuario_id: string | null
+        }
+        Insert: {
+          criado_em?: string
+          detalhe?: string | null
+          empresa_id: string
+          id?: string
+          motivo?: string | null
+          usuario_id?: string | null
+        }
+        Update: {
+          criado_em?: string
+          detalhe?: string | null
+          empresa_id?: string
+          id?: string
+          motivo?: string | null
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assinatura_cancelamentos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assinatura_cancelamentos_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_permissoes: {
         Row: {
           acao: string

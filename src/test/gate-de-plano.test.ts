@@ -197,9 +197,20 @@ describe('cerco do bloqueio por falta de pagamento', () => {
 
   const tudo = arquivos.map((a) => a.conteudo).join('\n');
 
-  const migrationDaLista = arquivos.find((a) => a.nome.includes('lista_de_excecoes_do_gate'));
-  if (!migrationDaLista) throw new Error('A migration da lista de excecoes nao existe.');
-  const EXCECOES = lerExcecoes(migrationDaLista.conteudo);
+  // 🔴 A ULTIMA DEFINICAO, NAO A PRIMEIRA. `tabelas_fora_do_gate()` e reescrita por
+  // `create or replace` toda vez que uma excecao entra — e migration nao se edita
+  // (CLAUDE.md §6.3), entao a versao vigente e a do arquivo de nome mais alto.
+  //
+  // A primeira versao deste teste procurava pelo NOME do arquivo que criou a funcao, e
+  // congelou na lista de 22 no dia seguinte, quando `assinatura_cancelamentos` entrou pela
+  // migration 20260830140000. O teste continuava verde lendo uma lista velha — exatamente a
+  // divergencia silenciosa que ele existe para impedir.
+  //
+  // `readdirSync` devolve em ordem alfabetica, e o nome comeca com a data: o ultimo da lista
+  // e o mais recente.
+  const definicoes = arquivos.filter((a) => a.conteudo.includes('tabelas_fora_do_gate'));
+  if (definicoes.length === 0) throw new Error('Nenhuma migration define tabelas_fora_do_gate().');
+  const EXCECOES = lerExcecoes(definicoes[definicoes.length - 1].conteudo);
 
   const RENOMEIOS = renomeios(arquivos);
 

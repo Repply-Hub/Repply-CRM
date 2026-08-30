@@ -11,7 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks, Upload } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks, Upload, CreditCard } from 'lucide-react';
+import { PagamentosTab } from '@/components/configuracoes/PagamentosTab';
+import { podeGerenciarAssinatura } from '@/lib/plano-gate';
 import { SidebarHistoricoDialog } from '@/components/configuracoes/SidebarHistoricoDialog';
 import { AvatarCropDialog } from '@/components/configuracoes/AvatarCropDialog';
 import { CamposTab } from '@/components/configuracoes/CamposTab';
@@ -798,8 +800,13 @@ const Configuracoes = () => {
   const setActiveTab = (aba: string) => setSearchParams({ tab: aba }, { replace: true });
   // A aba de Usuários usa layout de altura fixa (scroll interno nos cards); as demais rolam a página normalmente.
   const noPageScroll = activeTab === 'vendedores';
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const isEmpresaRole = profile?.role === 'empresa';
+
+  // Quem responde pela assinatura: o dono registrado da empresa ou qualquer gestor dela.
+  // 🔴 Mesmo critério que a função `stripe-portal` já exige por baixo — esconder a aba com
+  // uma regra DIFERENTE da que o servidor aplica é como o botão que só recusa no clique.
+  const podeVerPagamentos = podeGerenciarAssinatura(profile, session);
 
   const { data: isGestor } = useQuery({
     queryKey: ['is_gestor'],
@@ -844,6 +851,9 @@ const Configuracoes = () => {
             {(isAdmin || isEmpresaRole) && (
               <TabsTrigger value="empresas" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>
             )}
+            {podeVerPagamentos && (
+              <TabsTrigger value="pagamentos" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><CreditCard className="h-4 w-4" /> Pagamentos</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="perfil" className="mt-4"><ProfileTab /></TabsContent>
@@ -879,6 +889,14 @@ const Configuracoes = () => {
           {(isAdmin || isEmpresaRole) && (
             <TabsContent value="empresas" className="mt-4">
               <EmpresasTab mode={isAdmin ? 'admin' : 'empresa'} />
+            </TabsContent>
+          )}
+          {/* O conteúdo some junto com o gatilho: sem isto, a URL direta
+              `/configuracoes?tab=pagamentos` mostraria preço e botão de assinar para um
+              vendedor comum — que a função do servidor recusaria depois, no clique. */}
+          {podeVerPagamentos && (
+            <TabsContent value="pagamentos" className="mt-4">
+              <PagamentosTab />
             </TabsContent>
           )}
         </Tabs>
