@@ -211,3 +211,22 @@ Representações. É fase própria no roadmap: [`SPEC.md` §9](../../SPEC.md), F
       guarde credencial**. Foi assim que a chave do WhatsApp vazou — ver
       [`docs/divida-tecnica.md`](../divida-tecnica.md)
 - [ ] Testado logado como `vendedor` comum, não só como gestor
+- [ ] **A tabela entra no cerco do bloqueio por falta de pagamento?**
+
+      Se ela guarda dado do cliente, **sim — e você não precisa escrever nada**. A rotina
+      `gate-de-plano-conferencia-diaria` roda todo dia às 3h50, percorre as tabelas e cria as
+      políticas restritivas que faltam (`public.aplicar_gate_de_plano()`). E o teste
+      `src/test/gate-de-plano.test.ts` avisa antes disso, no build.
+
+      🔴 **O que a rotina NÃO faz por você: ligar a RLS.** Ela só alcança tabela que já tem
+      RLS habilitada — tabela sem RLS fica invisível para o cerco *e* sem isolamento entre
+      empresas. É o segundo item deste checklist, e é o que sustenta este último.
+
+      Se a tabela **não** deve entrar (log, catálogo compartilhado entre empresas,
+      preferência de tela, dado ligado ao login), acrescente o nome em **um lugar só**:
+      `public.tabelas_fora_do_gate()`. O teste lê a lista de lá — não existe segunda cópia
+      para manter em dia, de propósito.
+
+      > O cerco nasceu em 03/08/2026 cobrindo 5 tabelas. Em 27/08 alguém o copiou à mão para
+      > uma tabela nova e a cópia saiu pela metade — só `INSERT`, sem `UPDATE`. Quatro semanas
+      > depois de existir. É por isso que hoje é rotina, e não item de lista para lembrar.

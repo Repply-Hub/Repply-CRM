@@ -138,6 +138,18 @@ describe('comentário `//` em posição de filho de JSX', () => {
     expect(comentariosVazados(trecho)).toHaveLength(0);
   });
 
+  /**
+   * 🔴 30 SEGUNDOS, E NÃO OS 5 DE FÁBRICA — este teste lê o disco, não memória.
+   *
+   * Ele abre e varre TODOS os `.tsx` do projeto, um a um, de forma síncrona. Numa máquina
+   * ociosa leva menos de um segundo; com o build ou outra suíte rodando junto, já passou dos
+   * 5 segundos padrão do vitest e falhou por tempo — sem existir comentário vazado nenhum.
+   *
+   * Falha por tempo é a pior espécie: ela não reproduz quando alguém vai conferir, e o
+   * caminho fácil é desligar o teste. Medido em 29/08/2026: 11 segundos numa rodada com o
+   * build em paralelo, contra menos de 1 segundo isolado. 30 dá folga para a máquina ruim sem
+   * deixar um travamento de verdade rodar para sempre.
+   */
   it('🔴 nenhum arquivo .tsx do projeto tem comentário vazado', () => {
     const problemas = arquivosTsx(RAIZ).flatMap((caminho) =>
       comentariosVazados(readFileSync(caminho, 'utf-8'), caminho.replace(process.cwd(), '')),
@@ -148,5 +160,5 @@ describe('comentário `//` em posição de filho de JSX', () => {
     expect(
       problemas.map((p) => `${p.arquivo}:${p.linha} -> ${p.texto}`),
     ).toEqual([]);
-  });
+  }, 30_000);
 });
