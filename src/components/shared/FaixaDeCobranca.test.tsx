@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import * as gate from '@/lib/plano-gate';
 
 /**
  * A faixa diz a coisa certa para cada motivo — e, principalmente, NÃO diz a errada.
@@ -23,6 +24,30 @@ import { MemoryRouter } from 'react-router-dom';
 
 const useAuthFalso = vi.fn();
 vi.mock('@/hooks/use-auth', () => ({ useAuth: () => useAuthFalso() }));
+
+const ENCERRADA = () => false;
+
+/**
+ * O estado de cobrança vem do banco em produção (para não ficar velho — ver
+ * `use-estado-de-cobranca.ts`). Aqui ele é calculado do MESMO perfil falso, com as MESMAS
+ * funções de `plano-gate`, para os casos deste arquivo continuarem se escrevendo em
+ * "empresa com N dias de atraso" em vez de em objetos de resposta do banco.
+ */
+vi.mock('@/hooks/use-estado-de-cobranca', () => ({
+  useEstadoDeCobranca: () => {
+    const { profile } = useAuthFalso();
+    const bloqueio = gate.motivoDoBloqueio(profile);
+    return {
+      encerrada: ENCERRADA(),
+      bloqueado: !!bloqueio,
+      motivo: bloqueio?.motivo ?? null,
+      venceuEm: bloqueio?.venceuEm ?? null,
+      diasInadimplencia: gate.diasDeInadimplencia(profile),
+      degrau: gate.meuDegrauNaRegua(profile),
+    };
+  },
+}));
+
 
 import { FaixaDeCobranca } from './FaixaDeCobranca';
 

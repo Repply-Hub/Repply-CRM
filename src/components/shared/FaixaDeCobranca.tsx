@@ -2,12 +2,8 @@ import { useLayoutEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CreditCard, Timer } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
-import {
-  meuDegrauNaRegua,
-  motivoDoBloqueio,
-  podeGerenciarAssinatura,
-  type MotivoDoBloqueio,
-} from '@/lib/plano-gate';
+import { useEstadoDeCobranca } from '@/hooks/use-estado-de-cobranca';
+import { podeGerenciarAssinatura, type MotivoDoBloqueio } from '@/lib/plano-gate';
 import { cn } from '@/lib/utils';
 
 /**
@@ -140,9 +136,21 @@ export function FaixaDeCobranca() {
   const { profile, session } = useAuth();
   const ref = useRef<HTMLDivElement>(null);
 
-  const bloqueio = motivoDoBloqueio(profile);
-  const emTolerancia = !bloqueio && meuDegrauNaRegua(profile) === 'tolerancia';
-  const estado: EstadoDaFaixa | null = bloqueio ? bloqueio.motivo : emTolerancia ? 'tolerancia' : null;
+  const cobranca = useEstadoDeCobranca();
+
+  /**
+   * 🔴 A CONTA ENCERRADA NÃO GANHA FAIXA. Quem foi encerrado vê a tela inteira
+   * (`TelaDeSuspensao`), e uma faixa por baixo dela seria ruído — pior, uma faixa falando de
+   * assinatura para quem já não tem conta.
+   */
+  const emTolerancia = !cobranca.bloqueado && cobranca.degrau === 'tolerancia';
+  const estado: EstadoDaFaixa | null = cobranca.encerrada
+    ? null
+    : cobranca.bloqueado
+      ? (cobranca.motivo ?? 'nunca_ativou')
+      : emTolerancia
+        ? 'tolerancia'
+        : null;
 
   useAlturaPublicada(ref, !!estado);
   // Empresa em dia, perfil ainda carregando, admin global: nada a dizer. Devolver `null` e
@@ -165,7 +173,7 @@ export function FaixaDeCobranca() {
 
       <span className="font-medium text-foreground">
         {titulo}
-        {estado === 'teste_venceu' && desde(bloqueio?.venceuEm ?? null)}.
+        {estado === 'teste_venceu' && desde(cobranca.venceuEm)}.
       </span>
 
       {/* 🔴 DIZER O QUE AINDA FUNCIONA, e não só o que parou. Sem esta frase a pessoa

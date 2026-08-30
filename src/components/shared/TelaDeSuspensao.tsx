@@ -2,13 +2,8 @@ import { AlertOctagon, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
-import { useContaEncerrada } from '@/hooks/use-conta-encerrada';
-import {
-  acessoSuspenso,
-  diasDeInadimplencia,
-  meuDegrauNaRegua,
-  podeGerenciarAssinatura,
-} from '@/lib/plano-gate';
+import { useEstadoDeCobranca } from '@/hooks/use-estado-de-cobranca';
+import { podeGerenciarAssinatura } from '@/lib/plano-gate';
 
 /**
  * O degrau do dia 30: o acesso é suspenso e uma tela cobre o app, com o fundo desfocado.
@@ -30,7 +25,8 @@ function emDias(quantos: number): string {
 
 export function TelaDeSuspensao() {
   const { profile, session, signOut } = useAuth();
-  const encerrada = useContaEncerrada();
+  const cobranca = useEstadoDeCobranca();
+  const encerrada = cobranca.encerrada;
 
   /**
    * 🔴 CONTA ENCERRADA TEM TEXTO PRÓPRIO, e NEUTRO.
@@ -73,10 +69,11 @@ export function TelaDeSuspensao() {
     );
   }
 
-  if (!acessoSuspenso(profile)) return null;
+  // Suspensão é do dia 30 em diante. Vem do mesmo estado fresco, e não do perfil guardado.
+  const noPrazoFinal = cobranca.degrau === 'prazo_esgotado';
+  if (cobranca.degrau !== 'suspensa' && !noPrazoFinal) return null;
 
-  const dias = diasDeInadimplencia(profile) ?? 0;
-  const noPrazoFinal = meuDegrauNaRegua(profile) === 'prazo_esgotado';
+  const dias = cobranca.diasInadimplencia ?? 0;
   const podeResolver = podeGerenciarAssinatura(profile, session);
   const restam = Math.max(0, 90 - dias);
 

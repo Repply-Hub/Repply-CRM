@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { situacaoDaEmpresa, diasDeTrial, type EstadoAssinatura } from './situacao-empresa';
+import { situacaoDaEmpresa, diasDeTrial, type EstadoAssinatura , situacaoNoPainel, ROTULO_NO_PAINEL } from './situacao-empresa';
 
 const ONTEM = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
 const AMANHA = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
@@ -194,5 +194,95 @@ describe('🔴 abrir o checkout NÃO é pagar', () => {
         tem_customer_stripe: true,
       }),
     ).toBe('bloqueada');
+  });
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * situacaoNoPainel — o estado de AGORA, e a ordem em que ele vence
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe('situacaoNoPainel', () => {
+  const cortesiaAtiva = {
+    plan_status: 'active',
+    origem: 'cortesia',
+    current_period_end: null,
+    tem_customer_stripe: false,
+    tem_assinatura_stripe: false,
+  };
+  const pagante = {
+    plan_status: 'active',
+    origem: 'stripe',
+    current_period_end: null,
+    tem_customer_stripe: true,
+    tem_assinatura_stripe: true,
+  };
+  const hojeMenos = (dias: number) => new Date(Date.now() - dias * 86_400_000).toISOString();
+
+  it('sem nada acontecendo, devolve a leitura comercial de sempre', () => {
+    expect(situacaoNoPainel(cortesiaAtiva)).toBe('cortesia');
+    expect(situacaoNoPainel(pagante)).toBe('pagante');
+  });
+
+  it('🔴 excluída vence tudo — foi o defeito relatado em 30/08/2026', () => {
+    // A empresa "Repply" era cortesia, foi bloqueada e depois excluída. O painel continuava
+    // escrevendo "Cadastrou, não pagou" — o rótulo comercial, correto e inútil ali.
+    expect(
+      situacaoNoPainel({
+        ...cortesiaAtiva,
+        plan_status: 'inactive',
+        excluida_em: hojeMenos(1),
+        bloqueada_em: hojeMenos(2),
+        inadimplente_desde: hojeMenos(40),
+      }),
+    ).toBe('excluida');
+  });
+
+  it('🔴 bloqueio do painel não se confunde com "cadastrou e não pagou"', () => {
+    // As duas gravam `plan_status = 'inactive'`. O que separa é o registro do bloqueio.
+    const dados = { ...cortesiaAtiva, plan_status: 'inactive' };
+    expect(situacaoNoPainel(dados)).toBe('nunca_pagou');
+    expect(situacaoNoPainel({ ...dados, bloqueada_em: hojeMenos(1) })).toBe('bloqueada_admin');
+  });
+
+  it('🔴 empresa que voltou a pagar não fica escrita "Bloqueada"', () => {
+    // O Stripe reativa por fora, pelo webhook, sem passar pelo painel — então o registro do
+    // bloqueio pode sobrar. Quem manda é o status: se ela tem acesso, não está bloqueada.
+    expect(situacaoNoPainel({ ...pagante, bloqueada_em: hojeMenos(30) })).toBe('pagante');
+  });
+
+  it('a régua de cobrança aparece com os mesmos degraus do banco', () => {
+    const naRegua = (dias: number) =>
+      situacaoNoPainel({ ...pagante, inadimplente_desde: hojeMenos(dias) });
+
+    expect(naRegua(1)).toBe('tolerancia');
+    expect(naRegua(14)).toBe('tolerancia');
+    expect(naRegua(15)).toBe('somente_leitura');
+    expect(naRegua(29)).toBe('somente_leitura');
+    expect(naRegua(30)).toBe('suspensa');
+    expect(naRegua(89)).toBe('suspensa');
+    expect(naRegua(90)).toBe('prazo_esgotado');
+  });
+
+  it('bloqueio do painel vence a régua — quem cortou foi a decisão de vocês', () => {
+    expect(
+      situacaoNoPainel({
+        ...pagante,
+        plan_status: 'inactive',
+        bloqueada_em: hojeMenos(1),
+        inadimplente_desde: hojeMenos(40),
+      }),
+    ).toBe('bloqueada_admin');
+  });
+
+  it('data ilegível não inventa degrau nenhum', () => {
+    expect(situacaoNoPainel({ ...pagante, inadimplente_desde: 'nao-e-data' })).toBe('pagante');
+  });
+
+  it('todo rótulo novo tem texto — nada de aparecer em branco na tela', () => {
+    const todos = [
+      'excluida', 'bloqueada_admin', 'tolerancia', 'somente_leitura', 'suspensa', 'prazo_esgotado',
+      'pagante', 'trial', 'trial_vencido', 'cortesia', 'nunca_pagou', 'bloqueada',
+    ] as const;
+    for (const s of todos) expect(ROTULO_NO_PAINEL[s]?.length).toBeGreaterThan(0);
   });
 });

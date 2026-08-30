@@ -14,11 +14,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Ban, Building2, CalendarPlus, ChevronDown, ChevronRight, Clock, CreditCard, Gift, Loader2, Mail, MessageSquare, RefreshCw, Search, Timer, Trash2, TrendingUp, Users } from 'lucide-react';
+import { Ban, Building2, CalendarPlus, ChevronDown, ChevronRight, Clock, CreditCard, Gift, Loader2, Mail, MessageSquare, RefreshCw, RotateCcw, Search, Timer, Trash2, TrendingUp, Unlock, Users } from 'lucide-react';
 import {
   useEmpresasCS, useUsuariosDaEmpresa, useDefinirPlano,
-  situacaoDaEmpresa, diasDeTrial, ROTULO_SITUACAO,
-  type EmpresaCS, type SituacaoCS, type AcaoPlano,
+  situacaoDaEmpresa, diasDeTrial,
+  situacaoNoPainel, ROTULO_NO_PAINEL,
+  type EmpresaCS, type SituacaoCS, type SituacaoNoPainel, type AcaoPlano,
 } from '@/hooks/use-admin-cs';
 
 /** "há 3 dias" em vez de uma data — é assim que se lê risco de churn. */
@@ -43,13 +44,21 @@ function data(iso: string | null): string {
     : { day: '2-digit', month: 'short', year: '2-digit' });
 }
 
-const COR_SITUACAO: Record<SituacaoCS, string> = {
+const COR_SITUACAO: Record<SituacaoNoPainel, string> = {
   pagante: 'border-emerald-500/40 text-emerald-600',
   trial: 'border-blue-500/40 text-blue-600',
   trial_vencido: 'border-amber-500/40 text-amber-600',
   cortesia: 'border-violet-500/40 text-violet-600',
   nunca_pagou: 'border-amber-500/40 text-amber-600',
   bloqueada: 'border-destructive/40 text-destructive',
+  // 🔴 As situações OPERACIONAIS têm peso visual maior que as comerciais, de propósito: são
+  // estados em que alguém do outro lado está sem conseguir trabalhar agora.
+  excluida: 'border-destructive bg-destructive/10 text-destructive',
+  bloqueada_admin: 'border-destructive/60 text-destructive',
+  tolerancia: 'border-amber-500/40 text-amber-600',
+  somente_leitura: 'border-amber-500/60 text-amber-700',
+  suspensa: 'border-destructive/60 text-destructive',
+  prazo_esgotado: 'border-destructive bg-destructive/10 text-destructive',
 };
 
 function Metrica({ rotulo, valor, destaque }: { rotulo: string; valor: number; destaque?: boolean }) {
@@ -76,7 +85,9 @@ function LinhaUso({ icone: Icone, valor, rotulo }: { icone: typeof TrendingUp; v
 
 function CardEmpresa({ empresa }: { empresa: EmpresaCS }) {
   const [aberto, setAberto] = useState(false);
-  const [confirmar, setConfirmar] = useState<AcaoPlano | null>(null);
+  // 'restaurar' não é ação de plano — desfaz a exclusão, por outro caminho no banco. Vive
+  // na mesma confirmação porque, para quem clica, é a mesma família de gesto.
+  const [confirmar, setConfirmar] = useState<AcaoPlano | 'restaurar' | null>(null);
   const { data: usuarios, isLoading: carregandoUsuarios } = useUsuariosDaEmpresa(aberto ? empresa.empresa_id : null);
   const definirPlano = useDefinirPlano();
 
@@ -87,13 +98,18 @@ function CardEmpresa({ empresa }: { empresa: EmpresaCS }) {
   // fazê-las para as 10 empresas ao abrir a tela seria caro por nada.
   const { data: numeros } = useNumerosDaEmpresa(excluindo ? empresa.empresa_id : null);
 
-  const situacao = situacaoDaEmpresa(empresa);
+  // 🔴 A OPERACIONAL, não a comercial. `situacaoDaEmpresa` responde "essa empresa paga ou
+  // ganhou de graça?"; esta responde "o que está acontecendo com ela agora?". Uma empresa
+  // excluída continua sendo, comercialmente, uma cortesia — e era isso que o painel escrevia.
+  const situacao = situacaoNoPainel(empresa);
+  const excluida = !!empresa.excluida_em;
+  const bloqueadaPeloAdmin = situacao === 'bloqueada_admin';
   const dias = diasDeTrial(empresa);
   const acesso = desde(empresa.ultimo_acesso);
   // 14 dias sem ninguém entrar é o limiar que separa "operando" de "esfriando".
   const frio = acesso.dias !== null && acesso.dias >= 14;
 
-  const CONFIRMACAO: Record<AcaoPlano, { titulo: string; texto: string }> = {
+  const CONFIRMACAO: Record<AcaoPlano | 'restaurar', { titulo: string; texto: string }> = {
     trial: {
       titulo: `Liberar 7 dias para ${empresa.nome}?`,
       texto: 'A empresa volta a escrever imediatamente e o acesso expira sozinho ao fim do prazo. Nenhuma cobrança é criada no Stripe.',
@@ -105,6 +121,20 @@ function CardEmpresa({ empresa }: { empresa: EmpresaCS }) {
     bloquear: {
       titulo: `Bloquear ${empresa.nome}?`,
       texto: 'A empresa para de criar e editar dados, mas continua vendo tudo que já tem — nada é apagado. Reversível a qualquer momento.',
+    },
+    // 🔴 "Volta a ser o que era" é literal, e é por isso que este botão existe separado.
+    // Desbloquear dando cortesia transformaria um cliente PAGANTE em cliente de graça, em
+    // silêncio — o sistema guarda o estado no momento do bloqueio justamente para não ter
+    // de adivinhar aqui.
+    desbloquear: {
+      titulo: `Desbloquear ${empresa.nome}?`,
+      texto: 'A empresa volta exatamente ao plano que tinha antes do bloqueio — pagante, cortesia ou teste, o que fosse. Nada é cobrado nem criado no Stripe.',
+    },
+    restaurar: {
+      titulo: `Restaurar ${empresa.nome}?`,
+      texto: empresa.tem_assinatura_stripe
+        ? 'Todo mundo da empresa volta a entrar e os dados voltam como estavam. A assinatura, não: ela foi cancelada no dia da exclusão e precisa ser refeita pelo cliente.'
+        : 'Todo mundo da empresa volta a entrar e os dados voltam exatamente como estavam, no mesmo plano de antes.',
     },
   };
 
@@ -168,7 +198,7 @@ function CardEmpresa({ empresa }: { empresa: EmpresaCS }) {
               <LinhaUso icone={Mail} valor={empresa.emails_30d} rotulo="e-mails" />
             </div>
             <Badge variant="outline" className={COR_SITUACAO[situacao]}>
-              {ROTULO_SITUACAO[situacao]}
+              {ROTULO_NO_PAINEL[situacao]}
             </Badge>
           </div>
         </div>
@@ -176,36 +206,79 @@ function CardEmpresa({ empresa }: { empresa: EmpresaCS }) {
         {aberto && (
           <div className="border-t bg-muted/20 p-4">
             <div className="mb-4 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => setConfirmar('trial')} disabled={definirPlano.isPending}>
-                <Timer className="mr-1.5 h-4 w-4" /> Liberar 7 dias
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setConfirmar('cortesia')} disabled={definirPlano.isPending}>
-                <Gift className="mr-1.5 h-4 w-4" /> Cortesia
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-muted-foreground hover:text-destructive"
-                onClick={() => setConfirmar('bloquear')}
-                disabled={definirPlano.isPending}
-              >
-                <Ban className="mr-1.5 h-4 w-4" /> Bloquear
-              </Button>
+              {/* 🔴 EMPRESA EXCLUÍDA TEM UMA AÇÃO SÓ, e não é economia de tela. Liberar
+                  cortesia para quem está excluído não devolve nada: `empresa_plano_ativo()`
+                  confere a exclusão ANTES do plano e recusa de qualquer jeito. Deixar os
+                  outros botões ali seria oferecer cliques que não fazem nada visível. */}
+              {excluida ? (
+                <>
+                  <Button
+                    size="sm"
+                    onClick={() => setConfirmar('restaurar')}
+                    disabled={restaurar.isPending}
+                  >
+                    {restaurar.isPending ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RotateCcw className="mr-1.5 h-4 w-4" />
+                    )}
+                    Restaurar empresa
+                  </Button>
+                  <span className="self-center text-xs text-muted-foreground">
+                    Excluída {data(empresa.excluida_em)} — ninguém dela consegue entrar. Os
+                    dados continuam guardados.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => setConfirmar('trial')} disabled={definirPlano.isPending}>
+                    <Timer className="mr-1.5 h-4 w-4" /> Liberar 7 dias
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setConfirmar('cortesia')} disabled={definirPlano.isPending}>
+                    <Gift className="mr-1.5 h-4 w-4" /> Cortesia
+                  </Button>
 
-              {/* 🔴 SEPARADO DOS OUTROS TRÊS, de propósito. Liberar prazo, cortesia e
-                  bloquear são reversíveis com um clique; este abre um caminho que termina em
-                  dado apagado. O `border-l` e o espaço são o que impedem o gesto de virar
-                  "mais um botão da fileira". */}
-              <span className="mx-1 hidden h-6 self-center border-l sm:block" aria-hidden />
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => setExcluindo(true)}
-                disabled={definirPlano.isPending || excluir.isPending}
-              >
-                <Trash2 className="mr-1.5 h-4 w-4" /> Excluir
-              </Button>
+                  {/* 🔴 O MESMO LUGAR NA FILEIRA, o rótulo é que troca. Um botão "Desbloquear"
+                      permanente ao lado de "Bloquear" obrigaria a ler os dois para saber qual
+                      está valendo agora — e um deles estaria sempre sem efeito. */}
+                  {bloqueadaPeloAdmin ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10"
+                      onClick={() => setConfirmar('desbloquear')}
+                      disabled={definirPlano.isPending}
+                    >
+                      <Unlock className="mr-1.5 h-4 w-4" /> Desbloquear
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => setConfirmar('bloquear')}
+                      disabled={definirPlano.isPending}
+                    >
+                      <Ban className="mr-1.5 h-4 w-4" /> Bloquear
+                    </Button>
+                  )}
+
+                  {/* 🔴 SEPARADO DOS OUTROS TRÊS, de propósito. Liberar prazo, cortesia e
+                      bloquear são reversíveis com um clique; este abre um caminho que termina
+                      em dado apagado. O `border-l` e o espaço são o que impedem o gesto de
+                      virar "mais um botão da fileira". */}
+                  <span className="mx-1 hidden h-6 self-center border-l sm:block" aria-hidden />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => setExcluindo(true)}
+                    disabled={definirPlano.isPending || excluir.isPending}
+                  >
+                    <Trash2 className="mr-1.5 h-4 w-4" /> Excluir
+                  </Button>
+                </>
+              )}
               <span className="ml-auto self-center text-xs text-muted-foreground">
                 código <span className="font-mono">{empresa.codigo_acesso}</span>
                 {dias !== null && (
@@ -277,7 +350,9 @@ function CardEmpresa({ empresa }: { empresa: EmpresaCS }) {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (confirmar) {
+                if (confirmar === 'restaurar') {
+                  restaurar.mutate(empresa.empresa_id);
+                } else if (confirmar) {
                   definirPlano.mutate({ empresaId: empresa.empresa_id, acao: confirmar, dias: 7 });
                 }
                 setConfirmar(null);
@@ -309,13 +384,23 @@ export default function AdminEmpresas() {
 
   const resumo = useMemo(() => {
     const e = empresas ?? [];
-    const porSituacao = (s: SituacaoCS) => e.filter((x) => situacaoDaEmpresa(x) === s).length;
+    /**
+     * 🔴 EMPRESA EXCLUÍDA SAI DAS CONTAS COMERCIAIS. Ela não é mais base: contá-la em "Não
+     * pagaram" transformaria uma decisão de vocês num problema a resolver, e o número que
+     * deveria mostrar quem precisa de atenção passaria a inchar a cada exclusão.
+     *
+     * "Empresas" continua contando todas, porque é o número que tem de bater com a lista
+     * logo abaixo — uma contagem que não bate com o que está na tela vira dúvida sobre as
+     * outras quatro.
+     */
+    const naBase = e.filter((x) => !x.excluida_em);
+    const porSituacao = (s: SituacaoCS) => naBase.filter((x) => situacaoDaEmpresa(x) === s).length;
     return {
       total: e.length,
       pagantes: porSituacao('pagante'),
       emTeste: porSituacao('trial'),
       naoPagaram: porSituacao('nunca_pagou') + porSituacao('trial_vencido'),
-      frias: e.filter((x) => {
+      frias: naBase.filter((x) => {
         const d = desde(x.ultimo_acesso).dias;
         return d === null || d >= 14;
       }).length,

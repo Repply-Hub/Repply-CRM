@@ -112,3 +112,88 @@ export function diasDeTrial(e: EstadoAssinatura): number | null {
   if (Number.isNaN(fim.getTime())) return null;
   return Math.ceil((fim.getTime() - Date.now()) / 86_400_000);
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * A camada de CIMA: o que está acontecendo com a empresa AGORA
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * 🔴 POR QUE ESTA SEGUNDA CAMADA EXISTE. Relato do Lucas em 30/08/2026, depois de bloquear e
+ * excluir a empresa de testes:
+ *
+ *   "em ambas as situações lá na direita ainda continua com avisos como 'cadastrou, não
+ *    pagou', 'cortesia', etc, não falava sobre o real estado atual do cliente"
+ *
+ * E o rótulo não estava errado por descuido: `situacaoDaEmpresa` responde "essa empresa paga,
+ * testa ou ganhou de graça?" — uma pergunta COMERCIAL, sobre o vínculo. Uma empresa excluída
+ * continua sendo, comercialmente, uma cortesia. O que faltava era a outra pergunta, a
+ * OPERACIONAL: "o que está acontecendo com ela agora?".
+ *
+ * As duas convivem porque as duas são úteis, e por isso `situacaoNoPainel` não substitui a
+ * primeira — ela a envolve, e só assume quando há algo mais urgente a dizer. A ordem é a
+ * ordem de quem lê: excluída vence bloqueada, que vence a régua de cobrança, que vence o
+ * vínculo comercial.
+ */
+export type SituacaoNoPainel =
+  | SituacaoCS
+  | 'excluida'
+  | 'bloqueada_admin'
+  | 'tolerancia'
+  | 'somente_leitura'
+  | 'suspensa'
+  | 'prazo_esgotado';
+
+export interface EstadoOperacional extends EstadoAssinatura {
+  /** Quando foi excluída pelo painel. `null` = não foi. */
+  excluida_em?: string | null;
+  /** Quando foi bloqueada pelo painel. `null` = não foi. */
+  bloqueada_em?: string | null;
+  /** Quando o pagamento parou de passar. `null` = em dia. */
+  inadimplente_desde?: string | null;
+}
+
+export const ROTULO_NO_PAINEL: Record<SituacaoNoPainel, string> = {
+  ...ROTULO_SITUACAO,
+  excluida: 'Excluída',
+  bloqueada_admin: 'Bloqueada por vocês',
+  tolerancia: 'Cobrança falhou',
+  somente_leitura: 'Só leitura',
+  suspensa: 'Suspensa',
+  prazo_esgotado: 'Prazo esgotado',
+};
+
+/** Dias desde uma data. `null` quando não há data ou ela é ilegível. */
+function diasDesde(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86_400_000));
+}
+
+/** Os mesmos degraus de `plano-gate.ts` e da função `degrau_da_regua` do banco. */
+function degrauDaCobranca(dias: number): SituacaoNoPainel {
+  if (dias < 15) return 'tolerancia';
+  if (dias < 30) return 'somente_leitura';
+  if (dias < 90) return 'suspensa';
+  return 'prazo_esgotado';
+}
+
+export function situacaoNoPainel(e: EstadoOperacional): SituacaoNoPainel {
+  if (e.excluida_em) return 'excluida';
+
+  const status = (e.plan_status ?? '').trim().toLowerCase();
+  const aindaSemAcesso = ['inactive', 'canceled', 'unpaid', 'incomplete_expired'].includes(status);
+
+  /**
+   * 🔴 O `aindaSemAcesso` NÃO É REDUNDANTE. O registro do bloqueio some quando alguém
+   * desbloqueia pelo painel — mas o Stripe também reativa uma empresa por fora, pelo webhook,
+   * sem passar por lá. Sem esta condição, o painel escreveria "Bloqueada por vocês" em cima
+   * de um cliente que voltou a pagar e está usando o sistema normalmente.
+   */
+  if (e.bloqueada_em && aindaSemAcesso) return 'bloqueada_admin';
+
+  const dias = diasDesde(e.inadimplente_desde);
+  if (dias !== null) return degrauDaCobranca(dias);
+
+  return situacaoDaEmpresa(e);
+}

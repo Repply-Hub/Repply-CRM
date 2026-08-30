@@ -35,6 +35,14 @@ export interface EmpresaCS {
   negocios_30d: number;
   wa_msgs_30d: number;
   emails_30d: number;
+  /**
+   * 🔴 AS TRES QUE CONTAM O ESTADO DE AGORA. Sem elas o painel classificava a empresa so
+   * pelo status da assinatura — e uma empresa bloqueada ficava indistinguivel de uma que se
+   * cadastrou e nunca pagou, porque as duas gravam `plan_status = 'inactive'`.
+   */
+  excluida_em: string | null;
+  bloqueada_em: string | null;
+  inadimplente_desde: string | null;
 }
 
 export interface UsuarioCS {
@@ -47,7 +55,7 @@ export interface UsuarioCS {
   suspenso: boolean;
 }
 
-export type AcaoPlano = 'trial' | 'cortesia' | 'bloquear';
+export type AcaoPlano = 'trial' | 'cortesia' | 'bloquear' | 'desbloquear';
 
 /** Situação comercial derivada, que é como a tela agrupa as empresas. */
 // A classificação comercial vive em lib/situacao-empresa.ts: é regra de negócio
@@ -57,6 +65,11 @@ export {
   diasDeTrial,
   ROTULO_SITUACAO,
   type SituacaoCS,
+  // A leitura OPERACIONAL — excluida, bloqueada, em que degrau da cobranca. Envolve a
+  // comercial acima e so assume quando ha algo mais urgente a dizer.
+  situacaoNoPainel,
+  ROTULO_NO_PAINEL,
+  type SituacaoNoPainel,
 } from '@/lib/situacao-empresa';
 
 export function useEmpresasCS() {
@@ -111,11 +124,15 @@ export function useDefinirPlano() {
       // O perfil carrega a assinatura embutida: sem invalidar, o gate do próprio
       // admin continuaria com o estado antigo em cache.
       qc.invalidateQueries({ queryKey: ['usuarios'] });
+      // E o estado de cobrança que a faixa do cliente lê — quem estiver com o sistema
+      // aberto vê a mudança ao voltar para a aba, sem sair e entrar de novo.
+      qc.invalidateQueries({ queryKey: ['meu_estado_de_cobranca'] });
 
       const msg: Record<AcaoPlano, string> = {
         trial: `Teste liberado por ${params.dias ?? 7} dias.`,
         cortesia: 'Acesso de cortesia liberado, sem cobrança.',
         bloquear: 'Acesso bloqueado. Os dados continuam intactos.',
+        desbloquear: 'Acesso devolvido ao que era antes do bloqueio.',
       };
       toast.success(msg[params.acao]);
     },

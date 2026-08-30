@@ -1,3 +1,5 @@
+import { recusaDeAcesso } from '@/lib/recusa-do-banco';
+
 /**
  * A frase legível de um erro que veio de uma gravação direta em tabela.
  *
@@ -19,9 +21,17 @@
  * `mensagemDeErroDaFunction` de `@/lib/erro-edge-function`. Os dois casos parecem o mesmo e
  * não são: aplicar este aqui num erro de `functions.invoke` devolve a frase genérica em
  * inglês da biblioteca.
+ *
+ * 🔴 RECUSA DAS REGRAS DE ACESSO SAI NA FRENTE. É o único erro comum cuja frase original não
+ * ajuda ninguém — "new row violates row-level security policy" é inglês, é jargão de banco, e
+ * não diz nem a causa nem a saída. `recusaDeAcesso` troca por uma frase que diz as duas. Todo
+ * o resto continua chegando como o banco escreveu: ali a frase original é a parte útil.
  */
 export function mensagemDeErro(e: unknown, padrao = 'erro desconhecido'): string {
   if (typeof e === 'string' && e.trim()) return e;
+
+  const recusa = recusaDeAcesso(e);
+  if (recusa) return recusa;
 
   if (e && typeof e === 'object') {
     const o = e as { message?: unknown; details?: unknown; hint?: unknown };

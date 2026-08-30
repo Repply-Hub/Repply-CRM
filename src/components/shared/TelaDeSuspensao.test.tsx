@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import * as gate from '@/lib/plano-gate';
 
 /**
  * A tela do dia 30 — e as três coisas que ela não pode errar.
@@ -20,7 +21,29 @@ const useAuthFalso = vi.fn();
 vi.mock('@/hooks/use-auth', () => ({ useAuth: () => useAuthFalso() }));
 
 const encerradaFalso = vi.fn(() => false);
-vi.mock('@/hooks/use-conta-encerrada', () => ({ useContaEncerrada: () => encerradaFalso() }));
+const ENCERRADA = () => encerradaFalso();
+
+/**
+ * O estado de cobrança vem do banco em produção (para não ficar velho — ver
+ * `use-estado-de-cobranca.ts`). Aqui ele é calculado do MESMO perfil falso, com as MESMAS
+ * funções de `plano-gate`, para os casos deste arquivo continuarem se escrevendo em
+ * "empresa com N dias de atraso" em vez de em objetos de resposta do banco.
+ */
+vi.mock('@/hooks/use-estado-de-cobranca', () => ({
+  useEstadoDeCobranca: () => {
+    const { profile } = useAuthFalso();
+    const bloqueio = gate.motivoDoBloqueio(profile);
+    return {
+      encerrada: ENCERRADA(),
+      bloqueado: !!bloqueio,
+      motivo: bloqueio?.motivo ?? null,
+      venceuEm: bloqueio?.venceuEm ?? null,
+      diasInadimplencia: gate.diasDeInadimplencia(profile),
+      degrau: gate.meuDegrauNaRegua(profile),
+    };
+  },
+}));
+
 
 import { TelaDeSuspensao } from './TelaDeSuspensao';
 
