@@ -2,7 +2,12 @@ import { useLayoutEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CreditCard, Timer } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
-import { motivoDoBloqueio, podeGerenciarAssinatura, type MotivoDoBloqueio } from '@/lib/plano-gate';
+import {
+  meuDegrauNaRegua,
+  motivoDoBloqueio,
+  podeGerenciarAssinatura,
+  type MotivoDoBloqueio,
+} from '@/lib/plano-gate';
 import { cn } from '@/lib/utils';
 
 /**
@@ -36,7 +41,21 @@ interface Aparencia {
  * (teste acabou, assinatura nunca ativada) e VERMELHO para quem tem pendência de verdade. O
  * texto faz o resto do trabalho.
  */
-const APARENCIA: Record<MotivoDoBloqueio, Aparencia> = {
+/**
+ * 🔴 A TOLERÂNCIA NÃO É BLOQUEIO, e por isso não vem de `motivoDoBloqueio`. Nos 14 primeiros
+ * dias depois de o cartão falhar, tudo continua funcionando — a faixa só avisa. Tratá-la
+ * como bloqueio cortaria o acesso na primeira falha de cobrança, que é o jeito mais rápido
+ * de transformar um cartão vencido em cliente perdido.
+ */
+type EstadoDaFaixa = MotivoDoBloqueio | 'tolerancia';
+
+const APARENCIA: Record<EstadoDaFaixa, Aparencia> = {
+  tolerancia: {
+    caixa: 'border-warning/40 bg-warning/10',
+    icone: CreditCard,
+    titulo: 'Não conseguimos processar seu pagamento',
+    acao: 'Conferir pagamento',
+  },
   teste_venceu: {
     caixa: 'border-warning/40 bg-warning/10',
     icone: Timer,
@@ -122,12 +141,15 @@ export function FaixaDeCobranca() {
   const ref = useRef<HTMLDivElement>(null);
 
   const bloqueio = motivoDoBloqueio(profile);
-  useAlturaPublicada(ref, !!bloqueio);
+  const emTolerancia = !bloqueio && meuDegrauNaRegua(profile) === 'tolerancia';
+  const estado: EstadoDaFaixa | null = bloqueio ? bloqueio.motivo : emTolerancia ? 'tolerancia' : null;
+
+  useAlturaPublicada(ref, !!estado);
   // Empresa em dia, perfil ainda carregando, admin global: nada a dizer. Devolver `null` e
   // não uma caixa vazia — faixa de altura zero ainda empurraria o layout.
-  if (!bloqueio) return null;
+  if (!estado) return null;
 
-  const { caixa, icone: Icone, titulo, acao } = APARENCIA[bloqueio.motivo];
+  const { caixa, icone: Icone, titulo, acao } = APARENCIA[estado];
   const podeResolver = podeGerenciarAssinatura(profile, session);
 
   return (
@@ -143,14 +165,18 @@ export function FaixaDeCobranca() {
 
       <span className="font-medium text-foreground">
         {titulo}
-        {bloqueio.motivo === 'teste_venceu' && desde(bloqueio.venceuEm)}.
+        {estado === 'teste_venceu' && desde(bloqueio?.venceuEm ?? null)}.
       </span>
 
       {/* 🔴 DIZER O QUE AINDA FUNCIONA, e não só o que parou. Sem esta frase a pessoa
-          conclui que perdeu os dados — que é o medo real de quem vê um aviso vermelho no
-          topo do sistema onde está a carteira dela. */}
+          conclui que perdeu os dados — que é o medo real de quem vê um aviso no topo do
+          sistema onde está a carteira dela.
+
+          Na TOLERÂNCIA a frase é outra, e é a mais importante das duas: nada mudou ainda. */}
       <span className="text-muted-foreground">
-        Você continua vendo e exportando tudo. Criar e editar ficam indisponíveis.
+        {estado === 'tolerancia'
+          ? 'Nada mudou por enquanto — o banco vai tentar de novo nos próximos dias.'
+          : 'Você continua vendo e exportando tudo. Criar e editar ficam indisponíveis.'}
       </span>
 
       {podeResolver ? (

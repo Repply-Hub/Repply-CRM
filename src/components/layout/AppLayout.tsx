@@ -18,6 +18,7 @@ interface AppLayoutProps {
 }
 
 import { FaixaDeCobranca } from '@/components/shared/FaixaDeCobranca';
+import { TelaDeSuspensao } from '@/components/shared/TelaDeSuspensao';
 
 export function AppLayout({ children, title, subtitle, headerContent, mainClassName }: AppLayoutProps) {
   const { user, profile } = useAuth();
@@ -85,6 +86,11 @@ export function AppLayout({ children, title, subtitle, headerContent, mainClassN
               </Link>
             </div>
           </header>
+          {/* 🔴 DENTRO do layout, cobrindo por cima — não substituindo. O app fica atrás,
+              desfocado, e é isso que faz o cliente pagar: ver a própria carteira ali, fora de
+              alcance. Uma página em branco no lugar só faz esquecer. Some sozinha quando não
+              há suspensão. */}
+          <TelaDeSuspensao />
           <main className={mainClassName ?? "flex-1 overflow-auto"}>
             {children}
           </main>

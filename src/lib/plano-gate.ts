@@ -266,6 +266,68 @@ export function situacaoDoMeuPlano(
   });
 }
 
+/**
+ * Os degraus da régua de cobrança, espelhando `public.degrau_da_regua` do banco.
+ *
+ * 🔴 AS DUAS PRECISAM CONCORDAR. O banco decide o que a pessoa CONSEGUE fazer (a função
+ * `empresa_plano_ativo`, que guarda 135 políticas); esta cópia decide o que a tela DIZ. Se
+ * divergirem, a tela promete uma coisa e o sistema faz outra — que é pior que não avisar.
+ *
+ * As faixas estão nos dois lugares porque o frontend não pode consultar o banco a cada
+ * render. Ao mudar um número aqui, mude na migration; ao mudar lá, mude aqui.
+ */
+export type DegrauDaRegua =
+  | 'em_dia'
+  | 'tolerancia'
+  | 'somente_leitura'
+  | 'suspensa'
+  | 'prazo_esgotado';
+
+const DIA_DA_LEITURA = 15;
+const DIA_DA_SUSPENSAO = 30;
+const DIA_DO_PRAZO_FINAL = 90;
+
+/** Dias desde que o pagamento começou a falhar. `null` = em dia. */
+export function diasDeInadimplencia(profile: ProfileComPlano | null | undefined): number | null {
+  const bruto = extrairAssinatura(profile)?.inadimplente_desde;
+  if (typeof bruto !== 'string' || !bruto.trim()) return null;
+
+  const desde = new Date(bruto);
+  if (Number.isNaN(desde.getTime())) return null;
+
+  return Math.max(0, Math.floor((Date.now() - desde.getTime()) / 86_400_000));
+}
+
+export function degrauDaRegua(dias: number | null): DegrauDaRegua {
+  if (dias === null) return 'em_dia';
+  if (dias < DIA_DA_LEITURA) return 'tolerancia';
+  if (dias < DIA_DA_SUSPENSAO) return 'somente_leitura';
+  if (dias < DIA_DO_PRAZO_FINAL) return 'suspensa';
+  return 'prazo_esgotado';
+}
+
+/**
+ * O degrau da empresa de quem está logado.
+ *
+ * 🔴 `tolerancia` NÃO É BLOQUEIO. Nos primeiros 14 dias tudo funciona — a faixa avisa, e é
+ * só isso. Tratar tolerância como bloqueio cortaria o acesso na primeira falha de cartão, que
+ * é o jeito mais rápido de transformar um cartão vencido em cliente perdido.
+ */
+export function meuDegrauNaRegua(profile: ProfileComPlano | null | undefined): DegrauDaRegua {
+  // Admin global nunca entra na régua, pela mesma razão de `statusPlano`.
+  if (normalizar(profile?.role) === 'admin') return 'em_dia';
+  return degrauDaRegua(diasDeInadimplencia(profile));
+}
+
+/**
+ * A empresa está suspensa? É o degrau em que a tela deixa de ser utilizável e vira um aviso
+ * cobrindo o app (dia 30 em diante).
+ */
+export function acessoSuspenso(profile: ProfileComPlano | null | undefined): boolean {
+  const degrau = meuDegrauNaRegua(profile);
+  return degrau === 'suspensa' || degrau === 'prazo_esgotado';
+}
+
 /** Papéis que respondem pela empresa e podem, portanto, tratar da assinatura. */
 const PAPEIS_GESTORES = ['empresa', 'gestor'];
 

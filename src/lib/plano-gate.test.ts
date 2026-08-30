@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   STATUS_BLOQUEADOS,
   extrairEmpresa,
+  acessoSuspenso,
+  degrauDaRegua,
+  diasDeInadimplencia,
+  meuDegrauNaRegua,
   motivoDoBloqueio,
   planStatusBruto,
   planoBloqueado,
@@ -428,5 +432,74 @@ describe('motivoDoBloqueio — por que está bloqueado, não só se está', () =
   it('perfil sem assinatura não inventa motivo', () => {
     expect(motivoDoBloqueio(null)).toBeNull();
     expect(motivoDoBloqueio({ role: 'gestor', empresas: null })).toBeNull();
+  });
+});
+
+describe('a régua de cobrança, espelhada no frontend', () => {
+  function comInadimplencia(dias: number | null, role = 'gestor') {
+    return {
+      role,
+      empresas: {
+        empresa_assinaturas: {
+          plan_status: 'active',
+          inadimplente_desde:
+            dias === null ? null : new Date(Date.now() - dias * 86_400_000).toISOString(),
+        },
+      },
+    };
+  }
+
+  it('empresa em dia não está na régua', () => {
+    expect(meuDegrauNaRegua(comInadimplencia(null))).toBe('em_dia');
+    expect(acessoSuspenso(comInadimplencia(null))).toBe(false);
+  });
+
+  it('🔴 tolerância NÃO é bloqueio — nos 14 primeiros dias tudo funciona', () => {
+    // Cortar na primeira falha de cartão transforma cartão vencido em cliente perdido.
+    expect(meuDegrauNaRegua(comInadimplencia(0))).toBe('tolerancia');
+    expect(meuDegrauNaRegua(comInadimplencia(14))).toBe('tolerancia');
+    expect(acessoSuspenso(comInadimplencia(14))).toBe(false);
+  });
+
+  it('o dia 15 vira somente leitura', () => {
+    expect(meuDegrauNaRegua(comInadimplencia(15))).toBe('somente_leitura');
+    // Ainda NÃO é suspensão: a pessoa continua vendo tudo.
+    expect(acessoSuspenso(comInadimplencia(15))).toBe(false);
+    expect(meuDegrauNaRegua(comInadimplencia(29))).toBe('somente_leitura');
+  });
+
+  it('o dia 30 suspende', () => {
+    expect(meuDegrauNaRegua(comInadimplencia(30))).toBe('suspensa');
+    expect(acessoSuspenso(comInadimplencia(30))).toBe(true);
+    expect(meuDegrauNaRegua(comInadimplencia(89))).toBe('suspensa');
+  });
+
+  it('o dia 90 é o fim do prazo — e continua suspenso, não apaga nada', () => {
+    expect(meuDegrauNaRegua(comInadimplencia(90))).toBe('prazo_esgotado');
+    expect(acessoSuspenso(comInadimplencia(90))).toBe(true);
+    expect(meuDegrauNaRegua(comInadimplencia(365))).toBe('prazo_esgotado');
+  });
+
+  it('🔴 as fronteiras batem com as do banco (15, 30, 90)', () => {
+    // Se alguém mudar um número aqui sem mudar na migration, a tela promete uma coisa e o
+    // sistema faz outra. Este teste fixa os três.
+    expect(degrauDaRegua(14)).toBe('tolerancia');
+    expect(degrauDaRegua(15)).toBe('somente_leitura');
+    expect(degrauDaRegua(29)).toBe('somente_leitura');
+    expect(degrauDaRegua(30)).toBe('suspensa');
+    expect(degrauDaRegua(89)).toBe('suspensa');
+    expect(degrauDaRegua(90)).toBe('prazo_esgotado');
+  });
+
+  it('admin global nunca entra na régua', () => {
+    expect(meuDegrauNaRegua(comInadimplencia(200, 'admin'))).toBe('em_dia');
+    expect(acessoSuspenso(comInadimplencia(200, 'admin'))).toBe(false);
+  });
+
+  it('data ilegível não inventa inadimplência', () => {
+    expect(
+      meuDegrauNaRegua({ role: 'gestor', empresas: { empresa_assinaturas: { inadimplente_desde: 'abc' } } }),
+    ).toBe('em_dia');
+    expect(diasDeInadimplencia(null)).toBeNull();
   });
 });
