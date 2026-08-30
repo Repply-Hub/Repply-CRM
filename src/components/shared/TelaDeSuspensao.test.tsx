@@ -19,11 +19,15 @@ import { MemoryRouter } from 'react-router-dom';
 const useAuthFalso = vi.fn();
 vi.mock('@/hooks/use-auth', () => ({ useAuth: () => useAuthFalso() }));
 
+const encerradaFalso = vi.fn(() => false);
+vi.mock('@/hooks/use-conta-encerrada', () => ({ useContaEncerrada: () => encerradaFalso() }));
+
 import { TelaDeSuspensao } from './TelaDeSuspensao';
 
 afterEach(() => {
   cleanup();
   useAuthFalso.mockReset();
+  encerradaFalso.mockReturnValue(false);
 });
 
 function comDias(dias: number | null, role = 'gestor') {
@@ -121,5 +125,42 @@ describe('TelaDeSuspensao', () => {
   it('admin global nunca é suspenso', () => {
     comDias(200, 'admin');
     expect(desenhar().container).toBeEmptyDOMElement();
+  });
+});
+
+describe('conta encerrada — o texto NEUTRO', () => {
+  it('🔴 não inventa problema de pagamento para quem era cortesia', () => {
+    // O botão de excluir alcança empresas de três origens, e só uma chegou lá por dívida.
+    comDias(null); // em dia, nunca deveu nada
+    encerradaFalso.mockReturnValue(true);
+    desenhar();
+
+    expect(screen.getByText(/conta foi encerrada/i)).toBeTruthy();
+    expect(screen.queryByText(/pagamento/i)).toBeNull();
+    expect(screen.queryByText(/suspenso/i)).toBeNull();
+  });
+
+  it('🔴 não conta o prazo de 60 dias — é informação nossa, não dela', () => {
+    comDias(null);
+    encerradaFalso.mockReturnValue(true);
+    desenhar();
+    expect(screen.queryByText(/60 dias/i)).toBeNull();
+    expect(screen.queryByText(/apagad/i)).toBeNull();
+  });
+
+  it('encerrada vence sobre suspensa — um texto só, e o certo', () => {
+    comDias(45); // também suspensa pela régua
+    encerradaFalso.mockReturnValue(true);
+    desenhar();
+
+    expect(screen.getByText(/conta foi encerrada/i)).toBeTruthy();
+    expect(screen.queryByText(/acesso está suspenso/i)).toBeNull();
+  });
+
+  it('tem saída, como toda tela que cobre o app', () => {
+    comDias(null);
+    encerradaFalso.mockReturnValue(true);
+    desenhar();
+    expect(screen.getByRole('button', { name: /sair/i })).toBeTruthy();
   });
 });

@@ -2,6 +2,7 @@ import { AlertOctagon, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
+import { useContaEncerrada } from '@/hooks/use-conta-encerrada';
 import {
   acessoSuspenso,
   diasDeInadimplencia,
@@ -29,6 +30,48 @@ function emDias(quantos: number): string {
 
 export function TelaDeSuspensao() {
   const { profile, session, signOut } = useAuth();
+  const encerrada = useContaEncerrada();
+
+  /**
+   * 🔴 CONTA ENCERRADA TEM TEXTO PRÓPRIO, e NEUTRO.
+   *
+   * O botão de excluir vai ser usado em empresas de três origens, e só uma delas chegou lá
+   * por falta de pagamento. Mostrar a tela de cobrança para uma CORTESIA encerrada inventaria
+   * um problema de pagamento que nunca existiu — e o cliente ligaria perguntando qual fatura
+   * deixou de pagar.
+   *
+   * E ela NÃO diz "seus dados serão apagados em 60 dias": esse prazo é informação nossa, de
+   * controle interno. Para quem está do outro lado, ele só serviria para assustar sobre algo
+   * que a pessoa não pode resolver sozinha.
+   */
+  if (encerrada) {
+    return (
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="titulo-encerrada"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-md"
+      >
+        <div className="w-full max-w-md rounded-xl border bg-card p-6 text-center shadow-xl sm:p-8">
+          <h2 id="titulo-encerrada" className="text-lg font-semibold text-foreground">
+            Esta conta foi encerrada
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            O acesso ao sistema não está mais disponível. Se isso não era esperado, fale com o
+            suporte.
+          </p>
+          <Button
+            variant="ghost"
+            onClick={() => signOut?.()}
+            className="mt-5 text-muted-foreground"
+          >
+            <LogOut className="mr-1.5 h-4 w-4" />
+            Sair
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!acessoSuspenso(profile)) return null;
 

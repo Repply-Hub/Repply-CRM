@@ -1,4 +1,10 @@
 import { useMemo, useState } from 'react';
+import { ExcluirEmpresaDialog } from '@/components/admin/ExcluirEmpresaDialog';
+import {
+  useExcluirEmpresa,
+  useNumerosDaEmpresa,
+  useRestaurarEmpresa,
+} from '@/hooks/use-exclusao-empresa';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,11 +14,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Building2, Users, Loader2, ChevronDown, ChevronRight, Search,
-  TrendingUp, MessageSquare, Mail, Clock, RefreshCw, Gift, Timer, Ban,
-  CalendarPlus, CreditCard,
-} from 'lucide-react';
+import { Ban, Building2, CalendarPlus, ChevronDown, ChevronRight, Clock, CreditCard, Gift, Loader2, Mail, MessageSquare, RefreshCw, Search, Timer, Trash2, TrendingUp, Users } from 'lucide-react';
 import {
   useEmpresasCS, useUsuariosDaEmpresa, useDefinirPlano,
   situacaoDaEmpresa, diasDeTrial, ROTULO_SITUACAO,
@@ -77,6 +79,13 @@ function CardEmpresa({ empresa }: { empresa: EmpresaCS }) {
   const [confirmar, setConfirmar] = useState<AcaoPlano | null>(null);
   const { data: usuarios, isLoading: carregandoUsuarios } = useUsuariosDaEmpresa(aberto ? empresa.empresa_id : null);
   const definirPlano = useDefinirPlano();
+
+  const [excluindo, setExcluindo] = useState(false);
+  const excluir = useExcluirEmpresa();
+  const restaurar = useRestaurarEmpresa();
+  // Só conta quando a confirmação abre: são cinco somas pesadas (11.910 negócios na MD), e
+  // fazê-las para as 10 empresas ao abrir a tela seria caro por nada.
+  const { data: numeros } = useNumerosDaEmpresa(excluindo ? empresa.empresa_id : null);
 
   const situacao = situacaoDaEmpresa(empresa);
   const dias = diasDeTrial(empresa);
@@ -182,6 +191,21 @@ function CardEmpresa({ empresa }: { empresa: EmpresaCS }) {
               >
                 <Ban className="mr-1.5 h-4 w-4" /> Bloquear
               </Button>
+
+              {/* 🔴 SEPARADO DOS OUTROS TRÊS, de propósito. Liberar prazo, cortesia e
+                  bloquear são reversíveis com um clique; este abre um caminho que termina em
+                  dado apagado. O `border-l` e o espaço são o que impedem o gesto de virar
+                  "mais um botão da fileira". */}
+              <span className="mx-1 hidden h-6 self-center border-l sm:block" aria-hidden />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setExcluindo(true)}
+                disabled={definirPlano.isPending || excluir.isPending}
+              >
+                <Trash2 className="mr-1.5 h-4 w-4" /> Excluir
+              </Button>
               <span className="ml-auto self-center text-xs text-muted-foreground">
                 código <span className="font-mono">{empresa.codigo_acesso}</span>
                 {dias !== null && (
@@ -231,6 +255,17 @@ function CardEmpresa({ empresa }: { empresa: EmpresaCS }) {
           </div>
         )}
       </CardContent>
+
+      <ExcluirEmpresaDialog
+        aberto={excluindo}
+        onOpenChange={setExcluindo}
+        nomeDaEmpresa={empresa.nome}
+        numeros={numeros ?? null}
+        temAssinaturaAtiva={empresa.tem_assinatura_stripe}
+        aoConfirmar={(motivo) =>
+          excluir.mutateAsync({ empresaId: empresa.empresa_id, motivo }).then(() => undefined)
+        }
+      />
 
       <AlertDialog open={!!confirmar} onOpenChange={(o) => !o && setConfirmar(null)}>
         <AlertDialogContent>
