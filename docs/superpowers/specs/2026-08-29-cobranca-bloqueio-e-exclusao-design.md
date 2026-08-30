@@ -131,13 +131,40 @@ para as 81 tabelas é barato.
   vê "peça ao gestor").
 - **Agendador:** `pg_cron` com 7 rotinas e o padrão `public.chamar_edge_function(...)` pronto.
 
-### 2.9 🔴 `VITE_PAYWALL_ATIVO` está DESLIGADO
+### 2.9 🔴 CORRIGIDO EM 30/08/2026: `VITE_PAYWALL_ATIVO` estava LIGADO
 
-Ele controla **apenas** o desvio de navegação para `/assinar` — não tem relação com a trava do
-banco, que vale sempre.
+**A primeira versão deste documento afirmava o contrário, e estava errada.** A correção fica
+registrada porque o erro é fácil de repetir.
 
-Efeito prático hoje: empresa bloqueada recebe **erro silencioso** ao tentar salvar, sem
-nenhuma explicação. Ligar isso faz parte do trabalho.
+A variável **não existe em lugar nenhum do repositório** — nem no `.env`, nem no
+`.env.example` preenchido, nem no `vercel.json`. Ela mora no painel da Vercel. Quem levanta o
+estado lendo o repositório conclui "desligado", e o repositório simplesmente não sabe.
+
+O que resolve a dúvida é olhar o que está no ar. O valor é fixado no momento da compilação,
+então ele aparece literalmente dentro do arquivo publicado:
+
+```sh
+js=$(curl -s https://crm.repplyhub.com.br/ | grep -oE '/assets/index-[^"]+\.js' | head -1)
+curl -s "https://crm.repplyhub.com.br$js" | grep -oE '\["true","1","sim"\]\.includes\([^)]*\)'
+# -> ["true","1","sim"].includes("true".trim()      ou seja: LIGADO
+```
+
+**A consequência era maior que o erro de fato.** Com o desvio ligado, empresa bloqueada não
+ficava em somente-leitura: era **expulsa** para `/assinar`, sem ver nada e sem caminho de
+volta a não ser sair da conta. Isso é o degrau da SUSPENSÃO (dia 30) disparando no dia 15 —
+pulava o estágio intermediário, que é justamente o que faz o cliente pagar.
+
+Ninguém percebeu porque a única empresa nesse estado é a "Teste Empresa", com 1 usuário.
+
+**Decisão do Lucas em 30/08/2026:** vale o desenho. O desvio automático foi desligado
+(`src/App.tsx`), a faixa `<FaixaDeCobranca>` passou a explicar o bloqueio, e a tela `/assinar`
+continua de pé como destino do botão da faixa. A suspensão da etapa 4 volta a usar aquele
+ponto, com um predicado próprio.
+
+**Também é valor de compilação**, o que significa: não há interruptor instantâneo, e mudá-lo
+custa uma publicação. Se um dia for preciso ligar e desligar sem publicar, o projeto já tem o
+padrão pronto — `use-secoes.ts` lê a resposta do banco pela mesma função que a regra de
+segurança usa, justamente para tela e banco não divergirem.
 
 ### 2.10 Exportação não tem como ser bloqueada
 
@@ -449,7 +476,7 @@ inadimplência e acabaria marcado para exclusão.
 | # | Etapa | Por quê nesta ordem |
 |---|---|---|
 | 1 | Fechar o cerco do bloqueio (§6) | é a base de tudo; sem ele "somente leitura" não existe |
-| 2 | Faixa no topo + ligar `VITE_PAYWALL_ATIVO` (§4.5, §2.9) | sem isso o bloqueio é mudo |
+| 2 | Faixa no topo + desligar o desvio automático (§4.5, §2.9) | sem isso o bloqueio é mudo — e expulsa em vez de deixar ver |
 | 3 | Seção de Pagamentos (§5) | dá ao cliente como resolver antes de a régua apertar |
 | 4 | Escada + rotina diária + e-mails (§4) | depende de 1, 2 e 3 |
 | 5 | Botão de excluir com 60 dias (§7.1, §7.2) | reversível, seguro de entregar |

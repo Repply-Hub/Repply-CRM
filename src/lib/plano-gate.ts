@@ -181,6 +181,55 @@ export function planoBloqueado(profile: ProfileComPlano | null | undefined): boo
   return statusPlano(profile) === 'bloqueado';
 }
 
+/**
+ * POR QUE a empresa está bloqueada — não apenas SE está.
+ *
+ * `statusPlano` colapsa três situações diferentes na mesma palavra "bloqueado", e para a
+ * pessoa do outro lado da tela elas não são a mesma coisa nem de longe:
+ *
+ *   - `teste_venceu`    — usou os 7 dias e o prazo acabou. Nunca deveu nada.
+ *   - `nunca_ativou`    — cadastrou e não chegou a assinar. Também nunca deveu nada.
+ *   - `pagamento_parou` — foi cliente pagante e a cobrança falhou. Este sim tem pendência.
+ *
+ * 🔴 A DIFERENÇA ENTRE OS DOIS PRIMEIROS E O TERCEIRO NÃO É COSMÉTICA. Dizer "regularize seu
+ * pagamento" para quem nunca pagou um centavo é acusar de calote quem não deve nada — e é
+ * exatamente o erro que o painel de admin cometeu até 29/08/2026, quando mostrava "Pagamento
+ * parado" para uma empresa que só tinha aberto o checkout e desistido.
+ *
+ * O sinal que separa é `stripe_subscription_id`: só existe quando houve assinatura de verdade.
+ * NÃO use `stripe_customer_id` para isso — ele nasce quando a pessoa ABRE o checkout, antes de
+ * qualquer cobrança. Foi essa confusão que produziu o rótulo mentiroso.
+ *
+ * Devolve `null` quando a empresa NÃO está bloqueada, para quem chama poder usar como guarda.
+ */
+export type MotivoDoBloqueio = 'teste_venceu' | 'nunca_ativou' | 'pagamento_parou';
+
+export interface Bloqueio {
+  motivo: MotivoDoBloqueio;
+  /** Quando o teste venceu. Só preenchido em `teste_venceu`; `null` nos demais. */
+  venceuEm: Date | null;
+}
+
+export function motivoDoBloqueio(
+  profile: ProfileComPlano | null | undefined,
+): Bloqueio | null {
+  if (statusPlano(profile) !== 'bloqueado') return null;
+
+  // Teste vencido é o único caso em que `statusPlano` bloqueia SEM o status estar na denylist
+  // — ele bloqueia pela data. Por isso a checagem vem primeiro: perguntar pelo status aqui
+  // daria 'trialing', que não diz nada sobre estar vencido.
+  if (planStatusBruto(profile) === 'trialing') {
+    return { motivo: 'teste_venceu', venceuEm: fimDoPeriodo(profile) };
+  }
+
+  const assinatura = extrairAssinatura(profile);
+  const jaAssinou =
+    typeof assinatura?.stripe_subscription_id === 'string' &&
+    assinatura.stripe_subscription_id.trim() !== '';
+
+  return { motivo: jaAssinou ? 'pagamento_parou' : 'nunca_ativou', venceuEm: null };
+}
+
 /** Papéis que respondem pela empresa e podem, portanto, tratar da assinatura. */
 const PAPEIS_GESTORES = ['empresa', 'gestor'];
 

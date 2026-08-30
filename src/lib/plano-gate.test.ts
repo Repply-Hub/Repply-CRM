@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   STATUS_BLOQUEADOS,
   extrairEmpresa,
+  motivoDoBloqueio,
   planStatusBruto,
   planoBloqueado,
   podeGerenciarAssinatura,
@@ -347,5 +348,85 @@ describe('trial liberado pelo painel de CS — vale ate a data, nao para sempre'
 
   it('inactive segue bloqueado, com data ou sem', () => {
     expect(planoBloqueado(profileFake({ planStatus: 'inactive', fimDoPeriodo: AMANHA }))).toBe(true);
+  });
+});
+
+describe('motivoDoBloqueio — por que está bloqueado, não só se está', () => {
+  /** Perfil direto, para poder pôr `stripe_subscription_id`, que o `profileFake` não cobre. */
+  function comAssinatura(campos: Record<string, unknown>) {
+    return {
+      role: 'gestor',
+      empresas: {
+        id: 'empresa-1',
+        nome: 'Construtora Meridiano',
+        empresa_assinaturas: campos,
+      },
+    };
+  }
+
+  const ONTEM = new Date(Date.now() - 86_400_000).toISOString();
+  const AMANHA = new Date(Date.now() + 86_400_000).toISOString();
+
+  it('empresa em dia devolve null — serve de guarda para quem chama', () => {
+    expect(motivoDoBloqueio(comAssinatura({ plan_status: 'active' }))).toBeNull();
+  });
+
+  it('teste dentro do prazo não está bloqueado', () => {
+    expect(
+      motivoDoBloqueio(comAssinatura({ plan_status: 'trialing', current_period_end: AMANHA })),
+    ).toBeNull();
+  });
+
+  it('teste vencido é "teste_venceu", e traz a data', () => {
+    const b = motivoDoBloqueio(
+      comAssinatura({ plan_status: 'trialing', current_period_end: ONTEM }),
+    );
+    expect(b?.motivo).toBe('teste_venceu');
+    expect(b?.venceuEm?.toISOString()).toBe(ONTEM);
+  });
+
+  it('🔴 quem nunca assinou é "nunca_ativou" — não se acusa de calote quem não deve', () => {
+    // Toda empresa nasce com `inactive` por gatilho. Sem esta distinção, a faixa diria
+    // "regularize seu pagamento" para quem nunca pagou um centavo.
+    expect(motivoDoBloqueio(comAssinatura({ plan_status: 'inactive' }))?.motivo)
+      .toBe('nunca_ativou');
+  });
+
+  it('🔴 ter cadastro no Stripe NÃO é ter pago — o cadastro nasce ao abrir o checkout', () => {
+    expect(
+      motivoDoBloqueio(
+        comAssinatura({ plan_status: 'inactive', stripe_customer_id: 'cus_123' }),
+      )?.motivo,
+    ).toBe('nunca_ativou');
+  });
+
+  it('quem teve assinatura de verdade e caiu é "pagamento_parou"', () => {
+    expect(
+      motivoDoBloqueio(
+        comAssinatura({
+          plan_status: 'canceled',
+          stripe_customer_id: 'cus_123',
+          stripe_subscription_id: 'sub_123',
+        }),
+      )?.motivo,
+    ).toBe('pagamento_parou');
+  });
+
+  it('assinatura vazia em texto não conta como ter assinado', () => {
+    expect(
+      motivoDoBloqueio(
+        comAssinatura({ plan_status: 'unpaid', stripe_subscription_id: '   ' }),
+      )?.motivo,
+    ).toBe('nunca_ativou');
+  });
+
+  it('admin global nunca é bloqueado, então nunca tem motivo', () => {
+    expect(motivoDoBloqueio({ role: 'admin', empresas: { empresa_assinaturas: { plan_status: 'canceled' } } }))
+      .toBeNull();
+  });
+
+  it('perfil sem assinatura não inventa motivo', () => {
+    expect(motivoDoBloqueio(null)).toBeNull();
+    expect(motivoDoBloqueio({ role: 'gestor', empresas: null })).toBeNull();
   });
 });

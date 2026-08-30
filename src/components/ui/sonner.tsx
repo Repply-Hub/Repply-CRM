@@ -11,7 +11,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       position="top-right"
-      offset={{ top: "calc(5.5rem + 1rem)", right: "1rem" }}
+      // 🔴 A `var(--altura-faixa-cobranca, 0px)` e o que impede o aviso de pousar em cima do
+      // cabecalho quando a faixa de cobranca aparece. Ela e escrita por
+      // <FaixaDeCobranca>, que se mede sozinha (a faixa quebra em duas linhas no celular,
+      // entao a altura nao e constante). Sem a faixa, o padrao 0px mantem o de sempre.
+      offset={{ top: "calc(5.5rem + 1rem + var(--altura-faixa-cobranca, 0px))", right: "1rem" }}
       style={{ "--width": "26rem" } as CSSProperties}
       className="toaster group"
       closeButton

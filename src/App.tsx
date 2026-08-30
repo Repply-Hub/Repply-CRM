@@ -11,7 +11,6 @@ import { ErrorBoundary } from "@/components/layout/ErrorBoundary";
 import { TelaBloqueio } from "@/components/shared/TelaBloqueio";
 import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PAYWALL_ATIVO, planoBloqueado } from "@/lib/plano-gate";
 import { secaoDaRota } from "@/lib/secoes";
 import { useSecaoLigada } from "@/hooks/use-secoes";
 // Todas as páginas entram por aqui, e não pelo `lazy` do React: o wrapper
@@ -272,13 +271,31 @@ function ProtectedRoute({
   //
   // <Navigate> retornado no render, e não navigate() em efeito, para a página
   // protegida não chegar a pintar um frame antes do redirecionamento.
-  if (PAYWALL_ATIVO && requerPlano && profile && planoBloqueado(profile)) {
-    // O destino original vai no state para a tela de assinatura devolver o
-    // usuário ao lugar de onde ele veio depois de reativar.
-    return (
-      <Navigate to="/assinar" replace state={{ de: location.pathname + location.search }} />
-    );
-  }
+  // 🔴 O DESVIO AUTOMÁTICO PARA /assinar FOI DESLIGADO EM 30/08/2026. Decisão do Lucas.
+  //
+  // Ele expulsava do app quem estivesse com o plano inativo: a pessoa não via NADA, só a
+  // tela de pagamento, sem caminho de volta a não ser sair da conta. Isso não é o que o
+  // desenho aprovado pede.
+  //
+  // A escada de cobrança tem DOIS degraus, e eles são diferentes:
+  //
+  //   dia 15  SOMENTE LEITURA  — vê tudo e exporta, não cria nem edita. É onde a faixa
+  //                              <FaixaDeCobranca> (no AppLayout) explica o que houve.
+  //   dia 30  SUSPENSÃO        — aí sim a tela cobrindo o app.
+  //
+  // Este desvio implementava o dia 30 e disparava no dia 15 — pulava o degrau do meio, que
+  // é justamente o que faz o cliente pagar: ver a própria carteira e não conseguir
+  // trabalhar nela.
+  //
+  // ⚠️ NÃO REMOVA `PAYWALL_ATIVO` NEM A ROTA /assinar. A tela continua de pé e continua
+  // sendo o destino do botão da faixa; o que saiu foi só o desvio forçado. A SUSPENSÃO da
+  // etapa 4 volta a usar este ponto, com um predicado próprio — hoje nenhum estado do banco
+  // corresponde a ela, e escrever a condição antes do estado existir seria código morto
+  // fingindo de funcionalidade.
+  //
+  // 🔴 E o bloqueio de verdade nunca dependeu deste `if`: ele é a RLS do Postgres, que
+  // desde 29/08/2026 cobre 45 tabelas e recusa criar, editar e apagar. Este trecho sempre
+  // foi conveniência de navegação — está escrito no comentário logo acima.
 
   // A `key` inclui a ROTA, e essa é a correção mais importante deste arquivo.
   //
