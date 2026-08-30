@@ -322,10 +322,16 @@ mensagens e histórico → negócios → obras → contatos → clientes → fab
 
 ## 8. Riscos e pontos a validar durante a execução
 
+> **Atualização de 30/08/2026, depois da revisão do script:** os riscos 1 e 2 foram
+> resolvidos na leitura do código, e a revisão encontrou **nove defeitos reais no script**
+> — três deles fariam a execução abortar. Todos corrigidos antes de qualquer execução.
+> O registro está na mensagem do commit `feat(demo)`.
+
 | # | Risco | Como descubro | O que faço se acontecer |
 |---|---|---|---|
-| 1 | O gatilho `fn_set_pedido_fechado_em` pode não disparar quando o negócio já **nasce** com status de fechado — ele foi escrito para mudança de etapa | Lote de prova (passo 4), conferindo `fechado_em` dos 3 negócios | Preencho `fechado_em` explicitamente no INSERT |
-| 2 | A caixa de e-mail exige uma linha em `email_contas` e pode tentar sincronizar com o Nylas ao abrir (`Emails.tsx:324`) | Abrindo a tela depois do lote 7 | Deixo a conta num estado que não dispara sincronização |
+| 1 | ✅ **Resolvido na leitura.** O gatilho `fn_set_pedido_fechado_em` **dispara** no INSERT e **respeita** a data de fechamento que vier preenchida — só carimba a de hoje quando ela chega vazia (migration `20260821120100:58-67`). O lote de prova continua existindo para confirmar na prática | — | — |
+| 2 | ✅ **Resolvido, mas por outro mecanismo.** Quem segura a sincronização automática não é `ultima_sync_em`: é o `atualizado_em` das pastas recém-criadas (`Emails.tsx:326-338` lê a pasta, não a conta). A proteção vale 24h; depois disso a varredura dispara, não acha credencial e volta sem quebrar nada | Abrindo a tela depois do lote 7 | Nada a fazer — a falha é silenciosa e inofensiva |
+| 2b | 🔴 **Aberto, e é operacional.** A caixa da demonstração com `status='conectada'` entra na rotina global de sincronização de e-mail a cada 15 minutos e **divide o orçamento de tempo com a caixa real da MD** (`email-sync/index.ts:119`, orçamento de 90s dividido pelo número de contas). Não quebra, mas encurta a janela da caixa que importa | — | Decisão do Lucas: ou a base demo é temporária e a linha sai ao fim das apresentações, ou o `email-sync` passa a ignorar conta sem credencial antes de dividir |
 | 3 | O envio pela caixa de WhatsApp vai falhar na demonstração, porque não há número conectado | Conhecido de antemão | Avisar a equipe comercial: a caixa é para mostrar, não para enviar |
 | 4 | O Portal de Consultas mostra licenças reais de órgãos públicos, compartilhadas entre empresas | Conhecido | É dado público, não de cliente. Fica como está |
 | 5 | Outra sessão trabalha na mesma pasta e no mesmo banco | `git fetch` + `git status --short` antes de cada commit | Parar e avisar |
