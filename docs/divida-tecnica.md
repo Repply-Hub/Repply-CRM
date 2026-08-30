@@ -4,7 +4,7 @@ O que está quebrado, mal resolvido ou pendente neste sistema, com **o custo rea
 ordem de conserto**. Escrito para que ninguém precise redescobrir cada item.
 
 Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu. Itens 22 a 31
-acrescentados em 21/08/2026.
+acrescentados em 21/08/2026; o item 58, em 30/08/2026.
 
 > **Este documento não é lista de desejos.** Cada item aqui já tem consequência medida ou
 > observada. Melhoria que ainda é opinião não entra.
@@ -72,6 +72,7 @@ acrescentados em 21/08/2026.
 | 55 | [Coisas que deveriam ser por empresa e são globais](#55-coisas-que-deveriam-ser-por-empresa-e-são-compartilhadas-por-todas) | Média | Não |
 | 56 | [Onze pontos da documentação afirmam o que não é verdade](#56-onze-pontos-da-documentação-afirmam-coisa-que-não-é-verdade-hoje) | Média | Não |
 | 57 | [Os módulos que justificam o produto estão vazios](#57-os-módulos-que-justificam-o-produto-estão-vazios) | Produto | Decisão de produto pendente |
+| 58 | [Contato sem responsável aparece para TODAS as empresas](#58-contato-sem-responsável-aparece-para-todas-as-empresas) | **Alta** | Latente — 0 órfãos hoje, mas 3 caminhos podem criar um |
 
 ---
 
@@ -2007,6 +2008,100 @@ importação nunca preenche `pedidos.obra_id`** (a coluna "Obra" da planilha vir
 **A pergunta é de produto e não tem resposta técnica:** a MD não usa obras e tabela de preços
 porque nunca foram migradas, ou porque na prática não precisa delas? As duas respostas levam a
 roadmaps opostos.
+
+---
+
+## 58. Contato sem responsável aparece para TODAS as empresas
+
+**Gravidade: alta. Latente — medido em 30/08/2026: 0 órfãos hoje.**
+
+A regra de leitura de `contatos` e de `tarefas` tem uma terceira cláusula que ninguém
+comenta:
+
+```sql
+contatos_select : (usuario_id = get_my_usuario_id() OR usuario_in_my_empresa(usuario_id) OR usuario_id IS NULL)
+tarefas_select  : (usuario_id = get_my_usuario_id() OR usuario_in_my_empresa(usuario_id) OR usuario_id IS NULL)
+```
+
+**`OR usuario_id IS NULL` não é escopado por empresa.** Uma linha sem responsável não fica
+invisível: ela fica visível para as **nove** empresas do sistema. Um contato criado sem dono
+por um assinante qualquer entra na carteira da MD Representações, com nome, telefone e e-mail.
+
+### O tamanho hoje
+
+| tabela | órfãos | total |
+|---|---:|---:|
+| `contatos` | **0** | 1.092 |
+| `tarefas` | **0** | 4 |
+
+Está fechado por sorte, não por proteção. Não há `CHECK`, não há `NOT NULL`, e
+`contatos.usuario_id` e `tarefas.usuario_id` **não têm chave estrangeira nenhuma** — são
+colunas soltas (conferido no catálogo: só `criado_por_usuario_id` tem `REFERENCES usuarios`).
+
+### O que cria um órfão
+
+Três caminhos gravam contato com o dono vindo de uma consulta que pode voltar vazia, e
+nenhum confere o resultado:
+
+| arquivo | o que faz |
+|---|---|
+| `src/hooks/use-mutations.ts:47` | `const { data: vid } = await supabase.rpc('get_my_vendedor_id')` → `usuario_id: vid`, sem conferir |
+| `src/components/clientes/ImportClientesDialog.tsx:716` | mesmo `vid`, aplicado a um lote inteiro de importação |
+| `src/hooks/use-criar-contato-da-conversa.ts:54` | 🔴 `usuario_id: profile?.id ?? null` — escreve o nulo **explicitamente** |
+
+`get_my_vendedor_id()` delega para `get_my_usuario_id()`, que devolve nulo quando não há
+linha em `usuarios` para o login — a sessão órfã que o `ProtectedRoute` trata na tela, e que
+a função de banco simplesmente responde com nulo.
+
+### As duas coisas que fazem este item ser barato de consertar
+
+**1. O padrão certo já existe no mesmo código, a poucas linhas.** `use-tarefas.ts:85` recusa
+criar tarefa sem dono, com mensagem clara:
+
+```ts
+if (!usuarioRow?.id) throw new Error('Usuário não encontrado. Faça login novamente.');
+```
+
+É por isso que `tarefas` tem zero órfãos e nenhum produtor conhecido: o buraco na política
+existe, mas o app não o alimenta. Em `contatos` a mesma guarda não foi escrita.
+
+**2. O padrão certo da POLÍTICA também já existe, no mesmo banco.** `metas_vendas` aceita
+`usuario_id` nulo — ali o nulo significa "meta de equipe" — e mesmo assim não vaza, porque o
+nulo vem **emparelhado com a empresa**:
+
+```sql
+((usuario_id IS NULL) AND (empresa_id = get_my_empresa_id()))
+```
+
+`contatos` e `tarefas` são as **únicas duas** políticas do banco com a versão sem guarda
+(varredura de `pg_policies` em 30/08/2026).
+
+### O conserto, na ordem que não trava ninguém
+
+1. **Fechar a torneira primeiro:** acrescentar a guarda de `use-tarefas.ts:85` aos três
+   caminhos de contato. Sozinho, isso já impede o problema de nascer.
+2. **Depois fechar a política.** `contatos` e `tarefas` não têm coluna `empresa_id`, então
+   não dá para copiar `metas_vendas` literalmente: ou a cláusula do nulo simplesmente sai
+   (com o risco de esconder linha que hoje alguém enxerga — hoje são zero, então é seguro),
+   ou entra um `NOT NULL` na coluna, que é a versão definitiva.
+3. **Só então** vale medir de novo. Enquanto o passo 1 não existir, uma importação grande
+   pode criar centenas de órfãos entre a medição e o conserto.
+
+> ⚠️ **Não comece pelo passo 2 sem o passo 1.** Fechar a política com a torneira aberta faz
+> os contatos órfãos futuros ficarem invisíveis para todo mundo, inclusive para quem os
+> criou — troca um vazamento por um sumiço silencioso, que é mais difícil de perceber.
+
+### Como conferir a qualquer momento
+
+```sql
+select 'contatos' as tabela, count(*) filter (where usuario_id is null) as orfaos, count(*) as total from contatos
+union all
+select 'tarefas', count(*) filter (where usuario_id is null), count(*) from tarefas;
+```
+
+**Descoberto em 30/08/2026**, ao desenhar a base de demonstração da empresa Repply — a base
+precisou de uma trava própria para não criar contato órfão e despejá-lo na carteira da MD.
+Ver `docs/superpowers/specs/2026-08-30-base-demo-repply-design.md` §2.5.
 
 ---
 
