@@ -238,10 +238,43 @@ describe('situacaoNoPainel', () => {
   });
 
   it('🔴 bloqueio do painel não se confunde com "cadastrou e não pagou"', () => {
-    // As duas gravam `plan_status = 'inactive'`. O que separa é o registro do bloqueio.
-    const dados = { ...cortesiaAtiva, plan_status: 'inactive' };
+    // As duas gravam `plan_status = 'inactive'`, e é isso que as tornava indistinguíveis.
+    // O que separa é o registro do bloqueio — e a base aqui é uma empresa de ORIGEM STRIPE
+    // de propósito: numa cortesia o próprio "sem acesso" já denuncia o bloqueio (o teste
+    // logo acima), então ela não serviria para provar que o registro faz diferença.
+    const dados = {
+      plan_status: 'inactive',
+      origem: 'stripe',
+      current_period_end: null,
+      tem_customer_stripe: true,
+      tem_assinatura_stripe: false,
+    };
     expect(situacaoNoPainel(dados)).toBe('nunca_pagou');
     expect(situacaoNoPainel({ ...dados, bloqueada_em: hojeMenos(1) })).toBe('bloqueada_admin');
+  });
+
+  it('🔴 cortesia sem acesso é bloqueio, mesmo sem registro — o caso da "Repply"', () => {
+    // Ela foi bloqueada ANTES de o registro existir. Cortesia não vence e legacy nunca teve
+    // cobrança: se está sem acesso, alguém tirou. O rótulo antigo dizia "Cadastrou, não
+    // pagou" para uma empresa a quem vocês deram o sistema de graça.
+    expect(situacaoNoPainel({ ...cortesiaAtiva, plan_status: 'inactive' })).toBe('bloqueada_admin');
+    expect(
+      situacaoNoPainel({ ...cortesiaAtiva, origem: 'legacy', plan_status: 'canceled' }),
+    ).toBe('bloqueada_admin');
+  });
+
+  it('🔴 mas quem é do Stripe e nunca assinou continua "Cadastrou, não pagou"', () => {
+    // Essa realmente se cadastrou e desistiu na tela do cartão. Chamar de bloqueio esconderia
+    // um problema de ativação — que é outro assunto, e tem outra saída.
+    expect(
+      situacaoNoPainel({
+        plan_status: 'inactive',
+        origem: 'stripe',
+        current_period_end: null,
+        tem_customer_stripe: true,
+        tem_assinatura_stripe: false,
+      }),
+    ).toBe('nunca_pagou');
   });
 
   it('🔴 empresa que voltou a pagar não fica escrita "Bloqueada"', () => {

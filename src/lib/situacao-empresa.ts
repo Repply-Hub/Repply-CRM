@@ -190,7 +190,25 @@ export function situacaoNoPainel(e: EstadoOperacional): SituacaoNoPainel {
    * sem passar por lá. Sem esta condição, o painel escreveria "Bloqueada por vocês" em cima
    * de um cliente que voltou a pagar e está usando o sistema normalmente.
    */
-  if (e.bloqueada_em && aindaSemAcesso) return 'bloqueada_admin';
+  if (aindaSemAcesso) {
+    if (e.bloqueada_em) return 'bloqueada_admin';
+
+    /**
+     * 🔴 CORTESIA SEM ACESSO SÓ CHEGA AÍ POR BLOQUEIO — e reconhecer isso é o que faz o
+     * painel acertar nas empresas bloqueadas ANTES de o registro existir (o caso da "Repply",
+     * em 30/08/2026).
+     *
+     * Não é palpite, é a única porta: cortesia não vence (`current_period_end` é nulo por
+     * construção) e `legacy` nunca teve cobrança para falhar. Se uma delas está sem acesso,
+     * alguém tirou. Chamar isso de "Cadastrou, não pagou" acusa de calote uma empresa a quem
+     * vocês deram o sistema de graça.
+     *
+     * Quem tem `origem = 'stripe'` e nunca assinou fica de fora de propósito: essa realmente
+     * se cadastrou e não pagou, e o rótulo antigo está certo.
+     */
+    const origem = (e.origem ?? '').trim().toLowerCase();
+    if (origem === 'cortesia' || origem === 'legacy') return 'bloqueada_admin';
+  }
 
   const dias = diasDesde(e.inadimplente_desde);
   if (dias !== null) return degrauDaCobranca(dias);
