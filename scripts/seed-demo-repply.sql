@@ -363,7 +363,9 @@ select
     || '.' || b.seq || '@demo.exemplo.com.br',
   '(84) 9' || lpad((8000 + b.seq)::text, 4, '0') || '-' || lpad((1000 + b.seq)::text, 4, '0'),
   b.empresa, b.cidade, b.uf,
-  (current_date - (b.seq * 5))::text,
+  -- 🔴 o `::int` não é enfeite: `row_number()` devolve bigint, e o Postgres NÃO tem
+  --    operador `date - bigint`. Sem o cast, este INSERT falha de saída.
+  (current_date - (b.seq * 5)::int)::text,
   '{"_demo": true, "_lote": "2026-08-30"}'::jsonb
 from (
   select
@@ -498,7 +500,9 @@ values
   ('66666666-0000-4000-8000-000000000002',
    '33333333-0000-4000-8000-000000000003', '22222222-0000-4000-8000-000000000003',
    '11111111-0000-4000-8000-000000000004', 'a5f1074c-f35b-4b99-b90c-da4a4014bbb3',
-   '44444444-0000-4000-8000-000000000003',
+   -- sem obra de propósito: a obra 3 é do cliente 2, e este negócio é do cliente 3.
+   -- Negócio apontando para obra de outro cliente é a incoerência que o LOTE 5 evita.
+   null,
    'Metais sanitários - 48 unidades', current_date - 200, 'fechamento', current_date - 170, 132900.00,
    'Visita a obra', 'Fechado com desconto de 4% aprovado pela fábrica.', '{"_demo": true, "_lote": "2026-08-30", "_prova": true}'::jsonb),
 
@@ -653,7 +657,10 @@ left join lateral (
   select ob.id
   from obras ob
   where ob.cliente_id = ('33333333-0000-4000-8000-' || lpad((1 + mod(r.h_cli, 35))::text, 12, '0'))::uuid
-  order by ob.id
+  -- sorteia ENTRE as obras do cliente. Com `order by ob.id` cada cliente cederia sempre
+  -- a mesma, e 6 dos 18 canteiros nunca apareceriam em negócio nenhum — o mapa teria
+  -- pontos que a lista de negócios nunca menciona.
+  order by md5(ob.id::text || r.h_obr::text)
   limit 1
 ) o on true;
 
@@ -998,9 +1005,12 @@ select
   false, '#FF5A1F', 'empresa', 30, false,
   ('44444444-0000-4000-8000-' || lpad(v.obra_n::text, 12, '0'))::uuid,
   false
+-- A ordem é pelo HORÁRIO, não pela posição aqui. E ela precisa descer no mapa:
+-- obra 3 (-5.8210) → 9 (-5.8350) → 5 (-5.8600) → 1 (-5.8817). Invertida, a rota
+-- desenhada dá um recuo de ~1,5 km para o norte entre a 1ª e a 2ª parada.
 from (values
-  ( 9, 'Edifício Amintas Barros',      'Conferir medição do hall.',            8),
-  ( 3, 'Condomínio Solar da Lagoa',    'Apresentar linha de porcelanato.',    10),
+  ( 3, 'Condomínio Solar da Lagoa',    'Apresentar linha de porcelanato.',     8),
+  ( 9, 'Edifício Amintas Barros',      'Conferir medição do hall.',           10),
   ( 5, 'Torre Capim Macio',            'Levar amostras de metais.',           14),
   ( 1, 'Residencial Mar Aberto',       'Fechar pedido da área comum.',        16)
 ) as v(obra_n, obra, observacao, hora);
