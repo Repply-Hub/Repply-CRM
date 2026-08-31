@@ -883,6 +883,30 @@ Total, contagem e progresso de meta saem de função de banco ou de contagem exa
 servidor. Puxar milhares de pedidos para somar no navegador funcionava com a base pequena
 e para de funcionar sem aviso conforme a empresa cresce.
 
+### 10.13 O WhatsApp assina sempre o remetente, e isso não é configurável
+
+Toda mensagem enviada pelo CRM sai com `*Nome*` na primeira linha, para o contato saber com
+quem está falando. **Não há tela para desligar isso, e a ausência é a decisão.**
+
+Assinar é o padrão do mercado de sistemas de conversação, e o custo de não assinar recai em
+quem não escolheu: o contato recebe mensagem de um número da empresa sem saber qual pessoa
+está do outro lado. Oferecer o botão seria oferecer uma escolha que só piora o atendimento —
+e cada configuração exposta é mais uma coisa para alguém mexer sem entender e depois
+estranhar o resultado.
+
+Houve um interruptor até 31/08/2026. Ele nasceu global por acidente de calendário: foi feito
+em julho, quando havia **uma** empresa, gravando em todas de uma vez sem filtro. Quando as
+empresas viraram dez, virou falha de segurança — o gestor de um cliente mudava o WhatsApp dos
+outros nove — fechada na migration `20260829120000`. A remoção veio depois, ao responder a
+pergunta que aquela migration deixou em aberto.
+
+O que continua no banco: a coluna `empresas.whatsapp_assinar_remetente` (todas com `true`) e a
+RPC, que ninguém mais chama. O envio lê a coluna, e o padrão dele quando não consegue ler já é
+assinar (`supabase/functions/whatsapp-send/index.ts`). Duas camadas dizendo a mesma coisa.
+
+**Para reverter:** não basta recriar o cartão. A escrita precisaria passar a recortar pela
+empresa de quem chama — hoje ela grava em todas — senão a falha de 29/08 volta junto.
+
 ---
 
 ## 11. Riscos e dívida técnica

@@ -1625,16 +1625,22 @@ As duas portas descritas abaixo foram fechadas na mesma migration:
 | `set_whatsapp_assinar_remetente_global` | A permissão passou de `is_admin() OR is_gestor()` para **só `is_admin()`**, recusando com `ERRCODE 42501`. O `UPDATE` sem `WHERE` continua ali de propósito: nunca foi o alcance o defeito, e sim **quem podia disparar**. A migration `20260830102000_gate_nas_funcoes_que_furam.sql` ainda acrescentou a checagem de `empresa_plano_ativo()`. |
 | `delete_obras_bulk` | Ganhou o recorte por empresa. Identificador de obra alheia agora é ignorado em silêncio — o `COMMENT` da função diz "Filtro idêntico ao da política `obras_delete`". |
 
-⚠️ **A pergunta de produto continua aberta**, e é do Lucas: a preferência de assinatura
-deveria valer para todas as empresas ou ser de cada uma? A migration só fechou a porta
-enquanto isso — ela não atrapalha nenhuma das duas respostas.
+✅ **A pergunta de produto foi RESPONDIDA em 31/08/2026, pelo Lucas: o CRM assina sempre.**
+Assinar é o padrão do mercado de sistemas de conversação, então não há decisão a oferecer —
+e configuração que ninguém deve mudar não precisa de tela. O controle foi **removido por
+inteiro** de Configurações → WhatsApp no mesmo dia.
 
-🔴 **A tela levou dois dias para acompanhar o banco.** Até 31/08/2026 o gestor continuava
-**vendo** o interruptor em Configurações → WhatsApp: clicava, o banco recusava com 42501, e o
-que aparecia era "Erro ao atualizar preferência" — sem dizer que o problema era permissão.
-Corrigido no mesmo dia, escondendo o cartão atrás de `is_admin` em
-`src/components/configuracoes/WhatsAppInstanciasTab.tsx`. O resto da aba continua com o
-gestor, que é quem de fato provisiona e conecta as instâncias da própria empresa.
+O que ficou no banco: a coluna `empresas.whatsapp_assinar_remetente` (as dez empresas com
+`true`) e a RPC, que ninguém mais chama. O envio continua lendo a coluna
+(`supabase/functions/whatsapp-send/index.ts`), e o padrão dele quando não consegue ler já era
+assinar. Nada mudou no que o contato recebe. Limpar coluna e RPC é higiene, não urgência —
+some do produto, permanece no banco.
+
+🔴 **Antes disso, a tela passou dois dias atrás do banco, e vale como lição.** Até 31/08 o
+gestor continuava **vendo** o interruptor: clicava, o banco recusava com 42501, e o que
+aparecia era "Erro ao atualizar preferência" — sem dizer que o problema era permissão. Houve
+até um conserto intermediário naquele dia (esconder o cartão atrás de `is_admin`), substituído
+horas depois pela remoção, quando a pergunta de produto foi respondida.
 
 Fica o registro de que **fechar a permissão no banco não fecha o botão na tela** — é o mesmo
 defeito que o [item 47](#47-salvo-quando-o-banco-recusou--o-mesmo-defeito-em-quatro-telas)

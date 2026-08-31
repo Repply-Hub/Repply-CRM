@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import {
@@ -951,14 +951,10 @@ export function WhatsAppInstanciasTab() {
       const [
         { data: instancias, error: errI },
         { data: usuarios, error: errU },
-        { data: empresa, error: errE },
       ] = await Promise.all([
         supabase.from('configuracoes_wapi').select('*').eq('empresa_id', empresaId).order('instance_name'),
         supabase.from('usuarios').select('id, nome, role, user_id').eq('empresa_id', empresaId).neq('role', 'admin').order('nome'),
-        supabase.from('empresas').select('whatsapp_assinar_remetente').eq('id', empresaId).single(),
       ]);
-
-      if (errE) throw errE;
 
       if (errI) throw errI;
       if (errU) throw errU;
@@ -1002,59 +998,10 @@ export function WhatsAppInstanciasTab() {
 
       return {
         rows, todosUsuarios, usuariosSemInstancia, conectadas, desconectadas, semUsuario,
-        empresaId, assinarRemetente: empresa?.whatsapp_assinar_remetente ?? true,
+        empresaId,
       };
     },
     enabled: !!user,
-  });
-
-  /**
-   * O cartão de "assinar remetente" é do administrador global, não do gestor.
-   *
-   * A RPC `set_whatsapp_assinar_remetente_global` grava em TODAS as empresas de uma vez
-   * (é o propósito dela desde a migration 20260715120000), e por isso a migration
-   * 20260829120000 fechou a permissão em `is_admin()` — antes aceitava `is_gestor()`, e o
-   * gestor de um cliente mudava o WhatsApp dos outros nove.
-   *
-   * 🔴 A TELA não acompanhou o banco: o gestor continuava vendo o interruptor, clicava, e o
-   * banco recusava com 42501 — que aparecia como "Erro ao atualizar preferência", sem dizer
-   * que era permissão. É exatamente o "botão que só recusa no clique" que o cabeçalho de
-   * Configuracoes.tsx condena. Esconder é melhor que desabilitar: desabilitado sem
-   * explicação também não diz por quê.
-   *
-   * Some só o cartão. Todo o RESTO desta aba é do gestor por construção: criar, conectar,
-   * vincular, apelidar e apagar instância passam pela função `whatsapp-admin-provision`,
-   * que aceita 'admin', 'empresa' e 'gestor' e recorta pela empresa de quem chamou; apelido
-   * e cor passam pela política `wapi_config_update`, que cita 'gestor' e 'empresa'.
-   *
-   * `=== true` e não `!== false`: enquanto a resposta não chega o cartão fica fora, senão
-   * ele apareceria e sumiria na cara do gestor a cada abertura da aba.
-   */
-  const { data: isAdmin } = useQuery({
-    queryKey: ['is_admin'],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('is_admin');
-      if (error) throw error;
-      return data as boolean;
-    },
-  });
-
-  const queryClient = useQueryClient();
-  const toggleAssinarRemetente = useMutation({
-    mutationFn: async (novoValor: boolean) => {
-      // Aplica a preferência a TODAS as empresas de uma vez (RPC SECURITY DEFINER),
-      // independentemente da conta logada. Ver migration
-      // 20260715120000_wapi_assinar_remetente_global_rpc.sql
-      const { error } = await supabase.rpc('set_whatsapp_assinar_remetente_global', {
-        p_valor: novoValor,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
-      toast.success('Preferência aplicada a todas as empresas');
-    },
-    onError: () => toast.error('Erro ao atualizar preferência'),
   });
 
   if (isLoading) {
@@ -1064,6 +1011,24 @@ export function WhatsAppInstanciasTab() {
   const rows = data?.rows ?? [];
   const todosUsuarios = data?.todosUsuarios ?? [];
   const usuariosSemInstancia = data?.usuariosSemInstancia ?? [];
+
+  /*
+   Não existe mais interruptor de "assinar remetente" aqui, e a ausência é a decisão.
+
+   O CRM assina SEMPRE: a primeira linha da mensagem sai com "*Nome*", para o contato
+   saber com quem está falando. É o padrão do mercado de sistemas de conversação, e foi
+   a resposta do Lucas em 31/08/2026 à pergunta de produto que estava aberta desde
+   29/08 (ver o item 41 de docs/divida-tecnica.md).
+
+   O cartão que existia aqui gravava em TODAS as empresas de uma vez e, desde
+   29/08, só o admin global conseguia usá-lo — o gestor levava um 42501 travestido de
+   "Erro ao atualizar preferência". Some o controle inteiro em vez de acertar para quem
+   ele aparece: configuração que ninguém deve mudar não precisa de tela.
+
+   A coluna `empresas.whatsapp_assinar_remetente` e a RPC continuam no banco, as dez
+   empresas com `true`, e o envio segue lendo a coluna
+   (supabase/functions/whatsapp-send/index.ts). Nada muda no que o contato recebe.
+   */
 
   return (
     <div className="space-y-6">
@@ -1109,31 +1074,6 @@ export function WhatsAppInstanciasTab() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Assinatura do remetente: só o admin global — ver o comentário do `isAdmin` acima. */}
-      {isAdmin === true && (
-        <Card>
-          <CardContent className="pt-5">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <Label htmlFor="assinar-remetente" className="text-sm font-medium">
-                  Assinar remetente nas mensagens enviadas
-                </Label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Inclui "*Nome*" na primeira linha das mensagens enviadas pelo CRM, para que o contato saiba quem está falando.
-                  Esta preferência é aplicada a <strong>todas as empresas</strong>.
-                </p>
-              </div>
-              <Switch
-                id="assinar-remetente"
-                checked={data?.assinarRemetente ?? true}
-                disabled={toggleAssinarRemetente.isPending || isLoading}
-                onCheckedChange={(checked) => toggleAssinarRemetente.mutate(checked)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Lista de instâncias */}
       <Card>
