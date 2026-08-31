@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ImagePlus, Loader2, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
@@ -29,6 +30,7 @@ interface Props {
 
 export function CampoDeLogoDaEmpresa({ empresaId, logoUrl, aoMudar }: Props) {
   const qc = useQueryClient();
+  const { refreshProfile } = useAuth();
   const [enviando, setEnviando] = useState(false);
   const [arrastando, setArrastando] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -36,9 +38,21 @@ export function CampoDeLogoDaEmpresa({ empresaId, logoUrl, aoMudar }: Props) {
   const invalidar = () => {
     qc.invalidateQueries({ queryKey: ['minha_empresa'] });
     qc.invalidateQueries({ queryKey: ['empresas_admin'] });
-    // O perfil carrega a empresa embutida, e é de lá que os PDFs leem a logo. Sem isto, a
-    // exportação seguiria com a logo antiga até a pessoa recarregar a página.
     qc.invalidateQueries({ queryKey: ['usuarios'] });
+
+    /**
+     * 🔴 E O PERFIL, QUE NÃO É REACT-QUERY. Aqui estava o defeito: o `profile` do `useAuth`
+     * mora em `useState` (use-auth.tsx:77), não numa chave de cache — então nenhuma
+     * invalidação acima o alcança. E é EXATAMENTE de lá que os PDFs e a assinatura de e-mail
+     * leem a logo, via `marcaDaEmpresa(profile)`.
+     *
+     * Sem esta chamada, a pessoa subia a logo, via o preview certo na tela, exportava um
+     * relatório e ele saía SEM logo — até recarregar a página. A leitura óbvia seria
+     * "a logo não funciona".
+     *
+     * `void` de propósito: recarregar o perfil não pode segurar o aviso de sucesso.
+     */
+    void refreshProfile?.();
   };
 
   /** Grava a URL na empresa, conferindo que o banco realmente aceitou. */

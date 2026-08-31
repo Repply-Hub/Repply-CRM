@@ -145,7 +145,11 @@ export function montarRodapeEmailHtml(opts: {
   let logoHtml = '';
   if (mostrarLogo && opts.logoUrl) {
     logoHtml = (opts.logoCarregou ?? true)
-      ? `<img src="${opts.logoUrl}" alt="${nomeDaEmpresa}" style="max-height: 50px; display: block; margin-bottom: 10px;" />`
+      // 🔴 O ENDEREÇO TAMBÉM É ESCAPADO, e não só o nome. `logo_url` é uma coluna de TEXTO
+      // que o gestor grava — pela aba Empresa ou direto pela API — e ela entra aqui dentro de
+      // um atributo entre aspas. Sem escapar, uma aspa no meio do valor fecha o atributo e o
+      // resto vira HTML dentro do e-mail que sai da caixa da empresa.
+      ? `<img src="${escapeHtml(opts.logoUrl)}" alt="${nomeDaEmpresa}" style="max-height: 50px; display: block; margin-bottom: 10px;" />`
       : `<div style="font-size: 12px; color: #94a3b8; margin-bottom: 10px;">Nenhum logotipo enviado</div>`;
   }
   const estiloContainer = opts.isolado ? '' : 'margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;';
