@@ -10,6 +10,7 @@ import {
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { enderecoDeRetornoDaJanela } from "@/lib/endereco-de-retorno";
 
 interface AuthContextType {
   session: Session | null;
@@ -356,15 +357,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
+  /**
+   * 🔴 OS TRÊS CADASTROS MANDAM `emailRedirectTo` DE PROPÓSITO, mesmo com a confirmação
+   * de e-mail DESLIGADA hoje.
+   *
+   * Medido em 31/08/2026: os 30 logins do sistema foram confirmados em menos de 5
+   * segundos após a criação — ou seja, ninguém confirma nada, o e-mail não é enviado, e
+   * este parâmetro não faz diferença agora.
+   *
+   * Ele existe para o dia em que alguém ligar a confirmação no painel. Sem ele, o
+   * Supabase usa o Site URL — e foi exatamente assim que a redefinição de senha passou
+   * a mandar link para `http://localhost:3000` (ver src/lib/endereco-de-retorno.ts).
+   * Ligar a confirmação é um clique; descobrir por que os links nascem quebrados custou
+   * um dia. Deixar preenchido é de graça.
+   */
   const signUp = async (email: string, password: string, nome: string) => {
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { nome } } });
+    const { error } = await supabase.auth.signUp({
+      email, password,
+      options: { data: { nome }, emailRedirectTo: enderecoDeRetornoDaJanela('/app') },
+    });
     return { error: error as Error | null };
   };
 
   const signUpEmpresa = async (email: string, password: string, nome: string, nomeEmpresa: string, cnpjEmpresa?: string) => {
     const { error } = await supabase.auth.signUp({
       email, password,
-      options: { data: { nome, role: "empresa", nome_empresa: nomeEmpresa, cnpj_empresa: cnpjEmpresa ?? "" } },
+      options: {
+        data: { nome, role: "empresa", nome_empresa: nomeEmpresa, cnpj_empresa: cnpjEmpresa ?? "" },
+        emailRedirectTo: enderecoDeRetornoDaJanela('/assinar'),
+      },
     });
     return { error: error as Error | null };
   };
@@ -372,7 +393,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUpFuncionario = async (email: string, password: string, nome: string, codigoEmpresa: string) => {
     const { error } = await supabase.auth.signUp({
       email, password,
-      options: { data: { nome, role: "vendedor", codigo_empresa: codigoEmpresa.toUpperCase() } },
+      options: {
+        data: { nome, role: "vendedor", codigo_empresa: codigoEmpresa.toUpperCase() },
+        emailRedirectTo: enderecoDeRetornoDaJanela('/app'),
+      },
     });
     return { error: error as Error | null };
   };

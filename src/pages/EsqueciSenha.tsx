@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ArrowLeft, Mail } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
+import { enderecoDeRetornoDaJanela } from "@/lib/endereco-de-retorno";
 
 export default function EsqueciSenha() {
   const [loading, setLoading] = useState(false);
@@ -18,8 +19,11 @@ export default function EsqueciSenha() {
     const form = new FormData(e.currentTarget);
     const email = form.get("email") as string;
 
+    // NÃO use `window.location.origin` aqui. De uma prévia da Vercel ele manda o
+    // endereço da prévia, que não está na lista de endereços autorizados do Supabase —
+    // e aí o link do e-mail vira o Site URL, em silêncio. Ver src/lib/endereco-de-retorno.ts.
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/redefinir-senha`,
+      redirectTo: enderecoDeRetornoDaJanela('/redefinir-senha'),
     });
 
     if (error) {
