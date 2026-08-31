@@ -324,15 +324,18 @@ function FabricanteForm({
           </div>
           {/* Os contatos já no cadastro, no molde do seletor de contatos da obra: quem
               cadastra a marca acabou de falar com alguém dela, e obrigar a salvar,
-              reabrir e só então acrescentar é o atrito que matou o campo antigo.
+              reabrir e só então acrescentar é o atrito que matou o campo antigo. A lista
+              é rascunho e vai para o banco logo depois de a fábrica nascer.
 
-              Na EDIÇÃO a fábrica já existe, então cada gesto grava na hora. No cadastro
-              novo a lista é rascunho e vai para o banco logo depois de a fábrica nascer. */}
-          <ContatosDaFabrica
-            fabricanteId={editData?.id}
-            pendentes={contatosPendentes}
-            onPendentesChange={setContatosPendentes}
-          />
+              🔴 SÓ NO CADASTRO NOVO. Na edição a ficha da fábrica já mostra os contatos,
+              no mesmo quadro do Editar — repetir a lista aqui seria a mesma coisa em dois
+              lugares da tela, que é justamente o que o dono do produto pediu para evitar. */}
+          {!editData && (
+            <ContatosDaFabrica
+              pendentes={contatosPendentes}
+              onPendentesChange={setContatosPendentes}
+            />
+          )}
 
           <Button type="submit" className="w-full" disabled={isPending}>
             {isPending ? "Salvando..." : "Salvar"}
