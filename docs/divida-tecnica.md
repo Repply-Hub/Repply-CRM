@@ -55,7 +55,7 @@ acrescentados em 21/08/2026; os itens 58 e 59, em 30 e 31/08/2026.
 | 38 | [Excluir usuário não tira o acesso](#38-excluir-usuário-não-tira-o-acesso) | **Crítica** | Latente — 0 excluídos hoje, mas não há como revogar |
 | 39 | [Excluir etapa do Kanban move negócios mesmo quando o banco recusa](#39-excluir-etapa-do-kanban-move-os-negócios-mesmo-quando-o-banco-recusa) | **Crítica** | Sim — pode carimbar centenas como fechados hoje |
 | 40 | [O conserto de datas não alcança a tela de Negócios](#40--o-conserto-de-datas-da-importação-não-alcança-a-tela-de-negócios) | **Crítica** | **Sim — reabre a prioridade zero** |
-| 41 | [Duas funções do banco atravessam a fronteira entre empresas](#41-duas-funções-do-banco-atravessam-a-fronteira-entre-empresas) | Alta | Não |
+| 41 | [Duas funções do banco atravessam a fronteira entre empresas](#41-duas-funções-do-banco-atravessam-a-fronteira-entre-empresas) | ✅ Resolvido | Corrigido na migration `20260829120000` — a tela só acompanhou em 31/08 |
 | 42 | [Funções de servidor abertas sem motivo, e duas sem conferir quem chamou](#42-seis-funções-de-servidor-abertas-sem-motivo-escrito-e-duas-sem-conferir-quem-chamou) | Alta | Não |
 | 43 | [Os 22.276 arquivos do Storage podem ser LISTADOS sem login](#43-os-22276-arquivos-do-storage-podem-ser-listados-sem-login) | Alta | Complementa o plano dos baldes |
 | 44 | [A matriz de permissões só é conferida em 2 dos 15 módulos](#44-a-matriz-de-permissões-só-é-conferida-pelo-banco-em-2-dos-15-módulos) | Alta | Não — mas a tela promete o que não entrega |
@@ -1615,7 +1615,32 @@ tela**, não pelo módulo isolado — foi a validação pelo caminho errado que 
 
 ## 41. Duas funções do banco atravessam a fronteira entre empresas
 
-**Gravidade: alta.**
+**Gravidade: alta. ✅ CORRIGIDO em 29/08/2026, migration
+`20260829120000_duas_funcoes_atravessavam_a_parede_entre_empresas.sql`.**
+
+As duas portas descritas abaixo foram fechadas na mesma migration:
+
+| Função | O que mudou |
+|---|---|
+| `set_whatsapp_assinar_remetente_global` | A permissão passou de `is_admin() OR is_gestor()` para **só `is_admin()`**, recusando com `ERRCODE 42501`. O `UPDATE` sem `WHERE` continua ali de propósito: nunca foi o alcance o defeito, e sim **quem podia disparar**. A migration `20260830102000_gate_nas_funcoes_que_furam.sql` ainda acrescentou a checagem de `empresa_plano_ativo()`. |
+| `delete_obras_bulk` | Ganhou o recorte por empresa. Identificador de obra alheia agora é ignorado em silêncio — o `COMMENT` da função diz "Filtro idêntico ao da política `obras_delete`". |
+
+⚠️ **A pergunta de produto continua aberta**, e é do Lucas: a preferência de assinatura
+deveria valer para todas as empresas ou ser de cada uma? A migration só fechou a porta
+enquanto isso — ela não atrapalha nenhuma das duas respostas.
+
+🔴 **A tela levou dois dias para acompanhar o banco.** Até 31/08/2026 o gestor continuava
+**vendo** o interruptor em Configurações → WhatsApp: clicava, o banco recusava com 42501, e o
+que aparecia era "Erro ao atualizar preferência" — sem dizer que o problema era permissão.
+Corrigido no mesmo dia, escondendo o cartão atrás de `is_admin` em
+`src/components/configuracoes/WhatsAppInstanciasTab.tsx`. O resto da aba continua com o
+gestor, que é quem de fato provisiona e conecta as instâncias da própria empresa.
+
+Fica o registro de que **fechar a permissão no banco não fecha o botão na tela** — é o mesmo
+defeito que o [item 47](#47-salvo-quando-o-banco-recusou--o-mesmo-defeito-em-quatro-telas)
+cataloga em outras quatro telas.
+
+(texto original do achado abaixo, mantido como registro.)
 
 **`set_whatsapp_assinar_remetente_global`** faz `UPDATE public.empresas SET ...` **sem
 `WHERE`** — grava em todas. A permissão exigida é `is_admin() OR is_gestor()`, e `is_gestor()`
