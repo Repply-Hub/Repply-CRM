@@ -8,6 +8,7 @@ import { useFaturamentoMensal, useIndicadoresVendedor, useDashboardStats, useDas
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
+import { marcaDaEmpresa } from '@/lib/marca-da-empresa';
 import { useSecaoLigada } from '@/hooks/use-secoes';
 import { DateRangePicker, type DateRange } from '@/components/shared/DateRangePicker';
 import { ErrorBoundary } from '@/components/layout/ErrorBoundary';
@@ -287,6 +288,7 @@ const Dashboard = () => {
         : 'Todos';
       await generateDashboardPdf(
         dashboardContentRef.current,
+        marcaDaEmpresa(profile),
         `Período: ${periodoLabel}  ·  Fabricante: ${fabricanteLabel}  ·  Responsável: ${responsavelLabel}`
       );
     } finally {

@@ -41,8 +41,21 @@ serve(async (req) => {
       console.warn('User profile not found for ID:', userId, userError)
     }
 
-    const userName = userData?.nome || 'Usuário MD'
-    const userEmail = tokenData.email || userData?.email || 'contato@mdrepresentacoes.com'
+    // 🔴 SEM NOME NEM E-MAIL DA MD COMO RESERVA. Ate 31/08/2026 estes dois campos caiam em
+    // 'Usuario MD' e 'contato@mdrepresentacoes.com' — para as dez empresas assinantes. O
+    // e-mail de reserva e o pior dos dois: uma resposta do cliente iria para a caixa de outra
+    // representacao.
+    //
+    // O e-mail agora nao tem reserva NENHUMA: sem endereco de remetente nao ha o que enviar, e
+    // recusar com uma frase clara e melhor que enviar em nome de terceiro.
+    const userName = userData?.nome || ''
+    const userEmail = tokenData.email || userData?.email
+    if (!userEmail) {
+      return new Response(
+        JSON.stringify({ error: 'Nao encontrei o endereco de e-mail da sua conta para enviar.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
 
 
     let accessToken = tokenData.access_token
@@ -83,14 +96,18 @@ serve(async (req) => {
     // Prepare RFC 2822 message as multipart/alternative
     const boundary = `----=_Part_${Math.random().toString(36).substr(2, 9)}`;
     const utf8Subject = `=?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`;
-    const fromHeader = `${userName} <${userEmail}>`;
+    // Sem nome, so o endereco: `" " <fulano@...>` e um remetente com espaco na frente, e
+    // alguns servidores tratam isso como cabecalho malformado.
+    const fromHeader = userName ? `${userName} <${userEmail}>` : userEmail;
     
     const messageParts = [
       `From: ${fromHeader}`,
       `To: ${to}`,
       `Subject: ${utf8Subject}`,
       'MIME-Version: 1.0',
-      'X-Mailer: MD Representações CRM',
+      // Identificacao do programa que enviou. Era 'MD Representacoes CRM' em todo e-mail de
+      // toda empresa — o nome do produto e Repply CRM, e ele nao e de nenhum cliente.
+      'X-Mailer: Repply CRM',
       'Precedence: normal',
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
       '',

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { parse, isValid, startOfMonth, endOfMonth } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
+import { marcaDaEmpresa } from '@/lib/marca-da-empresa';
 import { useMinhaPermissao } from '@/hooks/use-minha-permissao';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useDelayedLoading } from '@/hooks/use-delayed-loading';
@@ -1512,7 +1513,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     // A coluna "Obra" do relatório sai do arquivo inteira quando a empresa não tem a seção.
     // O gerador é função pura (roda fora do React), então não tem como perguntar sozinho —
     // recebe a resposta por parâmetro de quem chama.
-    await generatePedidosPdf(rows, titulo, { comObra: temObras === true });
+    await generatePedidosPdf(rows, marcaDaEmpresa(profile), titulo, { comObra: temObras === true });
   };
 
   // Negócios cobertos pela exportação em Excel.

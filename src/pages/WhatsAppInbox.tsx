@@ -60,6 +60,7 @@ import { ProjetoSelect } from "@/components/tarefas/ProjetoSelect";
 import { ParticipantesMultiSelect } from "@/components/tarefas/ParticipantesMultiSelect";
 import { MarcadoresMultiSelect } from "@/components/tarefas/MarcadoresMultiSelect";
 import { useAuth } from "@/hooks/use-auth";
+import { marcaDaEmpresa } from "@/lib/marca-da-empresa";
 import { CriarContatoDaConversaDialog } from "@/components/whatsapp/CriarContatoDaConversaDialog";
 import { CadastroDoLead } from "@/components/whatsapp/CadastroDoLead";
 import { Button } from "@/components/ui/button";
@@ -2657,7 +2658,7 @@ function LeadSheet({
       if (formato === "pdf") {
         const { generateConversaPdf } =
           await import("@/lib/generate-conversa-pdf");
-        await generateConversaPdf(linhas, nomeContato, periodoLabel);
+        await generateConversaPdf(linhas, marcaDaEmpresa(profile), nomeContato, periodoLabel);
       } else if (formato === "xlsx") {
         const { generateConversaExcel } =
           await import("@/lib/generate-conversa-excel");
@@ -5283,7 +5284,7 @@ export default function WhatsAppInbox() {
       if (formato === "pdf") {
         const { generateConversasPdf } =
           await import("@/lib/generate-conversa-pdf");
-        await generateConversasPdf(conversasComMensagens, periodoLabel);
+        await generateConversasPdf(conversasComMensagens, marcaDaEmpresa(profile), periodoLabel);
       } else if (formato === "xlsx") {
         const { generateConversasExcel } =
           await import("@/lib/generate-conversa-excel");

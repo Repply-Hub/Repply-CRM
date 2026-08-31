@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import logoUrl from '@/assets/logo-md.webp';
+import { desenharMarca, desenharRodape, encurtar, type MarcaDaEmpresa } from '@/lib/marca-do-pdf';
 
 export interface ConversaExportRow {
   dataHora: string;
@@ -16,16 +16,6 @@ export interface ConversaParaExportar {
 
 const BRAND_ORANGE: [number, number, number] = [240, 106, 0];
 const BRAND_ORANGE_LIGHT: [number, number, number] = [255, 237, 222];
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
 
 // A fonte padrão do jsPDF (Helvetica, via WinAnsiEncoding) só desenha Latin-1
 // — emoji e outros símbolos fora desse conjunto não ficam em branco, saem como
@@ -58,40 +48,39 @@ function sanitizeForPdf(texto: string): string {
 // as conversas", onde cada uma começa em página nova com o próprio título no
 // topo, pra dar pra saber de cara, rolando o PDF, onde uma conversa termina e
 // a próxima começa.
-function desenharCabecalho(
+async function desenharCabecalho(
   doc: jsPDF,
   pageWidth: number,
-  img: HTMLImageElement | null,
+  marca: MarcaDaEmpresa,
   titulo: string,
   periodo: string,
 ) {
   doc.setFillColor(...BRAND_ORANGE);
   doc.rect(0, 0, pageWidth, 3, 'F');
 
-  if (img) {
-    const maxWidth = 26;
-    const maxHeight = 10;
-    const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
-    const imgWidth = img.width * ratio;
-    const imgHeight = img.height * ratio;
-    doc.addImage(img, 'WEBP', 14, 8, imgWidth, imgHeight);
-  } else {
-    doc.setFontSize(13);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...BRAND_ORANGE);
-    doc.text('MD Representações', 14, 15);
-  }
+  const X_DO_TEXTO = 46;
+  const { larguraDisponivelParaTexto } = await desenharMarca(doc, {
+    marca,
+    larguraDaPagina: pageWidth,
+    margemDireita: 14,
+    xDoTexto: X_DO_TEXTO,
+    caixaDoCliente: { x: 14, y: 8, maxLargura: 26, maxAltura: 10 },
+    tamanhoDoNome: 13,
+    corDoNome: BRAND_ORANGE,
+  });
 
   doc.setFontSize(15);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(50, 50, 50);
-  doc.text(sanitizeForPdf(titulo), 46, 13);
+  // 🔴 CORTADO PARA CABER. "Conversa — <nome do contato>" já estourava a margem direita com
+  // nome de contato longo, antes mesmo de a logo da Repply ocupar a direita.
+  doc.text(encurtar(doc, sanitizeForPdf(titulo), larguraDisponivelParaTexto), X_DO_TEXTO, 13);
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(120);
-  doc.text(`Período: ${periodo}`, 46, 18);
-  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 46, 22.5);
+  doc.text(encurtar(doc, `Período: ${periodo}`, larguraDisponivelParaTexto), X_DO_TEXTO, 18);
+  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, X_DO_TEXTO, 22.5);
 
   doc.setTextColor(0);
 }
@@ -99,7 +88,7 @@ function desenharCabecalho(
 function desenharTabelaMensagens(
   doc: jsPDF,
   pageWidth: number,
-  rodapeLabel: string,
+  marcaDoRodape: MarcaDaEmpresa,
   linhas: ConversaExportRow[],
 ) {
   autoTable(doc, {
@@ -119,22 +108,22 @@ function desenharTabelaMensagens(
     didDrawPage: () => {
       doc.setFillColor(...BRAND_ORANGE);
       doc.rect(0, 0, pageWidth, 3, 'F');
-      const pageHeight = doc.internal.pageSize.getHeight();
-      doc.setFontSize(7);
-      doc.setTextColor(160);
-      doc.text(rodapeLabel, 14, pageHeight - 6);
-      doc.text(`Página ${doc.getCurrentPageInfo().pageNumber}`, pageWidth - 14, pageHeight - 6, { align: 'right' });
+      desenharRodape(doc, { marca: marcaDoRodape, larguraDaPagina: pageWidth });
     },
   });
 }
 
-export async function generateConversaPdf(linhas: ConversaExportRow[], contato: string, periodo: string) {
-  const doc = new jsPDF('portrait', 'mm', 'a4');
+export async function generateConversaPdf(
+  linhas: ConversaExportRow[],
+  marca: MarcaDaEmpresa,
+  contato: string,
+  periodo: string,
+) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const img = await loadImage(logoUrl).catch(() => null);
 
-  desenharCabecalho(doc, pageWidth, img, `Conversa — ${contato}`, periodo);
-  desenharTabelaMensagens(doc, pageWidth, 'MD Representações', linhas);
+  await desenharCabecalho(doc, pageWidth, marca, `Conversa — ${contato}`, periodo);
+  desenharTabelaMensagens(doc, pageWidth, marca, linhas);
 
   const nomeArquivo = contato.replace(/[^a-zA-Z0-9À-ÿ -]/g, '').trim() || 'conversa';
   doc.save(`conversa-${nomeArquivo}-${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -143,16 +132,23 @@ export async function generateConversaPdf(linhas: ConversaExportRow[], contato: 
 // Exportação consolidada: um único PDF com todas as conversas, cada uma
 // começando em página nova e com o próprio nome como título no topo da
 // seção — ver comentário de `desenharCabecalho`.
-export async function generateConversasPdf(conversas: ConversaParaExportar[], periodo: string) {
-  const doc = new jsPDF('portrait', 'mm', 'a4');
+export async function generateConversasPdf(
+  conversas: ConversaParaExportar[],
+  marca: MarcaDaEmpresa,
+  periodo: string,
+) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const img = await loadImage(logoUrl).catch(() => null);
 
-  conversas.forEach((conversa, i) => {
+  // `for...of` e não `forEach`: o cabeçalho virou assíncrono (a logo do cliente vem de uma
+  // URL), e `forEach` não espera promessa — as conversas sairiam sem logo, em ordem aleatória.
+  for (const [i, conversa] of conversas.entries()) {
     if (i > 0) doc.addPage();
-    desenharCabecalho(doc, pageWidth, img, `Conversa — ${conversa.nomeContato}`, periodo);
-    desenharTabelaMensagens(doc, pageWidth, conversa.nomeContato, conversa.linhas);
-  });
+    await desenharCabecalho(doc, pageWidth, marca, `Conversa — ${conversa.nomeContato}`, periodo);
+    // O rodapé leva a EMPRESA, não o nome do contato: é a identificação de quem exportou o
+    // documento, e o contato já está no título da seção logo acima.
+    desenharTabelaMensagens(doc, pageWidth, marca, conversa.linhas);
+  }
 
   doc.save(`todas-as-conversas-${new Date().toISOString().slice(0, 10)}.pdf`);
 }

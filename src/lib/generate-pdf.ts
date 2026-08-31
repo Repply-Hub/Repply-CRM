@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import logoUrl from '@/assets/logo-md.webp';
+import { desenharMarca, desenharRodape, encurtar, type MarcaDaEmpresa } from '@/lib/marca-do-pdf';
 
 export interface PedidoRow {
   cliente: string;
@@ -18,16 +18,6 @@ export interface PedidoRow {
 const BRAND_ORANGE: [number, number, number] = [240, 106, 0];
 const BRAND_ORANGE_LIGHT: [number, number, number] = [255, 237, 222];
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
-
 /**
  * `opcoes.comObra` desliga a coluna "Obra" do relatório.
  *
@@ -40,44 +30,42 @@ function loadImage(src: string): Promise<HTMLImageElement> {
  */
 export async function generatePedidosPdf(
   pedidos: PedidoRow[],
+  marca: MarcaDaEmpresa,
   titulo: string = 'Relatório de Orçamentos',
   opcoes: { comObra?: boolean } = {},
 ) {
   const comObra = opcoes.comObra !== false;
-  const doc = new jsPDF('landscape', 'mm', 'a4');
+  // `compress: true` no documento inteiro: sem isto o jsPDF embute cada imagem crua, e duas
+  // logos num relatório de várias páginas passam de 10 MB — anexo que servidor de e-mail
+  // recusa. Medido na versão 4.2.0.
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
   const pageWidth = doc.internal.pageSize.getWidth();
+  const X_DO_TEXTO = 50;
 
   doc.setFillColor(...BRAND_ORANGE);
   doc.rect(0, 0, pageWidth, 3, 'F');
 
-  try {
-    const img = await loadImage(logoUrl);
-    const maxWidth = 30;
-    const maxHeight = 12;
-    const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
-    const imgWidth = img.width * ratio;
-    const imgHeight = img.height * ratio;
-    
-    doc.addImage(img, 'WEBP', 14, 8, imgWidth, imgHeight);
-  } catch {
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...BRAND_ORANGE);
-    doc.text('MD Representações', 14, 16);
-  }
+  const { larguraDisponivelParaTexto } = await desenharMarca(doc, {
+    marca,
+    larguraDaPagina: pageWidth,
+    margemDireita: 14,
+    xDoTexto: X_DO_TEXTO,
+    caixaDoCliente: { x: 14, y: 8, maxLargura: 30, maxAltura: 12 },
+    corDoNome: BRAND_ORANGE,
+  });
 
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(50, 50, 50);
-  doc.text(titulo, 50, 14);
+  doc.text(encurtar(doc, titulo, larguraDisponivelParaTexto), X_DO_TEXTO, 14);
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(120);
-  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 50, 20);
+  doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, X_DO_TEXTO, 20);
 
   const totalValor = pedidos.reduce((acc, p) => acc + p.valor, 0);
-  doc.text(`${pedidos.length} negócios · Total: ${totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, 50, 25);
+  doc.text(`${pedidos.length} negócios · Total: ${totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, X_DO_TEXTO, 25);
 
   doc.setTextColor(0);
 
@@ -106,11 +94,9 @@ export async function generatePedidosPdf(
     didDrawPage: () => {
       doc.setFillColor(...BRAND_ORANGE);
       doc.rect(0, 0, pageWidth, 3, 'F');
-      const pageHeight = doc.internal.pageSize.getHeight();
-      doc.setFontSize(7);
-      doc.setTextColor(160);
-      doc.text('MD Representações', 14, pageHeight - 6);
-      doc.text(`Página ${doc.getCurrentPageInfo().pageNumber}`, pageWidth - 14, pageHeight - 6, { align: 'right' });
+      // O rodapé leva o nome de quem exportou. Estava cravado "MD Representações" em toda
+      // página de todo relatório de toda empresa — e este nunca foi ramo de exceção.
+      desenharRodape(doc, { marca, larguraDaPagina: pageWidth });
     },
   });
 

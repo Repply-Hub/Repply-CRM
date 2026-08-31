@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Building2, Loader2, Pencil, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
+import { CampoDeLogoDaEmpresa } from '@/components/configuracoes/CampoDeLogoDaEmpresa';
 
 type Empresa = {
   id: string;
@@ -19,6 +20,8 @@ type Empresa = {
   cnpj: string | null;
   codigo_acesso: string;
   created_at: string;
+  /** A logo que vai no topo dos PDFs exportados e na assinatura de e-mail. */
+  logo_url: string | null;
 };
 
 function maskCnpj(value: string) {
@@ -51,6 +54,10 @@ function EmpresaForm({
 }) {
   const qc = useQueryClient();
   const [cnpj, setCnpj] = useState(formatCnpj(empresa.cnpj) ?? '');
+  // A logo grava sozinha, no ato — não espera o "Salvar alterações" dos campos de texto. São
+  // duas gravações diferentes (uma é arquivo, a outra é formulário), e juntá-las obrigaria a
+  // segurar o arquivo em memória até alguém clicar em salvar.
+  const [logo, setLogo] = useState<string | null>(empresa.logo_url ?? null);
 
   const update = useMutation({
     mutationFn: async (data: { nome: string; nome_fantasia: string; cnpj: string }) => {
@@ -104,6 +111,8 @@ function EmpresaForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <CampoDeLogoDaEmpresa empresaId={empresa.id} logoUrl={logo} aoMudar={setLogo} />
+
       <div className="space-y-1.5">
         <Label>Razão Social</Label>
         <Input name="nome" defaultValue={empresa.nome ?? ''} placeholder="Razão Social" />
@@ -147,7 +156,7 @@ function AdminEmpresasView() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('empresas')
-        .select('id, nome, nome_fantasia, cnpj, codigo_acesso, created_at')
+        .select('id, nome, nome_fantasia, cnpj, codigo_acesso, created_at, logo_url')
         .order('nome');
       if (error) throw error;
       return (data ?? []) as Empresa[];
@@ -263,7 +272,7 @@ function MinhaEmpresaView({ empresaId }: { empresaId: string }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('empresas')
-        .select('id, nome, nome_fantasia, cnpj, codigo_acesso, created_at')
+        .select('id, nome, nome_fantasia, cnpj, codigo_acesso, created_at, logo_url')
         .eq('id', empresaId)
         .single();
       if (error) throw error;

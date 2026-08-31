@@ -1,11 +1,24 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+/**
+ * 🔴 O NOME DA EMPRESA VEM DE FORA, e não chumbado.
+ *
+ * Até 31/08/2026 o texto de relacionamento dizia "Sou da MD Representações" — para as dez
+ * empresas assinantes. E este não é um texto interno: ele abre o WhatsApp já preenchido, e no
+ * atalho do sino (`NotificationCenter.tsx`) vai DIRETO, sem tela de edição. Um vendedor da JHS
+ * clicava e mandava, ao cliente dele, uma apresentação em nome de outra representação.
+ *
+ * Sem nome de empresa a frase perde a apresentação em vez de inventar uma — quem está
+ * escrevendo sabe quem é.
+ */
 const TEMPLATES = {
   cobranca: (clienteNome: string) =>
     `Olá! Estou entrando em contato sobre o orçamento pendente da empresa ${clienteNome}. Podemos conversar sobre o andamento?`,
-  relacionamento: (clienteNome: string) =>
-    `Olá! Tudo bem? Sou da MD Representações e gostaria de saber como está tudo por aí na ${clienteNome}. Estou à disposição para qualquer necessidade!`,
+  relacionamento: (clienteNome: string, minhaEmpresa: string) =>
+    minhaEmpresa
+      ? `Olá! Tudo bem? Sou da ${minhaEmpresa} e gostaria de saber como está tudo por aí na ${clienteNome}. Estou à disposição para qualquer necessidade!`
+      : `Olá! Tudo bem? Gostaria de saber como está tudo por aí na ${clienteNome}. Estou à disposição para qualquer necessidade!`,
 } as const;
 
 export type TipoMensagem = keyof typeof TEMPLATES;
@@ -23,8 +36,12 @@ export function buildWhatsAppUrl(phone: string, message: string): string {
   return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
 }
 
-export function getMessageTemplate(tipo: TipoMensagem, clienteNome: string): string {
-  return TEMPLATES[tipo](clienteNome);
+export function getMessageTemplate(
+  tipo: TipoMensagem,
+  clienteNome: string,
+  minhaEmpresa = '',
+): string {
+  return TEMPLATES[tipo](clienteNome, minhaEmpresa);
 }
 
 export function useSendWhatsApp() {

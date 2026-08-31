@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks, Upload, CreditCard } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks, CreditCard } from 'lucide-react';
 import { PagamentosTab } from '@/components/configuracoes/PagamentosTab';
 import { podeGerenciarAssinatura } from '@/lib/plano-gate';
 import { SidebarHistoricoDialog } from '@/components/configuracoes/SidebarHistoricoDialog';
@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
+import { marcaDaEmpresa } from '@/lib/marca-da-empresa';
 import { useSecaoLigada } from '@/hooks/use-secoes';
 import { UsuariosTab } from '@/components/configuracoes/UsuariosTab';
 import { DominioTab } from '@/components/configuracoes/DominioTab';
@@ -31,12 +32,10 @@ import { EmpresasTab } from '@/components/configuracoes/EmpresasTab';
 import { AutomacaoTab } from '@/components/configuracoes/AutomacaoTab';
 import { AssinaturaEmailEditor } from '@/components/configuracoes/AssinaturaEmailEditor';
 import {
-  LOGO_EMAIL_URL,
   montarRodapeEmailHtml,
   normalizarAssinaturaAntiga,
   sanitizarAssinaturaEmail,
 } from '@/lib/assinatura-email';
-import { validateFile } from '@/lib/file-validation';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -127,7 +126,11 @@ function CustomizeTab() {
 }
 
 function ProfileTab() {
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
+  // A mesma marca que vai no topo dos PDFs exportados. Uma logo só, um lugar só para trocar
+  // (a aba "Empresa") — antes esta tela tinha um upload próprio, num caminho global que uma
+  // empresa sobrescrevia da outra.
+  const marcaDaMinhaEmpresa = marcaDaEmpresa(profile);
   // A assinatura (e a logo do rodapé) só existem para serem anexadas ao e-mail
   // que o módulo de E-mail envia. Sem o módulo, é configuração sem efeito.
   const { ligada: temEmails } = useSecaoLigada('emails');
@@ -139,12 +142,6 @@ function ProfileTab() {
   const [assinaturaModo, setAssinaturaModo] = useState<'texto' | 'imagem'>('texto');
   const [mostrarNomeImagem, setMostrarNomeImagem] = useState(true);
   const [mostrarEmpresaImagem, setMostrarEmpresaImagem] = useState(true);
-  // Começa em Date.now() (não 0): o path no Storage é fixo, então um "?v=0"
-  // reaproveitado em toda visita faria o navegador servir do cache HTTP a
-  // logo de uma sessão anterior em vez de buscar a atual após um F5.
-  const [logoVersion, setLogoVersion] = useState(() => Date.now());
-  const [logoDragAtivo, setLogoDragAtivo] = useState(false);
-  const [logoExiste, setLogoExiste] = useState(true);
 
   const { data: perfil, isLoading } = useQuery({
     queryKey: ['meu_perfil', user?.id],
@@ -305,81 +302,6 @@ function ProfileTab() {
           }
         : {}),
     });
-  };
-
-  const uploadEmailLogo = async (file: File) => {
-    if (!validateFile(file, {
-      allowedMimePrefixes: ['image/'],
-      allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp'],
-      maxBytes: 5 * 1024 * 1024, // 5 MB
-    })) return;
-
-    try {
-      setIsUploading(true);
-      const filePath = `logo-email.png`;
-
-      // upsert: true para substituir a logo existente — o path é fixo de
-      // propósito (uma logo por empresa hoje), então o mesmo arquivo é
-      // sobrescrito a cada troca.
-      const { error: uploadError } = await supabase.storage
-        .from('email-assets')
-        .upload(filePath, file, { upsert: true, contentType: file.type || 'image/png' });
-
-      if (uploadError) throw uploadError;
-
-      // O path no Storage não muda, então o browser (e um eventual CDN)
-      // continuariam servindo a imagem antiga do cache sem isto.
-      setLogoVersion(Date.now());
-      setLogoExiste(true);
-      toast.success('Logo da empresa atualizada com sucesso!');
-    } catch (error: any) {
-      toast.error('Erro ao carregar logo: ' + error.message);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const removerLogoEmail = async () => {
-    try {
-      setIsUploading(true);
-      const { error } = await supabase.storage.from('email-assets').remove(['logo-email.png']);
-      if (error) throw error;
-      setLogoVersion(Date.now());
-      setLogoExiste(false);
-      toast.success('Logo removida.');
-    } catch (error: any) {
-      toast.error('Erro ao remover logo: ' + error.message);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const selecionarLogoPorInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (file) uploadEmailLogo(file);
-  };
-
-  const arrastarLogo = (ativo: boolean) => (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setLogoDragAtivo(ativo);
-  };
-
-  const soltarLogo = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setLogoDragAtivo(false);
-    const file = event.dataTransfer.files?.[0];
-    if (file) uploadEmailLogo(file);
-  };
-
-  // Área precisa de `tabIndex` (aplicado no elemento) pra ser focável: evento
-  // `paste` só chega em elementos com foco (ou em inputs/textareas).
-  const colarLogo = (event: React.ClipboardEvent<HTMLDivElement>) => {
-    const item = Array.from(event.clipboardData.items).find((i) => i.type.startsWith('image/'));
-    const file = item?.getAsFile();
-    if (!file) return;
-    event.preventDefault();
-    uploadEmailLogo(file);
   };
 
   const handleSalvarEmail = (e: React.FormEvent<HTMLFormElement>) => {
@@ -544,9 +466,9 @@ function ProfileTab() {
                             __html: montarRodapeEmailHtml({
                               nome: perfil.nome ?? '',
                               assinaturaHtml,
-                              logoUrl: `${LOGO_EMAIL_URL}?v=${logoVersion}`,
+                              logoUrl: marcaDaMinhaEmpresa.logoUrl,
+                              nomeDaEmpresa: marcaDaMinhaEmpresa.nome,
                               mostrarLogo: assinaturaModo === 'texto',
-                              logoCarregou: logoExiste,
                               isolado: true,
                               mostrarNome: assinaturaModo === 'texto' || mostrarNomeImagem,
                               mostrarNomeEmpresa: assinaturaModo === 'texto' || mostrarEmpresaImagem,
@@ -558,78 +480,18 @@ function ProfileTab() {
                   )}
                 </>
               )}
-              {/* Logotipo da empresa: dentro do mesmo form, mas discreto de
-                  propósito — é uma configuração da empresa (exclusiva de
-                  gestores/admin), não um dado pessoal, então não compete em
-                  destaque com os campos acima. Os botões aqui são
-                  `type="button"` com upload próprio (instantâneo, fora do
-                  submit do form) — só ficam dentro do form pra "Salvar
-                  alterações" poder vir depois deles no layout.
-                  Some quando a aba "Imagem" está selecionada — mesmo antes de
-                  um arquivo ser enviado: é exclusivo do modo texto, já que o
-                  rodapé some com a logo nesse caso (`mostrarLogo` acima) e
-                  oferecer o upload aqui seria uma configuração sem efeito
-                  nenhum. Usa `assinaturaModo` (a aba selecionada no editor),
-                  não o formato do `assinaturaHtml`: o valor só vira `<img>`
-                  depois que uma imagem é de fato enviada, e antes disso os
-                  dois modos ficam com o mesmo valor `''`.
-                  Some junto com a assinatura quando a empresa não tem a seção de
-                  E-mails: o único lugar onde esta logo aparece é o rodapé do
-                  e-mail enviado (`montarRodapeEmailHtml`), então sem o módulo é
-                  um upload que não vai a lugar nenhum. */}
-              {temEmails === true && (perfil.role === 'admin' || perfil.role === 'gestor' || perfil.role === 'empresa') && assinaturaModo === 'texto' && (
-                <div
-                  tabIndex={0}
-                  className={cn(
-                    'flex items-center gap-3 rounded-md border border-dashed px-3 py-2 outline-none transition-colors',
-                    logoDragAtivo && 'border-primary bg-primary/5',
-                  )}
-                  onDragOver={arrastarLogo(true)}
-                  onDragEnter={arrastarLogo(true)}
-                  onDragLeave={arrastarLogo(false)}
-                  onDrop={soltarLogo}
-                  onPaste={colarLogo}
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-muted/50 overflow-hidden">
-                    {logoExiste ? (
-                      <img
-                        key={logoVersion}
-                        src={`${LOGO_EMAIL_URL}?v=${logoVersion}`}
-                        alt="Logo da Empresa"
-                        className="max-h-9 max-w-9 object-contain"
-                        onLoad={() => setLogoExiste(true)}
-                        onError={() => setLogoExiste(false)}
-                      />
-                    ) : (
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-muted-foreground">Logotipo da empresa</p>
-                    <p className="truncate text-[10px] text-muted-foreground/70">Aparece no rodapé dos e-mails enviados</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button variant="ghost" size="sm" asChild disabled={isUploading} className="h-7 gap-1.5 text-xs">
-                      <label className="cursor-pointer">
-                        {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                        {logoExiste ? 'Trocar' : 'Enviar'}
-                        <input type="file" accept="image/*" onChange={selecionarLogoPorInput} disabled={isUploading} className="hidden" />
-                      </label>
-                    </Button>
-                    {logoExiste && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs text-destructive hover:text-destructive"
-                        onClick={removerLogoEmail}
-                        disabled={isUploading}
-                      >
-                        Remover
-                      </Button>
-                    )}
-                  </div>
-                </div>
+              {/* 🔴 O UPLOAD DE LOGO SAIU DAQUI em 31/08/2026, e não sumiu: virou um campo
+                  só, na aba "Empresa". Antes eram DOIS conceitos de logo — esta, do e-mail, e
+                  nenhuma para o PDF — e esta gravava num caminho fixo, `logo-email.png`, o
+                  MESMO para as dez empresas assinantes: uma sobrescrevia e APAGAVA a da outra,
+                  e a regra do balde permitia isso a qualquer pessoa logada.
+                  Agora a assinatura usa a mesma logo do cabeçalho dos PDFs. */}
+              {temEmails === true && assinaturaModo === 'texto' && !marcaDaMinhaEmpresa.logoUrl && (
+                <p className="text-xs text-muted-foreground">
+                  Sua empresa ainda não tem logo. Quem for gestor pode enviá-la em
+                  Configurações › Empresa — ela aparece aqui no rodapé e no topo dos PDFs
+                  exportados.
+                </p>
               )}
 
               <div className="flex justify-end pt-2">
@@ -899,7 +761,6 @@ const Configuracoes = () => {
               <CamposTab />
             </TabsContent>
           )}
-
 
           {/* O conteúdo some junto com o gatilho, pelo mesmo motivo do WhatsApp acima. */}
           {isGestor && temHoje === true && (

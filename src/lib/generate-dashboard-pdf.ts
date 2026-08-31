@@ -1,17 +1,7 @@
 import jsPDF from 'jspdf';
-import logoUrl from '@/assets/logo-md.webp';
+import { desenharMarca, encurtar, type MarcaDaEmpresa } from '@/lib/marca-do-pdf';
 
 const BRAND_ORANGE: [number, number, number] = [240, 106, 0];
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
 
 /**
  * Captura `element` como imagem (html2canvas) e monta um PDF paginado em A4,
@@ -21,6 +11,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
  */
 export async function generateDashboardPdf(
   element: HTMLElement,
+  marca: MarcaDaEmpresa,
   subtitulo: string,
   titulo: string = 'Dashboard'
 ) {
@@ -32,7 +23,11 @@ export async function generateDashboardPdf(
     useCORS: true,
   });
 
-  const doc = new jsPDF('portrait', 'mm', 'a4');
+  // 🔴 `compress: true` NÃO É AFINAÇÃO FINA AQUI. Cada página deste PDF é uma FATIA DE IMAGEM
+  // do painel, capturada em dobro de resolução. Medido na jsPDF 4.2.0: uma fatia de 1200x1800
+  // custa 6,18 MB sem compressão e 0,31 MB com — e a fatia real é maior que essa. Um painel de
+  // quatro páginas passava de 25 MB.
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 10;
@@ -47,30 +42,31 @@ export async function generateDashboardPdf(
 
   const drawFirstPageHeader = async () => {
     drawTopBar();
-    try {
-      const img = await loadImage(logoUrl);
-      const maxWidth = 30;
-      const maxHeight = 12;
-      const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
-      doc.addImage(img, 'WEBP', margin, 8, img.width * ratio, img.height * ratio);
-    } catch {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...BRAND_ORANGE);
-      doc.text('MD Representações', margin, 16);
-    }
+    const xDoTexto = margin + 36;
+
+    const { larguraDisponivelParaTexto } = await desenharMarca(doc, {
+      marca,
+      larguraDaPagina: pageWidth,
+      margemDireita: margin,
+      xDoTexto,
+      caixaDoCliente: { x: margin, y: 8, maxLargura: 30, maxAltura: 12 },
+      corDoNome: BRAND_ORANGE,
+    });
 
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(50, 50, 50);
-    doc.text(titulo, margin + 36, 14);
+    doc.text(encurtar(doc, titulo, larguraDisponivelParaTexto), xDoTexto, 14);
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(120);
-    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, margin + 36, 20);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, xDoTexto, 20);
     if (subtitulo) {
-      doc.text(subtitulo, margin + 36, 25);
+      // 🔴 CORTADO PARA CABER. O subtítulo do painel (o período escolhido, os filtros) já
+      // passava da margem direita em casos reais ANTES da logo da Repply existir — e o jsPDF
+      // não corta: ele desenha para fora da página, e o texto some sem aviso.
+      doc.text(encurtar(doc, subtitulo, larguraDisponivelParaTexto), xDoTexto, 25);
     }
     doc.setTextColor(0);
   };
@@ -97,7 +93,7 @@ export async function generateDashboardPdf(
     const ctx = sliceCanvas.getContext('2d');
     if (ctx) {
       ctx.drawImage(canvas, 0, renderedPx, canvas.width, availablePx, 0, 0, canvas.width, availablePx);
-      doc.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, startY, contentWidth, availablePx / pxPerMm);
+      doc.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, startY, contentWidth, availablePx / pxPerMm, undefined, 'FAST');
     }
 
     renderedPx += availablePx;

@@ -2,14 +2,17 @@ import DOMPurify from 'dompurify';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Calculada a partir do client Supabase configurado, não hardcoded: o
- * projeto Supabase deste CRM já foi trocado antes, e a URL antiga (de um
- * projeto que não existe mais) ficou presa aqui e duplicada em Emails.tsx —
- * por isso a logo aparecia sempre quebrada, tanto no preview quanto no
- * e-mail enviado. `getPublicUrl` só monta a string, não faz request.
+ * 🔴 A LOGO DO E-MAIL DEIXOU DE TER ENDEREÇO PRÓPRIO, em 31/08/2026.
+ *
+ * Ela morava em `email-assets/logo-email.png` — um caminho FIXO, o mesmo para as dez empresas
+ * assinantes. Uma empresa sobrescrevia e apagava a logo da outra, e a regra do balde permitia
+ * isso a qualquer pessoa logada. Conferido antes de mexer: o arquivo nunca chegou a existir,
+ * então ninguém perdeu nada na troca.
+ *
+ * Agora a assinatura usa a MESMA logo do cabeçalho dos PDFs — `empresas.logo_url`, guardada
+ * por empresa no balde `branding` e enviada na aba "Empresa" das configurações. Uma logo só,
+ * um lugar só para trocar.
  */
-export const LOGO_EMAIL_URL =
-  supabase.storage.from('email-assets').getPublicUrl('logo-email.png').data.publicUrl;
 
 /**
  * Assinatura pessoal roda como HTML digitado pelo próprio usuário (editor de
@@ -127,23 +130,31 @@ export function montarRodapeEmailHtml(opts: {
   isolado?: boolean;
   mostrarNome?: boolean;
   mostrarNomeEmpresa?: boolean;
+  /** O nome da empresa de quem envia. Sem ele, o rodapé simplesmente não escreve empresa. */
+  nomeDaEmpresa?: string;
 }): string {
   const assinaturaSegura = sanitizarAssinaturaEmail(opts.assinaturaHtml);
   const mostrarLogo = opts.mostrarLogo ?? true;
   const mostrarNome = opts.mostrarNome ?? true;
   const mostrarNomeEmpresa = opts.mostrarNomeEmpresa ?? true;
+  // O nome da empresa aparece em três lugares deste rodapé, e nos três estava escrito "MD
+  // Representações" — para todas as empresas. O `alt` importa mais do que parece: é o que o
+  // cliente lê quando o programa de e-mail bloqueia imagens, que é o padrão de muitos deles.
+  const nomeDaEmpresa = escapeHtml(opts.nomeDaEmpresa ?? '');
+
   let logoHtml = '';
-  if (mostrarLogo) {
+  if (mostrarLogo && opts.logoUrl) {
     logoHtml = (opts.logoCarregou ?? true)
-      ? `<img src="${opts.logoUrl}" alt="MD Representações" style="max-height: 50px; display: block; margin-bottom: 10px;" />`
+      ? `<img src="${opts.logoUrl}" alt="${nomeDaEmpresa}" style="max-height: 50px; display: block; margin-bottom: 10px;" />`
       : `<div style="font-size: 12px; color: #94a3b8; margin-bottom: 10px;">Nenhum logotipo enviado</div>`;
   }
   const estiloContainer = opts.isolado ? '' : 'margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;';
+  // Sem nome de pessoa, cai no nome da EMPRESA — e não num "Equipe MD" que não é de ninguém.
   const nomeHtml = mostrarNome
-    ? `<div style="color: #333; font-weight: bold; font-size: 16px;">${escapeHtml(opts.nome) || 'Equipe MD'}</div>`
+    ? `<div style="color: #333; font-weight: bold; font-size: 16px;">${escapeHtml(opts.nome) || nomeDaEmpresa}</div>`
     : '';
-  const empresaHtml = mostrarNomeEmpresa
-    ? `<div style="color: #94a3b8; font-size: 12px; margin-top: 15px;">MD Representações</div>`
+  const empresaHtml = mostrarNomeEmpresa && nomeDaEmpresa
+    ? `<div style="color: #94a3b8; font-size: 12px; margin-top: 15px;">${nomeDaEmpresa}</div>`
     : '';
   return `
     <div style="${estiloContainer}">

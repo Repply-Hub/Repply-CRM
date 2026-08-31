@@ -32,6 +32,8 @@ import {
   keepPreviousData,
 } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { marcaDaEmpresa } from "@/lib/marca-da-empresa";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -66,7 +68,6 @@ import { LeitorEmail, type EmailAberto } from "@/components/email/LeitorEmail";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
 import { ConfirmarEnviarEmailDialog } from "@/components/email/ConfirmarEnviarEmailDialog";
 import {
-  LOGO_EMAIL_URL,
   ehAssinaturaImagem,
   montarRodapeEmailHtml,
   normalizarAssinaturaAntiga,
@@ -362,6 +363,16 @@ const Emails = () => {
   });
 
   /**
+   * A marca da empresa de quem envia — a MESMA que vai no topo dos PDFs.
+   *
+   * 🔴 Até 31/08/2026 o rodapé do e-mail escrevia "MD Representações" e apontava para uma logo
+   * de caminho único, igual para as dez empresas. Todo e-mail de todo cliente saía assinado
+   * com o nome de outra representação.
+   */
+  const { profile } = useAuth();
+  const marcaDaMinhaEmpresa = useMemo(() => marcaDaEmpresa(profile), [profile]);
+
+  /**
    * Prévia da assinatura mostrada no compositor enquanto a pessoa escreve —
    * MESMA regra do rodapé que `sendEmailMutation` monta no envio (nome/logo/
    * imagem, com as preferências de mostrar-nome/mostrar-empresa), só que aqui
@@ -375,7 +386,8 @@ const Emails = () => {
     return montarRodapeEmailHtml({
       nome: perfil?.nome ?? "",
       assinaturaHtml: assinaturaNormalizada,
-      logoUrl: LOGO_EMAIL_URL,
+      logoUrl: marcaDaMinhaEmpresa.logoUrl,
+      nomeDaEmpresa: marcaDaMinhaEmpresa.nome,
       mostrarLogo: !ehAssinaturaImagem(assinaturaNormalizada),
       mostrarNome:
         !ehAssinaturaImagem(assinaturaNormalizada) ||
@@ -386,6 +398,10 @@ const Emails = () => {
       isolado: true,
     });
   }, [
+    // A marca entra nas dependências: sem ela, trocar a logo da empresa não repintaria este
+    // preview até a página ser recarregada.
+    marcaDaMinhaEmpresa.logoUrl,
+    marcaDaMinhaEmpresa.nome,
     perfil?.nome,
     perfil?.assinatura_email,
     perfil?.assinatura_imagem_mostrar_nome,
@@ -893,7 +909,9 @@ const Emails = () => {
         ${montarRodapeEmailHtml({
           nome: perfil?.nome ?? "",
           assinaturaHtml: assinaturaNormalizada,
-          logoUrl: `${LOGO_EMAIL_URL}?t=${Date.now()}`,
+          // A logo já vem com `?v=` do momento em que foi enviada — ver `CampoDeLogoDaEmpresa`.
+          logoUrl: marcaDaMinhaEmpresa.logoUrl,
+          nomeDaEmpresa: marcaDaMinhaEmpresa.nome,
           // Assinatura em modo imagem já é autossuficiente — mostrar a logo
           // da empresa em cima dela seria redundante/poluído.
           mostrarLogo: !ehAssinaturaImagem(assinaturaNormalizada),
