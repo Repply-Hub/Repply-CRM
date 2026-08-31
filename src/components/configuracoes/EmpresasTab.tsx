@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Building2, Loader2, Pencil, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 
 type Empresa = {
   id: string;
@@ -53,23 +54,42 @@ function EmpresaForm({
 
   const update = useMutation({
     mutationFn: async (data: { nome: string; nome_fantasia: string; cnpj: string }) => {
-      const { error } = await supabase
+      // 🔴 O `.select('id')` NÃO É ENFEITE — é o que separa "salvou" de "achou que salvou".
+      //
+      // Quando a regra de segurança do banco recusa um UPDATE, ela não devolve erro: ela
+      // simplesmente não encontra a linha, e o Supabase responde sucesso com zero linhas
+      // alteradas. Sem pedir as linhas de volta, esta tela mostrava "Empresa atualizada!"
+      // por cima de uma gravação que não aconteceu — e a pessoa só descobriria ao recarregar.
+      const { data: linhas, error } = await supabase
         .from('empresas')
         .update({
           nome: data.nome || null,
           nome_fantasia: data.nome_fantasia || null,
           cnpj: data.cnpj.replace(/\D/g, '') || null,
         })
-        .eq('id', empresa.id);
+        .eq('id', empresa.id)
+        .select('id');
       if (error) throw error;
+      if (!linhas?.length) {
+        throw new Error(
+          'A alteração não foi salva: o banco não autorizou. Se o acesso da empresa estiver bloqueado, é essa a causa.',
+        );
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['empresas_admin'] });
       qc.invalidateQueries({ queryKey: ['empresas_list'] });
+      // 🔴 A CHAVE QUE A PRÓPRIA TELA LÊ, e que ficava de fora. `MinhaEmpresaView` busca por
+      // ['minha_empresa', id]; sem invalidá-la, sair da aba e voltar remontava o formulário
+      // com o dado ANTIGO do cache — que se lê como "não salvou", e faz digitar tudo de novo.
+      // Sem o id de propósito: alcança também a empresa que o admin acabou de editar na lista.
+      qc.invalidateQueries({ queryKey: ['minha_empresa'] });
       toast.success('Empresa atualizada!');
       onSuccess?.();
     },
-    onError: (e: any) => toast.error(e.message),
+    // Erro do Supabase não é um `Error` (ver CLAUDE.md §4.6): `e.message` sozinho perde o
+    // `details`/`hint` e, principalmente, entrega em inglês a recusa das regras de acesso.
+    onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível salvar a empresa.')),
   });
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {

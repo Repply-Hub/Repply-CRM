@@ -801,7 +801,6 @@ const Configuracoes = () => {
   // A aba de Usuários usa layout de altura fixa (scroll interno nos cards); as demais rolam a página normalmente.
   const noPageScroll = activeTab === 'vendedores';
   const { profile, session } = useAuth();
-  const isEmpresaRole = profile?.role === 'empresa';
 
   // Quem responde pela assinatura: o dono registrado da empresa ou qualquer gestor dela.
   // 🔴 Mesmo critério que a função `stripe-portal` já exige por baixo — esconder a aba com
@@ -826,6 +825,28 @@ const Configuracoes = () => {
     },
   });
 
+  /**
+   * A aba "Empresa" segue `is_gestor()`, como TODAS as outras abas desta tela.
+   *
+   * 🔴 ELA ERA A ÚNICA FORA DO PADRÃO, e isso escondia a aba de quem o banco já autorizava.
+   * Até 31/08/2026 a condição aqui era `role === 'empresa'` — só o papel de dono. Mas:
+   *
+   *   · a política `empresas_update` do banco libera `is_gestor() AND id = get_my_empresa_id()`
+   *     desde 22/07/2026, criada justamente para o gestor poder regerar o código de acesso;
+   *   · `is_gestor()` no banco cobre os papéis 'gestor', 'admin' E 'empresa';
+   *   · o gestor JÁ grava nessa mesma tabela pela aba ao lado (o botão de código de acesso,
+   *     em Usuários), e já configura campos, automação e menu da empresa inteira.
+   *
+   * Ou seja, a tela era mais restritiva que o banco sem nenhuma razão registrada — e o efeito
+   * apareceu na MD Representações, a única das 10 empresas SEM ninguém de papel 'empresa': lá
+   * nem o dono registrado via a aba, porque ele também é 'gestor'.
+   *
+   * Espera o `isAdmin` responder antes de mostrar. Sem isso, o admin global (que também passa
+   * no `is_gestor`) veria por um instante a visão de empresa — e ele não tem empresa, então a
+   * tela piscaria "Nenhuma empresa vinculada" antes de virar a lista.
+   */
+  const abaEmpresaLiberada = isGestor === true && isAdmin !== undefined;
+
   return (
     <AppLayout
       title="Configurações"
@@ -848,7 +869,7 @@ const Configuracoes = () => {
             {isGestor && (
               <TabsTrigger value="campos" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><ListChecks className="h-4 w-4" /> Campos</TabsTrigger>
             )}
-            {(isAdmin || isEmpresaRole) && (
+            {abaEmpresaLiberada && (
               <TabsTrigger value="empresas" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>
             )}
             {podeVerPagamentos && (
@@ -886,7 +907,7 @@ const Configuracoes = () => {
               <AutomacaoTab empresaId={profile?.empresa_id ?? profile?.empresas?.id ?? undefined} />
             </TabsContent>
           )}
-          {(isAdmin || isEmpresaRole) && (
+          {abaEmpresaLiberada && (
             <TabsContent value="empresas" className="mt-4">
               <EmpresasTab mode={isAdmin ? 'admin' : 'empresa'} />
             </TabsContent>
