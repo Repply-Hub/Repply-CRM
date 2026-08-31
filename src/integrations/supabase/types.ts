@@ -2250,11 +2250,14 @@ export type Database = {
           atividade: string | null
           bloco_texto: string | null
           cnpj: string | null
+          coordenadas_utm: string | null
+          cpf_cnpj_formatado: string | null
           created_at: string
           data_emissao: string | null
           data_formacao: string | null
           data_validade: string | null
           empreendimento: string | null
+          endereco_empreendimento: string | null
           fato_gerador: string | null
           fonte: string | null
           id: string
@@ -2263,6 +2266,7 @@ export type Database = {
           numero_licenca: string | null
           numero_processo: string | null
           pdf_link: string | null
+          pdf_processado: boolean
           porte: string | null
           potencial_poluidor: string | null
           razao_social: string | null
@@ -2274,11 +2278,14 @@ export type Database = {
           atividade?: string | null
           bloco_texto?: string | null
           cnpj?: string | null
+          coordenadas_utm?: string | null
+          cpf_cnpj_formatado?: string | null
           created_at?: string
           data_emissao?: string | null
           data_formacao?: string | null
           data_validade?: string | null
           empreendimento?: string | null
+          endereco_empreendimento?: string | null
           fato_gerador?: string | null
           fonte?: string | null
           id?: string
@@ -2287,6 +2294,7 @@ export type Database = {
           numero_licenca?: string | null
           numero_processo?: string | null
           pdf_link?: string | null
+          pdf_processado?: boolean
           porte?: string | null
           potencial_poluidor?: string | null
           razao_social?: string | null
@@ -2298,11 +2306,14 @@ export type Database = {
           atividade?: string | null
           bloco_texto?: string | null
           cnpj?: string | null
+          coordenadas_utm?: string | null
+          cpf_cnpj_formatado?: string | null
           created_at?: string
           data_emissao?: string | null
           data_formacao?: string | null
           data_validade?: string | null
           empreendimento?: string | null
+          endereco_empreendimento?: string | null
           fato_gerador?: string | null
           fonte?: string | null
           id?: string
@@ -2311,6 +2322,7 @@ export type Database = {
           numero_licenca?: string | null
           numero_processo?: string | null
           pdf_link?: string | null
+          pdf_processado?: boolean
           porte?: string | null
           potencial_poluidor?: string | null
           razao_social?: string | null
@@ -4028,9 +4040,12 @@ export type Database = {
         Row: {
           apagada_para_todos: boolean
           conteudo: string
+          conteudo_original: string | null
           conversa_id: string
           created_at: string
           direcao: string
+          editada: boolean
+          editada_at: string | null
           empresa_id: string
           fixada: boolean
           id: string
@@ -4053,9 +4068,12 @@ export type Database = {
         Insert: {
           apagada_para_todos?: boolean
           conteudo: string
+          conteudo_original?: string | null
           conversa_id: string
           created_at?: string
           direcao: string
+          editada?: boolean
+          editada_at?: string | null
           empresa_id: string
           fixada?: boolean
           id?: string
@@ -4078,9 +4096,12 @@ export type Database = {
         Update: {
           apagada_para_todos?: boolean
           conteudo?: string
+          conteudo_original?: string | null
           conversa_id?: string
           created_at?: string
           direcao?: string
+          editada?: boolean
+          editada_at?: string | null
           empresa_id?: string
           fixada?: boolean
           id?: string

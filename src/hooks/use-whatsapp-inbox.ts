@@ -144,6 +144,14 @@ export interface WaMensagem {
   // "para todos", não existe apagar só localmente sem afetar o outro lado) e some
   // para todo mundo no CRM.
   apagada_para_todos?: boolean;
+  // Mensagem de texto de saída editada — via edge function whatsapp-edit-message
+  // (edição feita no CRM) ou via whatsapp-webhook (o cliente editou pelo celular).
+  // `conteudo` já traz o texto novo; a bolha mostra "· editada" ao lado da hora.
+  editada?: boolean;
+  editada_at?: string | null;
+  // Texto antes da primeira edição (gravado uma vez só). Não é exibido hoje,
+  // mas fica guardado para um eventual "ver original".
+  conteudo_original?: string | null;
   usuario?: {
     id: string;
     nome: string;
@@ -931,6 +939,165 @@ export function useWaExcluirMensagem() {
     onError: (err: any, vars) => {
       qc.invalidateQueries({ queryKey: ['wa_mensagens', vars.conversaId] });
       toast.error(err?.message ?? 'Erro ao excluir mensagem');
+    },
+  });
+}
+
+// --- Editar uma mensagem de texto já enviada ---
+// Chama whatsapp-edit-message, que troca o texto na uazapi (POST /message/edit) e
+// grava `conteudo`/`editada` no banco. O WhatsApp só deixa editar as mensagens de
+// TEXTO que a própria conta enviou, e só nos ~15 primeiros minutos — o botão
+// "Editar" no WhatsAppInbox.tsx já respeita isso, e a edge function refaz a
+// checagem. Otimista: mostra o texto novo na hora e marca "editada".
+
+export function useWaEditarMensagem() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { conversaId: string; mensagemId: string; novoTexto: string }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessão expirada');
+
+      const res = await supabase.functions.invoke('whatsapp-edit-message', {
+        body: { mensagemId: params.mensagemId, novoTexto: params.novoTexto },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (res.error) throw await erroLegivelDaFunction(res.error, 'Erro ao editar mensagem');
+      if (res.data?.error) throw new Error(res.data.error);
+      return res.data;
+    },
+
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: ['wa_mensagens', vars.conversaId] });
+      const texto = vars.novoTexto.trim();
+      qc.setQueryData<WaMensagem[]>(['wa_mensagens', vars.conversaId], (old) =>
+        (old ?? []).map((m) =>
+          m.id === vars.mensagemId
+            ? {
+                ...m,
+                conteudo: texto,
+                editada: true,
+                editada_at: new Date().toISOString(),
+                conteudo_original: m.conteudo_original ?? m.conteudo,
+              }
+            : m,
+        ),
+      );
+    },
+
+    onError: (err: Error, vars) => {
+      qc.invalidateQueries({ queryKey: ['wa_mensagens', vars.conversaId] });
+      toast.error(err?.message ?? 'Erro ao editar mensagem');
+    },
+  });
+}
+
+// --- Encaminhar uma mensagem para outras conversas ---
+// Encaminhar no WhatsApp é, na prática, reenviar o mesmo conteúdo: reaproveita a
+// edge function whatsapp-send (texto ou mídia) uma vez por conversa de destino.
+// Sequencial e com uma pausa curta entre envios para não estourar o limite da
+// operadora. Devolve quantas deram certo e quais falharam.
+
+// Placeholders que o whatsapp-send grava em `conteudo` quando a mídia vem sem
+// legenda — não devem ser reenviados como se fossem texto digitado.
+const PLACEHOLDERS_MIDIA = new Set(['[Imagem]', '[Áudio]', '[Vídeo]', '[Documento]', '[Sticker]', '[mensagem]']);
+
+// Prefixo que marca a mensagem como encaminhada. Como o encaminhamento é um
+// reenvio (não existe "forward" nativo na uazapi que a gente use), o aviso vai
+// no próprio texto/legenda, numa linha separada acima do conteúdo. Texto puro,
+// sem marcação de itálico — o CRM não renderiza `_x_` e mostraria os underscores.
+export const MARCADOR_ENCAMINHADA = '↪ Encaminhada';
+
+export function ehEncaminhada(conteudo: string | null | undefined): boolean {
+  return (conteudo ?? '').startsWith(MARCADOR_ENCAMINHADA);
+}
+
+// Junta a marca ao texto. Se o texto já vem com a marca (ex: editar uma mensagem
+// que já era encaminhada), não duplica.
+export function comMarcadorEncaminhada(texto: string): string {
+  const t = semMarcadorEncaminhada(texto);
+  return t ? `${MARCADOR_ENCAMINHADA}\n${t}` : MARCADOR_ENCAMINHADA;
+}
+
+// Tira a linha da marca, devolvendo só o conteúdo de verdade — é o que o campo
+// de edição mostra, para ninguém editar (nem apagar sem querer) o "Encaminhada".
+export function semMarcadorEncaminhada(conteudo: string | null | undefined): string {
+  const c = conteudo ?? '';
+  if (!ehEncaminhada(c)) return c.trim();
+  const resto = c.slice(MARCADOR_ENCAMINHADA.length);
+  return resto.replace(/^\r?\n/, '').trim();
+}
+
+export function useWaEncaminharMensagem() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      mensagem: WaMensagem;
+      destinos: { id: string; telefone: string }[];
+    }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessão expirada');
+      if (params.destinos.length === 0) throw new Error('Escolha ao menos uma conversa.');
+
+      const m = params.mensagem;
+      const ehMidia = !!m.media_url && m.tipo !== 'texto';
+      const legenda = m.conteudo && !PLACEHOLDERS_MIDIA.has(m.conteudo) ? m.conteudo : '';
+
+      const corpoBase: Record<string, unknown> = ehMidia
+        ? {
+            tipo: m.tipo,
+            media_url: m.media_url,
+            media_mime: m.media_mime ?? null,
+            // Em documento, `conteudo` guarda o nome do arquivo (ver whatsapp-send),
+            // então a marca vai sozinha na legenda; nos demais tipos, acima da legenda.
+            mensagem: m.tipo === 'documento'
+              ? MARCADOR_ENCAMINHADA
+              : comMarcadorEncaminhada(legenda),
+            nome_arquivo: m.tipo === 'documento' ? m.conteudo : null,
+            ptt: m.tipo === 'audio',
+          }
+        : { tipo: 'texto', mensagem: comMarcadorEncaminhada(m.conteudo) };
+
+      const falhas: string[] = [];
+      let ok = 0;
+      for (const destino of params.destinos) {
+        try {
+          const res = await supabase.functions.invoke('whatsapp-send', {
+            body: { ...corpoBase, telefone: destino.telefone, conversa_id: destino.id },
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          if (res.error) throw await erroLegivelDaFunction(res.error, 'Falha ao encaminhar');
+          if (res.data?.error) throw new Error(res.data.error);
+          ok += 1;
+        } catch (e) {
+          falhas.push(e instanceof Error ? e.message : 'erro desconhecido');
+        }
+        // Pausa curta entre envios consecutivos.
+        if (params.destinos.length > 1) await new Promise((r) => setTimeout(r, 400));
+      }
+
+      return { ok, falhas, total: params.destinos.length };
+    },
+
+    onSuccess: (r, vars) => {
+      // Atualiza a lista e as mensagens das conversas que receberam o encaminhamento.
+      qc.invalidateQueries({ queryKey: ['wa_conversas'] });
+      for (const d of vars.destinos) {
+        qc.invalidateQueries({ queryKey: ['wa_mensagens', d.id] });
+      }
+      if (r.falhas.length === 0) {
+        toast.success(r.total === 1 ? 'Mensagem encaminhada' : `Encaminhada para ${r.ok} conversas`);
+      } else if (r.ok === 0) {
+        toast.error(`Não foi possível encaminhar: ${r.falhas[0]}`);
+      } else {
+        toast.warning(`Encaminhada para ${r.ok} de ${r.total}. ${r.falhas.length} falhou.`);
+      }
+    },
+
+    onError: (err: Error) => {
+      toast.error(err?.message ?? 'Erro ao encaminhar mensagem');
     },
   });
 }

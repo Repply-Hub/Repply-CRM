@@ -751,6 +751,69 @@ async function handleIncomingMessage(
     return;
   }
 
+  // --- Edição de mensagem (alguém trocou o texto de uma mensagem já enviada) ---
+  // O WhatsApp entrega isso como um evento à parte, não como mensagem nova. O
+  // formato exato ainda não foi confirmado contra a instância real (docs.uazapi.com
+  // não é acessível programaticamente) — por isso a detecção olha vários caminhos
+  // e o payload cru vai para webhook_debug, igual ao bloco de reação acima. Cobre
+  // tanto a edição feita pelo contato quanto a feita pelo celular/WhatsApp Web da
+  // própria empresa (a edição feita DENTRO do CRM não chega aqui: volta com
+  // wasSentByApi=true e já saiu no early-return lá em cima).
+  const protocolo = content?.protocolMessage ?? msg.protocolMessage ?? null;
+  const looksLikeEdit =
+    msgType.includes("edit") ||
+    (typeof protocolo?.type === "string" && protocolo.type.toUpperCase().includes("EDIT")) ||
+    !!msg.editedMessageId ||
+    !!content?.editedMessage;
+  if (looksLikeEdit) {
+    const editTargetWamid: string | null =
+      msg.editedMessageId ??
+      protocolo?.key?.ID ??
+      protocolo?.key?.id ??
+      msg.quoted?.id ??
+      msg.quoted?.messageid ??
+      content?.key?.ID ??
+      content?.key?.id ??
+      null;
+    const editedInner =
+      protocolo?.editedMessage ?? content?.editedMessage ?? null;
+    const novoTexto: string =
+      editedInner?.conversation ??
+      editedInner?.extendedTextMessage?.text ??
+      editedInner?.text ??
+      content?.text ??
+      msg.text ??
+      "";
+
+    await supabase.from("webhook_debug").insert({
+      payload: {
+        _edit_debug: true,
+        msg: semSegredos(msg),
+        chat: semSegredos(payload.chat),
+        editTargetWamid,
+        novoTexto,
+      },
+    });
+
+    if (editTargetWamid && novoTexto) {
+      const { data: alvos } = await supabase
+        .from("whatsapp_mensagens")
+        .select("id, conteudo, conteudo_original")
+        .eq("empresa_id", empresaId)
+        .like("wamid", `%${editTargetWamid}`);
+      for (const alvo of alvos ?? []) {
+        const patch: Record<string, unknown> = {
+          conteudo: novoTexto,
+          editada: true,
+          editada_at: new Date().toISOString(),
+        };
+        if (!alvo.conteudo_original) patch.conteudo_original = alvo.conteudo ?? "";
+        await supabase.from("whatsapp_mensagens").update(patch).eq("id", alvo.id);
+      }
+    }
+    return;
+  }
+
   let conteudo: string = msg.text || content?.caption || msg.caption || "";
   let tipo = "texto";
 

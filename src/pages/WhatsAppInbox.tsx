@@ -22,6 +22,11 @@ import {
   useWaAddNota,
   useWaSetNotaFixada,
   useWaExcluirMensagem,
+  useWaEditarMensagem,
+  useWaEncaminharMensagem,
+  ehEncaminhada,
+  semMarcadorEncaminhada,
+  comMarcadorEncaminhada,
   useWaConnect,
   useWaSyncStatus,
   useWaDisconnect,
@@ -50,6 +55,7 @@ import { useSecaoLigada } from "@/hooks/use-secoes";
 import { useTarefasKanbanColunas } from "@/hooks/use-tarefas-kanban-colunas";
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
 import { ChatMessageSearch } from "@/components/chat/ChatMessageSearch";
+import { EncaminharMensagemDialog } from "@/components/chat/EncaminharMensagemDialog";
 import { ProjetoSelect } from "@/components/tarefas/ProjetoSelect";
 import { ParticipantesMultiSelect } from "@/components/tarefas/ParticipantesMultiSelect";
 import { MarcadoresMultiSelect } from "@/components/tarefas/MarcadoresMultiSelect";
@@ -187,6 +193,7 @@ import {
   UserX,
   List,
   Reply,
+  Forward,
   SmilePlus,
   ListTodo,
   StickyNote,
@@ -1572,7 +1579,7 @@ function QuotedPreview({
 // de renderização de mensagens.
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
-function ReactionPicker({ onPick }: { onPick: (emoji: string) => void }) {
+function ReactionPicker({ onPick, visivel }: { onPick: (emoji: string) => void; visivel?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -1581,8 +1588,8 @@ function ReactionPicker({ onPick }: { onPick: (emoji: string) => void }) {
           type="button"
           title="Reagir"
           className={cn(
-            "h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground opacity-0 group-hover/bubble:opacity-100 transition-opacity",
-            open && "opacity-100",
+            "h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground transition-opacity",
+            open || visivel ? "opacity-100" : "opacity-0 group-hover/bubble:opacity-100",
           )}
         >
           <SmilePlus className="h-3.5 w-3.5" />
@@ -1660,12 +1667,29 @@ function ReactionBadge({
   );
 }
 
+// O WhatsApp só deixa editar mensagem de TEXTO enviada pela própria conta, e só
+// nos ~15 primeiros minutos. Fora disso o item "Editar" nem aparece (a
+// whatsapp-edit-message refaz essa checagem do lado do servidor).
+const JANELA_EDICAO_MS = 15 * 60 * 1000;
+function podeEditarMensagem(msg: WaMensagem, isSaida: boolean): boolean {
+  return (
+    isSaida &&
+    msg.tipo === "texto" &&
+    !!msg.wamid &&
+    !msg.apagada_para_todos &&
+    !msg.is_nota_interna &&
+    Date.now() - new Date(msg.created_at).getTime() < JANELA_EDICAO_MS
+  );
+}
+
 function DraggableBubble({
   msg,
   isSaida,
   onReply,
   onReact,
   onExcluir,
+  onEditar,
+  onEncaminhar,
   children,
 }: {
   msg: WaMensagem;
@@ -1673,10 +1697,16 @@ function DraggableBubble({
   onReply: (msg: WaMensagem) => void;
   onReact: (msg: WaMensagem, emoji: string) => void;
   onExcluir: (msg: WaMensagem) => void;
+  onEditar: (msg: WaMensagem) => void;
+  onEncaminhar: (msg: WaMensagem) => void;
   children: React.ReactNode;
 }) {
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
+  // Hover controlado por JS: o `group-hover` puro do Tailwind não estava
+  // revelando os botões de forma confiável ao passar o mouse (só depois de um
+  // clique), por causa do gesto de arraste (pointer capture) nesta mesma div.
+  const [hovered, setHovered] = useState(false);
   const startXRef = useRef(0);
   const triggeredRef = useRef(false);
   const THRESHOLD = 56;
@@ -1724,6 +1754,8 @@ function DraggableBubble({
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       <div
         className="absolute inset-y-0 flex items-center text-muted-foreground pointer-events-none"
@@ -1753,18 +1785,24 @@ function DraggableBubble({
           type="button"
           title="Responder"
           onClick={() => onReply(msg)}
-          className="h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground opacity-0 group-hover/bubble:opacity-100 transition-opacity"
+          className={cn(
+            "h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground transition-opacity",
+            hovered ? "opacity-100" : "opacity-0 group-hover/bubble:opacity-100",
+          )}
         >
           <Reply className="h-3.5 w-3.5" />
         </button>
-        <ReactionPicker onPick={(emoji) => onReact(msg, emoji)} />
+        <ReactionPicker onPick={(emoji) => onReact(msg, emoji)} visivel={hovered} />
         {!msg.apagada_para_todos && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
                 title="Mais opções"
-                className="h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground opacity-0 group-hover/bubble:opacity-100 transition-opacity"
+                className={cn(
+                  "h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground transition-opacity",
+                  hovered ? "opacity-100" : "opacity-0 group-hover/bubble:opacity-100",
+                )}
               >
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
@@ -1775,6 +1813,18 @@ function DraggableBubble({
                 capturava o ponteiro antes do clique chegar ao Radix, fechando o menu
                 sem disparar a ação. */}
             <DropdownMenuContent align={isSaida ? "end" : "start"} data-no-drag>
+              {podeEditarMensagem(msg, isSaida) && (
+                <DropdownMenuItem onClick={() => onEditar(msg)}>
+                  <Pencil className="h-3.5 w-3.5 mr-2" />
+                  Editar
+                </DropdownMenuItem>
+              )}
+              {!msg.is_nota_interna && (
+                <DropdownMenuItem onClick={() => onEncaminhar(msg)}>
+                  <Forward className="h-3.5 w-3.5 mr-2" />
+                  Encaminhar
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={() => onExcluir(msg)}
@@ -2007,6 +2057,11 @@ function MessageContent({
           isSaida ? "text-white/70" : "text-muted-foreground",
         )}
       >
+        {msg.editada && (
+          <span className="text-[9px] italic" title="Mensagem editada">
+            editada
+          </span>
+        )}
         <span className="text-[9px]">
           {format(new Date(msg.created_at), "HH:mm")}
         </span>
@@ -4188,7 +4243,14 @@ export default function WhatsAppInbox() {
   const sendMessage = useWaSendMessage();
   const reagirMutation = useWaReagir();
   const excluirMensagem = useWaExcluirMensagem();
+  const editarMensagem = useWaEditarMensagem();
+  const encaminharMensagem = useWaEncaminharMensagem();
   const [msgParaApagar, setMsgParaApagar] = useState<WaMensagem | null>(null);
+  // Mensagem sendo editada: o campo de texto passa a valer "salvar edição" em vez
+  // de "enviar nova". Some ao trocar de conversa (ver useEffect abaixo).
+  const [msgEmEdicao, setMsgEmEdicao] = useState<WaMensagem | null>(null);
+  // Mensagem escolhida para encaminhar — abre o EncaminharMensagemDialog.
+  const [msgParaEncaminhar, setMsgParaEncaminhar] = useState<WaMensagem | null>(null);
   const marcarLida = useWaMarcarLida();
   // Abrir a conversa só marca como lida quando quem abre é o responsável por ela —
   // gestor/admin entrando numa conversa que não é sua não deve alterar o estado de
@@ -5036,13 +5098,32 @@ export default function WhatsAppInbox() {
   useEffect(() => {
     inputRef.current?.focus();
     setRespondendoA(null);
+    setMsgEmEdicao(null);
     prependAnchorRef.current = null;
   }, [conversaAtiva?.id]);
 
   // Ao marcar uma mensagem para responder, já deixa o campo de texto pronto pra digitar.
   function handleReply(msg: WaMensagem) {
+    setMsgEmEdicao(null);
     setRespondendoA(msg);
     inputRef.current?.focus();
+  }
+
+  // Entra no modo de edição: preenche o campo com o texto atual e troca o botão
+  // de enviar por "salvar". Cancelar (X no aviso) ou trocar de conversa sai do modo.
+  function handleIniciarEdicao(msg: WaMensagem) {
+    setRespondendoA(null);
+    clearAttachments();
+    setMsgEmEdicao(msg);
+    // Numa mensagem encaminhada, o campo mostra SÓ o conteúdo — a linha
+    // "Encaminhada" fica de fora da edição e é recolocada ao salvar.
+    setTexto(semMarcadorEncaminhada(msg.conteudo));
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
+  function handleCancelarEdicao() {
+    setMsgEmEdicao(null);
+    setTexto("");
   }
 
   // Clicar no mesmo emoji que já reagiu remove a reação (toggle, como no WhatsApp).
@@ -5691,6 +5772,38 @@ export default function WhatsAppInbox() {
 
     if (!config || config.status !== "connected") {
       toast.error("WhatsApp desconectado. Verifique as configurações.");
+      return;
+    }
+
+    // Modo edição: salva o novo texto da mensagem escolhida em vez de enviar uma
+    // nova. Sem anexos, sem menção, sem citação — o WhatsApp só edita o texto.
+    if (msgEmEdicao) {
+      const alvo = msgEmEdicao;
+      const corpo = texto.trim();
+      // Recoloca a linha "Encaminhada" se a mensagem já era encaminhada — o
+      // usuário editou só o conteúdo, a marca não muda.
+      const novoTexto = ehEncaminhada(alvo.conteudo)
+        ? comMarcadorEncaminhada(corpo)
+        : corpo;
+      if (!corpo || novoTexto === (alvo.conteudo ?? "").trim()) {
+        handleCancelarEdicao();
+        return;
+      }
+      isSendingRef.current = true;
+      setMsgEmEdicao(null);
+      setTexto("");
+      try {
+        await editarMensagem.mutateAsync({
+          conversaId: conversaAtiva.id,
+          mensagemId: alvo.id,
+          novoTexto,
+        });
+      } catch (err) {
+        console.error("[whatsapp] falha ao editar:", err);
+      } finally {
+        isSendingRef.current = false;
+        setTimeout(() => inputRef.current?.focus(), 0);
+      }
       return;
     }
 
@@ -7899,6 +8012,8 @@ export default function WhatsAppInbox() {
                                         onReply={handleReply}
                                         onReact={handleReact}
                                         onExcluir={setMsgParaApagar}
+                                        onEditar={handleIniciarEdicao}
+                                        onEncaminhar={setMsgParaEncaminhar}
                                       >
                                         <div
                                           className={cn(
@@ -8146,8 +8261,29 @@ export default function WhatsAppInbox() {
                     </div>
                   )}
 
+                  {/* Aviso de edição em andamento — o campo abaixo salva a edição */}
+                  {msgEmEdicao && (
+                    <div className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-muted/60 px-3 py-2 text-xs">
+                      <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-foreground">Editando mensagem</p>
+                        <p className="truncate text-muted-foreground">
+                          {semMarcadorEncaminhada(msgEmEdicao.conteudo)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCancelarEdicao}
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        title="Cancelar edição"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+
                   {/* Preview da mensagem em resposta — clicar rola até a mensagem original */}
-                  {respondendoA && (
+                  {respondendoA && !msgEmEdicao && (
                     <div className="max-w-sm">
                       <QuotedPreview
                         remetenteNome={quotedNomeFor(respondendoA)}
@@ -8230,7 +8366,7 @@ export default function WhatsAppInbox() {
                       size="icon"
                       className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={isBusy || isRecording || !!pendingAudio}
+                      disabled={isBusy || isRecording || !!pendingAudio || !!msgEmEdicao}
                       title="Anexar arquivo"
                     >
                       {isUploading ? (
@@ -8246,7 +8382,7 @@ export default function WhatsAppInbox() {
                       size="icon"
                       className="h-9 w-9 shrink-0"
                       onClick={toggleRecording}
-                      disabled={isBusy || !!pendingAudio}
+                      disabled={isBusy || !!pendingAudio || !!msgEmEdicao}
                       title={isRecording ? "Parar gravação" : "Gravar áudio"}
                     >
                       {isRecording ? (
@@ -8264,7 +8400,7 @@ export default function WhatsAppInbox() {
                           variant="ghost"
                           size="icon"
                           className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
-                          disabled={isBusy || isRecording || !!pendingAudio}
+                          disabled={isBusy || isRecording || !!pendingAudio || !!msgEmEdicao}
                           title="Adicionar"
                         >
                           <Plus className="h-4 w-4" />
@@ -8306,11 +8442,13 @@ export default function WhatsAppInbox() {
                         className="flex-1 min-h-9 resize-none py-2 overflow-hidden"
                         rows={1}
                         placeholder={
-                          attachments.length > 0
-                            ? "Legenda (opcional)..."
-                            : isConnected
-                              ? "Digite uma mensagem..."
-                              : "WhatsApp desconectado"
+                          msgEmEdicao
+                            ? "Edite a mensagem..."
+                            : attachments.length > 0
+                              ? "Legenda (opcional)..."
+                              : isConnected
+                                ? "Digite uma mensagem..."
+                                : "WhatsApp desconectado"
                         }
                         value={texto}
                         onChange={handleTextoChange}
@@ -8333,6 +8471,8 @@ export default function WhatsAppInbox() {
                     >
                       {isBusy ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : msgEmEdicao ? (
+                        <Check className="h-4 w-4" />
                       ) : (
                         <Send className="h-4 w-4" />
                       )}
@@ -8384,6 +8524,13 @@ export default function WhatsAppInbox() {
         }}
       />
       <ConfigDialog open={showConfig} onClose={() => setShowConfig(false)} />
+
+      <EncaminharMensagemDialog
+        mensagem={msgParaEncaminhar}
+        conversas={conversas}
+        conversaAtualId={conversaAtivaId}
+        onClose={() => setMsgParaEncaminhar(null)}
+      />
 
       <Dialog
         open={!!viewingImage}
