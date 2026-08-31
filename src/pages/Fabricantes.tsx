@@ -20,11 +20,12 @@ import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConteudoDialogo } from "@/components/shared/DialogoResponsivo";
 
 import { useFabricantes } from "@/hooks/use-clientes";
-import { ContatosDaFabrica } from "@/components/fabricantes/ContatosDaFabrica";
+import { ContatosDaFabrica, type ContatoEditavel } from "@/components/fabricantes/ContatosDaFabrica";
 import { GerenciarFuncoesDialog } from "@/components/fabricantes/GerenciarFuncoesDialog";
 import {
   useContatosDeTodasAsFabricas,
   useFabricanteFuncoes,
+  useCriarContatosEmLote,
 } from "@/hooks/use-fabricante-contatos";
 import { rotuloDoCartao, type ContatoDaFabrica, type FuncaoDaFabrica } from "@/lib/contatos-da-fabrica";
 // Criar, editar e excluir fabricante vêm todos do arquivo do domínio (CLAUDE.md §5.3).
@@ -84,6 +85,7 @@ function FabricanteForm({
 }) {
   const createFabricante = useCreateFabricante();
   const updateFabricante = useUpdateFabricante();
+  const criarContatosEmLote = useCriarContatosEmLote();
   const [cnpj, setCnpj] = useState(editData?.cnpj ?? "");
   const [cnpjStatus, setCnpjStatus] = useState<
     "idle" | "loading" | "valid" | "invalid"
@@ -95,6 +97,9 @@ function FabricanteForm({
   // representá-la. `fabricanteEstaAtivo` cobre o cadastro antigo que ainda não tem o
   // campo — ausência de informação não vira "inativa".
   const [ativo, setAtivo] = useState(fabricanteEstaAtivo(editData));
+  // Contatos montados ANTES de a fábrica existir. Só usados no cadastro novo: na edição a
+  // fábrica já tem identificador e cada gesto grava na hora.
+  const [contatosPendentes, setContatosPendentes] = useState<ContatoEditavel[]>([]);
   const sessionRef = useRef(0);
 
   const reset = () => {
@@ -105,6 +110,7 @@ function FabricanteForm({
     setContato("");
     setTelefone("");
     setAtivo(true);
+    setContatosPendentes([]);
   };
 
   useEffect(() => {
@@ -116,6 +122,7 @@ function FabricanteForm({
       setContato(editData?.nome_contato ?? "");
       setTelefone(editData?.telefone ?? "");
       setAtivo(fabricanteEstaAtivo(editData));
+      setContatosPendentes([]);
     }
   }, [open, editData]);
 
@@ -170,13 +177,40 @@ function FabricanteForm({
             : "Marca desativada. Ela sai do topo das listas, mas continua no sistema com todos os negócios dela.",
         );
       } else {
-        await createFabricante.mutateAsync({
+        const novoId = await createFabricante.mutateAsync({
           nome,
           cnpj: cnpj || undefined,
           nome_contato: contato || undefined,
           telefone: telefone || undefined,
           ativo,
         });
+        // Os contatos montados antes de a fábrica existir agora têm a quem se prender.
+        // Se ESTA gravação falhar, a fábrica já foi criada — por isso a mensagem separa as
+        // duas coisas em vez de dizer que nada funcionou.
+        if (contatosPendentes.length > 0) {
+          try {
+            await criarContatosEmLote.mutateAsync({
+              fabricanteId: novoId,
+              contatos: contatosPendentes.map((c) => ({
+                nome: c.nome,
+                funcao_id: c.funcao_id,
+                telefone: c.telefone,
+                email: c.email,
+                observacao: c.observacao,
+                principal: c.principal,
+              })),
+            });
+          } catch (erroDosContatos) {
+            toast.error(
+              "Fabricante cadastrado, mas os contatos não foram salvos: " +
+                (erroDosContatos instanceof Error ? erroDosContatos.message : "erro desconhecido") +
+                ". Abra a ficha da fábrica e acrescente-os por lá.",
+            );
+            reset();
+            onOpenChange(false);
+            return;
+          }
+        }
         toast.success("Fabricante cadastrado!");
       }
       reset();
@@ -288,6 +322,18 @@ function FabricanteForm({
               className="mt-0.5 shrink-0"
             />
           </div>
+          {/* Os contatos já no cadastro, no molde do seletor de contatos da obra: quem
+              cadastra a marca acabou de falar com alguém dela, e obrigar a salvar,
+              reabrir e só então acrescentar é o atrito que matou o campo antigo.
+
+              Na EDIÇÃO a fábrica já existe, então cada gesto grava na hora. No cadastro
+              novo a lista é rascunho e vai para o banco logo depois de a fábrica nascer. */}
+          <ContatosDaFabrica
+            fabricanteId={editData?.id}
+            pendentes={contatosPendentes}
+            onPendentesChange={setContatosPendentes}
+          />
+
           <Button type="submit" className="w-full" disabled={isPending}>
             {isPending ? "Salvando..." : "Salvar"}
           </Button>
@@ -447,6 +493,11 @@ function FabricanteDetailHeader({
             </Button>
           </div>
         </div>
+
+        {/* Os contatos vivem DENTRO deste quadro, junto do Editar e do Excluir, e não num
+            cartão próprio: decisão do dono do produto em 31/08/2026, para não acrescentar
+            mais um bloco à tela de Fabricantes. */}
+        <ContatosDaFabrica fabricanteId={fab.id} className="mt-4" />
       </CardContent>
     </Card>
   );
@@ -670,15 +721,6 @@ const Fabricantes = () => {
                   />
                 </div>
 
-                {/* Irmão do drive de catálogos, como ele. A ficha da fábrica passa a ter
-                    a lista de pessoas com quem se fala nela — gerente, logística,
-                    assistência técnica —, em vez do campo único que estava vazio nas 28
-                    fábricas da MD. */}
-                <Card className="rounded-xl border-border/60 flex-none">
-                  <CardContent className="p-5">
-                    <ContatosDaFabrica fabricanteId={selectedFab.id} />
-                  </CardContent>
-                </Card>
 
                 {/* O drive ocupa o lugar do antigo cartão "Catálogo de Produtos", que saiu
                     em 26/08/2026 (commit acbcb415) sem nunca ter tido dado real — zero linhas

@@ -110,6 +110,42 @@ export function useSalvarContato() {
   });
 }
 
+/**
+ * Grava de uma vez os contatos que foram montados ANTES de a fábrica existir.
+ *
+ * O cadastro de fábrica deixa acrescentar contato antes de salvar — é o padrão de
+ * `SeletorContatosObra`, apontado pelo dono do produto como referência. Enquanto a fábrica
+ * não tem identificador, os contatos vivem no estado do formulário; assim que ela nasce,
+ * esta função os prende a ela.
+ *
+ * Um único INSERT, não um por contato: N gravações seriam N idas ao servidor logo depois
+ * de outra ida, e qualquer uma delas falhando deixaria a fábrica criada com metade dos
+ * contatos.
+ */
+export function useCriarContatosEmLote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      fabricanteId,
+      contatos,
+    }: {
+      fabricanteId: string;
+      contatos: Omit<DadosDeContato, 'fabricante_id' | 'id'>[];
+    }) => {
+      if (contatos.length === 0) return;
+      const { data, error } = await supabase
+        .from('fabricante_contatos')
+        .insert(contatos.map((c) => ({ ...c, fabricante_id: fabricanteId })))
+        .select('id');
+      if (error) throw new Error(mensagemDeErro(error));
+      if (!data || data.length !== contatos.length) {
+        throw new Error('A regra de segurança do banco recusou parte dos contatos.');
+      }
+    },
+    onSuccess: (_d, v) => invalidarContatos(qc, v.fabricanteId),
+  });
+}
+
 export function useRemoverContato() {
   const qc = useQueryClient();
   return useMutation({

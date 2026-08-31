@@ -37,8 +37,21 @@ export function useCreateFabricante() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (data: DadosDeFabricante) => {
-      const { error } = await supabase.from('fabricantes').insert(data);
+      // 🔴 O `.select('id')` devolve a fábrica recém-criada, e isso é NECESSÁRIO: o
+      // cadastro já permite acrescentar contatos, e eles só podem ser gravados depois que
+      // a fábrica existe e tem identificador.
+      //
+      // De brinde, ele fecha uma recusa silenciosa: no PostgREST, gravação barrada por
+      // regra de segurança NÃO devolve erro — atinge zero linhas e reporta sucesso. Sem a
+      // conferência abaixo, a tela diria "Fabricante cadastrado!" com nada no banco.
+      const { data: criado, error } = await supabase
+        .from('fabricantes')
+        .insert(data)
+        .select('id')
+        .single();
       if (error) throw error;
+      if (!criado?.id) throw new Error('A regra de segurança do banco recusou o cadastro.');
+      return criado.id as string;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fabricantes'] });
