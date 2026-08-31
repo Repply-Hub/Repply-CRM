@@ -69,21 +69,6 @@ const MODULOS: ModuloDescricao[] = [
     ],
   },
   {
-    key: 'pipeline',
-    label: 'Pipeline',
-    descricoes: {
-      ver: 'Visualizar o Kanban com os leads e negócios',
-      criar: 'Criar novos leads no pipeline',
-      editar: 'Alterar dados dos cards do pipeline',
-      excluir: 'Remover leads do pipeline',
-    },
-    funcionalidades: [
-      { key: 'mover_cards', label: 'Mover Cards', descricao: 'Arrastar cards entre as etapas do pipeline', icon: 'move' },
-      { key: 'exportar_pdf', label: 'Exportar PDF', descricao: 'Gerar relatório em PDF do pipeline', icon: 'pdf' },
-      { key: 'filtrar_avancado', label: 'Filtro Avançado', descricao: 'Usar filtros por vendedor, fabricante e período', icon: 'filter' },
-    ],
-  },
-  {
     key: 'clientes',
     label: 'Clientes',
     descricoes: {
@@ -115,16 +100,22 @@ const MODULOS: ModuloDescricao[] = [
     key: 'pedidos',
     label: 'Negócios',
     descricoes: {
-      ver: 'Visualizar lista de negócios e detalhes',
+      ver: 'Visualizar lista de negócios e detalhes (inclui o Kanban — Pipeline e Negócios são a mesma tabela, "pedidos", e não têm permissão separada)',
       criar: 'Criar novos negócios e orçamentos',
       editar: 'Alterar dados e itens dos negócios',
       excluir: 'Remover negócios do sistema',
     },
+    // "mover_cards" e "filtrar_avancado" vieram do módulo "pipeline", removido em 31/08/2026
+    // por operar sobre a mesma tabela "pedidos" — não fazia sentido ter duas permissões
+    // independentes para o mesmo dado (Kanban e lista de Negócios). "exportar_pdf" já
+    // existia aqui, então não duplicou.
     funcionalidades: [
       { key: 'importar', label: 'Importar Negócios', descricao: 'Importar negócios via planilha', icon: 'import' },
       { key: 'exportar_pdf', label: 'Exportar PDF', descricao: 'Gerar PDF dos negócios', icon: 'pdf' },
       { key: 'alterar_status', label: 'Alterar Status', descricao: 'Mudar status do negócio (ex: Novo → Enviado)', icon: 'status' },
       { key: 'whatsapp', label: 'WhatsApp', descricao: 'Enviar cobrança ou acompanhamento via WhatsApp', icon: 'whatsapp' },
+      { key: 'mover_cards', label: 'Mover Cards', descricao: 'Arrastar cards entre as etapas do Kanban', icon: 'move' },
+      { key: 'filtrar_avancado', label: 'Filtro Avançado', descricao: 'Usar filtros por vendedor, fabricante e período no Kanban', icon: 'filter' },
     ],
   },
   {

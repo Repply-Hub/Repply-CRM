@@ -3,7 +3,7 @@ import { SECOES, SECOES_DESLIGAVEIS, secaoDaRota, type SecaoId } from './secoes'
 
 /**
  * POR QUE ESTE ARQUIVO EXISTE: o projeto tinha DUAS listas de módulos que não batiam —
- * DEFAULT_SIDEBAR_ITEMS (15 ids, com os 3 de admin) e MODULOS (14 chaves, com `contatos`
+ * DEFAULT_SIDEBAR_ITEMS (15 ids, com os 3 de admin) e MODULOS (13 chaves, com `contatos`
  * e `pedidos` que o menu não tem). O controle de acesso por empresa precisava de uma
  * lista; criar a terceira criaria a terceira verdade.
  *

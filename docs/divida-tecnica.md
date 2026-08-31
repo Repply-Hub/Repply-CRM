@@ -49,7 +49,8 @@ acrescentados em 21/08/2026; os itens 58 e 59, em 30 e 31/08/2026.
 | 32 | [Cópia sem uso da chave do Resend no Vault](#32-cópia-sem-uso-da-chave-do-resend-no-vault) | Baixa | Não — higiene de credencial |
 | 33 | [O WhatsApp não tem contagem de envio nenhuma](#33-o-whatsapp-não-tem-contagem-de-envio-nenhuma) | **Alta** | Não hoje — mas um número da MD é compartilhado por 13 pessoas, sem trava |
 | 34 | [A etapa da configuração não é verificada contra a tela](#34-a-etapa-gravada-na-configuração-não-é-verificada-contra-a-tela) | Média | Já travou o Novo Negócio 3 vezes — campo obrigatório sem onde preencher |
-| 35 | [Logo de e-mail é um arquivo único para todas as empresas](#35-logo-de-e-mail-é-um-arquivo-único-para-todas-as-empresas) | Média | Não hoje (só 1 empresa paga usa) — mas quebra a próxima |
+| 35 | [Logo de e-mail é um arquivo único para todas as empresas](#35-logo-de-e-mail-é-um-arquivo-único-para-todas-as-empresas) | ✅ Resolvida | Corrigido na migration `20260831140000` |
+| 36 | [Matriz de permissões ainda decorativa em criar/editar, e em 3 módulos que não são tabela](#36-matriz-de-permissões-ainda-decorativa-em-criareditar-e-em-3-módulos-que-não-são-tabela) | Média | Não — falsa sensação de controle, não vazamento |
 | 36 | [As 8 visões `v_md_*` entregam a carteira de clientes sem login](#36-as-8-visões-v_md_-entregam-a-carteira-de-clientes-sem-login) | **Crítica** | Sim — 1.305 clientes legíveis sem login |
 | 37 | [A pré-visualização de anexo executa o HTML do arquivo](#37-a-pré-visualização-de-anexo-executa-o-html-do-arquivo-recebido) | **Crítica** | Sim — arquivo de estranho roda na sessão de quem abre |
 | 38 | [Excluir usuário não tira o acesso](#38-excluir-usuário-não-tira-o-acesso) | **Crítica** | Latente — 0 excluídos hoje, mas não há como revogar |
@@ -1427,8 +1428,17 @@ uma chave em `configuracoes_campos` que a tela não conhece.
 
 ## 35. Logo de e-mail é um arquivo único para todas as empresas
 
-**Gravidade: média. Achado em 26/08/2026, durante a correção dos gaps de permissão da
-Fase 2 (auditoria de RLS/Storage). Não é um dos 4 itens daquela fase — registrado à parte.**
+**Gravidade: média. ✅ CORRIGIDO em 31/08/2026, migration
+`20260831140000_logo_da_empresa_por_empresa.sql`.**
+
+Achado em 26/08/2026, durante a correção dos gaps de permissão da Fase 2 (auditoria de
+RLS/Storage) — não era um dos 4 itens daquela fase, ficou registrado à parte. A correção
+foi além do que este item sugeria: em vez de só prefixar `logo-email.png` com `empresa_id`,
+nasceu um bucket `branding` próprio (`<empresa_id>/logo.png`, só PNG, escrita restrita a
+`is_gestor()`), e a assinatura de e-mail passou a usar a mesma fonte (`empresas.logo_url`)
+em vez de um arquivo à parte. O caminho `logo-email.png` foi removido da política
+`email_assets_write` do bucket `email-assets` — texto original do achado abaixo, mantido
+como registro.
 
 O bucket `email-assets` guarda a logo usada na assinatura de e-mail sob um caminho **fixo e
 único**, sem `empresa_id` nenhum: `logo-email.png`. A referência é uma constante
@@ -2244,6 +2254,45 @@ A regra ficou em `src/lib/endereco-de-retorno.ts`, com 8 testes: em máquina de
 desenvolvimento vale o endereço local (senão ninguém testa), em qualquer outro lugar vale o
 canônico. A comparação de hostname é **exata**, nunca por substring — `localhost.exemplo.com`
 é um domínio público como outro qualquer.
+
+---
+
+## 36. Matriz de permissões ainda decorativa em criar/editar, e em 3 módulos que não são tabela
+
+**Gravidade: média. Registrado em 31/08/2026, na Fase 3 de correção de permissões.**
+
+A Fase 3 ligou `has_permission()`/`has_funcionalidade()` de verdade em várias policies de
+RLS (ver migration `20260831160000_fase3_permissoes_reais_no_banco.sql`), mas só no que dava
+para fazer **sem tirar capacidade de ninguém hoje**. Ficou de fora, por decisão explícita
+para não quebrar produção sem aviso:
+
+**Criar/editar liberado para qualquer vendedor da empresa, sem checar a matriz:**
+
+| Módulo | Hoje | Por que não entrou |
+|---|---|---|
+| Clientes, Contatos | `criar`/`editar` = dono OU qualquer colega da empresa | Travar via `has_permission` REMOVE uma capacidade que todo vendedor tem agora — exige popular `permissoes_usuario` para cada vendedor ativo antes, ou alguém perde acesso no meio do expediente |
+| Obras | `criar`/`editar` = qualquer colega da empresa (nem checa dono) | Mesmo motivo, ainda mais aberto hoje |
+| Fabricantes | `criar`/`editar`/`excluir` = qualquer usuário autenticado da empresa, **sem checagem de papel nenhuma** — nem `is_gestor()` | É o único módulo sem trava de cargo alguma; corrigir precisa da mesma population prévia |
+
+**Módulos que não são uma tabela-com-dono simples**, cada um pede solução diferente de RLS:
+
+- **Dashboard → ver**: os números vêm de função do banco (`dashboard_stats`,
+  `pedidos_stats`), não de uma linha com `usuario_id`. Checar a permissão aqui é dentro da
+  função (`has_permission(get_my_usuario_id(), 'dashboard', 'ver')` no corpo do SQL), não
+  como policy de tabela.
+- **Portal → Importar Licenças**: aciona a edge function `import-licencas`, que hoje nem
+  autentica quem chama (`verify_jwt = false`, sem segredo próprio — é o gap médio que ficou
+  fora da Fase 2 de segurança). Checar a funcionalidade aqui depende de primeiro dar
+  autenticação nenhuma à function.
+- **E-mails → excluir**: a ação não existe no banco hoje. `email_mensagens` não tem policy
+  de `DELETE` nenhuma — só é possível excluir rascunho (`email_rascunhos`). Antes de travar
+  "excluir e-mail" pela matriz, alguém precisa decidir o que essa ação deveria fazer de
+  verdade (arquivar? remover local só da caixa própria? apagar do servidor via Nylas?).
+
+**Antes de mexer em qualquer um destes**: rodar um backfill dando a `permissoes_usuario` uma
+linha sensata para cada vendedor ativo (equivalente ao que ele já pode fazer hoje), e só
+então trocar a regra do banco — na ordem inversa, alguém perde acesso sem aviso no meio do
+expediente.
 
 ---
 

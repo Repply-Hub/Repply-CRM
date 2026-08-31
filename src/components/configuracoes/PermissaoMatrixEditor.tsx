@@ -72,7 +72,7 @@ export function PermissaoMatrixEditor({
   // configurando "quem pode ver o Portal" — uma tela que ninguém daquela empresa alcança,
   // porque a rota recusa (SecaoRoute) e o banco recusa (política de licencas_*).
   //
-  // MODULOS tem 14 chaves e SECOES tem 12: `contatos` e `pedidos` não são seções próprias
+  // MODULOS tem 13 chaves e SECOES tem 12: `contatos` e `pedidos` não são seções próprias
   // (pertencem a Clientes e Negócios, ambas do núcleo). Módulo sem seção correspondente,
   // ou de seção não desligável, passa direto e nunca some.
   //

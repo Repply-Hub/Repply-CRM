@@ -3,7 +3,7 @@
  *
  * POR QUE ISTO EXISTE: até 21/08/2026 havia DUAS listas canônicas de módulos que não
  * batiam entre si — `DEFAULT_SIDEBAR_ITEMS` (src/hooks/use-sidebar-preferences.ts, 15 ids,
- * incluindo os 3 de admin) e `MODULOS` (src/hooks/use-permissoes.ts, 14 chaves, com
+ * incluindo os 3 de admin) e `MODULOS` (src/hooks/use-permissoes.ts, 13 chaves, com
  * `contatos` e `pedidos` que o menu não tem). O controle de acesso por empresa precisava
  * de uma lista; criar a terceira criaria a terceira verdade.
  *
@@ -62,9 +62,9 @@ export const SECOES: Secao[] = [
   // (decisão do dono do produto em 24/08/2026: validar na MD antes de abrir para o resto).
   // Mesmo caminho que o Portal já seguia. Usa a permissão de Negócios porque é a lista de
   // negócios da pessoa, recortada — quem não pode ver negócio não pode ver a pauta deles.
-  { id: 'hoje',          label: 'Hoje',          rota: '/hoje',          desligavel: true,  modulosPermissao: ['pipeline', 'pedidos'] },
+  { id: 'hoje',          label: 'Hoje',          rota: '/hoje',          desligavel: true,  modulosPermissao: ['pedidos'] },
   { id: 'dashboard',     label: 'Dashboard',     rota: '/dashboard',     desligavel: true,  modulosPermissao: ['dashboard'] },
-  { id: 'pipeline',      label: 'Negócios',      rota: '/app',           rotasExtras: ['/pedidos'], desligavel: false, modulosPermissao: ['pipeline', 'pedidos'] },
+  { id: 'pipeline',      label: 'Negócios',      rota: '/app',           rotasExtras: ['/pedidos'], desligavel: false, modulosPermissao: ['pedidos'] },
   { id: 'clientes',      label: 'Clientes',      rota: '/clientes',      rotasExtras: ['/contatos'], desligavel: false, modulosPermissao: ['clientes', 'contatos'] },
   { id: 'obras',         label: 'Obras',         rota: '/obras',         desligavel: true,  modulosPermissao: ['obras'] },
   { id: 'fabricantes',   label: 'Fabricantes',   rota: '/fabricantes',   desligavel: false, modulosPermissao: ['fabricantes'] },
