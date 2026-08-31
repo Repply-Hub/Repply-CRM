@@ -30,6 +30,7 @@ import {
 } from "@/hooks/use-fabricante-contatos";
 import { rotuloDoCartao, type ContatoDaFabrica, type FuncaoDaFabrica } from "@/lib/contatos-da-fabrica";
 import { telefoneParaCadastro } from "@/lib/contato-da-conversa";
+import { useAuth } from "@/hooks/use-auth";
 // Criar, editar e excluir fabricante vêm todos do arquivo do domínio (CLAUDE.md §5.3).
 // `use-mutations.ts` teve um `useCreateFabricante` até 28/08/2026; ele foi removido de lá
 // porque não aceitava `ativo` e descartaria o status em silêncio — criar e editar têm de
@@ -518,6 +519,16 @@ const Fabricantes = () => {
   const [deleteAlert, setDeleteAlert] = useState<{ type: "fab"; id: string } | null>(null);
   const [funcoesAberto, setFuncoesAberto] = useState(false);
 
+  // Quem responde pela empresa edita a lista de funções; vendedor, não. Mesmo alcance da
+  // função `is_gestor()` do banco, que vale para 'gestor', 'admin' e 'empresa' — ela
+  // significa "responde pela empresa", não "tem o cargo gestor" (CLAUDE.md §7.2).
+  //
+  // 🔴 Isto é CONVENIÊNCIA, não proteção. A recusa de verdade é a do banco
+  // (20260831160000): esconder botão nunca protegeu nada (CLAUDE.md §6.1).
+  const { profile } = useAuth();
+  const respondePelaEmpresa =
+    profile?.role === "gestor" || profile?.role === "admin" || profile?.role === "empresa";
+
   // Uma consulta para TODOS os cartões, não uma por cartão: a MD tem 28 fábricas, e a
   // regra da casa é buscar no banco em vez de N vezes no navegador (CLAUDE.md §6.4).
   const { data: todosContatos = [] } = useContatosDeTodasAsFabricas();
@@ -622,16 +633,18 @@ const Fabricantes = () => {
                     {/* Abre daqui, e não de Configurações: lista usada num lugar só fica
                         perto de onde é usada — o mesmo caminho do "Gerenciar colunas" do
                         Kanban. */}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setFuncoesAberto(true)}
-                      className="h-9"
-                      title="Gerenciar as funções de contato das fábricas"
-                      aria-label="Gerenciar as funções de contato das fábricas"
-                    >
-                      Funções
-                    </Button>
+                    {respondePelaEmpresa && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setFuncoesAberto(true)}
+                        className="h-9"
+                        title="Gerenciar as funções de contato das fábricas"
+                        aria-label="Gerenciar as funções de contato das fábricas"
+                      >
+                        Funções
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       onClick={() => {
