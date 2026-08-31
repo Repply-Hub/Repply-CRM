@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -55,6 +55,22 @@ export function PermissaoMatrixEditor({
   const [expandedModulo, setExpandedModulo] = useState<string | null>(null);
   const [searchModulo, setSearchModulo] = useState('');
   const { mapa: secoesDaEmpresa } = useSecoesDaEmpresa();
+
+  // Ao abrir um módulo, joga o scroll para deixar o conteúdo aberto no centro da área
+  // visível — o gestor não precisa procurar onde o painel apareceu, nem perde de vista o
+  // cabeçalho do módulo que acabou de tocar. Um por vez fica aberto, então basta guardar
+  // a referência de cada linha e centralizar a do módulo expandido.
+  const moduloRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  useEffect(() => {
+    if (!expandedModulo) return;
+    const el = moduloRefs.current.get(expandedModulo);
+    if (!el) return;
+    // espera o painel expandido pintar antes de medir a posição
+    const raf = requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [expandedModulo]);
 
   const getPermCount = (modKey: string) => {
     const mod = MODULOS.find(m => m.key === modKey);
@@ -118,8 +134,12 @@ export function PermissaoMatrixEditor({
           return (
             <div
               key={mod.key}
+              ref={el => {
+                if (el) moduloRefs.current.set(mod.key, el);
+                else moduloRefs.current.delete(mod.key);
+              }}
               className={cn(
-                "rounded-lg border transition-all overflow-hidden",
+                "rounded-lg border transition-all overflow-hidden scroll-mt-4 scroll-mb-4",
                 ver ? "border-border bg-card" : "border-border/50 bg-muted/20",
                 isExpanded && "border-primary/30 shadow-sm"
               )}

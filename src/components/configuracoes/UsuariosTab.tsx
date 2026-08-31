@@ -160,9 +160,13 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
 
   return (
     <div className="space-y-4">
-      {/* Presets */}
-      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
-        <div className="flex items-center gap-1.5 flex-wrap">
+      {/* Cabeçalho: título do bloco à esquerda, presets alinhados à direita na mesma linha */}
+      <div className="flex flex-col lg:flex-row lg:items-start gap-3 lg:gap-4 justify-between">
+        <div className="min-w-0">
+          <h3 className="text-sm font-medium">Permissões por Módulo</h3>
+          <p className="text-xs text-muted-foreground">Controle granular de acesso para {vendedor.nome}</p>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap lg:justify-end lg:shrink-0">
           <span className="text-xs text-muted-foreground">Presets:</span>
           {(presets ?? []).map(preset => (
             <Button
@@ -176,7 +180,6 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
               {preset.nome}
             </Button>
           ))}
-        </div>
         {empresaId && (
           <Dialog open={savePresetOpen} onOpenChange={setSavePresetOpen}>
             <DialogTrigger asChild>
@@ -209,6 +212,7 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
             </DialogContent>
           </Dialog>
         )}
+        </div>
       </div>
 
       <PermissaoMatrixEditor
@@ -520,11 +524,7 @@ function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId, 
       {/* Section content */}
       {isGestor && activeSection === 'permissoes' && (
         <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <CardHeader className="pb-2 flex-none">
-            <CardTitle className="text-sm font-medium">Permissões por Módulo</CardTitle>
-            <CardDescription className="text-xs">Controle granular de acesso para {vendedor.nome}</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0 sm:p-6 sm:pt-0 flex-1 min-h-0 overflow-y-auto">
+          <CardContent className="p-4 sm:p-6 flex-1 min-h-0 overflow-y-auto">
             <InlinePermissaoEditor vendedor={vendedor} />
           </CardContent>
         </Card>
