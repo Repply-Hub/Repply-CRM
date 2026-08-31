@@ -1786,6 +1786,75 @@ export type Database = {
           },
         ]
       }
+      fabricante_contatos: {
+        Row: {
+          created_at: string
+          email: string | null
+          fabricante_id: string
+          funcao_id: string | null
+          id: string
+          nome: string
+          observacao: string | null
+          principal: boolean
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          fabricante_id: string
+          funcao_id?: string | null
+          id?: string
+          nome: string
+          observacao?: string | null
+          principal?: boolean
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          fabricante_id?: string
+          funcao_id?: string | null
+          id?: string
+          nome?: string
+          observacao?: string | null
+          principal?: boolean
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fabricante_funcoes: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          is_sistema: boolean
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          is_sistema?: boolean
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          is_sistema?: boolean
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fabricantes: {
         Row: {
           ativo: boolean
