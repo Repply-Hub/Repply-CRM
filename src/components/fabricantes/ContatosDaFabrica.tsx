@@ -13,6 +13,7 @@ import {
   useRemoverContato, useMarcarPrincipal,
 } from '@/hooks/use-fabricante-contatos';
 import { ordenarContatos, aoMarcarPrincipal } from '@/lib/contatos-da-fabrica';
+import { telefoneParaCadastro } from '@/lib/contato-da-conversa';
 
 /**
  * A lista de contatos de uma fábrica — gerente, logística, assistência técnica.
@@ -58,6 +59,19 @@ export interface ContatoEditavel {
 const SEM_FUNCAO = '__sem_funcao__';
 
 const FORMULARIO_VAZIO = { nome: '', funcao_id: '', telefone: '', email: '', observacao: '' };
+
+/**
+ * E-mail padronizado: sem espaço nas pontas e em minúsculas.
+ *
+ * Minúsculas porque nenhum provedor de verdade distingue maiúscula no endereço, e sem isso
+ * `Ana@X.com` e `ana@x.com` viram dois contatos que ninguém percebe serem a mesma pessoa.
+ *
+ * Texto vazio continua vazio — não vira string com espaço, que gravaria um e-mail em branco
+ * no lugar de nulo.
+ */
+function emailPadronizado(bruto: string): string {
+  return bruto.trim().toLowerCase();
+}
 
 interface Props {
   /** Quando existe, cada gesto grava direto. Quando não, a lista é rascunho do pai. */
@@ -272,9 +286,21 @@ export function ContatosDaFabrica({
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Telefone</Label>
+              {/* 🔴 Formata AO SAIR do campo, não a cada tecla. Reformatar enquanto a
+                  pessoa digita move o cursor no meio do número e faz ela redigitar — é
+                  onde o erro nasce (CLAUDE.md §7.10: brigar com quem está digitando é pior
+                  que a diferença).
+
+                  `telefoneParaCadastro` é o formatador que já existe na casa, e ele carrega
+                  três armadilhas resolvidas: não força o nono dígito (enfiá-lo em número de
+                  10 dígitos quebra os FIXOS que têm WhatsApp, e isso já respondeu por 100%
+                  das falhas de envio deste sistema), deixa número estrangeiro passar
+                  inteiro, e não confunde o DDD 55 do Rio Grande do Sul com código de país. */}
               <Input
                 value={form.telefone}
                 onChange={(e) => setForm({ ...form, telefone: e.target.value })}
+                onBlur={(e) => setForm({ ...form, telefone: telefoneParaCadastro(e.target.value) })}
+                placeholder="(00) 00000-0000"
                 className="h-8 text-sm"
               />
             </div>
@@ -284,6 +310,7 @@ export function ContatosDaFabrica({
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
+                onBlur={(e) => setForm({ ...form, email: emailPadronizado(e.target.value) })}
                 className="h-8 text-sm"
               />
             </div>
