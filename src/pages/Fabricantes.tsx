@@ -20,6 +20,13 @@ import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConteudoDialogo } from "@/components/shared/DialogoResponsivo";
 
 import { useFabricantes } from "@/hooks/use-clientes";
+import { ContatosDaFabrica } from "@/components/fabricantes/ContatosDaFabrica";
+import { GerenciarFuncoesDialog } from "@/components/fabricantes/GerenciarFuncoesDialog";
+import {
+  useContatosDeTodasAsFabricas,
+  useFabricanteFuncoes,
+} from "@/hooks/use-fabricante-contatos";
+import { rotuloDoCartao, type ContatoDaFabrica, type FuncaoDaFabrica } from "@/lib/contatos-da-fabrica";
 // Criar, editar e excluir fabricante vêm todos do arquivo do domínio (CLAUDE.md §5.3).
 // `use-mutations.ts` teve um `useCreateFabricante` até 28/08/2026; ele foi removido de lá
 // porque não aceitava `ativo` e descartaria o status em silêncio — criar e editar têm de
@@ -295,10 +302,16 @@ function FabricanteCard({
   fab,
   isSelected,
   onClick,
+  contatos,
+  funcoes,
 }: {
   fab: any;
   isSelected: boolean;
   onClick: () => void;
+  // Vêm de cima já buscados: uma consulta por cartão faria N consultas na abertura da
+  // tela, e a MD tem 28 fábricas.
+  contatos: ContatoDaFabrica[];
+  funcoes: FuncaoDaFabrica[];
 }) {
   return (
     <button
@@ -342,10 +355,10 @@ function FabricanteCard({
               </span>
             )}
           </div>
-          {fab.nome_contato && (
+          {rotuloDoCartao(contatos, funcoes) && (
             <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
               <User className="h-3 w-3 flex-shrink-0" />
-              {fab.nome_contato}
+              {rotuloDoCartao(contatos, funcoes)}
             </p>
           )}
         </div>
@@ -359,10 +372,14 @@ function FabricanteDetailHeader({
   fab,
   onEdit,
   onDelete,
+  contatos,
+  funcoes,
 }: {
   fab: any;
   onEdit: () => void;
   onDelete: () => void;
+  contatos: ContatoDaFabrica[];
+  funcoes: FuncaoDaFabrica[];
 }) {
   return (
     <Card className="rounded-xl border-border/60 overflow-hidden">
@@ -394,10 +411,10 @@ function FabricanteDetailHeader({
                     {fab.cnpj}
                   </span>
                 )}
-                {fab.nome_contato && (
+                {rotuloDoCartao(contatos, funcoes) && (
                   <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
                     <User className="h-3.5 w-3.5" />
-                    {fab.nome_contato}
+                    {rotuloDoCartao(contatos, funcoes)}
                   </span>
                 )}
                 {fab.telefone && (
@@ -445,6 +462,20 @@ const Fabricantes = () => {
   // `deleteAlert` perdeu o tipo "preco" junto com o catálogo de produtos: só se exclui
   // fabricante por aqui agora.
   const [deleteAlert, setDeleteAlert] = useState<{ type: "fab"; id: string } | null>(null);
+  const [funcoesAberto, setFuncoesAberto] = useState(false);
+
+  // Uma consulta para TODOS os cartões, não uma por cartão: a MD tem 28 fábricas, e a
+  // regra da casa é buscar no banco em vez de N vezes no navegador (CLAUDE.md §6.4).
+  const { data: todosContatos = [] } = useContatosDeTodasAsFabricas();
+  const { data: funcoes = [] } = useFabricanteFuncoes();
+
+  const contatosPorFabricante = todosContatos.reduce<Record<string, ContatoDaFabrica[]>>(
+    (acc, c) => {
+      (acc[c.fabricante_id] ??= []).push(c);
+      return acc;
+    },
+    {},
+  );
 
   const deleteFabricante = useDeleteFabricante();
 
@@ -534,6 +565,19 @@ const Fabricantes = () => {
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    {/* Abre daqui, e não de Configurações: lista usada num lugar só fica
+                        perto de onde é usada — o mesmo caminho do "Gerenciar colunas" do
+                        Kanban. */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setFuncoesAberto(true)}
+                      className="h-9"
+                      title="Gerenciar as funções de contato das fábricas"
+                      aria-label="Gerenciar as funções de contato das fábricas"
+                    >
+                      Funções
+                    </Button>
                     <Button
                       size="sm"
                       onClick={() => {
@@ -584,6 +628,8 @@ const Fabricantes = () => {
                           fab={f}
                           isSelected={selectedFabId === f.id}
                           onClick={() => setSelectedFabId(f.id)}
+                          contatos={contatosPorFabricante[f.id] ?? []}
+                          funcoes={funcoes}
                         />
                       </div>
                     ))}
@@ -619,8 +665,20 @@ const Fabricantes = () => {
                     onDelete={() =>
                       setDeleteAlert({ type: "fab", id: selectedFab.id })
                     }
+                    contatos={contatosPorFabricante[selectedFab.id] ?? []}
+                    funcoes={funcoes}
                   />
                 </div>
+
+                {/* Irmão do drive de catálogos, como ele. A ficha da fábrica passa a ter
+                    a lista de pessoas com quem se fala nela — gerente, logística,
+                    assistência técnica —, em vez do campo único que estava vazio nas 28
+                    fábricas da MD. */}
+                <Card className="rounded-xl border-border/60 flex-none">
+                  <CardContent className="p-5">
+                    <ContatosDaFabrica fabricanteId={selectedFab.id} />
+                  </CardContent>
+                </Card>
 
                 {/* O drive ocupa o lugar do antigo cartão "Catálogo de Produtos", que saiu
                     em 26/08/2026 (commit acbcb415) sem nunca ter tido dado real — zero linhas
@@ -674,6 +732,8 @@ const Fabricantes = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <GerenciarFuncoesDialog open={funcoesAberto} onOpenChange={setFuncoesAberto} />
 
     </AppLayout>
   );
