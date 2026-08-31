@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
 import { useVendedores } from '@/hooks/use-clientes';
@@ -15,6 +15,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { ChevronDown } from 'lucide-react';
+import { descreverAlteracao, resumirAlteracao } from '@/lib/historico-legivel';
 
 const TABELA_LABELS: Record<string, string> = {
   pedidos: 'Negócio',
@@ -27,6 +28,9 @@ const TABELA_LABELS: Record<string, string> = {
   permissoes_usuario: 'Permissão',
   kanban_colunas: 'Coluna do Kanban',
   funis: 'Funil',
+  // A lista de responsáveis de um negócio. Sem esta entrada a tela mostraria o nome cru da
+  // tabela na coluna "Entidade", e o filtro não a ofereceria.
+  pedido_responsaveis: 'Responsável do Negócio',
 };
 
 const ACAO_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
@@ -37,20 +41,18 @@ const ACAO_LABELS: Record<string, { label: string; variant: 'default' | 'seconda
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 
-function resumoCampos(antes: Record<string, unknown> | null, depois: Record<string, unknown> | null): string | null {
-  if (!antes || !depois) return null;
-  const camposIgnorados = new Set(['updated_at', 'created_at']);
-  const alterados = Object.keys(depois).filter(
-    (chave) => !camposIgnorados.has(chave) && JSON.stringify(antes[chave]) !== JSON.stringify(depois[chave]),
-  );
-  if (alterados.length === 0) return null;
-  return `Campos alterados: ${alterados.join(', ')}`;
-}
-
-function LinhaHistorico({ item }: { item: HistoricoAlteracao }) {
+function LinhaHistorico({
+  item,
+  nomeDe,
+}: {
+  item: HistoricoAlteracao;
+  /** Traduz identificador de pessoa em nome. Ver `historico-legivel.ts`. */
+  nomeDe: (id: string) => string | null;
+}) {
   const [aberto, setAberto] = useState(false);
   const acao = ACAO_LABELS[item.acao] ?? { label: item.acao, variant: 'secondary' as const };
-  const resumo = resumoCampos(item.dados_antes, item.dados_depois);
+  const resumo = resumirAlteracao(item.dados_antes, item.dados_depois, nomeDe);
+  const mudancas = descreverAlteracao(item.dados_antes, item.dados_depois, nomeDe);
   const temDetalhe = !!(item.dados_antes || item.dados_depois);
 
   return (
@@ -80,22 +82,38 @@ function LinhaHistorico({ item }: { item: HistoricoAlteracao }) {
           <CollapsibleContent asChild>
             <TableRow>
               <TableCell colSpan={6} className="bg-muted/30">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2 text-xs">
-                  {item.dados_antes && (
-                    <div>
-                      <p className="font-semibold mb-1 text-muted-foreground">Antes</p>
-                      <pre className="whitespace-pre-wrap break-all bg-background rounded p-2 border">
-                        {JSON.stringify(item.dados_antes, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                  {item.dados_depois && (
-                    <div>
-                      <p className="font-semibold mb-1 text-muted-foreground">Depois</p>
-                      <pre className="whitespace-pre-wrap break-all bg-background rounded p-2 border">
-                        {JSON.stringify(item.dados_depois, null, 2)}
-                      </pre>
-                    </div>
+                {/* 🔴 CAMPO A CAMPO, NÃO O JSON CRU. Este painel mostrava dois blocos de JSON
+                    com identificadores de 36 caracteres — quem quisesse conferir "alguém puxou
+                    um negócio para si?" precisava traduzir na mão. É a auditoria em que a
+                    liberdade de reatribuir se apoia; ilegível, ela não vale nada. */}
+                <div className="py-2 text-xs">
+                  {mudancas.length > 0 ? (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="text-muted-foreground">
+                          <th className="w-1/4 pb-1 text-left font-semibold">Campo</th>
+                          <th className="w-2/5 pb-1 text-left font-semibold">Antes</th>
+                          <th className="pb-1 text-left font-semibold">Depois</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mudancas.map((m) => (
+                          <tr key={m.campo} className="align-top">
+                            <td className="py-0.5 pr-3 font-medium text-foreground">{m.rotulo}</td>
+                            <td className="py-0.5 pr-3 break-words text-muted-foreground line-through decoration-muted-foreground/40">
+                              {m.de}
+                            </td>
+                            <td className="py-0.5 break-words text-foreground">{m.para}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    // Criação e exclusão não têm "antes e depois" — aí o retrato cru é a
+                    // informação, e não há o que traduzir.
+                    <pre className="whitespace-pre-wrap break-all rounded border bg-background p-2">
+                      {JSON.stringify(item.dados_depois ?? item.dados_antes, null, 2)}
+                    </pre>
                   )}
                 </div>
               </TableCell>
@@ -118,6 +136,24 @@ export default function HistoricoAlteracoes() {
   const [usuarioFiltro, setUsuarioFiltro] = useState<string | undefined>(undefined);
 
   const { ligada: temObras } = useSecaoLigada('obras');
+
+  /**
+   * Identificador de pessoa → nome. A tela já carrega `useVendedores()` para o filtro; este
+   * mapa reaproveita a mesma lista, sem consulta nova.
+   *
+   * 🔴 INCLUI QUEM FOI EXCLUÍDO? Não — `useVendedores` traz só quem está ativo. Quem saiu da
+   * equipe aparece como um pedaço do identificador, que é melhor que o identificador inteiro
+   * e honesto sobre não saber. Trazer os removidos exigiria uma segunda consulta em toda
+   * abertura da tela, para um caso que quase não acontece.
+   */
+  const nomePorId = useMemo(() => {
+    const mapa = new Map<string, string>();
+    for (const v of vendedores ?? []) {
+      if (v?.id && v?.nome) mapa.set(v.id, v.nome);
+    }
+    return mapa;
+  }, [vendedores]);
+  const nomeDe = useCallback((id: string) => nomePorId.get(id) ?? null, [nomePorId]);
 
   // Cascata da seção Obras: sem a seção, "Obra" sai das opções deste filtro.
   //
@@ -211,7 +247,7 @@ export default function HistoricoAlteracoes() {
                   </TableRow>
                 )}
                 {itens.map((item) => (
-                  <LinhaHistorico key={item.id} item={item} />
+                  <LinhaHistorico key={item.id} item={item} nomeDe={nomeDe} />
                 ))}
               </TableBody>
             </Table>
