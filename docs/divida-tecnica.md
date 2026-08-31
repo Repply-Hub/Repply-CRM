@@ -2159,6 +2159,45 @@ No painel do Supabase, **Authentication → URL Configuration**:
 > ⚠️ **Ao ligar a confirmação de e-mail um dia, confira isto ANTES.** Com o Site URL
 > errado, todo link de confirmação nasce quebrado, e o sintoma não aponta para a causa.
 
+### 🔴 As DUAS configurações importam, e falhar na segunda é PIOR
+
+Corrigir só o Site URL troca uma falha barulhenta por uma silenciosa.
+
+Se `https://crm.repplyhub.com.br/redefinir-senha` **não estiver** na lista de endereços
+autorizados, o Supabase descarta o caminho e manda a pessoa para o Site URL puro —
+`https://crm.repplyhub.com.br`. E aí:
+
+1. O cliente do Supabase lê o token da barra de endereço sozinho (`detectSessionInUrl` é
+   ligado por padrão) e **cria a sessão**.
+2. `LandingRoute` (`App.tsx:366-371`) vê sessão e manda a pessoa para dentro do app.
+3. Ela **nunca vê o formulário de nova senha**. `RedefinirSenha.tsx` é quem chama
+   `updateUser({ password })`, e essa tela não foi aberta.
+
+Resultado: a pessoa clica no link, entra no CRM, conclui que deu certo — e descobre no
+próximo login que **a senha continua a antiga**. O link para localhost pelo menos falhava
+na cara; este não.
+
+### Como conferir qual dos dois casos você está
+
+Peça uma redefinição e olhe o **fim** do link no e-mail:
+
+| o link termina em… | significa |
+|---|---|
+| `/redefinir-senha` | as duas configurações certas ✅ |
+| o domínio puro, sem caminho | falta o caminho na lista de endereços autorizados |
+
+Nos registros, um pedido de redefinição (`/recover`) grava o destino COMPLETO — então dá
+para confirmar sem abrir o e-mail:
+
+```sql
+select log_attributes['referer'] as destino, log_attributes['path'] as endpoint
+from logs where source = 'auth_logs' and log_attributes['path'] = '/recover'
+order by timestamp desc limit 5;
+```
+
+As chamadas do dia a dia (`/user`, `/token`, `/logout`) **não** servem para isso: elas não
+carregam endereço de retorno, então sempre mostram o Site URL e nunca o caminho.
+
 ### O que JÁ foi feito no código (31/08/2026)
 
 Não conserta o acima — conserta a fragilidade que estava do lado e produziria o **mesmo
