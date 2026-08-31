@@ -52,14 +52,20 @@ const MODULOS: ModuloDescricao[] = [
     key: 'plano_vendas',
     label: 'Plano de Vendas',
     descricoes: {
-      ver: 'Visualizar a visão geral do Plano de Vendas (meta x realizado do período) no Dashboard',
+      // Desde 31/08/2026 o "ver" inclui a quebra por fabricante — o que a tela do Dashboard
+      // chama de "Mostrar vendas detalhado". Deixou de ser uma funcionalidade à parte porque
+      // ninguém achava a chave: em toda a história do produto houve UM clique em funcionalidade,
+      // e foi no Portal. Ver PlanoVendasSection.tsx, no bloco do `podeVerMetasFabrica`.
+      ver: 'Visualizar o Plano de Vendas no Dashboard: meta x realizado do período e o detalhamento por fabricante',
       criar: 'Criar novas metas de vendas',
       editar: 'Editar ou remover metas de vendas existentes',
       excluir: 'Não aplicável ao Plano de Vendas — remover uma meta é feito dentro de editar',
     },
     funcionalidades: [
-      { key: 'ver_metas_fabrica', label: 'Metas por Fabricante', descricao: 'Ver o detalhamento de metas por fabricante', icon: 'filter' },
-      { key: 'ver_metas_vendedor', label: 'Metas por Vendedor', descricao: 'Ver o detalhamento nominal de metas por vendedor', icon: 'users' },
+      // 🔴 A única que sobrou, e é a sensível: mostra o RANKING NOMINAL da equipe — quanto cada
+      // colega vendeu, com nome. Nenhum preset a concede, nem o "Total" (decisão do Lucas em
+      // 31/08/2026, registrada na migration 20260831200000). Só ligando aqui, pessoa a pessoa.
+      { key: 'ver_metas_vendedor', label: 'Ver quanto cada colega vendeu', descricao: 'Mostra o detalhamento nominal por vendedor: o nome de cada pessoa da equipe com o quanto ela vendeu e a meta dela', icon: 'users' },
     ],
   },
   {

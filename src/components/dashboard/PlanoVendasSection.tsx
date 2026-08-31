@@ -166,14 +166,48 @@ export function PlanoVendasSection({ empresaId, currentUsuarioId, vendedorIds, f
   // — `isGestor` era usado nos quatro pontos abaixo e saiu por completo desta
   // seção; quem renderiza (Dashboard.tsx) continua com seu próprio `isGestor`
   // pra decidir OUTRAS coisas da página, sem relação com este componente.
-  const podeVerMetasFabrica = usePodeFazer('plano_vendas', 'ver', 'ver_metas_fabrica');
+  // 🔴 A QUEBRA POR FABRICANTE DEIXOU DE SER PERMISSÃO À PARTE EM 31/08/2026.
+  //
+  // Decisão do Lucas, nas palavras dele: "quando alguém recebe acesso ao plano de vendas isso
+  // significa ter acesso também a ver as vendas detalhadas". Antes eram três níveis separados
+  // (migration 20260824240000): ver o total, ver por fabricante, ver por vendedor. Os dois
+  // primeiros viraram um só.
+  //
+  // O que motivou: liberar o módulo para um vendedor entregava um cartão de UMA LINHA — só o
+  // "Total do período" — e nem o interruptor "Mostrar vendas detalhado" era desenhado, então
+  // não havia como descobrir que existia algo atrás. A chave que abria isso morava dentro de um
+  // sanfonado, num bloco "Funcionalidades Específicas", com o rótulo "Metas por Fabricante" —
+  // que não se parece com o que a pessoa procura. Medido em `audit_permissoes`: em toda a
+  // história do produto houve 40 aplicações de preset e 28 cliques em ver/criar/editar, contra
+  // UM único clique em funcionalidade (e foi no Portal). Não era descuido de quem configura:
+  // era uma porta que ninguém achava.
+  //
+  // O nível 3 (`ver_metas_vendedor`, o ranking nominal da equipe) CONTINUA separado, e continua
+  // fora de todos os presets — decisão do Lucas no mesmo dia, ver a migration 20260831200000.
+  //
+  // A seção inteira só é montada quando este `ver` é verdadeiro (Dashboard.tsx:414), então na
+  // prática isto é "quem chega aqui, vê o detalhe".
+  const podeVerMetasFabrica = usePodeFazer('plano_vendas', 'ver');
   const podeVerMetasVendedor = usePodeFazer('plano_vendas', 'ver', 'ver_metas_vendedor');
   const podeCriarMeta = usePodeFazer('plano_vendas', 'criar');
   const podeEditarMeta = usePodeFazer('plano_vendas', 'editar');
 
   const [editOpen, setEditOpen] = useState(false);
+  // 🔴 NASCE LIGADO. Chave ausente = ligado; só um '0' GRAVADO desliga.
+  //
+  // Isto não é permissão, e por isso quase passou batido: o interruptor "Mostrar vendas
+  // detalhado" vive no navegador de CADA PESSOA. Com o padrão anterior (`=== '1'`), o gestor
+  // liberava o módulo, conferia na própria tela — onde a chave já estava gravada em '1' de
+  // tanto usar — via o detalhe aparecer, e concluía que estava tudo certo. O vendedor abria o
+  // Dashboard num navegador sem a chave e continuava vendo o cartão de uma linha.
+  //
+  // Ou seja: sem esta troca, o conserto de permissão acima estaria correto e mesmo assim
+  // ouviríamos "continua sem aparecer".
+  //
+  // A inversão preserva quem desligou de propósito: quem clicou para esconder tem '0' gravado
+  // (o efeito abaixo grava sempre), e continua vendo escondido.
   const [mostrarDetalhado, setMostrarDetalhado] = useState(
-    () => localStorage.getItem(MOSTRAR_DETALHADO_KEY) === '1',
+    () => localStorage.getItem(MOSTRAR_DETALHADO_KEY) !== '0',
   );
 
   useEffect(() => {
@@ -192,12 +226,13 @@ export function PlanoVendasSection({ empresaId, currentUsuarioId, vendedorIds, f
     localStorage.setItem(VISUALIZACAO_KEY, visualizacao);
   }, [visualizacao]);
 
-  // Quem tem `ver_metas_vendedor` mas não `ver_metas_fabrica` (configuração
-  // incomum, mas possível desde que o gestor pode restringir as duas
-  // funcionalidades de forma independente) nunca deveria ficar preso em
-  // "fabricante" — a visão padrão/guardada no localStorage pode ter sido
-  // escolhida antes da permissão mudar, e sem este ajuste o switch "Mostrar
-  // vendas detalhado" abriria uma seção vazia.
+  // Rede de segurança para o instante do carregamento: `usePodeFazer` responde FALSO enquanto
+  // as permissões não chegam do servidor, então `podeVerMetasFabrica` pode ser falso por um
+  // momento mesmo para quem tem acesso. Sem este ajuste, a visão guardada no navegador poderia
+  // deixar a pessoa presa em "fabricante" com a seção vazia.
+  //
+  // Desde 31/08/2026 a combinação "vê por vendedor mas não por fabricante" não é mais
+  // configurável — as duas deixaram de ser permissões independentes (ver o bloco acima).
   useEffect(() => {
     if (!podeVerMetasFabrica && podeVerMetasVendedor && visualizacao === 'fabricante') {
       setVisualizacao('vendedor');
