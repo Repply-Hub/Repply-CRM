@@ -1008,6 +1008,37 @@ export function WhatsAppInstanciasTab() {
     enabled: !!user,
   });
 
+  /**
+   * O cartão de "assinar remetente" é do administrador global, não do gestor.
+   *
+   * A RPC `set_whatsapp_assinar_remetente_global` grava em TODAS as empresas de uma vez
+   * (é o propósito dela desde a migration 20260715120000), e por isso a migration
+   * 20260829120000 fechou a permissão em `is_admin()` — antes aceitava `is_gestor()`, e o
+   * gestor de um cliente mudava o WhatsApp dos outros nove.
+   *
+   * 🔴 A TELA não acompanhou o banco: o gestor continuava vendo o interruptor, clicava, e o
+   * banco recusava com 42501 — que aparecia como "Erro ao atualizar preferência", sem dizer
+   * que era permissão. É exatamente o "botão que só recusa no clique" que o cabeçalho de
+   * Configuracoes.tsx condena. Esconder é melhor que desabilitar: desabilitado sem
+   * explicação também não diz por quê.
+   *
+   * Some só o cartão. Todo o RESTO desta aba é do gestor por construção: criar, conectar,
+   * vincular, apelidar e apagar instância passam pela função `whatsapp-admin-provision`,
+   * que aceita 'admin', 'empresa' e 'gestor' e recorta pela empresa de quem chamou; apelido
+   * e cor passam pela política `wapi_config_update`, que cita 'gestor' e 'empresa'.
+   *
+   * `=== true` e não `!== false`: enquanto a resposta não chega o cartão fica fora, senão
+   * ele apareceria e sumiria na cara do gestor a cada abertura da aba.
+   */
+  const { data: isAdmin } = useQuery({
+    queryKey: ['is_admin'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('is_admin');
+      if (error) throw error;
+      return data as boolean;
+    },
+  });
+
   const queryClient = useQueryClient();
   const toggleAssinarRemetente = useMutation({
     mutationFn: async (novoValor: boolean) => {
@@ -1079,28 +1110,30 @@ export function WhatsAppInstanciasTab() {
         </CardContent>
       </Card>
 
-      {/* Assinatura do remetente nas mensagens enviadas */}
-      <Card>
-        <CardContent className="pt-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <Label htmlFor="assinar-remetente" className="text-sm font-medium">
-                Assinar remetente nas mensagens enviadas
-              </Label>
-              <p className="text-xs text-muted-foreground mt-1">
-                Inclui "*Nome*" na primeira linha das mensagens enviadas pelo CRM, para que o contato saiba quem está falando.
-                Esta preferência é aplicada a <strong>todas as empresas</strong>.
-              </p>
+      {/* Assinatura do remetente: só o admin global — ver o comentário do `isAdmin` acima. */}
+      {isAdmin === true && (
+        <Card>
+          <CardContent className="pt-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label htmlFor="assinar-remetente" className="text-sm font-medium">
+                  Assinar remetente nas mensagens enviadas
+                </Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Inclui "*Nome*" na primeira linha das mensagens enviadas pelo CRM, para que o contato saiba quem está falando.
+                  Esta preferência é aplicada a <strong>todas as empresas</strong>.
+                </p>
+              </div>
+              <Switch
+                id="assinar-remetente"
+                checked={data?.assinarRemetente ?? true}
+                disabled={toggleAssinarRemetente.isPending || isLoading}
+                onCheckedChange={(checked) => toggleAssinarRemetente.mutate(checked)}
+              />
             </div>
-            <Switch
-              id="assinar-remetente"
-              checked={data?.assinarRemetente ?? true}
-              disabled={toggleAssinarRemetente.isPending || isLoading}
-              onCheckedChange={(checked) => toggleAssinarRemetente.mutate(checked)}
-            />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Lista de instâncias */}
       <Card>
