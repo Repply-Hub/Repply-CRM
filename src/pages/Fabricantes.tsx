@@ -21,6 +21,7 @@ import { ConteudoDialogo } from "@/components/shared/DialogoResponsivo";
 
 import { useFabricantes } from "@/hooks/use-clientes";
 import { ContatosDaFabrica, type ContatoEditavel } from "@/components/fabricantes/ContatosDaFabrica";
+import { BotaoContatosDaFabrica } from "@/components/fabricantes/BotaoContatosDaFabrica";
 import { GerenciarFuncoesDialog } from "@/components/fabricantes/GerenciarFuncoesDialog";
 import {
   useContatosDeTodasAsFabricas,
@@ -91,7 +92,6 @@ function FabricanteForm({
     "idle" | "loading" | "valid" | "invalid"
   >("idle");
   const [nome, setNome] = useState(editData?.nome ?? "");
-  const [contato, setContato] = useState(editData?.nome_contato ?? "");
   const [telefone, setTelefone] = useState(editData?.telefone ?? "");
   // Fabricante novo nasce Ativa: quem cadastra uma marca é porque acabou de passar a
   // representá-la. `fabricanteEstaAtivo` cobre o cadastro antigo que ainda não tem o
@@ -107,7 +107,6 @@ function FabricanteForm({
     setCnpj("");
     setCnpjStatus("idle");
     setNome("");
-    setContato("");
     setTelefone("");
     setAtivo(true);
     setContatosPendentes([]);
@@ -119,7 +118,6 @@ function FabricanteForm({
       setCnpj(editData?.cnpj ?? "");
       setCnpjStatus("idle");
       setNome(editData?.nome ?? "");
-      setContato(editData?.nome_contato ?? "");
       setTelefone(editData?.telefone ?? "");
       setAtivo(fabricanteEstaAtivo(editData));
       setContatosPendentes([]);
@@ -165,7 +163,9 @@ function FabricanteForm({
           id: editData.id,
           nome,
           cnpj: cnpj || undefined,
-          nome_contato: contato || undefined,
+          // `nome_contato` NÃO vai mais: quem guarda pessoa agora é `fabricante_contatos`.
+          // Não mandar preserva o que a coluna já tinha — apagá-la é o passo 2, em arquivo
+          // próprio, depois deste site publicado.
           telefone: telefone || undefined,
           ativo,
         });
@@ -180,7 +180,6 @@ function FabricanteForm({
         const novoId = await createFabricante.mutateAsync({
           nome,
           cnpj: cnpj || undefined,
-          nome_contato: contato || undefined,
           telefone: telefone || undefined,
           ativo,
         });
@@ -282,14 +281,6 @@ function FabricanteForm({
             />
           </div>
           <div>
-            <Label>Contato</Label>
-            <Input
-              value={contato}
-              onChange={(e) => setContato(e.target.value)}
-              placeholder="Nome do contato"
-            />
-          </div>
-          <div>
             <Label>Telefone</Label>
             <Input
               value={telefone}
@@ -327,15 +318,15 @@ function FabricanteForm({
               reabrir e só então acrescentar é o atrito que matou o campo antigo. A lista
               é rascunho e vai para o banco logo depois de a fábrica nascer.
 
-              🔴 SÓ NO CADASTRO NOVO. Na edição a ficha da fábrica já mostra os contatos,
-              no mesmo quadro do Editar — repetir a lista aqui seria a mesma coisa em dois
-              lugares da tela, que é justamente o que o dono do produto pediu para evitar. */}
-          {!editData && (
-            <ContatosDaFabrica
-              pendentes={contatosPendentes}
-              onPendentesChange={setContatosPendentes}
-            />
-          )}
+              Vale nos DOIS modos, e é o mesmo componente: no cadastro a lista é rascunho
+              e vai para o banco depois que a fábrica nasce; na edição a fábrica já tem
+              identificador e cada gesto grava na hora. A ficha não edita contato — quem
+              edita é este painel, e só ele. */}
+          <ContatosDaFabrica
+            fabricanteId={editData?.id}
+            pendentes={contatosPendentes}
+            onPendentesChange={setContatosPendentes}
+          />
 
           <Button type="submit" className="w-full" disabled={isPending}>
             {isPending ? "Salvando..." : "Salvar"}
@@ -485,6 +476,15 @@ function FabricanteDetailHeader({
               <Pencil className="h-3.5 w-3.5" />
               <span>Editar</span>
             </Button>
+            {/* Entre o Editar e o Excluir, do mesmo tamanho deles: decisão do dono do
+                produto em 31/08/2026. A lista aqui é só de LEITURA — quem edita é o painel
+                de edição da fábrica, para onde este botão leva. Um lugar de edição, não
+                dois. */}
+            <BotaoContatosDaFabrica
+              contatos={contatos}
+              funcoes={funcoes}
+              onEditar={onEdit}
+            />
             <Button
               variant="destructive"
               size="sm"
@@ -496,11 +496,6 @@ function FabricanteDetailHeader({
             </Button>
           </div>
         </div>
-
-        {/* Os contatos vivem DENTRO deste quadro, junto do Editar e do Excluir, e não num
-            cartão próprio: decisão do dono do produto em 31/08/2026, para não acrescentar
-            mais um bloco à tela de Fabricantes. */}
-        <ContatosDaFabrica fabricanteId={fab.id} className="mt-4" />
       </CardContent>
     </Card>
   );
