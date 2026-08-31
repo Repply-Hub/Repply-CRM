@@ -26,6 +26,8 @@ const useAuthFalso = vi.fn();
 vi.mock('@/hooks/use-auth', () => ({ useAuth: () => useAuthFalso() }));
 
 const ENCERRADA = () => false;
+/** Campos que um teste pode sobrescrever no estado devolvido pelo banco. */
+let SOBRESCRITA: Record<string, unknown> = {};
 
 /**
  * O estado de cobrança vem do banco em produção (para não ficar velho — ver
@@ -44,6 +46,10 @@ vi.mock('@/hooks/use-estado-de-cobranca', () => ({
       venceuEm: bloqueio?.venceuEm ?? null,
       diasInadimplencia: gate.diasDeInadimplencia(profile),
       degrau: gate.meuDegrauNaRegua(profile),
+      // O padrão é CONFIRMADO: os casos abaixo descrevem o que o banco respondeu. O caso do
+      // palpite ainda não confirmado tem teste próprio.
+      confirmado: true,
+      ...SOBRESCRITA,
     };
   },
 }));
@@ -54,6 +60,7 @@ import { FaixaDeCobranca } from './FaixaDeCobranca';
 afterEach(() => {
   cleanup();
   useAuthFalso.mockReset();
+  SOBRESCRITA = {};
 });
 
 const AUTH_ID = '11111111-1111-4111-8111-111111111111';
@@ -157,5 +164,64 @@ describe('FaixaDeCobranca', () => {
     comAssinatura(null);
     const { container } = desenhar();
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Bloqueio feito pelo painel — a conversa que NÃO é sobre dinheiro
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe('bloqueio manual', () => {
+  /**
+   * 🔴 DECISÃO DO LUCAS, 31/08/2026: o bloqueio da régua (dia 30) segue cobrando, porque a
+   * pessoa deve mesmo. O bloqueio feito no painel é outra coisa — vai cair quase sempre numa
+   * cortesia, onde cobrança nenhuma existe.
+   *
+   * Antes disto, uma cortesia bloqueada pelo painel lia "Sua assinatura ainda não está ativa"
+   * com um botão "Ativar assinatura"; e uma empresa PAGANTE bloqueada lia "Seu pagamento está
+   * pendente" com "Regularizar" — enquanto o Stripe continuava cobrando ela em dia.
+   */
+  it('🔴 não fala de pagamento, nem oferece checkout', () => {
+    comAssinatura({ plan_status: 'inactive', origem: 'cortesia' });
+    SOBRESCRITA = { motivo: 'bloqueio_manual' };
+    desenhar();
+
+    expect(screen.getByText(/acesso está suspenso/i)).toBeTruthy();
+    // Nada de dinheiro no texto. ("reativar", na frase do suporte, é outra coisa — por isso a
+    // busca é por palavra inteira e não por pedaço.)
+    expect(screen.queryByText(/pagamento|assinatura|regulariz/i)).toBeNull();
+    // E nenhum botão que leve ao checkout: não há o que a pessoa resolva sozinha.
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('🔴 manda falar com o suporte — é a única saída que existe', () => {
+    comAssinatura({ plan_status: 'inactive', origem: 'cortesia' });
+    SOBRESCRITA = { motivo: 'bloqueio_manual' };
+    desenhar();
+    expect(screen.getByText(/suporte/i)).toBeTruthy();
+  });
+
+  it('e mesmo assim diz o que continua funcionando', () => {
+    comAssinatura({ plan_status: 'inactive', origem: 'cortesia' });
+    SOBRESCRITA = { motivo: 'bloqueio_manual' };
+    desenhar();
+    expect(screen.getByText(/continua vendo e exportando/i)).toBeTruthy();
+  });
+});
+
+describe('a faixa espera o banco confirmar', () => {
+  it('🔴 sem confirmação, não escreve acusação nenhuma', () => {
+    // O palpite tirado do perfil não enxerga `empresa_bloqueios`: ele chutaria "pagamento
+    // pendente" para quem foi bloqueado pelo painel e está pagando em dia. Meio segundo sem
+    // faixa é melhor que meio segundo acusando quem não deve.
+    comAssinatura({ plan_status: 'canceled', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1' });
+    SOBRESCRITA = { confirmado: false };
+    expect(desenhar().container).toBeEmptyDOMElement();
+  });
+
+  it('confirmado, a faixa aparece normalmente', () => {
+    comAssinatura({ plan_status: 'canceled', stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1' });
+    desenhar();
+    expect(screen.getByText(/pagamento está pendente/i)).toBeTruthy();
   });
 });

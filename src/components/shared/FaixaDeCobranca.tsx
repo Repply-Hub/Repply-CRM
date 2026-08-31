@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, CreditCard, Timer } from 'lucide-react';
+import { AlertTriangle, CreditCard, Lock, Timer } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useEstadoDeCobranca } from '@/hooks/use-estado-de-cobranca';
 import { podeGerenciarAssinatura, type MotivoDoBloqueio } from '@/lib/plano-gate';
@@ -25,7 +25,8 @@ interface Aparencia {
   icone: typeof AlertTriangle;
   titulo: string;
   /** O que a pessoa faz a respeito. Só aparece para quem pode mexer na assinatura. */
-  acao: string;
+  /** `null` quando não há autoatendimento possível — ver `bloqueio_manual`. */
+  acao: string | null;
 }
 
 /**
@@ -69,6 +70,21 @@ const APARENCIA: Record<EstadoDaFaixa, Aparencia> = {
     icone: AlertTriangle,
     titulo: 'Seu pagamento está pendente',
     acao: 'Regularizar',
+  },
+  /**
+   * 🔴 O ÚNICO ESTADO SEM BOTÃO, e é o ponto dele. Bloqueio feito pelo painel não se resolve
+   * pagando: quem decidiu foi a equipe da Repply, e quem desfaz é ela. Oferecer "Regularizar"
+   * aqui mandaria a pessoa ao checkout resolver um problema que ela não tem — e, se for
+   * pagante, ela encontraria lá a própria assinatura ativa e em dia.
+   *
+   * Âmbar, não vermelho: não há pendência financeira. E o texto não diz o motivo do bloqueio
+   * de propósito — ele é conversa de vocês com o cliente, não um aviso automático.
+   */
+  bloqueio_manual: {
+    caixa: 'border-warning/40 bg-warning/10',
+    icone: Lock,
+    titulo: 'Seu acesso está suspenso',
+    acao: null,
   },
 };
 
@@ -143,8 +159,19 @@ export function FaixaDeCobranca() {
    * (`TelaDeSuspensao`), e uma faixa por baixo dela seria ruído — pior, uma faixa falando de
    * assinatura para quem já não tem conta.
    */
+  /**
+   * 🔴 ESPERA O BANCO CONFIRMAR. Esta faixa escreve uma acusação ("seu pagamento está
+   * pendente", "ative sua assinatura"), e o palpite tirado do perfil não enxerga
+   * `empresa_bloqueios` — ele chutaria a acusação errada para quem foi bloqueado pelo painel.
+   * Meio segundo sem faixa é melhor que meio segundo acusando quem está em dia.
+   *
+   * O bloqueio em si (`cobranca.bloqueado`) continua valendo desde o palpite: é ele que as
+   * outras guardas usam, e ali errar para o lado de bloquear não ofende ninguém.
+   */
   const emTolerancia = !cobranca.bloqueado && cobranca.degrau === 'tolerancia';
-  const estado: EstadoDaFaixa | null = cobranca.encerrada
+  const estado: EstadoDaFaixa | null = !cobranca.confirmado
+    ? null
+    : cobranca.encerrada
     ? null
     : cobranca.bloqueado
       ? (cobranca.motivo ?? 'nunca_ativou')
@@ -187,7 +214,12 @@ export function FaixaDeCobranca() {
           : 'Você continua vendo e exportando tudo. Criar e editar ficam indisponíveis.'}
       </span>
 
-      {podeResolver ? (
+      {!acao ? (
+        // Sem autoatendimento: a única saída é falar com quem bloqueou.
+        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+          Fale com o suporte para reativar.
+        </span>
+      ) : podeResolver ? (
         <Link
           to="/assinar"
           className="ml-auto shrink-0 rounded-md border border-foreground/20 bg-background/60 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-background focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"

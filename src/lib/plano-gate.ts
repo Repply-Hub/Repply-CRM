@@ -204,7 +204,17 @@ export function planoBloqueado(profile: ProfileComPlano | null | undefined): boo
  *
  * Devolve `null` quando a empresa NÃO está bloqueada, para quem chama poder usar como guarda.
  */
-export type MotivoDoBloqueio = 'teste_venceu' | 'nunca_ativou' | 'pagamento_parou';
+/**
+ * 🔴 `bloqueio_manual` SÓ VEM DO BANCO, nunca de `motivoDoBloqueio` aqui embaixo. O sinal que
+ * o separa dos outros três é a existência de uma linha em `empresa_bloqueios`, e essa tabela
+ * é legível só pelo admin — o perfil que o navegador carrega não a enxerga. Quem devolve esse
+ * motivo é `meu_estado_de_cobranca()`; ver `use-estado-de-cobranca.ts`.
+ */
+export type MotivoDoBloqueio =
+  | 'teste_venceu'
+  | 'nunca_ativou'
+  | 'pagamento_parou'
+  | 'bloqueio_manual';
 
 export interface Bloqueio {
   motivo: MotivoDoBloqueio;

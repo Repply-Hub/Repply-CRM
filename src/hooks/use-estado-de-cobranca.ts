@@ -40,6 +40,16 @@ export interface EstadoDeCobranca {
   /** Dias desde que o pagamento parou. `null` para quem não está na régua. */
   diasInadimplencia: number | null;
   degrau: DegrauDaRegua;
+  /**
+   * A resposta veio do BANCO (ou a consulta falhou de vez), e não do palpite do perfil.
+   *
+   * 🔴 QUEM PRECISA DISTO: a faixa de cobrança, que escreve uma ACUSAÇÃO. O perfil não
+   * enxerga `empresa_bloqueios`, então o palpite não sabe distinguir um bloqueio feito pelo
+   * painel de uma dívida — e chutaria "Seu pagamento está pendente" para quem está pagando em
+   * dia, ou "Ative sua assinatura" para uma cortesia. Meio segundo de acusação errada é pior
+   * que meio segundo sem faixa.
+   */
+  confirmado: boolean;
 }
 
 interface RespostaDoBanco {
@@ -64,9 +74,10 @@ export function useEstadoDeCobranca(): EstadoDeCobranca {
     venceuEm: bloqueioDoPerfil?.venceuEm ?? null,
     diasInadimplencia: diasDeInadimplencia(profile),
     degrau: meuDegrauNaRegua(profile),
+    confirmado: false,
   };
 
-  const { data } = useQuery({
+  const { data, isError } = useQuery({
     queryKey: ['meu_estado_de_cobranca', empresaId],
     queryFn: async (): Promise<EstadoDeCobranca> => {
       const { data, error } = await supabase.rpc('meu_estado_de_cobranca' as never);
@@ -83,6 +94,7 @@ export function useEstadoDeCobranca(): EstadoDeCobranca {
         venceuEm: r?.venceu_em ? new Date(r.venceu_em) : null,
         diasInadimplencia: r?.dias_inadimplencia ?? null,
         degrau: r?.degrau ?? 'em_dia',
+        confirmado: true,
       };
     },
     // Admin global não tem empresa e nunca é bloqueado.
@@ -94,7 +106,14 @@ export function useEstadoDeCobranca(): EstadoDeCobranca {
     retry: false,
   });
 
-  const estado = data ?? palpite;
+  /**
+   * Consulta que falhou de vez conta como confirmada, de propósito: com `retry: false`, insistir
+   * em esperar deixaria a faixa MUDA para sempre depois de uma falha de rede — e ficar sem
+   * aviso nenhum é pior que um aviso menos específico. Quem não tem empresa (o admin global)
+   * também não tem o que confirmar.
+   */
+  const semConsulta = !empresaId || profile?.role === 'admin';
+  const estado = data ?? { ...palpite, confirmado: isError || semConsulta };
 
   /**
    * 🔴 DEIXA O ESTADO ONDE UMA FUNÇÃO SEM REACT ALCANCE. `mensagemDeErro` roda dentro do
