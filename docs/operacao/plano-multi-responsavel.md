@@ -4,7 +4,9 @@
 A MD precisa registrar que mais de uma pessoa trabalhou o mesmo negócio, sem que isso
 mexa no dinheiro de ninguém.
 
-**Estado:** desenho decidido pelo dono do produto em 23/08/2026. **Nada implementado.**
+**Estado:** desenho decidido pelo dono do produto em 23/08/2026; as três perguntas que
+o travavam foram **respondidas em 31/08/2026** (§12). **Nada implementado — pronto para
+virar plano de execução.**
 
 **Este documento é o *o quê* e o *porquê*.** Ele é para o Lucas aprovar e para outro dev
 executar. Números de banco medidos em 23/08/2026 na produção; números de linha são do
@@ -310,8 +312,12 @@ Lendo a tabela:
 | Espelhar a decisão 3 também no apagar | `pedidos_delete` passa a aceitar quem tem `pode_excluir` nas Configurações. **Só 1 das 10 linhas de `permissoes_usuario` do módulo `pedidos` tem `pode_excluir`** — o efeito prático é quase igual ao de cima |
 | Manter o apagar largo de propósito | Registra a escolha em vez de deixá-la acontecer por acidente |
 
-**Recomendação: a primeira**, com aviso à MD antes. Mas é mudança no que o cliente vê —
-`CLAUDE.md` §11 — e por isso está em §12 como pergunta ao Lucas, não como decisão tomada.
+**Recomendação deste plano era a primeira**, com aviso à MD antes.
+
+> ✅ **O Lucas escolheu a SEGUNDA, em 31/08/2026** — e dispensou o aviso trocando-o por
+> preparação: o gestor marca a permissão de quem deve continuar apagando **antes** de a
+> política larga cair. Ver §12.1 e §12.2. A análise acima fica como está, porque é ela
+> que explica por que a escolha importa.
 
 **O botão continua aparecendo.** `Negocios.tsx:1747` e `:2319` mostram "Excluir" para
 todo mundo. Depois da Fase 0, quem não é gestor clica e recebe erro. Ou o botão passa a
@@ -642,26 +648,62 @@ a mesma consulta.
 
 ---
 
-## 12. O que ainda precisa do Lucas
+## 12. ✅ RESPONDIDO PELO LUCAS EM 31/08/2026
 
-Três perguntas. As duas primeiras travam a Fase 0.
+As três perguntas que travavam este plano foram respondidas. **Nada aqui está mais
+pendente de decisão.**
 
-1. **Quem pode apagar negócio depois da Fase 0?** Hoje é qualquer pessoa da empresa, por
-   acidente (§1.1). Ao fechar a política larga, o padrão vira "só gestor" — e **7 pessoas da
-   MD, incluindo Érika com 3.772 negócios, deixam de apagar até o próprio negócio**. As três
-   saídas estão em §4.2. É mudança no que o cliente vê (`CLAUDE.md` §11).
+### 12.1 Quem pode apagar negócio depois da Fase 0
 
-2. **A MD precisa ser avisada antes?** A Fase 0 muda o comportamento de 7 das 13 pessoas
-   dela no dia em que subir. Não há como fazer isso sem alguém notar.
+**Resposta: gestor, MAIS quem o gestor liberar na tela de permissões.** É a segunda saída
+da §4.2 — `pedidos_delete` passa a aceitar também `has_permission('pedidos','excluir')`.
 
-3. **O filtro "Responsável" deve incluir participação?** A recomendação deste plano é
-   **não** — "Responsável" significa principal nas duas telas, e participação entra depois
-   como opção separada (§7, ponto 6). O motivo: o filtro da tela de Negócios alimenta
-   `pedidos_stats`, que devolve o **valor** do recorte. Se filtrar por Fulano trouxesse os
-   negócios em que ele só participou, o valor cheio desses negócios entraria no total dele —
-   e o número da tela passaria a discordar do "Rendimento por Responsável" do Dashboard, sem
-   nada indicando qual dos dois está certo. **Esta não trava as fases 0 a 2**, mas trava a
-   Fase 3.
+> ⚠️ **Isto contraria a recomendação escrita na §4.2**, que era "só gestor". A razão da
+> mudança: o efeito HOJE é praticamente o mesmo — das 10 linhas de `permissoes_usuario` do
+> módulo `pedidos`, **só 1 tem `pode_excluir`** —, mas a alavanca passa a ser do cliente.
+> Se a Érika precisar apagar, o gestor marca a caixinha e resolve no minuto, em vez de
+> depender de uma publicação de código.
+
+### 12.2 A MD precisa ser avisada antes
+
+**Resposta: não é preciso avisar — é preciso PREPARAR.**
+
+A escolha do 12.1 abriu uma terceira saída que este plano não tinha considerado. A ordem
+passa a ser:
+
+1. O gestor da MD marca a permissão de excluir para quem deve continuar apagando.
+2. **Só então** a política larga cai (Fase 0).
+
+Assim ninguém perde acesso em dia nenhum, ninguém precisa ser avisado de nada, e o acesso
+deixa de ser acidental sem custo humano.
+
+> 🔴 **A ordem é a proteção inteira.** Invertida — política primeiro, permissão depois —
+> ela vira exatamente o cenário que este plano queria evitar: 7 pessoas travadas no meio do
+> trabalho, incluindo quem tem 3.772 negócios.
+
+### 12.3 O filtro "Responsável" deve incluir participação
+
+**Resposta: não.** "Responsável" significa o principal nas duas telas, como este plano
+recomendava.
+
+O motivo é numérico: o filtro alimenta `pedidos_stats`, que devolve o **valor** do recorte.
+Trazer os negócios de participação faria o valor cheio deles entrar no total da pessoa — e
+o número da tela passaria a discordar do "Rendimento por Responsável" do Dashboard, sem
+nada indicando qual dos dois está certo.
+
+Participação entra depois, como filtro **separado**, se o uso cobrar (§7, ponto 6).
+
+### 12.4 Decorrência: o botão de excluir
+
+Com o 12.1 respondido, o que a §4.2 deixou em aberto sobre o botão se resolve assim —
+**decisão minha, comunicada, não pendente**:
+
+- O botão passa a respeitar `usePodeFazer('pedidos','excluir')`, e some para quem não pode.
+- **E** a mensagem de erro passa a explicar o motivo em português, para o caso de a recusa
+  vir do banco mesmo assim.
+
+Os dois, não um ou outro: sumir com o botão é conveniência de navegação; a recusa de
+verdade é a do banco (`CLAUDE.md` §6.1), e ela precisa saber se explicar.
 
 ---
 
