@@ -1080,57 +1080,6 @@ export type Database = {
         }
         Relationships: []
       }
-      dom_licencas: {
-        Row: {
-          acao: string | null
-          atividade: string | null
-          criado_em: string | null
-          data_edicao: string | null
-          endereco: string | null
-          id: string
-          numero_edicao: string | null
-          processo: string | null
-          renovacao: boolean | null
-          requerente: string | null
-          texto_bloco: string | null
-          tipo_edicao: string | null
-          tipos_licenca: string[]
-          url_pdf: string
-        }
-        Insert: {
-          acao?: string | null
-          atividade?: string | null
-          criado_em?: string | null
-          data_edicao?: string | null
-          endereco?: string | null
-          id?: string
-          numero_edicao?: string | null
-          processo?: string | null
-          renovacao?: boolean | null
-          requerente?: string | null
-          texto_bloco?: string | null
-          tipo_edicao?: string | null
-          tipos_licenca?: string[]
-          url_pdf: string
-        }
-        Update: {
-          acao?: string | null
-          atividade?: string | null
-          criado_em?: string | null
-          data_edicao?: string | null
-          endereco?: string | null
-          id?: string
-          numero_edicao?: string | null
-          processo?: string | null
-          renovacao?: boolean | null
-          requerente?: string | null
-          texto_bloco?: string | null
-          tipo_edicao?: string | null
-          tipos_licenca?: string[]
-          url_pdf?: string
-        }
-        Relationships: []
-      }
       emails: {
         Row: {
           assunto: string
@@ -2335,6 +2284,7 @@ export type Database = {
       licencas_natal: {
         Row: {
           bloco_texto: string | null
+          bloco_texto_hash: string | null
           cnpj: string | null
           construtora: string | null
           created_at: string
@@ -2348,12 +2298,14 @@ export type Database = {
           obra_descricao: string | null
           pdf_link: string | null
           pdf_nome: string | null
+          pdf_storage_path: string | null
           razao_social: string | null
           telefone: string | null
           tipo_licenca: string | null
         }
         Insert: {
           bloco_texto?: string | null
+          bloco_texto_hash?: string | null
           cnpj?: string | null
           construtora?: string | null
           created_at?: string
@@ -2367,12 +2319,14 @@ export type Database = {
           obra_descricao?: string | null
           pdf_link?: string | null
           pdf_nome?: string | null
+          pdf_storage_path?: string | null
           razao_social?: string | null
           telefone?: string | null
           tipo_licenca?: string | null
         }
         Update: {
           bloco_texto?: string | null
+          bloco_texto_hash?: string | null
           cnpj?: string | null
           construtora?: string | null
           created_at?: string
@@ -2386,6 +2340,7 @@ export type Database = {
           obra_descricao?: string | null
           pdf_link?: string | null
           pdf_nome?: string | null
+          pdf_storage_path?: string | null
           razao_social?: string | null
           telefone?: string | null
           tipo_licenca?: string | null
