@@ -376,6 +376,13 @@ const buildSearchOrClause = (matches: SearchMatches): string => {
 // quais linhas voltam, não em quais campos), então lista, Kanban e planilha continuam
 // recebendo o mesmo objeto. `obra` e `marcador` NUNCA levam `!inner`: as duas colunas aceitam
 // nulo, e junção interna nelas apagaria a maior parte da lista (ver ORDENS, acima).
+// 🔴 `usuarios!pedidos_vendedor_id_fkey` NÃO é decoração. Desde a migration
+// `20260831200000_responsaveis_do_negocio.sql` existe `pedido_responsaveis`, que liga
+// `pedidos` a `usuarios` por um SEGUNDO caminho (many-to-many). Sem nomear o FK direto, o
+// PostgREST recusa o embed inteiro com `PGRST201 — more than one relationship`, e a lista
+// de Negócios volta VAZIA (a contagem, que não embute nada, continua achando os registros —
+// foi assim que o bug passou: o cabeçalho contava certo e as colunas ficavam a zero).
+// Vale para todo embed de `usuarios` a partir de `pedidos` neste arquivo e em use-edit-pedido.ts.
 function montarSelectDeNegocios(relacoesInternas: RelacaoInterna[] = []): string {
   const j = (rel: RelacaoInterna) => (relacoesInternas.includes(rel) ? '!inner' : '');
   return `
@@ -383,7 +390,7 @@ function montarSelectDeNegocios(relacoesInternas: RelacaoInterna[] = []): string
   cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
   cliente:clientes${j('cliente')}(id, empresa),
   fabricante:fabricantes${j('fabricante')}(id, nome),
-  vendedor:usuarios${j('vendedor')}(id, nome, empresa_id),
+  vendedor:usuarios!pedidos_vendedor_id_fkey${j('vendedor')}(id, nome, empresa_id),
   obra:obras(id, nome_obra),
   marcador:marcadores(id, nome, cor)
 `;
@@ -651,7 +658,7 @@ export function usePedidosPorCliente(clienteId?: string | null) {
           cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
           cliente:clientes(id, empresa),
           fabricante:fabricantes(id, nome),
-          vendedor:usuarios(id, nome, empresa_id),
+          vendedor:usuarios!pedidos_vendedor_id_fkey(id, nome, empresa_id),
           obra:obras(id, nome_obra),
           marcador:marcadores(id, nome, cor)
         `)

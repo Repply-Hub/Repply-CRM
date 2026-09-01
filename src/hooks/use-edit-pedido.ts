@@ -14,7 +14,9 @@ export function usePedidoCompleto(pedidoId: string | null) {
     queryFn: async () => {
       const { data: pedido, error: pErr } = await supabase
         .from('pedidos')
-        .select('*, cliente:clientes(id, empresa, tipo), fabricante:fabricantes(id, nome), vendedor:usuarios(id, nome), obra:obras(id, nome_obra, endereco_entrega, spe_cnpj)')
+        // vendedor:usuarios!pedidos_vendedor_id_fkey — desambigua o embed depois que
+        // pedido_responsaveis criou um 2º caminho pedidos↔usuarios (ver use-pedidos.ts).
+        .select('*, cliente:clientes(id, empresa, tipo), fabricante:fabricantes(id, nome), vendedor:usuarios!pedidos_vendedor_id_fkey(id, nome), obra:obras(id, nome_obra, endereco_entrega, spe_cnpj)')
         .eq('id', pedidoId!)
         .single();
       if (pErr) throw pErr;
