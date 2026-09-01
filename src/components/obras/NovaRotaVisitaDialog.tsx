@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format, addMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { AlertTriangle, ArrowLeft, CalendarIcon, ChevronDown, GripVertical, HardHat, Users, X, Check } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CalendarIcon, ChevronDown, GripVertical, HardHat, Users, X, Check } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
 import { diferencaDaRota } from '@/lib/rota-em-edicao';
@@ -56,6 +57,16 @@ interface Parada {
   obraId: string;
   nomeObra: string;
   observacao: string;
+  /**
+   * Se ESTA parada já foi visitada.
+   *
+   * 🔴 É POR PARADA, não pela rota. A chave "Essas visitas já aconteceram" do topo é da
+   * CRIAÇÃO, onde ela significa "estou registrando uma rota que já rodou inteira". Numa rota
+   * que já existe isso não vale: uma parada pode estar feita e a seguinte não, e foi o que o
+   * Lucas apontou em 01/09/2026 — ele marcou uma visita como realizada e, ao abrir a edição,
+   * não a via marcada nem via o comentário.
+   */
+  realizada: boolean;
   horario: string; // HH:mm
 }
 
@@ -216,6 +227,9 @@ export function NovaRotaVisitaDialog({
             // A anotação que já está no banco vem junto: se a pessoa ligar a chave, ela EDITA
             // o que está escrito em vez de começar do zero e apagar sem perceber.
             observacao: p.visitaObservacao ?? '',
+            // O estado real de CADA parada, como está no banco. É isto que faz a visita já
+            // realizada aparecer marcada, com o comentário, ao abrir a edição.
+            realizada: !!p.visitaRealizada,
             horario: format(p.inicio, 'HH:mm'),
           })),
         ),
@@ -232,6 +246,7 @@ export function NovaRotaVisitaDialog({
         obraId: o.id,
         nomeObra: o.nome_obra || 'Obra sem nome',
         observacao: '',
+        realizada: false,
         horario: somarMinutos('09:00', idx * DURACAO_PADRAO_MINUTOS),
       })),
     );
@@ -263,7 +278,10 @@ export function NovaRotaVisitaDialog({
       // 1 DA MANHÃ, porque `somarMinutos('')` conta a partir da meia-noite sem reclamar.
       const ultima = ultimoHorarioUtilizavel(prev);
       const horario = ultima ? somarMinutos(ultima, DURACAO_PADRAO_MINUTOS) : '09:00';
-      return [...prev, { obraId: obra.id, nomeObra: obra.nome_obra || 'Obra sem nome', observacao: '', horario }];
+      return [
+        ...prev,
+        { obraId: obra.id, nomeObra: obra.nome_obra || 'Obra sem nome', observacao: '', realizada: false, horario },
+      ];
     });
     setBuscaOpen(false);
   };
@@ -289,6 +307,10 @@ export function NovaRotaVisitaDialog({
 
   const atualizarObservacao = (obraId: string, observacao: string) => {
     setParadas((prev) => prev.map((p) => (p.obraId === obraId ? { ...p, observacao } : p)));
+  };
+
+  const alternarRealizada = (obraId: string, realizada: boolean) => {
+    setParadas((prev) => prev.map((p) => (p.obraId === obraId ? { ...p, realizada } : p)));
   };
 
   const atualizarHorario = (obraId: string, horario: string) => {
@@ -340,16 +362,21 @@ export function NovaRotaVisitaDialog({
           visitaRealizada: !!p.visitaRealizada,
           visitaObservacao: p.visitaObservacao ?? null,
         })),
-      // 🔴 O registro de campo SÓ VIAJA COM A CHAVE LIGADA. Com ela desligada os dois campos
-      // ficam ausentes, e ausente significa "não mexa" — é assim que editar o horário de uma
-      // parada não apaga a anotação escrita em outra (ver `ParadaEditada` em rota-em-edicao.ts).
+      // O registro de campo vai POR PARADA, com o estado que está na tela de cada uma. Mandar
+      // o valor que já está gravado é inofensivo: `diferencaDaRota` compara e não gera
+      // alteração nenhuma quando nada mudou.
+      //
+      // 🔴 DESMARCAR NÃO APAGA A ANOTAÇÃO. Quando a caixinha está desmarcada, `visitaObservacao`
+      // fica AUSENTE, e ausente significa "não mexa". A pessoa que desmarca está dizendo "esta
+      // visita não aconteceu", não "jogue fora o que eu escrevi" — e o texto volta a aparecer
+      // se ela marcar de novo. Apagar de propósito continua possível: é marcar, limpar o campo
+      // e salvar, aí sim vai `null`.
       paradasEmOrdem.map((p) => ({
         grupoId: p.grupoId,
         obraId: p.obraId,
         horario: p.horario,
-        ...(jaRealizada
-          ? { visitaRealizada: true, visitaObservacao: p.observacao || null }
-          : {}),
+        visitaRealizada: p.realizada,
+        ...(p.realizada ? { visitaObservacao: p.observacao || null } : {}),
       })),
       format(data, 'yyyy-MM-dd'),
       DURACAO_PADRAO_MINUTOS,
@@ -507,6 +534,39 @@ export function NovaRotaVisitaDialog({
           )}
         </CabecalhoDialogo>
 
+        {/* AS MESMAS DUAS ABAS DO CARD DE EVENTO, e é assim que se volta.
+            Decisão do Lucas em 01/09/2026, depois de ver a primeira versão: em vez de um botão
+            "Voltar" no rodapé, as duas seções continuam no topo e alternar é clicar numa delas —
+            o mesmo gesto do card de evento (`EventDialog.tsx`, no bloco do `Tabs`), com o mesmo
+            desenho, só que aqui com "Visita a obra" já selecionada.
+
+            🔴 SÓ APARECE QUANDO SE CHEGOU AQUI DE DENTRO DO EVENTO. `onVoltar` é passado apenas
+            pelo Calendário; as duas chamadas de Obras.tsx não passam, e lá não há para onde
+            voltar — desenhar a aba "Evento" ali levaria a lugar nenhum.
+
+            E é por isso que a seção Obras desligada continua fechando tudo: o Calendário só
+            monta este diálogo com `temObras === true`, então sem a seção não há aba aqui nem
+            aba no card de evento. As duas nascem do mesmo interruptor. */}
+        {onVoltar && (
+          <div className="px-6 pb-2 shrink-0">
+            <Tabs
+              value="visita"
+              onValueChange={(v) => {
+                if (v === 'evento') onVoltar();
+              }}
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="evento" className="gap-1.5">
+                  <CalendarDays className="h-3.5 w-3.5" /> Evento
+                </TabsTrigger>
+                <TabsTrigger value="visita" className="gap-1.5">
+                  <HardHat className="h-3.5 w-3.5" /> Visita a obra
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
+
         <CorpoDialogo className="space-y-4">
           {/* O título vem ANTES da data porque é o que a pessoa tem na cabeça ao começar
               ("a rota da Zona Norte"), e porque deixá-lo depois das obras faria com que só
@@ -564,15 +624,22 @@ export function NovaRotaVisitaDialog({
             </Popover>
           </div>
 
-          <div className="flex items-center justify-between rounded-md border p-3">
-            <div>
-              <Label htmlFor="ja-realizada" className="cursor-pointer">Essas visitas já aconteceram</Label>
-              <p className="text-xs text-muted-foreground">
-                Registra a rota como realizada, com espaço para anotar o que foi visto.
-              </p>
+          {/* Só na CRIAÇÃO. Aqui a chave quer dizer "estou registrando uma rota que já rodou
+              inteira", e vale para todas as paradas de uma vez. Numa rota que já existe isso
+              seria mentira — cada parada tem o seu estado, e a caixinha de cada uma, abaixo,
+              é quem manda. Uma chave de rota junto das caixinhas só criaria a dúvida de qual
+              das duas ganha. */}
+          {!editando && (
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div>
+                <Label htmlFor="ja-realizada" className="cursor-pointer">Essas visitas já aconteceram</Label>
+                <p className="text-xs text-muted-foreground">
+                  Registra a rota como realizada, com espaço para anotar o que foi visto.
+                </p>
+              </div>
+              <Switch id="ja-realizada" checked={jaRealizada} onCheckedChange={setJaRealizada} />
             </div>
-            <Switch id="ja-realizada" checked={jaRealizada} onCheckedChange={setJaRealizada} />
-          </div>
+          )}
 
           {funcionariosDisponiveis.length > 0 && (
             <div className="space-y-1.5">
@@ -738,14 +805,40 @@ export function NovaRotaVisitaDialog({
                                   <X className="h-4 w-4" />
                                 </button>
                               </div>
-                              {jaRealizada && (
-                                <Textarea
-                                  className="mt-2 text-sm"
-                                  rows={2}
-                                  placeholder="O que você viu nesta obra?"
-                                  value={parada.observacao}
-                                  onChange={(e) => atualizarObservacao(parada.obraId, e.target.value)}
-                                />
+                              {/* EDITANDO: cada parada tem o SEU estado, porque numa rota que já
+                                  existe uma visita pode ter acontecido e a seguinte não. Vem
+                                  marcada e com o comentário quando já está assim no banco.
+                                  CRIANDO: quem manda é a chave do topo — ali a rota inteira é
+                                  registrada de uma vez, que é o que aquela chave significa. */}
+                              {editando ? (
+                                <div className="mt-2 space-y-2">
+                                  <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                                    <Checkbox
+                                      checked={parada.realizada}
+                                      onCheckedChange={(v) => alternarRealizada(parada.obraId, v === true)}
+                                    />
+                                    Visita já realizada
+                                  </label>
+                                  {parada.realizada && (
+                                    <Textarea
+                                      className="text-sm"
+                                      rows={2}
+                                      placeholder="O que você viu nesta obra?"
+                                      value={parada.observacao}
+                                      onChange={(e) => atualizarObservacao(parada.obraId, e.target.value)}
+                                    />
+                                  )}
+                                </div>
+                              ) : (
+                                jaRealizada && (
+                                  <Textarea
+                                    className="mt-2 text-sm"
+                                    rows={2}
+                                    placeholder="O que você viu nesta obra?"
+                                    value={parada.observacao}
+                                    onChange={(e) => atualizarObservacao(parada.obraId, e.target.value)}
+                                  />
+                                )
                               )}
                             </div>
                           )}
@@ -761,19 +854,9 @@ export function NovaRotaVisitaDialog({
         </CorpoDialogo>
 
         <RodapeDialogo>
-          {/* "Voltar" só aparece quando alguém abriu esta janela de dentro de outra (hoje, o
-              "Novo evento" do Calendário). Fica à ESQUERDA, longe de Cancelar, porque as duas
-              saídas têm consequências opostas: uma devolve o rascunho do evento, a outra o
-              descarta. Mesmo lugar e mesmo motivo do "Excluir" em `EventDialog.tsx:557`.
-
-              `sm:mr-auto` e não `mr-auto`: no celular o `DialogFooter` é `flex-col-reverse`, e
-              a margem automática ali faria este botão encolher e desalinhar dos outros dois. */}
-          {onVoltar && (
-            <Button variant="ghost" className="sm:mr-auto" onClick={onVoltar}>
-              <ArrowLeft className="mr-1.5 h-4 w-4" />
-              Voltar
-            </Button>
-          )}
+          {/* Sem "Voltar" aqui: quem devolve o evento é a aba "Evento" no topo (decisão do
+              Lucas em 01/09/2026). Duas saídas com o mesmo nome em lugares diferentes é pior
+              que uma — e o rodapé fica com o par de sempre, Cancelar e gravar. */}
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           {/* O MESMO botão serve para criar e para editar (`rotaParaEditar`). Em edição ele diz
               "Salvar", e `editarRota.isPending` tem de entrar no `disabled` junto com
