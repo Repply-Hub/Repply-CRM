@@ -2140,6 +2140,7 @@ export type Database = {
       licencas_extremoz: {
         Row: {
           bloco_texto: string | null
+          bloco_texto_hash: string | null
           cnpj: string | null
           created_at: string
           data_edicao: string | null
@@ -2150,6 +2151,7 @@ export type Database = {
           obra_descricao: string | null
           pdf_link: string | null
           pdf_nome: string | null
+          pdf_storage_path: string | null
           prioridade: string | null
           quadro_societario: string | null
           razao_social: string | null
@@ -2158,6 +2160,7 @@ export type Database = {
         }
         Insert: {
           bloco_texto?: string | null
+          bloco_texto_hash?: string | null
           cnpj?: string | null
           created_at?: string
           data_edicao?: string | null
@@ -2168,6 +2171,7 @@ export type Database = {
           obra_descricao?: string | null
           pdf_link?: string | null
           pdf_nome?: string | null
+          pdf_storage_path?: string | null
           prioridade?: string | null
           quadro_societario?: string | null
           razao_social?: string | null
@@ -2176,6 +2180,7 @@ export type Database = {
         }
         Update: {
           bloco_texto?: string | null
+          bloco_texto_hash?: string | null
           cnpj?: string | null
           created_at?: string
           data_edicao?: string | null
@@ -2186,6 +2191,7 @@ export type Database = {
           obra_descricao?: string | null
           pdf_link?: string | null
           pdf_nome?: string | null
+          pdf_storage_path?: string | null
           prioridade?: string | null
           quadro_societario?: string | null
           razao_social?: string | null

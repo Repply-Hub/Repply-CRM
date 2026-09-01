@@ -21,19 +21,17 @@ const formatDataEdicao = (raw: string): string => {
   if (isValid(d) && !isNaN(d.getTime())) return format(d, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
   return raw;
 };
-import { CalendarIcon } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ColumnSettings } from '@/components/shared/ColumnSettings';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { DateRangePicker, type DateRange } from '@/components/shared/DateRangePicker';
 import { cn } from '@/lib/utils';
 import { ListPagination } from '@/components/shared/ListPagination';
 
-import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronDown, ChevronUp, CloudDownload, List, Settings2, Calendar as CalendarLucide } from 'lucide-react';
+import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronDown, ChevronUp, CloudDownload, List, Settings2, Calendar as CalendarLucide, FilterX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -169,9 +167,17 @@ export default function Portal() {
     localStorage.setItem('portal-column-labels', JSON.stringify(columnLabels));
   }, [columnLabels]);
 
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(subMonths(new Date(), 1)));
-  const [dateTo, setDateTo] = useState<Date | undefined>(new Date());
+  // Filtro de período padronizado com o do Dashboard (DateRangePicker: atalhos +
+  // abas De/Até). O padrão é "do 1º dia do mês passado até hoje".
+  const periodoPadrao = (): DateRange => ({
+    from: startOfMonth(subMonths(new Date(), 1)),
+    to: new Date(),
+  });
+  const [dateRange, setDateRange] = useState<DateRange>(periodoPadrao);
   const [idemaTypeFilter, setIdemaTypeFilter] = useState<string | null>(null);
+  // Bump para re-consultar após limpar os filtros — o fetch precisa rodar já com o
+  // `search` zerado, e a chamada síncrona pegaria o valor antigo (closure).
+  const [tickLimparFiltro, setTickLimparFiltro] = useState(0);
 
   useEffect(() => {
     localStorage.setItem('portal-visible-columns', JSON.stringify(visibleColumns));
@@ -270,166 +276,46 @@ export default function Portal() {
     }
   };
 
-  // Client-side scraping for Extremoz (bypasses server IP block)
+  // ─── Extremoz: dispara o scraper server-side (Edge Function scrape-extremoz-licencas) ──
+  // Antes rodava no navegador do usuário ("bypass" de um suposto bloqueio de IP). A Fase 0
+  // (01/09/2026) provou que o servidor de Extremoz responde à Edge Function — então o
+  // download + parse + dedupe por hash roda no servidor, igual IDEMA e DOM Natal, e tem cron.
   const scrapeExtremoz = async () => {
     setScraping((prev) => ({ ...prev, extremoz: true }));
     const toastId = toast.loading('Buscando diários oficiais de Extremoz...');
+    const extremozUrl = 'https://extremoz.rn.gov.br/diario-oficial/';
     try {
-      // Step 1: Fetch the listing page from user's browser
-      const years = ['2026', '2025'];
-      const pdfLinks: Array<{ href: string; title: string; date: string }> = [];
+      const { data, error } = await supabase.functions.invoke('scrape-extremoz-licencas');
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
 
-      for (const year of years) {
-        const baseUrl = `https://extremoz.rn.gov.br/diario-oficial/diario-oficial-${year}/`;
-        for (let page = 1; page <= 5; page++) {
-          const url = page === 1 ? baseUrl : `${baseUrl}page/${page}/`;
-          try {
-            const resp = await fetch(url);
-            if (!resp.ok) break;
-            const html = await resp.text();
+      const inseridos: number = data?.inseridos ?? 0;
+      const novas: number = data?.novas ?? 0;
+      const parcial: boolean = Boolean(data?.parcial);
 
-            // Extract PDF links
-            const hrefRegex = /href="(https?:\/\/extremoz\.rn\.gov\.br\/wp-content\/uploads\/[^"]+\.(?:pdf|doc\.pdf))"/gi;
-            let match;
-            while ((match = hrefRegex.exec(html)) !== null) {
-              const href = match[1];
-              if (pdfLinks.some(p => p.href === href)) continue;
-              const filename = href.split('/').pop() || '';
-              const title = filename.replace(/\.doc\.pdf$|\.pdf$/i, '').replace(/-/g, ' ');
-              pdfLinks.push({ href, title, date: '' });
-            }
+      const base =
+        novas === 0
+          ? 'Banco de dados já está atualizado.'
+          : inseridos > 0
+            ? `${inseridos} publicação${inseridos === 1 ? '' : 'ões'} de licença importada${inseridos === 1 ? '' : 's'} de ${novas} edição${novas === 1 ? '' : 'ões'}.`
+            : `${novas} edição${novas === 1 ? '' : 'ões'} lida${novas === 1 ? '' : 's'} — sem LP/LI/LO.`;
+      const cauda = parcial ? ' Pode haver mais — clique de novo para continuar.' : '';
+      toast.success(base + cauda, { id: toastId });
 
-            if (!html.includes(`/page/${page + 1}`)) break;
-          } catch {
-            break;
-          }
-        }
-        if (pdfLinks.length > 0) break; // found PDFs, stop
-      }
-
-      if (pdfLinks.length === 0) {
-        toast.error('Nenhum PDF encontrado no site de Extremoz', { id: toastId });
-        setScraping((prev) => ({ ...prev, extremoz: false }));
-        return;
-      }
-
-      toast.loading(`Encontrados ${pdfLinks.length} PDFs. Verificando novos...`, { id: toastId });
-
-      // Step 2: Check which PDFs are already in the database
-      const { data: existing } = await supabase
-        .from('licencas_extremoz')
-        .select('pdf_link');
-      const existingLinks = new Set((existing || []).map(r => r.pdf_link));
-      const newPdfs = pdfLinks.filter(p => !existingLinks.has(p.href));
-
-      if (newPdfs.length === 0) {
-        toast.success('Banco de dados já está atualizado! Nenhum novo diário encontrado.', { id: toastId });
-        setScraping((prev) => ({ ...prev, extremoz: false }));
-        return;
-      }
-
-      toast.loading(`Processando ${newPdfs.length} novos PDFs...`, { id: toastId });
-
-      // Step 3: Process new PDFs (limit to 5 at a time)
-      const toProcess = newPdfs.slice(0, 5);
-      let totalInserted = 0;
-
-      for (const pdf of toProcess) {
-        try {
-          const resp = await fetch(pdf.href);
-          if (!resp.ok) continue;
-          const buffer = new Uint8Array(await resp.arrayBuffer());
-
-          if (buffer.length > 2 * 1024 * 1024) {
-            continue;
-          }
-
-          const raw = new TextDecoder('latin1').decode(buffer);
-          const textParts: string[] = [];
-          const btEtRegex = /BT\s([\s\S]*?)ET/g;
-          let btMatch;
-          while ((btMatch = btEtRegex.exec(raw)) !== null) {
-            const block = btMatch[1];
-            const tjRegex = /\(([^)]*)\)\s*Tj/g;
-            let tjMatch;
-            while ((tjMatch = tjRegex.exec(block)) !== null) {
-              const decoded = tjMatch[1].replace(/\\n/g, '\n').replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\').trim();
-              if (decoded) textParts.push(decoded);
-            }
-            const tjArrayRegex = /\[([\s\S]*?)\]\s*TJ/g;
-            let tjArrMatch;
-            while ((tjArrMatch = tjArrayRegex.exec(block)) !== null) {
-              const strRegex = /\(([^)]*)\)/g;
-              let strMatch;
-              const parts: string[] = [];
-              while ((strMatch = strRegex.exec(tjArrMatch[1])) !== null) {
-                parts.push(strMatch[1].replace(/\\n/g, '\n').replace(/\\\(/g, '(').replace(/\\\)/g, ')').replace(/\\\\/g, '\\'));
-              }
-              const joined = parts.join('').trim();
-              if (joined) textParts.push(joined);
-            }
-          }
-          const text = textParts.join('\n');
-
-          if (!text || text.length < 20) {
-            continue;
-          }
-
-          const contexts: string[] = [];
-          const cnpjRegex = /\d{2}[.\s]?\d{3}[.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}/g;
-          const cnpjs = [...new Set((text.match(cnpjRegex) || []).map(c => c.replace(/\s/g, '')))];
-
-          if (cnpjs.length > 0) {
-            for (const cnpj of cnpjs) {
-              const idx = text.indexOf(cnpj);
-              if (idx !== -1) contexts.push(text.substring(Math.max(0, idx - 350), Math.min(text.length, idx + 500)));
-            }
-          } else {
-            contexts.push(text.substring(0, 1200));
-          }
-
-          for (const context of contexts) {
-            const lower = context.toLowerCase();
-            let tipo = '';
-            if (/\bLP\b/i.test(context) || lower.includes('licença prévia')) tipo = 'Licença Prévia';
-            else if (/\bLI\b/i.test(context) || lower.includes('licença de instalação')) tipo = 'Licença de Instalação';
-            else if (/\bLO\b/i.test(context) || lower.includes('licença de operação')) tipo = 'Licença de Operação';
-
-            if (!tipo) continue;
-
-            const cnpjMatch = context.match(cnpjRegex);
-            const cnpj = cnpjMatch?.[0]?.replace(/\s/g, '') || '';
-            const emailMatch = context.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-            const email = emailMatch?.[0] || '';
-            const faseMatch = context.match(/(implantação[^,\.]{0,80}|instalação[^,\.]{0,80}|operação[^,\.]{0,80}|construção[^,\.]{0,80}|ampliação[^,\.]{0,80}|reforma[^,\.]{0,80})/i);
-            const obraMatch = context.match(/((?:CONSTRUÇÃO|REFORMA|AMPLIAÇÃO|IMPLANTAÇÃO|PAVIMENTAÇÃO|LOTEAMENTO)[\s\S]{3,120}?)(?:[,.]|\s+localiz)/i);
-
-            await supabase.from('licencas_extremoz').insert({
-              data_edicao: pdf.title,
-              tipo_licenca: tipo,
-              cnpj,
-              razao_social: '',
-              nome_fantasia: '',
-              email,
-              prioridade: faseMatch?.[1]?.trim() || '',
-              obra_descricao: obraMatch?.[1]?.replace(/\s+/g, ' ').trim() || '',
-              pdf_nome: pdf.href.split('/').pop() || '',
-              pdf_link: pdf.href,
-              bloco_texto: context.substring(0, 300),
-            });
-            totalInserted++;
-          }
-        } catch (err) {
-          console.error('Erro ao processar PDF:', pdf.href, err);
-        }
-      }
-
-      toast.success(`${totalInserted} novos registros importados de ${toProcess.length} PDFs!`, { id: toastId });
-      // Reload data
       await fetchExtremozFromDb();
     } catch (err) {
-      console.error('Scraping error:', err);
-      toast.error('Erro ao fazer scraping de Extremoz', { id: toastId });
+      console.error('Scraping Extremoz error:', err);
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setResults((prev) => ({
+        ...prev,
+        extremoz: {
+          success: false,
+          error: `Erro ao acessar o Diário de Extremoz: ${message}`,
+          fallback_url: extremozUrl,
+          site: { id: 'extremoz', name: 'Diário Oficial - Extremoz', url: extremozUrl },
+        },
+      }));
+      toast.error('Erro ao acessar o Diário de Extremoz.', { id: toastId });
     } finally {
       setScraping((prev) => ({ ...prev, extremoz: false }));
     }
@@ -493,9 +379,8 @@ export default function Portal() {
     setScraping((prev) => ({ ...prev, natal: true }));
     const toastId = toast.loading('Consultando edições disponíveis do DOM Natal...');
     try {
-      const now = new Date();
-      const from = dateFrom || startOfMonth(subMonths(now, 1));
-      const to   = dateTo   || now;
+      const from = dateRange.from;
+      const to   = dateRange.to;
 
       // Monta lista de meses sem repetição — ignora o dia selecionado
       const meses: { mes: number; ano: number }[] = [];
@@ -672,6 +557,26 @@ export default function Portal() {
     }
   };
 
+  const temFiltroAtivo = Boolean(
+    search.trim() !== '' ||
+    idemaTypeFilter !== null ||
+    dateRange.from.getTime() !== startOfMonth(subMonths(new Date(), 1)).getTime() ||
+    dateRange.to.toDateString() !== new Date().toDateString(),
+  );
+
+  const limparFiltros = () => {
+    setSearch('');
+    setDateRange(periodoPadrao());
+    setIdemaTypeFilter(null);
+    setTickLimparFiltro((t) => t + 1);
+  };
+
+  // Re-consulta depois que os filtros foram zerados (o fetch roda já no render novo,
+  // com o `search` vazio).
+  useEffect(() => {
+    if (tickLimparFiltro > 0) fetchAll();
+  }, [tickLimparFiltro]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const exportCsv = (siteId: string) => {
     const result = results[siteId];
     if (!result?.success || !result.data?.table?.length) return;
@@ -694,8 +599,8 @@ export default function Portal() {
   };
 
   return (
-    <AppLayout title="Portal de Consultas" subtitle="Consulte licenças e publicações oficiais de órgãos públicos" mainClassName="flex-1 overflow-hidden flex flex-col">
-      <div className="p-3 sm:p-4 md:p-6 flex flex-col flex-1 min-h-0 gap-4 sm:gap-6">
+    <AppLayout title="Portal de Consultas" subtitle="Consulte licenças e publicações oficiais de órgãos públicos" mainClassName="flex-1 overflow-y-auto">
+      <div className="p-3 sm:p-4 md:p-6 flex flex-col gap-4 sm:gap-6">
         {/* Search bar */}
         <div className="flex flex-wrap items-center gap-3 shrink-0">
           <div className="relative flex-1">
@@ -708,31 +613,7 @@ export default function Portal() {
               onKeyDown={(e) => e.key === 'Enter' && fetchAll()}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal text-xs h-9 min-w-[130px]", !dateFrom && "text-muted-foreground")}>
-                  <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
-                  {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Data início"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} defaultMonth={dateFrom ?? dateTo} initialFocus className={cn("p-3 pointer-events-auto")} locale={ptBR} captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear() + 1} />
-              </PopoverContent>
-            </Popover>
-            <span className="text-xs text-muted-foreground">até</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className={cn("justify-start text-left font-normal text-xs h-9 min-w-[130px]", !dateTo && "text-muted-foreground")}>
-                  <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
-                  {dateTo ? format(dateTo, "dd/MM/yyyy") : "Data fim"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateTo} onSelect={setDateTo} defaultMonth={dateTo ?? dateFrom} initialFocus className={cn("p-3 pointer-events-auto")} locale={ptBR} captionLayout="dropdown-buttons" fromYear={2020} toYear={new Date().getFullYear() + 1} />
-              </PopoverContent>
-            </Popover>
-          </div>
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
           <Button onClick={fetchAll} disabled={Object.values(loading).some(Boolean)}>
             {Object.values(loading).some(Boolean) ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -741,10 +622,21 @@ export default function Portal() {
             )}
             Consultar Todos
           </Button>
+          {temFiltroAtivo && (
+            <Button
+              variant="ghost"
+              onClick={limparFiltros}
+              disabled={Object.values(loading).some(Boolean)}
+              title="Limpar busca e datas"
+            >
+              <FilterX className="h-4 w-4 mr-2" />
+              Limpar filtro
+            </Button>
+          )}
         </div>
 
         {/* Site cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 flex-1 min-h-0 overflow-y-auto content-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {SITES.map((site) => {
             const res = results[site.id];
             const isBusy = loading[site.id] || scraping[site.id];
@@ -1007,7 +899,9 @@ export default function Portal() {
                             </div>
                           )}
 
-                          <div className={cn("w-full max-w-full overflow-x-auto rounded-md border overscroll-x-contain", site.id === 'idema' && "hidden md:block")}>
+                          <div className={cn("w-full max-w-full rounded-md border overflow-hidden", site.id === 'idema' && "hidden md:block")}>
+                            {/* Só a TABELA rola na horizontal; a paginação (footer) fica fora deste contêiner. */}
+                            <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
                             <table className={site.id === 'idema' ? "w-full min-w-[860px] text-sm table-fixed" : "min-w-[1100px] text-sm"}>
                               <thead>
                                 <tr className="bg-muted/50 border-b border-border/60">
@@ -1140,6 +1034,7 @@ export default function Portal() {
                                 })}
                               </tbody>
                             </table>
+                            </div>
                             <ListPagination
                               page={currentPage}
                               totalPages={totalPages}
