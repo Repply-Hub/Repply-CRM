@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { expandMergedCells } from './expand-merged-cells';
+import { normalizarDatas } from './ler-planilha';
 
 export interface ParsedFile {
   headers: string[];
@@ -10,13 +11,19 @@ export interface ParsedFile {
  * Parseia XLS/XLSX/CSV no client e devolve dados já estruturados
  * (array de objetos chaveados pelo header), prontos para o MappingStep.
  * Não envolve IA — parsing puro de planilha.
+ *
+ * 🔴 A normalização de datas mora em `ler-planilha.ts`, junto com a leitura que as telas de
+ * importação usam. Ela já esteve duplicada aqui, e foi assim que o conserto de 20/08/2026
+ * ficou num arquivo que nenhuma tela chamava enquanto o bug seguia vivo na tela real.
  */
 export async function parseImportFile(file: File): Promise<ParsedFile> {
   const name = file.name.toLowerCase();
 
   if (name.endsWith('.csv')) {
     const text = await file.text();
-    const workbook = XLSX.read(text, { type: 'string' });
+    // `raw: true` desliga a reinterpretação de data do parser de CSV do SheetJS, que lê
+    // `2026-08-12` e devolve `8/11/26` — um dia a menos. Medido com o xlsx 0.18.5 do projeto.
+    const workbook = XLSX.read(text, { type: 'string', raw: true });
     return sheetToRows(workbook);
   }
 
@@ -29,48 +36,6 @@ export async function parseImportFile(file: File): Promise<ParsedFile> {
   }
 
   throw new Error('Formato não suportado. Use .csv, .xls ou .xlsx.');
-}
-
-/**
- * Reescreve o texto exibido das células de data para ISO (`AAAA-MM-DD`, com `THH:mm`
- * quando há hora).
- *
- * POR QUE ISTO EXISTE: `sheet_to_json` com `raw: false` devolve o texto FORMATADO da
- * célula. Quando a planilha traz a data como número sem formato definido — que é
- * exatamente como o Bitrix24 exporta — o SheetJS cai no padrão dele, que é americano:
- * o serial 46247 (12/08/2026) vira o texto "8/12/26".
- *
- * Daí para frente ninguém mais consegue saber se "8/12" é 8 de dezembro ou 12 de agosto,
- * e `sanitizeFieldValue` precisa adivinhar. Na importação da base da MD isso trocou dia e
- * mês em ~1 de cada 4 datas, sem rejeitar uma linha sequer.
- *
- * A informação inequívoca existe na célula. Este passo simplesmente para de jogá-la fora:
- * a data sai daqui em ISO e nenhuma adivinhação acontece depois.
- *
- * Mexe em `w` (o texto exibido) e não no valor, porque é `w` que o `raw: false` lê — e
- * fazer isso antes de `sheet_to_json` preserva o tratamento de linhas em branco e de
- * células mescladas que vem de graça na conversão.
- */
-function normalizarDatas(sheet: XLSX.WorkSheet): void {
-  if (!sheet['!ref']) return;
-  const range = XLSX.utils.decode_range(sheet['!ref']);
-
-  const dois = (n: number) => String(n).padStart(2, '0');
-
-  for (let r = range.s.r; r <= range.e.r; r++) {
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      const cell = sheet[XLSX.utils.encode_cell({ r, c })] as XLSX.CellObject | undefined;
-      if (!cell || cell.t !== 'd' || !(cell.v instanceof Date)) continue;
-
-      const d = cell.v;
-      // Getters locais, e não `toISOString()`: com `cellDates` o SheetJS constrói o Date
-      // com o construtor local. Usar UTC aqui deslocaria a data em um dia para quem está
-      // a oeste de Greenwich — que é o caso do Brasil inteiro.
-      const data = `${d.getFullYear()}-${dois(d.getMonth() + 1)}-${dois(d.getDate())}`;
-      const temHora = d.getHours() || d.getMinutes() || d.getSeconds();
-      cell.w = temHora ? `${data}T${dois(d.getHours())}:${dois(d.getMinutes())}` : data;
-    }
-  }
 }
 
 function sheetToRows(workbook: XLSX.WorkBook): ParsedFile {

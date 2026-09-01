@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
-import * as XLSX from 'xlsx';
+import { lerPlanilhaComoObjetos } from '@/lib/import/ler-planilha';
 import { validateFile } from '@/lib/file-validation';
 import { MappingStep, sanitizeImportedRows, type ExtraMappingValue } from '@/components/import/MappingStep';
 import { ImportInstructionsStep } from '@/components/import/ImportInstructionsStep';
@@ -310,10 +310,10 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
     if (!validateFile(file, { allowedExtensions: IMPORT_ALLOWED_EXT })) return;
     setFileName(file.name);
     try {
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: 'array' });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
+      // 🔴 `preservarNumeros` NÃO é detalhe: sem ele o CNPJ `12345678000190` volta como
+      // "1.23457E+13" e a limpeza de não-dígitos grava `12345713`, um CNPJ que não existe.
+      // Neste modo a data chega como Date de verdade, sem passar por adivinhação de formato.
+      const json = (await lerPlanilhaComoObjetos(file, { preservarNumeros: true })) as Record<string, any>[];
 
       if (json.length === 0) {
         toast.error('Arquivo vazio ou sem dados válidos');

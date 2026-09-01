@@ -11,9 +11,10 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import * as XLSX from 'xlsx';
 import { validateFile } from '@/lib/file-validation';
-import { expandMergedCells } from '@/lib/import/expand-merged-cells';
+import { lerPlanilhaComoObjetos } from '@/lib/import/ler-planilha';
+import { diagnosticarDatasDaPlanilha } from '@/lib/import/ordem-de-data';
+import { conferirDatasImportadas, textoDoAviso } from '@/lib/import/conferencia-de-datas';
 import { MappingStep, sanitizeImportedRows, getExtraDisplayName, type ExtraMappingValue, type FieldDef } from '@/components/import/MappingStep';
 import { ImportInstructionsStep } from '@/components/import/ImportInstructionsStep';
 import { useBulkImport } from '@/hooks/use-bulk-import';
@@ -182,11 +183,12 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     if (!validateFile(file, { allowedExtensions: IMPORT_ALLOWED_EXT })) return;
     setFileName(file.name);
     try {
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: 'array' });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      expandMergedCells(sheet);
-      const json = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '', raw: false });
+      // 🔴 A leitura da planilha NÃO mora mais aqui. Esta tela tinha a sua própria, sem
+      // `cellDates` — e por isso o conserto de dia/mês trocados de 20/08/2026, que só entrou
+      // em `file-parser.ts`, nunca alcançou a importação que a MD de fato usa. Em 01/09/2026
+      // o erro reapareceu: 786 dos 2.358 negócios importados entraram com dia e mês
+      // invertidos. Ver `src/lib/import/ler-planilha.ts`.
+      const json = (await lerPlanilhaComoObjetos(file)) as Record<string, any>[];
 
       if (json.length === 0) {
         toast.error('Arquivo vazio ou sem dados válidos');
@@ -344,6 +346,20 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     },
     [extras, customColumns]
   );
+
+  /**
+   * 🔴 A conferência que faltava em 01/09/2026. Ela olha as datas JÁ convertidas — as mesmas
+   * que a tabela abaixo mostra e que a importação vai gravar — e procura o impossível:
+   * negócio criado depois de hoje. Naquela importação isso aconteceu 294 vezes e nada disse
+   * nada. Ver `src/lib/import/conferencia-de-datas.ts`.
+   */
+  const avisoDeDatas = useMemo(() => {
+    if (step !== 'preview' || previewRows.length === 0) return null;
+    const cabecalhos = Array.from(new Set(rawData.flatMap(linha => Object.keys(linha))));
+    const aviso = conferirDatasImportadas(previewRows, diagnosticarDatasDaPlanilha(rawData, cabecalhos));
+    const frases = textoDoAviso(aviso);
+    return frases.length > 0 ? { ...aviso, frases } : null;
+  }, [step, previewRows, rawData]);
 
   // Vincula o nome da coluna Responsável/Vendedor a um usuário real da empresa (por nome,
   // tolerando acentos/variação de digitação) para mostrar o resultado já no preview.
@@ -715,6 +731,39 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+
+            {avisoDeDatas && (
+              <div
+                className={cn(
+                  'rounded-xl border p-4 flex items-start gap-3',
+                  avisoDeDatas.grave
+                    ? 'bg-destructive/5 border-destructive/30'
+                    : 'bg-amber-500/5 border-amber-500/20',
+                )}
+              >
+                <div
+                  className={cn(
+                    'h-8 w-8 rounded-lg flex items-center justify-center shrink-0',
+                    avisoDeDatas.grave ? 'bg-destructive/10' : 'bg-amber-500/10',
+                  )}
+                >
+                  <AlertTriangle className={cn('h-4 w-4', avisoDeDatas.grave ? 'text-destructive' : 'text-amber-600')} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className={cn('text-xs font-bold', avisoDeDatas.grave ? 'text-destructive' : 'text-amber-900')}>
+                    Confira as datas antes de importar
+                  </span>
+                  {avisoDeDatas.frases.map((frase) => (
+                    <p
+                      key={frase}
+                      className={cn('text-[11px] leading-relaxed', avisoDeDatas.grave ? 'text-destructive/90' : 'text-amber-800')}
+                    >
+                      {frase}
+                    </p>
+                  ))}
+                </div>
               </div>
             )}
 

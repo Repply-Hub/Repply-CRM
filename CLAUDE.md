@@ -460,6 +460,55 @@ Só campo de ESCOLHER data usa `defaultMonth`.
 
 ---
 
+### 7.14 Planilha do Bitrix: a data vem em ordem AMERICANA, e o conserto precisa estar na tela certa
+
+Duas lições numa, e a segunda é a que custou caro.
+
+**A armadilha técnica.** O Bitrix24 exporta a data como número de série do Excel com o formato
+curto embutido (`m/d/yy`) — que é **americano**. Ler a planilha e pedir o texto formatado
+(`sheet_to_json` com `raw: false`) faz o SheetJS escrever `"8/12/26"` para 12 de agosto. A
+partir daí ninguém sabe se é 8 de dezembro ou 12 de agosto, e o conversor precisa adivinhar:
+ele assume brasileiro, **invertendo dia e mês em toda data cujo dia real seja de 1 a 12**.
+
+Medido em produção em 01/09/2026, numa importação de 2.358 negócios:
+
+| grupo | linhas | em meses de set a dez |
+|---|---|---|
+| dia 13 a 31 — o "13" denuncia o formato, o conversor acerta | 1.572 | **0** |
+| dia 01 a 12 — ambíguo, o conversor chuta | 786 | **294** |
+
+Zero contra 37,4% no mesmo arquivo. As 294 caíram em datas que ainda não aconteceram, e
+**nenhuma linha foi rejeitada**.
+
+O CSV é pior ainda: o parser do SheetJS reinterpreta a data sozinho antes de qualquer código
+nosso, e `2026-08-12` volta como `8/11/26` — **um dia a menos**. Ler CSV como bytes
+(`type: 'array'`) também come acento: `AÇÃO` vira `AÃÃO`.
+
+**A armadilha de verdade: o conserto certo no arquivo errado não conserta nada.** Este bug foi
+corrigido em 20/08/2026, validado contra 26.181 datas reais, e **voltou em 01/09/2026** — sem
+ninguém ter revertido nada. O conserto estava em `file-parser.ts`, que nenhuma tela renderizada
+chamava, enquanto a tela que a MD usa tinha a sua própria leitura de planilha. Havia **três
+leituras independentes** no projeto. A validação passou por um caminho que o cliente não usa.
+
+Hoje existe **um leitor só**: `lerPlanilhaComoObjetos`, em `src/lib/import/ler-planilha.ts`.
+Ele liga `cellDates`, normaliza a data para ISO antes de qualquer adivinhação, lê CSV como
+texto e tem o modo `preservarNumeros` para quem importa CNPJ (com o texto formatado,
+`12345678000190` vira `"1.23457E+13"` e a limpeza grava um CNPJ que não existe).
+
+O que sobra de ambíguo — CSV e data digitada como texto — é decidido **por coluna**, não por
+célula: uma única linha com dia 25 prova que a coluna inteira é brasileira
+(`src/lib/import/ordem-de-data.ts`).
+
+🔴 **Nunca escreva `XLSX.read` numa tela.** O teste `src/test/uma-leitura-de-planilha-so.test.ts`
+falha se alguém tentar — é o único guarda contra a quarta leitura nascer daqui a três meses.
+
+E a rede de segurança que faltava: a prévia da importação agora avisa quando alguma data de
+criação cai **depois de hoje**. Negócio criado no futuro não existe; foi o único sinal que
+teria pegado as 786 linhas no dia. Distribuição estatística **não** teria funcionado — as
+linhas sãs mantiveram dia acima de 12 e o histograma continuou com cara normal.
+
+---
+
 ## 8. Identidade visual
 
 Sistema de marca já implementado em `src/index.css` ("Repply Brand System V2.0"). **Use os
@@ -541,6 +590,7 @@ Além disso, conforme o que mudou:
 - ❌ Parâmetro que escolhe entre duas colunas de data dentro de uma RPC (§7.9)
 - ❌ Tratar `prazo_resposta` como prazo (§4.4) — é a data de fechamento, e o nome mente
 - ❌ Construir gráfico novo sem perguntar ao Lucas se ele conta por criação ou por fechamento
+- ❌ `XLSX.read` fora de `src/lib/import/` (§7.14) — foi assim que o conserto de datas ficou num arquivo que nenhuma tela chamava
 - ❌ Limpar não-dígitos de identificador de WhatsApp
 - ❌ Painel que atribua culpa — ver o princípio "registra, não interpreta" (`SPEC.md` §3.5)
 - ❌ Transformar prática da MD em regra do sistema (`SPEC.md` §4)

@@ -17,7 +17,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026.
 |---|---|---|---|
 | 1 | [Chave do WhatsApp legível](#1-a-chave-do-whatsapp-está-legível) | **Crítica** | ⏳ Exposição fechada em 20/08. Restam 3 fases — [plano](operacao/plano-blindagem-whatsapp.md) |
 | 2 | [Titularidade dos serviços](#2-titularidade-dos-serviços) | **Crítica** | Sim — impede aplicar mudança de banco |
-| 3 | [Importação: formatação de datas](#3-importação--formatação-de-datas) | **Alta** | ⚠️ o conserto não alcança a tela de Negócios — ver item 40 |
+| 3 | [Importação: formatação de datas](#3-importação--formatação-de-datas) | **Alta** | ✅ código corrigido em 01/09/2026 (item 40) · ⚠️ o dado gravado continua errado |
 | 4 | [Agendamentos nunca funcionaram](#4-os-agendamentos-nunca-funcionaram) | Alta | Não |
 | 5 | [Cobertura de teste quase zero](#5-cobertura-de-teste-quase-zero) | Alta | Não |
 | 6 | [Função `import-data` órfã](#6-função-import-data-órfã) | Média | Não |
@@ -1587,9 +1587,61 @@ usa `useMinhaPermissao` em `Negocios.tsx` para outro botão.
 
 ---
 
-## 40. 🔴 O conserto de datas da importação não alcança a tela de Negócios
+## 40. ✅ O conserto de datas da importação não alcançava a tela de Negócios
 
-**Gravidade: crítica. Bloqueia a prioridade zero do projeto.**
+**Resolvido no CÓDIGO em 01/09/2026. O DADO já gravado continua errado — ver o fim do item.**
+
+> 🔴 **A previsão se confirmou, e do jeito pior.** Em 01/09/2026 o Lucas importou 2.358
+> negócios pela tela de Negócios e **786 entraram com dia e mês trocados** — exatamente o que
+> este item alertava. Medido em produção no mesmo dia:
+>
+> | grupo | linhas | em meses de set a dez/2026 |
+> |---|---|---|
+> | dia 13 a 31 (o conversor acerta) | 1.572 | **0** |
+> | dia 01 a 12 (o conversor chuta) | 786 | **294** |
+>
+> Zero contra 37,4% no mesmo arquivo. As 294 caíram em datas que ainda não aconteceram.
+>
+> **O conserto (commit deste item):** existe agora **um leitor só**,
+> `lerPlanilhaComoObjetos` em `src/lib/import/ler-planilha.ts`, e as duas telas de importação
+> passaram a usá-lo. Junto vieram três coisas que o conserto de 20/08 não tinha:
+>
+> - **decisão por COLUNA** (`src/lib/import/ordem-de-data.ts`) para o que `cellDates` não
+>   alcança — CSV e data digitada como texto. Uma linha com dia 25 decide a coluna inteira;
+> - **aviso na prévia** quando alguma data de criação cai depois de hoje
+>   (`src/lib/import/conferencia-de-datas.ts`) — o sinal de custo zero que teria pego as 786
+>   linhas no dia;
+> - **guarda estrutural** (`src/test/uma-leitura-de-planilha-so.test.ts`), que falha se
+>   alguém escrever `XLSX.read` fora de `src/lib/import/`. É o que impede este item de
+>   voltar uma terceira vez.
+>
+> Também foram consertados dois defeitos vizinhos, medidos com o SheetJS do projeto: CSV
+> devolvia `2026-08-12` como `8/11/26` (**um dia a menos**) e comia acento (`AÇÃO` →
+> `AÃÃO`); e o serial `"46247"` sem formato virava **o ano 46247**, que o Postgres aceita.
+>
+> ⚠️ **O QUE CONTINUA ABERTO: o dado.** Nada foi escrito no banco — decisão do Lucas em
+> 01/09/2026, de consertar só o código nesta etapa. Seguem errados:
+>
+> - **os 2.358 negócios de 01/09/2026** (2026, ano corrente);
+> - **os 10.427 negócios de 18 e 20/08/2026** (histórico de 2022 a 2025), o item 19.
+>
+> 🔴 **E o reparo NÃO é uma troca cega de dia por mês.** Simulado com `SELECT` em 01/09/2026:
+> das 786 linhas suspeitas do lote novo, **~145 vieram CERTAS da planilha** e estão
+> misturadas às trocadas dentro do mesmo arquivo — a ponta visível são 48 linhas que, ao
+> serem "corrigidas", cairiam no futuro. Desfazer no escuro consertaria ~640 e estragaria
+> ~145. O reparo confiável precisa da planilha de origem.
+>
+> ⚠️ **Reimportar por cima DUPLICA.** `computeRowHash` (`row-hash.ts:22-23`) inclui
+> `data_pedido` e `prazo_resposta` no hash. Com a data lida corretamente o hash muda, a
+> deduplicação não reconhece as linhas antigas, e a base fica com o negócio em dobro — um com
+> a data errada e outro com a certa. Apagar o lote antes é parte do plano, não detalhe.
+>
+> **Contexto que ajuda quem for fazer:** os 2.358 de 01/09 não têm nenhum trabalho por cima
+> (zero itens, zero tarefas, zero interações registradas), só o histórico de etapa que o
+> gatilho cria sozinho.
+
+<details>
+<summary>O diagnóstico original, de 28/08/2026</summary>
 
 O item 3 desta lista está marcado como resolvido em `446779ff`, com validação de 26.181 datas
 reais do Bitrix a 100%. **O conserto é real e está correto — e mora num arquivo que a tela de
@@ -1623,6 +1675,8 @@ Trocar as quatro chamadas por `parseImportFile`. E **refazer a validação das 2
 tela**, não pelo módulo isolado — foi a validação pelo caminho errado que deu o falso "pronto".
 
 ---
+
+</details>
 
 ## 41. Duas funções do banco atravessam a fronteira entre empresas
 

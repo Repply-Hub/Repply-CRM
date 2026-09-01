@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { AlertCircle, ArrowRight, CheckCircle2, EyeOff, FileSpreadsheet, Info, Plus, Search, Sparkles, X, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { diagnosticarDatasDaPlanilha, type OrdemDeData } from '@/lib/import/ordem-de-data';
 
 export type SupabaseFieldType = 'text' | 'cnpj' | 'phone' | 'email' | 'date' | 'number' | 'status';
 
@@ -158,7 +159,18 @@ export function getFieldType(field: FieldDef | string): SupabaseFieldType {
   return 'text';
 }
 
-export function sanitizeFieldValue(value: unknown, type: SupabaseFieldType): string | number | undefined {
+/**
+ * 🔴 O terceiro parâmetro existe por causa de 01/09/2026. Sem ele, esta função decide sozinha
+ * se `12/08/2026` é 12 de agosto ou 8 de dezembro — e decidia errado em toda data cujo dia
+ * real fosse de 1 a 12. Quem chama passando `ordemDeData` já olhou a COLUNA inteira e sabe a
+ * resposta (`src/lib/import/ordem-de-data.ts`). Sem o parâmetro, o comportamento é o de
+ * sempre, para nenhum chamador antigo mudar de significado em silêncio.
+ */
+export function sanitizeFieldValue(
+  value: unknown,
+  type: SupabaseFieldType,
+  opcoes?: { ordemDeData?: OrdemDeData },
+): string | number | undefined {
   if (value === null || value === undefined) return undefined;
   const raw = value instanceof Date ? value.toISOString() : String(value).trim();
   if (!raw) return undefined;
@@ -195,7 +207,12 @@ export function sanitizeFieldValue(value: unknown, type: SupabaseFieldType): str
       if (a > 31 || b > 31 || a === 0 || b === 0) return null;
       if (a > 12) return { day: seg1.padStart(2, '0'), month: seg2.padStart(2, '0') }; // BR: DD/MM
       if (b > 12) return { day: seg2.padStart(2, '0'), month: seg1.padStart(2, '0') }; // US: MM/DD
-      return { day: seg1.padStart(2, '0'), month: seg2.padStart(2, '0') }; // ambíguo → assume BR
+      // 🔴 AMBÍGUO: os dois cabem em mês, e esta célula sozinha não tem como saber. Quem
+      // sabe é a coluna — uma única linha com dia 25 decide as outras todas. Sem essa
+      // informação, mantém o padrão do país, que é o comportamento histórico.
+      return opcoes?.ordemDeData === 'us'
+        ? { day: seg2.padStart(2, '0'), month: seg1.padStart(2, '0') }
+        : { day: seg1.padStart(2, '0'), month: seg2.padStart(2, '0') };
     }
 
     // DD/MM/YYYY ou DD-MM-YYYY (sem hora)
@@ -219,6 +236,21 @@ export function sanitizeFieldValue(value: unknown, type: SupabaseFieldType): str
     if (iso) {
       return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
     }
+    // 🔴 SERIAL DO EXCEL QUE CHEGOU COMO TEXTO. Célula numérica sem formato nenhum vira o
+    // texto "46247" — e `new Date("46247")` é VÁLIDO: devolve o ano 46247, que o Postgres
+    // aceita sem reclamar (o tipo `date` vai até 5874897). Medido com o xlsx do projeto.
+    // A faixa 20000..60000 cobre de 1954 a 2064; fora dela, não é data de negócio nenhum.
+    const soDigitos = /^\d{5}$/.exec(str);
+    if (soDigitos) {
+      const serial = Number(str);
+      if (serial >= 20000 && serial <= 60000) {
+        const epoch = new Date(Date.UTC(1899, 11, 30));
+        epoch.setUTCDate(epoch.getUTCDate() + serial);
+        return epoch.toISOString().slice(0, 10);
+      }
+      return raw;
+    }
+
     const date = new Date(str);
     if (!Number.isNaN(date.getTime())) {
       const year = date.getFullYear();
@@ -247,8 +279,28 @@ export function sanitizeImportedRows(params: {
   fieldDefaultValues?: Record<string, string>;
   fieldLabels?: Record<string, string>;
   existingColumns?: Array<{ id: string; label: string }>;
+  /**
+   * Em que ordem cada COLUNA da planilha escreve as datas, por cabeçalho. Quando não vem,
+   * é calculado aqui a partir do arquivo inteiro.
+   *
+   * 🔴 Existe para a tela poder mandar a escolha do usuário quando a coluna for ambígua
+   * demais para se decidir sozinha — e para a prévia e a gravação usarem sempre a MESMA
+   * ordem. Prévia mostrando uma data e importação gravando outra é pior que o bug original.
+   */
+  ordensDeData?: Record<string, OrdemDeData>;
 }) {
-  const { rawData, fields, mapping, extras = {}, customColumns = {}, fieldDefaultValues = {}, fieldLabels = {}, existingColumns = [] } = params;
+  const { rawData, fields, mapping, extras = {}, customColumns = {}, fieldDefaultValues = {}, fieldLabels = {}, existingColumns = [], ordensDeData } = params;
+
+  // Uma passada pela planilha inteira ANTES de converter qualquer linha: é o que permite uma
+  // linha com dia 25 decidir o formato das outras todas (`src/lib/import/ordem-de-data.ts`).
+  const ordens: Record<string, OrdemDeData> = { ...(() => {
+    const cabecalhos = Array.from(new Set(rawData.flatMap((linha) => Object.keys(linha))));
+    const diagnostico = diagnosticarDatasDaPlanilha(rawData, cabecalhos);
+    const decididas: Record<string, OrdemDeData> = {};
+    Object.entries(diagnostico).forEach(([cabecalho, d]) => { if (d.decidida) decididas[cabecalho] = d.ordem; });
+    return decididas;
+  })(), ...(ordensDeData ?? {}) };
+
   return rawData.map((row) => {
     const payload: Record<string, unknown> = {};
     fields.forEach((field) => {
@@ -258,14 +310,18 @@ export function sanitizeImportedRows(params: {
       const defaultValue = fieldDefaultValues[field.key];
       
       let rawValue: any = undefined;
+      // De qual coluna da planilha este valor saiu — a ordem das datas é decidida por coluna.
+      let cabecalhoUsado: string | undefined;
       
       // Se houver múltiplos cabeçalhos mapeados, unifica-os
       if (headers.length > 0) {
-        const values = headers
-          .map(h => row[h])
-          .filter(v => v !== undefined && v !== null && String(v ?? '').trim() !== '');
+        const pares = headers
+          .map(h => ({ cabecalho: h, valor: row[h] }))
+          .filter(p => p.valor !== undefined && p.valor !== null && String(p.valor ?? '').trim() !== '');
+        const values = pares.map(p => p.valor);
         
         if (values.length > 0) {
+          cabecalhoUsado = pares[0].cabecalho;
           // Para campos de texto, une com vírgula e espaço seguindo a regra:
           // A: 1, B: 2 -> "1, 2"
           // A: empty, B: 2 -> "2"
@@ -282,10 +338,12 @@ export function sanitizeImportedRows(params: {
       // Se não mapeado explicitamente ou não encontrou valor, tenta encontrar por nome customizado (label)
       if ((rawValue === undefined || rawValue === null || rawValue === '') && customLabel && row[customLabel] !== undefined) {
         rawValue = row[customLabel];
+        cabecalhoUsado = customLabel;
       }
       // Se não mapeado nem por label, tenta encontrar pela label padrão
       else if ((rawValue === undefined || rawValue === null || rawValue === '') && field.label && row[field.label] !== undefined) {
         rawValue = row[field.label];
+        cabecalhoUsado = field.label;
       }
       
       // Se ainda não tem valor da planilha, usa o valor padrão se existir
@@ -295,7 +353,9 @@ export function sanitizeImportedRows(params: {
 
       let sanitized: string | number | undefined;
       try {
-        sanitized = sanitizeFieldValue(rawValue, getFieldType(field));
+        sanitized = sanitizeFieldValue(rawValue, getFieldType(field), {
+          ordemDeData: cabecalhoUsado ? ordens[cabecalhoUsado] : undefined,
+        });
       } catch (err) {
         // Marca a linha para tratamento posterior (ex: data inválida); não aborta o loop de linhas.
         if (err instanceof Error) (payload as any).__dateError = err.message;
