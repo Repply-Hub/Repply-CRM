@@ -24,6 +24,11 @@ function resumoMensagem(msg: WaMensagem): string {
   if (msg.tipo === "audio") return "Áudio";
   if (msg.tipo === "documento") return `Documento — ${msg.conteudo}`;
   if (msg.tipo === "sticker") return "Figurinha";
+  if (msg.tipo === "contato") {
+    const itens = msg.contato_payload?.itens ?? [];
+    if (itens.length > 1) return `${itens.length} contatos`;
+    return `Contato — ${itens[0]?.nome ?? msg.conteudo}`;
+  }
   return msg.conteudo;
 }
 

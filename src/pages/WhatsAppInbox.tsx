@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,6 +56,8 @@ import { useTarefasKanbanColunas } from "@/hooks/use-tarefas-kanban-colunas";
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
 import { ChatMessageSearch } from "@/components/chat/ChatMessageSearch";
 import { EncaminharMensagemDialog } from "@/components/chat/EncaminharMensagemDialog";
+import { EnviarContatoDialog } from "@/components/whatsapp/EnviarContatoDialog";
+import { SalvarContatoRecebidoDialog } from "@/components/whatsapp/SalvarContatoRecebidoDialog";
 import { ProjetoSelect } from "@/components/tarefas/ProjetoSelect";
 import { ParticipantesMultiSelect } from "@/components/tarefas/ParticipantesMultiSelect";
 import { MarcadoresMultiSelect } from "@/components/tarefas/MarcadoresMultiSelect";
@@ -198,6 +200,7 @@ import {
   SmilePlus,
   ListTodo,
   StickyNote,
+  Contact,
   MessageSquareText,
   Eye,
   EyeOff,
@@ -261,6 +264,14 @@ function formatPhone(phone: string) {
   return phone;
 }
 
+// Chave tolerante para casar telefones apesar da bagunça do 9º dígito: DDI fora,
+// DDD + os últimos 8 dígitos. Serve só para heurística de UI (mostrar/esconder
+// botão no cartão de contato), não para envio.
+function chaveDeTelefone(telefone: string | null | undefined): string {
+  const d = (telefone ?? "").replace(/\D/g, "").replace(/^55/, "");
+  return d.length >= 10 ? d.slice(0, 2) + d.slice(-8) : d;
+}
+
 const TIPO_MENSAGEM_LABELS: Record<string, string> = {
   texto: "Texto",
   imagem: "Imagem",
@@ -268,6 +279,7 @@ const TIPO_MENSAGEM_LABELS: Record<string, string> = {
   video: "Vídeo",
   documento: "Documento",
   sticker: "Figurinha",
+  contato: "Contato",
 };
 
 // Transcrição pra exportação: mensagem de mídia vira "[Tipo] — legenda" (o
@@ -1691,6 +1703,7 @@ function DraggableBubble({
   onExcluir,
   onEditar,
   onEncaminhar,
+  onCriarTarefa,
   children,
 }: {
   msg: WaMensagem;
@@ -1700,6 +1713,9 @@ function DraggableBubble({
   onExcluir: (msg: WaMensagem) => void;
   onEditar: (msg: WaMensagem) => void;
   onEncaminhar: (msg: WaMensagem) => void;
+  // Só é passada quando a empresa tem a seção "Tarefas" ligada — sem ela, o
+  // item "Criar tarefa" nem aparece no menu da bolha.
+  onCriarTarefa?: (msg: WaMensagem) => void;
   children: React.ReactNode;
 }) {
   const [dragX, setDragX] = useState(0);
@@ -1826,6 +1842,12 @@ function DraggableBubble({
                   Encaminhar
                 </DropdownMenuItem>
               )}
+              {onCriarTarefa && !msg.is_nota_interna && (
+                <DropdownMenuItem onClick={() => onCriarTarefa(msg)}>
+                  <ListTodo className="h-3.5 w-3.5 mr-2" />
+                  Criar tarefa
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={() => onExcluir(msg)}
@@ -1841,6 +1863,106 @@ function DraggableBubble({
   );
 }
 
+// Cartão de contato (vCard) enviado/recebido no chat. Layout inspirado no
+// cartão nativo do WhatsApp: nome, telefone e as ações que fazem sentido dentro
+// do CRM — abrir a ficha do contato (quando o número já é um contato
+// cadastrado), abrir a conversa daquele número e salvar em Contatos.
+function ContatoCard({
+  nome,
+  telefone,
+  isSaida,
+  onAbrir,
+  onConversar,
+  onSalvar,
+}: {
+  nome: string;
+  telefone: string;
+  isSaida: boolean;
+  /** Quando definido, o cabeçalho do cartão vira um botão que abre a ficha do contato. */
+  onAbrir?: () => void;
+  /** undefined esconde o botão "Abrir conversa" (não há conversa com esse número). */
+  onConversar?: () => void;
+  /** undefined esconde "Salvar em Contatos" (número já é um contato). */
+  onSalvar?: () => void;
+}) {
+  const inicial = (nome || "?").trim().charAt(0).toUpperCase();
+  const cabecalho = (
+    <>
+      <div
+        className={cn(
+          "h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold",
+          isSaida ? "bg-white/20 text-white" : "bg-primary/10 text-primary",
+        )}
+      >
+        {inicial}
+      </div>
+      <div className="min-w-0 text-left">
+        <p className={cn("text-sm font-medium truncate", isSaida ? "text-white" : "text-foreground")}>
+          {nome || "Contato"}
+        </p>
+        <p className={cn("text-xs truncate", isSaida ? "text-white/80" : "text-muted-foreground")}>
+          {formatPhone(telefone)}
+        </p>
+      </div>
+    </>
+  );
+  return (
+    <div className="min-w-[210px] max-w-[260px]">
+      {onAbrir ? (
+        <button
+          type="button"
+          onClick={onAbrir}
+          title="Abrir a ficha deste contato"
+          className={cn(
+            "flex w-full items-center gap-2.5 rounded-md -m-1 p-1 transition-colors",
+            isSaida ? "hover:bg-white/10" : "hover:bg-primary/5",
+          )}
+        >
+          {cabecalho}
+        </button>
+      ) : (
+        <div className="flex items-center gap-2.5">{cabecalho}</div>
+      )}
+      {(onConversar || onSalvar) && (
+        <div
+          className={cn(
+            "mt-2 flex flex-wrap gap-1.5 border-t pt-2",
+            isSaida ? "border-white/20" : "border-border",
+          )}
+        >
+          {onConversar && (
+            <button
+              type="button"
+              onClick={onConversar}
+              className={cn(
+                "text-xs font-medium hover:underline",
+                isSaida ? "text-white" : "text-primary",
+              )}
+            >
+              Abrir conversa
+            </button>
+          )}
+          {onConversar && onSalvar && (
+            <span className={isSaida ? "text-white/40" : "text-muted-foreground"}>·</span>
+          )}
+          {onSalvar && (
+            <button
+              type="button"
+              onClick={onSalvar}
+              className={cn(
+                "text-xs font-medium hover:underline",
+                isSaida ? "text-white" : "text-primary",
+              )}
+            >
+              Salvar em Contatos
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MessageContent({
   msg,
   isSaida,
@@ -1848,6 +1970,10 @@ function MessageContent({
   onPreviewFile,
   conversaAtiva,
   enderecoDe,
+  resolverCartaoContato,
+  onAbrirConversa,
+  onAbrirContato,
+  onSalvarContatoRecebido,
 }: {
   msg: WaMensagem;
   isSaida: boolean;
@@ -1856,6 +1982,18 @@ function MessageContent({
   conversaAtiva: WaConversa;
   /** Traduz o endereço gravado no endereço a usar. Ver `use-arquivo-privado`. */
   enderecoDe: (url: string | null | undefined) => string | null;
+  /** Cartão de contato: dado um telefone, resolve conversa e contato cadastrado daquele número. */
+  resolverCartaoContato?: (telefone: string) => {
+    conversaId: string | null;
+    contatoId: string | null;
+    contatoNome: string | null;
+  };
+  /** Cartão de contato: abre a conversa de id informado. */
+  onAbrirConversa?: (conversaId: string) => void;
+  /** Cartão de contato: abre a ficha do contato cadastrado. */
+  onAbrirContato?: (contatoId: string, nome: string) => void;
+  /** Cartão de contato: abre "Salvar em Contatos" com nome/telefone prontos. */
+  onSalvarContatoRecebido?: (dados: { nome: string; telefone: string }) => void;
 }) {
   const textCls = isSaida ? "text-white" : "text-foreground";
 
@@ -1880,6 +2018,48 @@ function MessageContent({
         <EyeOff className="h-3.5 w-3.5 shrink-0" />
         Esta mensagem foi apagada
       </p>
+    );
+  }
+
+  if (msg.tipo === "contato") {
+    const itens = msg.contato_payload?.itens ?? [];
+    if (itens.length === 0) {
+      return (
+        <p className={cn("text-sm flex items-center gap-1.5", textCls)}>
+          <Contact className="h-4 w-4 shrink-0 opacity-70" />
+          {msg.conteudo || "Contato"}
+        </p>
+      );
+    }
+    return (
+      <div className="flex flex-col gap-2 py-0.5">
+        {itens.map((it, i) => {
+          const info = it.telefone ? resolverCartaoContato?.(it.telefone) : undefined;
+          return (
+            <ContatoCard
+              key={i}
+              nome={info?.contatoNome || it.nome}
+              telefone={it.telefone}
+              isSaida={isSaida}
+              onAbrir={
+                info?.contatoId
+                  ? () => onAbrirContato?.(info.contatoId as string, info.contatoNome || it.nome)
+                  : undefined
+              }
+              onConversar={
+                info?.conversaId
+                  ? () => onAbrirConversa?.(info.conversaId as string)
+                  : undefined
+              }
+              onSalvar={
+                it.telefone && info && !info.contatoId
+                  ? () => onSalvarContatoRecebido?.({ nome: it.nome, telefone: it.telefone })
+                  : undefined
+              }
+            />
+          );
+        })}
+      </div>
     );
   }
 
@@ -4038,11 +4218,24 @@ export default function WhatsAppInbox() {
     pedido_id: "",
   });
 
-  function abrirNovaTarefa() {
+  // `msgOrigem` vem preenchida quando a tarefa nasce de uma mensagem específica
+  // (menu da bolha ou botão "Criar tarefa" ao citar): a descrição já entra com o
+  // texto que o cliente mandou, junto de quem enviou e quando.
+  function abrirNovaTarefa(msgOrigem?: WaMensagem) {
     if (!conversaAtiva) return;
+    let descricao = "";
+    if (msgOrigem) {
+      const quem = quotedNomeFor(msgOrigem) ?? "Contato";
+      const quando = format(
+        new Date(msgOrigem.created_at),
+        "dd/MM/yyyy HH:mm",
+      );
+      const corpo = (msgOrigem.conteudo ?? "").trim() || `[${msgOrigem.tipo}]`;
+      descricao = `Mensagem de ${quem} (${quando}):\n"${corpo}"`;
+    }
     setTarefaForm({
       titulo: "",
-      descricao: "",
+      descricao,
       status: KANBAN_STAGES_TAREFAS[0]?.key || "pendente",
       prazo_final: "",
       responsavel: "",
@@ -4072,6 +4265,13 @@ export default function WhatsAppInbox() {
           : null,
       });
       toast.success("Tarefa criada");
+      // Deixa rastro no fio da conversa — a mesma "nota de sistema" (cinza) de
+      // "assumiu esta conversa". Começa com o nome de quem criou de propósito:
+      // é assim que a UI diferencia nota de sistema de nota digitada à mão.
+      addNota.mutate({
+        conversaId: conversaAtiva.id,
+        texto: `${profile?.nome ?? "Alguém"} criou a tarefa "${tarefaForm.titulo.trim()}"`,
+      });
       setNovaTarefaOpen(false);
     } catch (err: any) {
       toast.error(err?.message || "Erro ao criar tarefa");
@@ -4082,6 +4282,13 @@ export default function WhatsAppInbox() {
   const [notaTexto, setNotaTexto] = useState("");
   const [notaFixada, setNotaFixada] = useState(false);
   const setNotaFixadaMutation = useWaSetNotaFixada();
+
+  // --- Enviar contato (cartão vCard) ---
+  const [enviarContatoOpen, setEnviarContatoOpen] = useState(false);
+  // Aberto pelo botão "Salvar em Contatos" dentro de um cartão de contato recebido.
+  const [salvarContatoRecebido, setSalvarContatoRecebido] = useState<
+    { nome: string; telefone: string } | null
+  >(null);
 
   async function salvarNotaManual() {
     if (!conversaAtiva || !notaTexto.trim()) {
@@ -4126,6 +4333,47 @@ export default function WhatsAppInbox() {
   // meio segundo antes de a primeira imagem aparecer.
   const { enderecoDe: enderecoDaMidia } = useArquivosPrivados(
     mensagens.map((m) => m.media_url),
+  );
+
+  // --- Cartão de contato: resolver "abrir conversa" e "já é contato?" ---
+  // A busca dos telefones dos contatos só dispara quando a conversa aberta
+  // realmente tem um cartão de contato — não é custo de toda entrada na inbox.
+  const temCartaoDeContato = useMemo(
+    () => mensagens.some((m) => m.tipo === "contato"),
+    [mensagens],
+  );
+  const { data: contatosPorTelefone } = useQuery({
+    queryKey: ["contatos-telefones-para-cartao"],
+    enabled: temCartaoDeContato,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contatos")
+        .select("id, nome_contato, telefone")
+        .not("telefone", "is", null);
+      if (error) throw error;
+      const map = new Map<string, { id: string; nome: string }>();
+      for (const c of data ?? []) {
+        const k = chaveDeTelefone(c.telefone);
+        if (k && !map.has(k)) map.set(k, { id: c.id, nome: c.nome_contato ?? "" });
+      }
+      return map;
+    },
+  });
+  const resolverCartaoContato = useCallback(
+    (telefone: string) => {
+      const chave = chaveDeTelefone(telefone);
+      const conversa = chave
+        ? conversas.find((c) => chaveDeTelefone(c.telefone) === chave)
+        : undefined;
+      const contato = chave ? contatosPorTelefone?.get(chave) : undefined;
+      return {
+        conversaId: conversa?.id ?? null,
+        contatoId: contato?.id ?? null,
+        contatoNome: contato?.nome ?? null,
+      };
+    },
+    [conversas, contatosPorTelefone],
   );
   // Lookup de wamid -> id da mensagem, usado para rolar até a mensagem original ao
   // clicar em uma citação (reply).
@@ -8015,6 +8263,11 @@ export default function WhatsAppInbox() {
                                         onExcluir={setMsgParaApagar}
                                         onEditar={handleIniciarEdicao}
                                         onEncaminhar={setMsgParaEncaminhar}
+                                        onCriarTarefa={
+                                          temTarefasSecao === true
+                                            ? abrirNovaTarefa
+                                            : undefined
+                                        }
                                       >
                                         <div
                                           className={cn(
@@ -8119,6 +8372,16 @@ export default function WhatsAppInbox() {
                                             onPreviewFile={setPreviewFile}
                                             conversaAtiva={conversaAtiva}
                                             enderecoDe={enderecoDaMidia}
+                                            resolverCartaoContato={resolverCartaoContato}
+                                            onAbrirConversa={setConversaAtivaId}
+                                            onAbrirContato={(id, nome) =>
+                                              navigate(
+                                                `/contatos/${slugify(nome || "contato")}-${id}`,
+                                              )
+                                            }
+                                            onSalvarContatoRecebido={
+                                              setSalvarContatoRecebido
+                                            }
                                           />
                                           <ReactionBadge
                                             reacoes={msg.reacoes ?? []}
@@ -8285,14 +8548,27 @@ export default function WhatsAppInbox() {
 
                   {/* Preview da mensagem em resposta — clicar rola até a mensagem original */}
                   {respondendoA && !msgEmEdicao && (
-                    <div className="max-w-sm">
-                      <QuotedPreview
-                        remetenteNome={quotedNomeFor(respondendoA)}
-                        conteudo={respondendoA.conteudo}
-                        tipo={respondendoA.tipo}
-                        onClick={() => irParaMensagem(respondendoA.id)}
-                        onCancel={() => setRespondendoA(null)}
-                      />
+                    <div className="flex items-center gap-2">
+                      <div className="max-w-sm min-w-0 flex-1">
+                        <QuotedPreview
+                          remetenteNome={quotedNomeFor(respondendoA)}
+                          conteudo={respondendoA.conteudo}
+                          tipo={respondendoA.tipo}
+                          onClick={() => irParaMensagem(respondendoA.id)}
+                          onCancel={() => setRespondendoA(null)}
+                        />
+                      </div>
+                      {temTarefasSecao === true && (
+                        <button
+                          type="button"
+                          onClick={() => abrirNovaTarefa(respondendoA)}
+                          title="Abre o formulário de tarefa já com o texto desta mensagem na descrição"
+                          className="mb-1.5 shrink-0 inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                        >
+                          <ListTodo className="h-3.5 w-3.5 text-primary" />
+                          Criar tarefa
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -8412,7 +8688,7 @@ export default function WhatsAppInbox() {
                             nota", que é do WhatsApp e não tem relação com Tarefas — menu
                             com um item só funciona normalmente. */}
                         {temTarefasSecao === true && (
-                          <DropdownMenuItem onClick={abrirNovaTarefa}>
+                          <DropdownMenuItem onClick={() => abrirNovaTarefa()}>
                             <ListTodo className="h-4 w-4 mr-2" />
                             Nova tarefa
                           </DropdownMenuItem>
@@ -8420,6 +8696,13 @@ export default function WhatsAppInbox() {
                         <DropdownMenuItem onClick={() => setNovaNotaOpen(true)}>
                           <StickyNote className="h-4 w-4 mr-2" />
                           Adicionar nota
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setEnviarContatoOpen(true)}
+                          disabled={conversaAtiva?.is_group}
+                        >
+                          <Contact className="h-4 w-4 mr-2" />
+                          Enviar contato
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -8531,6 +8814,21 @@ export default function WhatsAppInbox() {
         conversas={conversas}
         conversaAtualId={conversaAtivaId}
         onClose={() => setMsgParaEncaminhar(null)}
+      />
+
+      <EnviarContatoDialog
+        open={enviarContatoOpen}
+        onClose={() => setEnviarContatoOpen(false)}
+        conversaAtiva={
+          conversaAtiva
+            ? { id: conversaAtiva.id, telefone: conversaAtiva.telefone }
+            : null
+        }
+      />
+
+      <SalvarContatoRecebidoDialog
+        dados={salvarContatoRecebido}
+        onClose={() => setSalvarContatoRecebido(null)}
       />
 
       <Dialog

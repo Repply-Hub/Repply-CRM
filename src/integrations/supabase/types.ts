@@ -4039,6 +4039,7 @@ export type Database = {
       whatsapp_mensagens: {
         Row: {
           apagada_para_todos: boolean
+          contato_payload: Json | null
           conteudo: string
           conteudo_original: string | null
           conversa_id: string
@@ -4067,6 +4068,7 @@ export type Database = {
         }
         Insert: {
           apagada_para_todos?: boolean
+          contato_payload?: Json | null
           conteudo: string
           conteudo_original?: string | null
           conversa_id: string
@@ -4095,6 +4097,7 @@ export type Database = {
         }
         Update: {
           apagada_para_todos?: boolean
+          contato_payload?: Json | null
           conteudo?: string
           conteudo_original?: string | null
           conversa_id?: string

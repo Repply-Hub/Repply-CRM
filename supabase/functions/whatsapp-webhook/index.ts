@@ -10,6 +10,25 @@ const corsHeaders = {
 
 type ClienteDeBanco = ReturnType<typeof createClient>;
 
+type ContatoVcard = { nome: string; telefone: string };
+
+/**
+ * Extrai nome + telefone de um vCard recebido no WhatsApp. Só o essencial:
+ * `FN` (nome de exibição) e a primeira linha `TEL` — priorizando o `waid=`
+ * (o JID que o WhatsApp embute), com fallback para os dígitos do valor.
+ * Devolve null quando não dá pra tirar um telefone.
+ */
+function parseVcard(vcard: string): ContatoVcard | null {
+  if (typeof vcard !== "string" || !vcard) return null;
+  const fn = /(?:^|\n)FN[^:\n]*:(.+)/i.exec(vcard)?.[1]?.trim();
+  const telLineMatch = /(?:^|\n)(TEL[^:\n]*:.+)/i.exec(vcard)?.[1] ?? "";
+  const waid = /waid=(\d{8,})/i.exec(telLineMatch)?.[1];
+  const telValor = telLineMatch.split(":").slice(1).join(":").trim();
+  const telefone = (waid ?? telValor.replace(/\D/g, "")) || "";
+  if (!telefone) return null;
+  return { nome: fn || "Contato", telefone };
+}
+
 /**
  * Comparação de tempo constante: sair no primeiro byte diferente vaza o segredo,
  * um byte por tentativa, para quem consegue medir o tempo de resposta.
@@ -816,6 +835,8 @@ async function handleIncomingMessage(
 
   let conteudo: string = msg.text || content?.caption || msg.caption || "";
   let tipo = "texto";
+  // Preenchido só quando tipo vira "contato" (cartão vCard recebido).
+  let contatoPayload: { itens: ContatoVcard[] } | null = null;
 
   const anyMediaUrl = (): string | null =>
     content?.URL ??
@@ -861,6 +882,38 @@ async function handleIncomingMessage(
     tipo = "sticker";
     mediaUrl = anyMediaUrl();
     conteudo = "[Sticker]";
+  } else if (
+    msgType.includes("contact") ||
+    msgType.includes("vcard") ||
+    content?.vcard ||
+    content?.vCard ||
+    Array.isArray(content?.contacts) ||
+    content?.displayName
+  ) {
+    // Cartão de contato (vCard) recebido. A uazapi (Baileys) entrega isso como
+    // `contactMessage { displayName, vcard }` ou `contactsArrayMessage
+    // { contacts: [{ vcard }] }`. Guardamos nome + telefone já extraídos em
+    // contato_payload para a tela desenhar o cartão sem reparsear vCard.
+    tipo = "contato";
+    const brutos: string[] = [];
+    if (typeof content?.vcard === "string") brutos.push(content.vcard);
+    if (typeof content?.vCard === "string") brutos.push(content.vCard);
+    if (typeof msg.vcard === "string") brutos.push(msg.vcard);
+    for (const c of Array.isArray(content?.contacts) ? content.contacts : []) {
+      if (typeof c?.vcard === "string") brutos.push(c.vcard);
+    }
+    const itens = brutos.map(parseVcard).filter((x): x is ContatoVcard => !!x);
+    if (itens.length === 0 && content?.displayName) {
+      itens.push({ nome: String(content.displayName), telefone: "" });
+    }
+    if (itens.length > 0) {
+      contatoPayload = { itens };
+      conteudo = itens.length === 1
+        ? (itens[0].nome || "[Contato]")
+        : `${itens.length} contatos`;
+    } else {
+      conteudo = "[Contato]";
+    }
   }
 
   // Fallback: detecta pelo mimetype
@@ -961,7 +1014,7 @@ async function handleIncomingMessage(
   const mediaKey: string | null =
     content?.mediaKey ?? content?.MediaKey ?? msg.mediaKey ?? null;
 
-  if (tipo !== "texto" && wamid) {
+  if (tipo !== "texto" && tipo !== "contato" && wamid) {
     const storedUrl = await downloadAndStoreMedia(
       supabase,
       config,
@@ -1158,6 +1211,7 @@ async function handleIncomingMessage(
   if (wamid) insertData.wamid = wamid;
   if (mediaUrl) insertData.media_url = mediaUrl;
   if (mediaMime) insertData.media_mime = mediaMime;
+  if (contatoPayload) insertData.contato_payload = contatoPayload;
   if (remetenteNome) insertData.remetente_nome = remetenteNome;
   if (remetenteTelefone) insertData.remetente_telefone = remetenteTelefone;
   if (quotedWamid) insertData.quoted_wamid = quotedWamid;

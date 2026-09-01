@@ -139,6 +139,10 @@ export interface WaMensagem {
   // Reações (emoji) à mensagem — um item por "autor" (telefone do contato, ou o
   // literal "eu" para reações da própria instância).
   reacoes?: WaReacao[];
+  // Cartão de contato (tipo === 'contato'): nome + telefone das pessoas
+  // compartilhadas. Preenchido no envio (whatsapp-send) e no recebimento
+  // (whatsapp-webhook, lendo o vCard).
+  contato_payload?: { itens: { nome: string; telefone: string }[] } | null;
   // Mensagem excluída via edge function whatsapp-delete-message: reflete no
   // WhatsApp real (POST /message/delete da uazapi, que só tem esse modo — sempre
   // "para todos", não existe apagar só localmente sem afetar o outro lado) e some
@@ -1045,7 +1049,12 @@ export function useWaEncaminharMensagem() {
       const ehMidia = !!m.media_url && m.tipo !== 'texto';
       const legenda = m.conteudo && !PLACEHOLDERS_MIDIA.has(m.conteudo) ? m.conteudo : '';
 
-      const corpoBase: Record<string, unknown> = ehMidia
+      // Cartão de contato: reenvia como cartão (um por vez), não como texto.
+      const itensContato = m.tipo === 'contato' ? (m.contato_payload?.itens ?? []) : [];
+
+      const corpoBase: Record<string, unknown> = itensContato.length > 0
+        ? { tipo: 'contato' }
+        : ehMidia
         ? {
             tipo: m.tipo,
             media_url: m.media_url,
@@ -1060,16 +1069,28 @@ export function useWaEncaminharMensagem() {
           }
         : { tipo: 'texto', mensagem: comMarcadorEncaminhada(m.conteudo) };
 
+      // Uma mensagem normal = um envio por destino; um cartão de contato com N
+      // pessoas = N envios por destino (a uazapi manda um vCard por chamada).
+      const corpos: Record<string, unknown>[] = itensContato.length > 0
+        ? itensContato.map((it) => ({
+            tipo: 'contato',
+            contato_nome: it.nome,
+            contato_telefone: it.telefone,
+          }))
+        : [corpoBase];
+
       const falhas: string[] = [];
       let ok = 0;
       for (const destino of params.destinos) {
         try {
-          const res = await supabase.functions.invoke('whatsapp-send', {
-            body: { ...corpoBase, telefone: destino.telefone, conversa_id: destino.id },
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          });
-          if (res.error) throw await erroLegivelDaFunction(res.error, 'Falha ao encaminhar');
-          if (res.data?.error) throw new Error(res.data.error);
+          for (const corpo of corpos) {
+            const res = await supabase.functions.invoke('whatsapp-send', {
+              body: { ...corpo, telefone: destino.telefone, conversa_id: destino.id },
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+            if (res.error) throw await erroLegivelDaFunction(res.error, 'Falha ao encaminhar');
+            if (res.data?.error) throw new Error(res.data.error);
+          }
           ok += 1;
         } catch (e) {
           falhas.push(e instanceof Error ? e.message : 'erro desconhecido');
@@ -1098,6 +1119,65 @@ export function useWaEncaminharMensagem() {
 
     onError: (err: Error) => {
       toast.error(err?.message ?? 'Erro ao encaminhar mensagem');
+    },
+  });
+}
+
+// --- Enviar cartão(ões) de contato para a conversa aberta ---
+// Um cartão por chamada à whatsapp-send (a uazapi manda um vCard por vez);
+// sequencial, com pausa curta entre eles, igual ao encaminhar.
+export function useWaEnviarContatos() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      conversa: { id: string; telefone: string };
+      contatos: { nome: string; telefone: string }[];
+    }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Sessão expirada');
+      const contatos = params.contatos.filter((c) => c.nome?.trim() && c.telefone?.trim());
+      if (contatos.length === 0) throw new Error('Escolha ao menos um contato com telefone.');
+
+      const falhas: string[] = [];
+      let ok = 0;
+      for (const c of contatos) {
+        try {
+          const res = await supabase.functions.invoke('whatsapp-send', {
+            body: {
+              tipo: 'contato',
+              telefone: params.conversa.telefone,
+              conversa_id: params.conversa.id,
+              contato_nome: c.nome.trim(),
+              contato_telefone: c.telefone.trim(),
+            },
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          if (res.error) throw await erroLegivelDaFunction(res.error, 'Falha ao enviar contato');
+          if (res.data?.error) throw new Error(res.data.error);
+          ok += 1;
+        } catch (e) {
+          falhas.push(e instanceof Error ? e.message : 'erro desconhecido');
+        }
+        if (contatos.length > 1) await new Promise((r) => setTimeout(r, 400));
+      }
+      return { ok, falhas, total: contatos.length };
+    },
+
+    onSuccess: (r, vars) => {
+      qc.invalidateQueries({ queryKey: ['wa_conversas'] });
+      qc.invalidateQueries({ queryKey: ['wa_mensagens', vars.conversa.id] });
+      if (r.falhas.length === 0) {
+        toast.success(r.total === 1 ? 'Contato enviado' : `${r.ok} contatos enviados`);
+      } else if (r.ok === 0) {
+        toast.error(`Não foi possível enviar: ${r.falhas[0]}`);
+      } else {
+        toast.warning(`${r.ok} de ${r.total} enviados. ${r.falhas.length} falhou.`);
+      }
+    },
+
+    onError: (err: Error) => {
+      toast.error(err?.message ?? 'Erro ao enviar contato');
     },
   });
 }
@@ -1589,7 +1669,7 @@ export function useWaAddNota() {
         .select()
         .single();
       if (error) throw error;
-      return data as WaMensagem;
+      return data as unknown as WaMensagem;
     },
     // O `.insert().select()` devolve só as colunas de `whatsapp_mensagens`,
     // sem o join `usuario:usuarios(...)` do MENSAGEM_SELECT (ver
@@ -1623,7 +1703,7 @@ export function useWaSetNotaFixada() {
         .select()
         .single();
       if (error) throw error;
-      return data as WaMensagem;
+      return data as unknown as WaMensagem;
     },
     onSuccess: (nota) => {
       qc.setQueryData<WaMensagem[]>(['wa_mensagens', nota.conversa_id], (old) =>

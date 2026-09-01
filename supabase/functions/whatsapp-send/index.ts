@@ -13,6 +13,7 @@ const PLACEHOLDER: Record<string, string> = {
   audio: '[Áudio]',
   video: '[Vídeo]',
   documento: '[Documento]',
+  contato: '[Contato]',
 };
 
 // Prefixa a mensagem enviada ao WhatsApp com "*Nome*" para que quem recebe saiba
@@ -178,6 +179,9 @@ serve(async (req) => {
     const {
       telefone, mensagem, conversa_id, tipo = 'texto', media_url, media_mime, nome_arquivo, ptt = false,
       mentions, quoted_wamid, quoted_conteudo, quoted_tipo, quoted_remetente_nome,
+      // Cartão de contato (tipo='contato'): um contato por chamada — o frontend
+      // repete o envio para cada contato selecionado.
+      contato_nome, contato_telefone,
     } = body;
 
     if (!telefone) {
@@ -308,7 +312,28 @@ serve(async (req) => {
     // O corpo do envio SEM o `number` — ele entra por tentativa em enviarUmaVez.
     let wapiOptions: Record<string, unknown>;
 
-    if (tipo === 'texto' || !media_url) {
+    if (tipo === 'contato') {
+      // --- Cartão de contato (vCard): POST /send/contact ---
+      // A uazapi monta o vCard a partir de fullName + phoneNumber; um contato
+      // por requisição. phoneNumber vai normalizado (só dígitos, com DDI) pela
+      // MESMA regra do número de destino — inclusive o 9º dígito (ver _shared).
+      const nomeContato = (contato_nome ?? '').trim();
+      const foneContato = normalizeWhatsappPhone(contato_telefone ?? '');
+      if (!nomeContato || foneContato.replace(/\D/g, '').length < 12) {
+        return await recusar(
+          supabase, "contato_invalido",
+          "Escolha um contato com nome e telefone válidos.", 400,
+          { contato_nome, contato_telefone },
+        );
+      }
+      wapiUrl = `${baseUrl}/send/contact`;
+      wapiOptions = {
+        instanceName: uazapiInstance,
+        fullName: nomeContato,
+        phoneNumber: foneContato,
+        ...(quoted_wamid ? { replyid: rawMessageId(quoted_wamid) } : {}),
+      };
+    } else if (tipo === 'texto' || !media_url) {
       // --- Texto ---
       if (!mensagem) {
         return await recusar(supabase, "mensagem_vazia", "Escreva uma mensagem antes de enviar.", 400, { tipo });
@@ -547,7 +572,10 @@ serve(async (req) => {
     // nome_arquivo só deve virar legenda visível para documentos; pra imagem/áudio/
     // vídeo isso vazaria o nome do arquivo (ex: "imagem-colada-...png") como se fosse
     // texto digitado pelo usuário.
-    const conteudo = mensagem || (tipo === 'documento' ? nome_arquivo : null) || PLACEHOLDER[tipo] || '[mensagem]';
+    const conteudo = mensagem
+      || (tipo === 'documento' ? nome_arquivo : null)
+      || (tipo === 'contato' ? (contato_nome ?? '').trim() : null)
+      || PLACEHOLDER[tipo] || '[mensagem]';
     const now = new Date().toISOString();
 
     // Garante conversa e grava mensagem — operações em paralelo quando possível
@@ -571,6 +599,11 @@ serve(async (req) => {
       };
       if (media_url) insertData.media_url = media_url;
       if (media_mime) insertData.media_mime = media_mime;
+      if (tipo === 'contato' && contato_nome && contato_telefone) {
+        insertData.contato_payload = {
+          itens: [{ nome: (contato_nome ?? '').trim(), telefone: normalizeWhatsappPhone(contato_telefone ?? '') }],
+        };
+      }
       if (quoted_wamid) insertData.quoted_wamid = quoted_wamid;
       if (quoted_conteudo) insertData.quoted_conteudo = quoted_conteudo;
       if (quoted_tipo) insertData.quoted_tipo = quoted_tipo;
