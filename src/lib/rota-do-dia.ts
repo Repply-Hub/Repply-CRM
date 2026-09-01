@@ -57,6 +57,15 @@ export interface VisitaParaRota {
    * no campo, que é a única parte da exclusão que apaga TRABALHO e não só agendamento.
    */
   visitaRealizada?: boolean;
+  /**
+   * A anotação escrita NO CAMPO depois da visita ("cliente pediu orçamento de porcelanato").
+   *
+   * 🔴 Chega até aqui para a EDIÇÃO poder comparar. Sem ela, a tela de editar rota não sabe o
+   * que já está gravado, e qualquer comparação trataria "não mexi nisso" como "apague" — o que
+   * manteve a chave "Essas visitas já aconteceram" desligada até 31/08/2026. É a única coisa
+   * numa parada que é TRABALHO e não agendamento.
+   */
+  visitaObservacao?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   /**

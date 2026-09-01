@@ -137,6 +137,8 @@ export function VisitasObrasPainel({
         inicio: new Date(v.inicio),
         criadoPor: v.criadoPor,
         visitaRealizada: v.visitaRealizada,
+        // Vai junto para a edição saber o que já está escrito e não passar por cima.
+        visitaObservacao: v.visitaObservacao,
         latitude: v.latitude,
         longitude: v.longitude,
         // A identidade e o título da rota. Nulos nas paradas antigas — nesse caso o

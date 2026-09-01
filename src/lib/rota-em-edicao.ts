@@ -50,11 +50,34 @@ export interface ParadaEditada {
   obraId: string;
   /** "09:00" */
   horario: string;
+  /**
+   * O registro de campo, quando a pessoa mexeu nele nesta edição.
+   *
+   * 🔴 AUSENTE (`undefined`) SIGNIFICA "NÃO MEXA", NUNCA "APAGUE". É este contrato que deixa
+   * alguém corrigir o horário de uma parada sem passar por cima da anotação escrita em OUTRA —
+   * a proteção que o cabeçalho de `useEditarRotaDeVisita` descreve.
+   *
+   * `null` e `undefined` são coisas DIFERENTES aqui: `null` é apagar de propósito.
+   */
+  visitaRealizada?: boolean;
+  visitaObservacao?: string | null;
 }
 
 export interface DiferencaDaRota {
-  /** Paradas que continuam, com o que mudou nelas. */
-  alterar: Array<{ grupoId: string; inicio: Date; fim: Date }>;
+  /**
+   * Paradas que continuam, com o que mudou nelas.
+   *
+   * 🔴 `visitaRealizada` e `visitaObservacao` só APARECEM quando mudaram. Quem grava precisa
+   * mandar ao banco exatamente as chaves presentes: escrever as ausentes como `false`/`null`
+   * apagaria a anotação de campo de paradas que ninguém tocou.
+   */
+  alterar: Array<{
+    grupoId: string;
+    inicio: Date;
+    fim: Date;
+    visitaRealizada?: boolean;
+    visitaObservacao?: string | null;
+  }>;
   /** Paradas que saíram da rota: apagar TODAS as cópias destes grupos. */
   remover: string[];
   /** Paradas novas. */
@@ -211,8 +234,30 @@ export function diferencaDaRota(
     // ela tira a parada e põe outra, que aí vira remover + inserir. O teste
     // "trocar a obra de uma parada gravada não vira alteração" fixa este comportamento para
     // que a decisão apareça quando alguém for mudá-la.
-    if (instanteMudou(gravada.inicio, instante)) {
-      alterar.push({ grupoId, inicio: instante, fim });
+    // O registro de campo (realizada / observação) só entra quando a pessoa MUDOU alguma coisa
+    // nele nesta edição. As chaves são acrescentadas uma a uma, e não com um objeto de valores
+    // `undefined`, porque quem grava monta o UPDATE a partir das chaves PRESENTES — um
+    // `visitaObservacao: undefined` viajando junto viraria "apague a observação".
+    const registro: { visitaRealizada?: boolean; visitaObservacao?: string | null } = {};
+    if (
+      parada.visitaRealizada !== undefined &&
+      parada.visitaRealizada !== gravada.visitaRealizada
+    ) {
+      registro.visitaRealizada = parada.visitaRealizada;
+    }
+    if (
+      parada.visitaObservacao !== undefined &&
+      // `null` e `''` significam a mesma coisa no banco (a coluna guarda nulo), então
+      // comparar sem normalizar faria a tela mandar UPDATE toda vez que alguém abrisse e
+      // fechasse a edição de uma parada sem anotação.
+      (parada.visitaObservacao || null) !== (gravada.visitaObservacao || null)
+    ) {
+      registro.visitaObservacao = parada.visitaObservacao;
+    }
+    const registroMudou = Object.keys(registro).length > 0;
+
+    if (instanteMudou(gravada.inicio, instante) || registroMudou) {
+      alterar.push({ grupoId, inicio: instante, fim, ...registro });
     }
   }
 

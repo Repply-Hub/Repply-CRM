@@ -615,3 +615,148 @@ describe('diferencaDaRota — guardas que a mutação pegou soltas', () => {
     expect(comSegundos.remover).toEqual([]);
   });
 });
+
+/**
+ * O REGISTRO DE CAMPO NA EDIÇÃO
+ *
+ * A chave "Essas visitas já aconteceram" existia na tela de editar rota e não fazia nada: quem
+ * ligasse e escrevesse o que viu na obra perdia o texto ao salvar, sem aviso nenhum. Relatado
+ * pelo Lucas em 31/08/2026, que decidiu fazê-la funcionar em vez de escondê-la.
+ *
+ * 🔴 O CONTRATO QUE PROTEGE O QUE JÁ ESTÁ ESCRITO: campo AUSENTE (`undefined`) significa "não
+ * mexa", nunca "apague". É o que permite editar o horário de uma parada sem tocar na anotação
+ * de campo de outra — a proteção que o cabeçalho de `useEditarRotaDeVisita` descreve e que este
+ * bloco não pode desfazer. `null` e `''` são coisa diferente: são apagar de propósito.
+ */
+describe('diferencaDaRota — registro de campo (realizada e observação)', () => {
+  it('marcar uma parada como realizada entra em alterar, mesmo sem mexer no horário', () => {
+    const antes = [gravada('g1', MARES, 9)];
+    const depois: ParadaEditada[] = [
+      { ...editada(MARES, '09:00', 'g1'), visitaRealizada: true },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.semMudanca).toBe(false);
+    expect(diff.alterar).toHaveLength(1);
+    expect(diff.alterar[0].grupoId).toBe('g1');
+    expect(diff.alterar[0].visitaRealizada).toBe(true);
+    expect(diff.remover).toEqual([]);
+    expect(diff.inserir).toEqual([]);
+  });
+
+  it('a observação escrita no campo chega em alterar', () => {
+    const antes = [gravada('g1', MARES, 9)];
+    const depois: ParadaEditada[] = [
+      {
+        ...editada(MARES, '09:00', 'g1'),
+        visitaRealizada: true,
+        visitaObservacao: 'cliente pediu orçamento de porcelanato',
+      },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.alterar[0].visitaObservacao).toBe('cliente pediu orçamento de porcelanato');
+  });
+
+  it('🔴 parada sem registro na tela NÃO entra em alterar: ausente é "não mexa"', () => {
+    // Esta é a proteção. A parada g2 já tem anotação de campo gravada; a pessoa mexeu só no
+    // horário da g1. A g2 não pode entrar em alterar, senão a gravação passaria por cima da
+    // anotação dela.
+    const antes = [
+      gravada('g1', MARES, 9),
+      gravada('g2', ALPHAVILLE, 11, 0, {
+        visitaRealizada: true,
+        visitaObservacao: 'encarregado pediu retorno',
+      }),
+    ];
+    const depois = [editada(MARES, '10:00', 'g1'), editada(ALPHAVILLE, '11:00', 'g2')];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.alterar).toHaveLength(1);
+    expect(diff.alterar[0].grupoId).toBe('g1');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaRealizada');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaObservacao');
+  });
+
+  it('mandar o MESMO registro que já está gravado não conta como mudança', () => {
+    const antes = [
+      gravada('g1', MARES, 9, 0, { visitaRealizada: true, visitaObservacao: 'obra parada' }),
+    ];
+    const depois: ParadaEditada[] = [
+      {
+        ...editada(MARES, '09:00', 'g1'),
+        visitaRealizada: true,
+        visitaObservacao: 'obra parada',
+      },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.semMudanca).toBe(true);
+    expect(diff.alterar).toEqual([]);
+  });
+
+  it('corrigir a observação de uma parada já realizada entra em alterar', () => {
+    const antes = [
+      gravada('g1', MARES, 9, 0, { visitaRealizada: true, visitaObservacao: 'texto antigo' }),
+    ];
+    const depois: ParadaEditada[] = [
+      { ...editada(MARES, '09:00', 'g1'), visitaRealizada: true, visitaObservacao: 'texto novo' },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.alterar).toHaveLength(1);
+    expect(diff.alterar[0].visitaObservacao).toBe('texto novo');
+  });
+
+  it('apagar a observação de propósito é `null`, e isso É uma mudança', () => {
+    // `null` explícito se distingue de ausente: aqui a pessoa apagou o texto na tela.
+    const antes = [
+      gravada('g1', MARES, 9, 0, { visitaRealizada: true, visitaObservacao: 'engano meu' }),
+    ];
+    const depois: ParadaEditada[] = [
+      { ...editada(MARES, '09:00', 'g1'), visitaRealizada: true, visitaObservacao: null },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.alterar).toHaveLength(1);
+    expect(diff.alterar[0].visitaObservacao).toBeNull();
+  });
+
+  it('horário E registro mudando na mesma parada viram UMA alteração só', () => {
+    const antes = [gravada('g1', MARES, 9)];
+    const depois: ParadaEditada[] = [
+      { ...editada(MARES, '14:30', 'g1'), visitaRealizada: true, visitaObservacao: 'fui à tarde' },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.alterar).toHaveLength(1);
+    expect(diff.alterar[0].inicio.getHours()).toBe(14);
+    expect(diff.alterar[0].inicio.getMinutes()).toBe(30);
+    expect(diff.alterar[0].visitaRealizada).toBe(true);
+    expect(diff.alterar[0].visitaObservacao).toBe('fui à tarde');
+  });
+
+  it('🔴 parada com horário ilegível continua intocada, mesmo trazendo registro', () => {
+    // O horário pela metade já descartava a parada para não apagar a anotação dela. Trazer
+    // registro junto não pode furar essa regra: a gravação iria com um instante inválido.
+    const antes = [
+      gravada('g1', MARES, 9, 0, { visitaRealizada: true, visitaObservacao: 'não perca isto' }),
+    ];
+    const depois: ParadaEditada[] = [
+      { obraId: MARES, horario: '', grupoId: 'g1', visitaRealizada: true, visitaObservacao: 'x' },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.semMudanca).toBe(true);
+    expect(diff.alterar).toEqual([]);
+    expect(diff.remover).toEqual([]);
+  });
+});

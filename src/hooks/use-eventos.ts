@@ -570,14 +570,32 @@ export function useEditarRotaDeVisita() {
 
       // ── 2. ALTERAR ────────────────────────────────────────────────────────
       //
-      // 🔴 SÓ `inicio` e `fim`. `visita_realizada` e `visita_observacao` não aparecem aqui de
-      // propósito: a preservação acontece por NÃO tocar nesses campos. Se um dia alguém
-      // acrescentar um deles neste update "para deixar consistente", apaga a anotação de campo
-      // de toda parada já visitada, e nada na tela vai indicar isso.
+      // 🔴 `inicio` e `fim` SEMPRE; o registro de campo SÓ QUANDO VEIO NA DIFERENÇA.
+      //
+      // A preservação continua acontecendo por NÃO TOCAR: `diferencaDaRota` só põe
+      // `visitaRealizada`/`visitaObservacao` na parada quando a pessoa mexeu neles nesta
+      // edição (ausente = "não mexa", nunca "apague"). Aqui o update é montado a partir das
+      // chaves PRESENTES, uma a uma.
+      //
+      // 🔴 NÃO troque isto por um objeto que sempre carrega os dois campos. Escrever
+      // `visita_observacao: parada.visitaObservacao ?? null` apagaria a anotação de campo de
+      // toda parada que ninguém tocou — e nada na tela indicaria. Foi exatamente esse risco
+      // que manteve a chave "Essas visitas já aconteceram" desligada até 31/08/2026.
       for (const parada of diferenca.alterar) {
+        const camposDaParada: Record<string, unknown> = {
+          inicio: parada.inicio.toISOString(),
+          fim: parada.fim.toISOString(),
+        };
+        if (parada.visitaRealizada !== undefined) {
+          camposDaParada.visita_realizada = parada.visitaRealizada;
+        }
+        if (parada.visitaObservacao !== undefined) {
+          camposDaParada.visita_observacao = parada.visitaObservacao || null;
+        }
+
         const { error } = await supabase
           .from('eventos')
-          .update({ inicio: parada.inicio.toISOString(), fim: parada.fim.toISOString() })
+          .update(camposDaParada)
           // Por GRUPO: uma parada com participantes é uma linha por pessoa, e mudar só uma
           // deixaria os colegas com o horário velho.
           .eq('grupo_id', parada.grupoId);

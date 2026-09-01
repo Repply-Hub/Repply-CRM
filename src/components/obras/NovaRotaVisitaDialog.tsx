@@ -196,9 +196,12 @@ export function NovaRotaVisitaDialog({
 
     if (rotaParaEditar) {
       // Editando: o formulário abre com o que está gravado. `jaRealizada` fica FALSO de
-      // propósito — ele é o atalho de "essas visitas já aconteceram" do momento da criação, e
-      // ligá-lo aqui marcaria como realizada uma rota que talvez não seja, de uma vez só.
-      // Marcar visita feita continua sendo gesto individual, na lista.
+      // propósito — ele é o atalho de "essas visitas já aconteceram", e ligá-lo sozinho ao
+      // abrir marcaria como realizada, de uma vez só, uma rota que talvez não seja.
+      //
+      // 🔴 Ficar falso aqui é o que PRESERVA o que já está gravado: com a chave desligada a
+      // edição não manda registro de campo nenhum, e o banco mantém o que tem. Ligar a chave é
+      // um gesto deliberado de quem está dizendo "essas visitas aconteceram".
       setData(rotaParaEditar.data);
       setTitulo(rotaParaEditar.titulo ?? '');
       setJaRealizada(false);
@@ -210,7 +213,9 @@ export function NovaRotaVisitaDialog({
             grupoId: p.grupoId,
             obraId: p.obraId,
             nomeObra: p.obraNome || 'Obra sem nome',
-            observacao: '',
+            // A anotação que já está no banco vem junto: se a pessoa ligar a chave, ela EDITA
+            // o que está escrito em vez de começar do zero e apagar sem perceber.
+            observacao: p.visitaObservacao ?? '',
             horario: format(p.inicio, 'HH:mm'),
           })),
         ),
@@ -333,9 +338,19 @@ export function NovaRotaVisitaDialog({
           obraId: p.obraId,
           inicio: p.inicio,
           visitaRealizada: !!p.visitaRealizada,
-          visitaObservacao: null,
+          visitaObservacao: p.visitaObservacao ?? null,
         })),
-      paradasEmOrdem.map((p) => ({ grupoId: p.grupoId, obraId: p.obraId, horario: p.horario })),
+      // 🔴 O registro de campo SÓ VIAJA COM A CHAVE LIGADA. Com ela desligada os dois campos
+      // ficam ausentes, e ausente significa "não mexa" — é assim que editar o horário de uma
+      // parada não apaga a anotação escrita em outra (ver `ParadaEditada` em rota-em-edicao.ts).
+      paradasEmOrdem.map((p) => ({
+        grupoId: p.grupoId,
+        obraId: p.obraId,
+        horario: p.horario,
+        ...(jaRealizada
+          ? { visitaRealizada: true, visitaObservacao: p.observacao || null }
+          : {}),
+      })),
       format(data, 'yyyy-MM-dd'),
       DURACAO_PADRAO_MINUTOS,
     );
