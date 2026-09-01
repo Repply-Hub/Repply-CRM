@@ -4,7 +4,7 @@ O que está quebrado, mal resolvido ou pendente neste sistema, com **o custo rea
 ordem de conserto**. Escrito para que ninguém precise redescobrir cada item.
 
 Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu. Itens 22 a 31
-acrescentados em 21/08/2026; os itens 58 e 59, em 30 e 31/08/2026.
+acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026.
 
 > **Este documento não é lista de desejos.** Cada item aqui já tem consequência medida ou
 > observada. Melhoria que ainda é opinião não entra.
@@ -75,6 +75,7 @@ acrescentados em 21/08/2026; os itens 58 e 59, em 30 e 31/08/2026.
 | 57 | [Os módulos que justificam o produto estão vazios](#57-os-módulos-que-justificam-o-produto-estão-vazios) | Produto | Decisão de produto pendente |
 | 58 | [Contato sem responsável aparece para TODAS as empresas](#58-contato-sem-responsável-aparece-para-todas-as-empresas) | **Alta** | Latente — 0 órfãos hoje, mas 3 caminhos podem criar um |
 | 59 | [O link de redefinir senha aponta para `localhost`](#59-o-link-de-redefinir-senha-aponta-para-localhost) | **Alta** | **Sim — ninguém consegue redefinir a própria senha hoje.** O conserto é de painel |
+| 60 | [O ranking de vendedores chega inteiro no navegador de todo mundo](#60-o-ranking-de-vendedores-chega-inteiro-no-navegador-de-todo-mundo) | **Alta** | Não — mas entrega pela porta dos fundos o que foi fechado pela da frente em 31/08 |
 
 ---
 
@@ -2293,6 +2294,80 @@ para não quebrar produção sem aviso:
 linha sensata para cada vendedor ativo (equivalente ao que ele já pode fazer hoje), e só
 então trocar a regra do banco — na ordem inversa, alguém perde acesso sem aviso no meio do
 expediente.
+## 60. O ranking de vendedores chega inteiro no navegador de todo mundo
+
+**Gravidade: alta. Em produção, em todas as empresas. O corte é feito na tela, não no servidor.**
+
+Achado em 31/08/2026, de passagem, enquanto se consertava outra coisa no Plano de Vendas.
+
+### O que acontece
+
+A RPC `dashboard_stats` devolve o array `rendimento_vendedor` com **o nome e o faturamento de
+cada vendedor da empresa**. O gráfico não mostra os colegas para quem não é gestor — mas o
+recorte acontece no navegador, depois de a lista inteira já ter chegado
+(`src/pages/Dashboard.tsx:249-253`):
+
+```ts
+const rendimentoVendedor = useMemo(() => {
+  const raw = stats?.rendimento_vendedor ?? [];
+  if (isGestor) return raw;
+  return raw.filter(v => v.vendedor === profile?.nome);
+}, [stats, isGestor, profile?.nome]);
+```
+
+Qualquer vendedor que abra a aba de rede do navegador lê o faturamento nominal do time inteiro.
+Confirmado numa sessão real de vendedor da MD: as cinco pessoas, com nome e valor.
+
+Contraria a regra 6.1 do `CLAUDE.md` — *"a autorização real é a RLS do Postgres; esconder botão
+não protege nada"* — e o anti-padrão da §10, *"confiar em verificação de permissão feita só no
+frontend"*.
+
+### Por que dói mais agora
+
+Em 31/08/2026 o Lucas decidiu, perguntado antes e com o motivo registrado na migration
+`20260831200000`, que a funcionalidade `ver_metas_vendedor` — o ranking nominal no Plano de
+Vendas — ficaria **fora de todos os presets de permissão, inclusive do "Total"**, porque abrir o
+desempenho da equipe aos colegas não pode acontecer como efeito colateral de um clique em lote.
+
+Este furo entrega pela porta dos fundos exatamente o que aquela decisão fechou pela porta da
+frente.
+
+### Por que não é conserto de uma linha
+
+O próprio comentário no código explica, e é honesto:
+
+> `rendimento_vendedor` vem da mesma RPC `dashboard_stats` agregada pra empresa toda (KPIs,
+> segmentação, etc.) — não dá pra restringir a query sem também reduzir os KPIs gerais a "só
+> meu", que não foi pedido.
+
+Ou seja: a mesma consulta serve dois propósitos com públicos diferentes. Cortar no servidor sem
+separar as duas coisas transformaria o painel do vendedor num painel só dele — o que ninguém
+pediu e provavelmente ninguém quer.
+
+Os caminhos a comparar antes de mexer:
+
+1. **Separar `rendimento_vendedor` numa RPC própria**, com o gate de permissão dentro dela. Os
+   KPIs continuam agregados; só o array nominal passa a exigir autorização.
+2. **Cortar dentro da própria `dashboard_stats`**, devolvendo o array já filtrado para quem não
+   responde pela empresa, e deixando os demais campos intactos.
+3. Manter como está e assumir o risco por escrito.
+
+### Item vizinho, no mesmo assunto
+
+`plano_vendas_progresso` — **as duas assinaturas** — não checa permissão nenhuma, nem `pode_ver`.
+Um vendedor com o módulo Plano de Vendas desligado ainda recebe os dados chamando a RPC direto;
+`EXECUTE` está concedido a `authenticated`. Confirmado por `pg_get_functiondef`: `prosecdef =
+false` e zero chamadas a `has_permission` / `has_funcionalidade`.
+
+**Alarme falso descartado no caminho:** chegou-se a suspeitar de uma segunda versão de
+`plano_vendas_progresso_por_vendedor(p_ano, p_mes, …)` sem proteção. Ela é um invólucro de seis
+linhas que chama a assinatura por data, então **herda** o `has_funcionalidade`. Não é furo, não
+gaste conserto nisso.
+
+### Pendente com o Lucas
+
+O conserto tem efeito visível para cliente pagante e mexe numa consulta compartilhada. Precisa de
+decisão dele sobre qual dos três caminhos seguir, antes de qualquer código.
 
 ---
 

@@ -311,6 +311,11 @@ export interface ConflitoVisita {
  * tem outra visita (a qualquer obra) que colide de horário. Não bloqueia —
  * quem chama decide se avisa e deixa confirmar mesmo assim.
  *
+ * 🔴 O CHOQUE É SEMPRE DA MESMA PESSOA, e é o `.in('user_id', participantes)` lá embaixo que
+ * garante isso. Dois vendedores DIFERENTES, em obras diferentes, no mesmo horário NÃO são
+ * conflito — é o dia normal de uma equipe em campo, e nada é avisado. O que esta função
+ * procura é uma só coisa: a mesma pessoa marcada em dois lugares ao mesmo tempo.
+ *
  * A busca no banco recorta só pelo intervalo [menor início, maior fim] entre
  * todas as janelas pedidas (mais largo que cada parada isolada), e o filtro
  * fino — cada janela contra cada linha — é feito aqui, porque paradas de uma
@@ -320,12 +325,19 @@ export interface ConflitoVisita {
 export async function buscarConflitosDeVisita({
   participantes,
   janelas,
-  excluirGrupoId,
+  excluirGrupoIds,
 }: {
   participantes: string[];
   janelas: { inicio: string; fim: string }[]; // ISO
-  /** Ao editar uma visita existente, não conflitar com ela mesma. */
-  excluirGrupoId?: string;
+  /**
+   * Os `grupo_id` que NÃO devem contar como conflito — as paradas da própria visita/rota que
+   * está sendo editada.
+   *
+   * 🔴 É UMA LISTA, e não um id só, porque uma rota tem UM `grupo_id` POR PARADA (ver
+   * `useCreateRotaVisita`). Com um id só era impossível editar uma rota sem falso alarme: ela
+   * batia nas próprias paradas, que continuam gravadas no horário antigo.
+   */
+  excluirGrupoIds?: string[];
 }): Promise<ConflitoVisita[]> {
   if (participantes.length === 0 || janelas.length === 0) return [];
 
@@ -340,8 +352,11 @@ export async function buscarConflitosDeVisita({
     .lt('inicio', fimMax)
     .gt('fim', inicioMin);
 
-  if (excluirGrupoId) {
-    query = query.neq('grupo_id', excluirGrupoId);
+  if (excluirGrupoIds && excluirGrupoIds.length > 0) {
+    // A lista vazia é barrada de propósito: `in.()` é sintaxe inválida no PostgREST e derrubaria
+    // a consulta inteira. `grupo_id` é NOT NULL (conferido no banco), então o `not.in` não
+    // descarta linha nenhuma por nulo.
+    query = query.not('grupo_id', 'in', `(${excluirGrupoIds.join(',')})`);
   }
 
   const { data, error } = await query;

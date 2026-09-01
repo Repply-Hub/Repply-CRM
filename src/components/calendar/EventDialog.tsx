@@ -57,6 +57,19 @@ interface EventDialogProps {
    * a rota de visita cria linha em `eventos` com obra_id.
    */
   onAbrirRotaVisita?: (dataInicial?: Date) => void;
+  /**
+   * Está reabrindo DEPOIS de uma ida ao diálogo de rota de visita — o que já estava
+   * preenchido tem de voltar como estava.
+   *
+   * 🔴 O `form` deste componente SOBREVIVE à ida: a página Calendário mantém o EventDialog
+   * montado o tempo todo, só fecha. Quem apaga o rascunho é o efeito de abertura logo abaixo,
+   * que reescreve o formulário toda vez que `open` vira verdadeiro. Sem esta bandeira,
+   * "Voltar" devolveria um formulário em branco — exatamente o mesmo que Cancelar.
+   *
+   * Quem abre um evento novo, ou clica num evento existente, passa falso, e a limpeza volta a
+   * acontecer normalmente.
+   */
+  retomandoRascunho?: boolean;
 }
 
 function toDatetimeLocal(iso: string): string {
@@ -94,6 +107,7 @@ export function EventDialog({
   onSave,
   onDelete,
   onAbrirRotaVisita,
+  retomandoRascunho = false,
 }: EventDialogProps) {
   const [form, setForm] = useState<EventoForm>(defaultForm());
   const [participantesOpen, setParticipantesOpen] = useState(false);
@@ -122,6 +136,12 @@ export function EventDialog({
     // já que a página de calendário fica montada e o cache pode estar desatualizado
     // (ex.: usuário novo criado em outra sessão/aba).
     refetchUsuarios();
+
+    // Voltando da rota de visita: o que a pessoa já tinha preenchido continua na tela.
+    // Este efeito é o ÚNICO lugar que apaga o rascunho, então sair aqui é o que faz o
+    // "Voltar" valer alguma coisa. A releitura de funcionários acima acontece de qualquer
+    // jeito — ela não mexe no formulário.
+    if (retomandoRascunho) return;
 
     if (editingEvent) {
       const ini = editingEvent.diaInteiro
@@ -153,7 +173,7 @@ export function EventDialog({
         ...initialData,
       });
     }
-  }, [open, editingEvent, initialData, user?.id]);
+  }, [open, editingEvent, initialData, retomandoRascunho, user?.id]);
 
   // Preenche os participantes do evento assim que a busca resolve (chega
   // depois da abertura do modal, por isso é um efeito separado do de cima).
@@ -224,7 +244,9 @@ export function EventDialog({
         const encontrados = await buscarConflitosDeVisita({
           participantes: participantesSelecionados,
           janelas: [{ inicio, fim }],
-          excluirGrupoId: editingEvent?.grupoId,
+          // Aqui é uma parada só (o evento aberto), então a lista tem um item. O parâmetro é
+          // lista por causa da rota inteira — ver `buscarConflitosDeVisita`.
+          excluirGrupoIds: editingEvent?.grupoId ? [editingEvent.grupoId] : undefined,
         });
         if (encontrados.length > 0) {
           setConflitos(encontrados);
@@ -584,11 +606,15 @@ export function EventDialog({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-500" />
-            Já existe visita marcada nesse horário
+            Alguém deste evento já tem visita nesse horário
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-2 text-left">
-              <p>Pelo menos um participante já tem outra visita que colide com este horário:</p>
+              <p>
+                A mesma pessoa ficaria marcada em dois lugares ao mesmo tempo. Vendedores
+                diferentes, em obras diferentes, no mesmo horário não caem aqui — isso é
+                permitido e não avisa nada. O choque é este:
+              </p>
               <ul className="space-y-1 rounded-md border bg-muted/40 p-2.5 text-xs">
                 {conflitos.map((c, i) => {
                   const nome =

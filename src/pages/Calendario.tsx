@@ -10,6 +10,7 @@ import { Search, HardHat } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { periodoDoCalendario } from '@/lib/periodo-do-calendario';
 import { useAuth } from '@/hooks/use-auth';
+import { useSecaoLigada } from '@/hooks/use-secoes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -113,6 +114,11 @@ export default function Calendario() {
   // organizou passaria a ser tratado como mero participante, e "excluir" deixaria o compromisso
   // de pé na agenda de todo mundo (CLAUDE.md §4.5).
   const { user } = useAuth();
+  // Empresa que não contratou Obras não pode ver visita a obra em canto nenhum do calendário:
+  // nem a aba "Visita a obra" do novo evento, nem o diálogo de rota, nem a legenda da lateral.
+  // `=== true` de propósito — `undefined` é "ainda não sei", e cascata dentro de uma tela
+  // ESCONDE na dúvida (ver o comentário de `useSecaoLigada`).
+  const { ligada: temObras } = useSecaoLigada('obras');
   const [viewMode, setViewMode] = useState<ViewMode>("semana");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [month, setMonth] = useState(new Date());
@@ -123,6 +129,12 @@ export default function Calendario() {
   const [searchQuery, setSearchQuery] = useState("");
   const [rotaVisitaDialogOpen, setRotaVisitaDialogOpen] = useState(false);
   const [rotaVisitaDataInicial, setRotaVisitaDataInicial] = useState<Date | undefined>(undefined);
+  // 🔴 "Vou reabrir o evento SEM apagar o que ele já tinha." Só o "Voltar" da rota de visita
+  // liga isto; abrir um evento novo ou clicar num evento existente desliga. O rascunho em si
+  // nunca sai de dentro do EventDialog — aqui só se decide se ele é reaproveitado ou jogado
+  // fora. Quem criar um TERCEIRO caminho de abrir o EventDialog precisa desligar a bandeira,
+  // senão o "Novo evento" seguinte abre com o rascunho velho.
+  const [retomandoRascunhoDoEvento, setRetomandoRascunhoDoEvento] = useState(false);
 
   const [isImporting, setIsImporting] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -196,6 +208,9 @@ export default function Calendario() {
   const openNewEvent = (slot?: Partial<EventoForm>) => {
     setEditingEvent(null);
     setInitialSlot(slot ?? {});
+    // Evento novo é evento novo: formulário em branco, mesmo que a última ida à rota de
+    // visita tenha terminado em Cancelar e deixado a bandeira ligada.
+    setRetomandoRascunhoDoEvento(false);
     setDialogOpen(true);
   };
 
@@ -204,10 +219,28 @@ export default function Calendario() {
     setRotaVisitaDialogOpen(true);
   };
 
+  /**
+   * "Voltar" da rota de visita: fecha a rota e devolve o "Novo evento" como ele estava.
+   *
+   * O EventDialog fica montado o tempo todo — só o `open` dele muda —, então o que a pessoa
+   * digitou ainda está lá. O que apagava era o efeito de abertura DELE;
+   * `retomandoRascunhoDoEvento` é o recado para esse efeito não limpar desta vez.
+   *
+   * 🔴 Só o botão "Voltar" passa por aqui. Cancelar, o "X" e a criação bem-sucedida da rota
+   * continuam em `onOpenChange(false)` e fecham tudo — se o sucesso caísse aqui, quem
+   * acabasse de criar a rota seria devolvido a um evento pela metade.
+   */
+  const voltarDaRotaParaEvento = () => {
+    setRotaVisitaDialogOpen(false);
+    setRetomandoRascunhoDoEvento(true);
+    setDialogOpen(true);
+  };
+
   const openEditEvent = (event: CalendarEvent) => {
     if (!event.editavel) return; // prazos/contatos são read-only
     setEditingEvent(event);
     setInitialSlot({});
+    setRetomandoRascunhoDoEvento(false);
     setDialogOpen(true);
   };
 
@@ -425,10 +458,12 @@ export default function Calendario() {
                   <div className="w-2.5 h-2.5 rounded-sm shrink-0 bg-[#6b7280]" />
                   <span className="text-xs text-muted-foreground">Contatos</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <HardHat className="h-2.5 w-2.5 shrink-0 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Visita a obra</span>
-                </div>
+                {temObras === true && (
+                  <div className="flex items-center gap-2">
+                    <HardHat className="h-2.5 w-2.5 shrink-0 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Visita a obra</span>
+                  </div>
+                )}
               </div>
             </div>
           </aside>
@@ -465,15 +500,29 @@ export default function Calendario() {
           onClose={() => setDialogOpen(false)}
           onSave={handleSave}
           onDelete={handleDelete}
-          onAbrirRotaVisita={abrirRotaVisita}
+          onAbrirRotaVisita={temObras === true ? abrirRotaVisita : undefined}
+          retomandoRascunho={retomandoRascunhoDoEvento}
         />
 
-        {/* Dialog de rota de visita a obras */}
-        <NovaRotaVisitaDialog
-          open={rotaVisitaDialogOpen}
-          onOpenChange={setRotaVisitaDialogOpen}
-          dataInicial={rotaVisitaDataInicial}
-        />
+        {/* Dialog de rota de visita a obras.
+            🔴 SÓ MONTA COM A SEÇÃO OBRAS CONTRATADA, e as duas linhas andam juntas:
+            sem `onAbrirRotaVisita` o EventDialog não desenha a aba "Visita a obra"
+            (`EventDialog.tsx`: `{!isEditing && onAbrirRotaVisita && (`), e sem o diálogo
+            aqui não há como abri-lo por outro caminho. Era por aqui que a rota de visita
+            continuava aparecendo no Calendário mesmo com Obras desligada — e o diálogo
+            ainda chamava `useObras()` para listar os canteiros da empresa.
+
+            `onVoltar` é a saída de volta para o "Novo evento" que ficou aberto atrás: só o
+            Calendário passa, porque só aqui se chega a esta janela de dentro de outra. As
+            duas chamadas de Obras.tsx (linhas 1023 e 1036) não passam, e lá não há Voltar. */}
+        {temObras === true && (
+          <NovaRotaVisitaDialog
+            open={rotaVisitaDialogOpen}
+            onOpenChange={setRotaVisitaDialogOpen}
+            dataInicial={rotaVisitaDataInicial}
+            onVoltar={voltarDaRotaParaEvento}
+          />
+        )}
 
         {/* Dialog de importação */}
         <Dialog

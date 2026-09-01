@@ -1451,7 +1451,7 @@ const ClienteDetalhe = () => {
                     </div>
                     {/* Marcação múltipla: uma pessoa pode responder por vários canteiros
                         (decisão de 27/08/2026). Nenhuma marcada = contato da empresa toda. */}
-                    {cliente.obras && cliente.obras.length > 0 && (
+                    {temObras === true && cliente.obras && cliente.obras.length > 0 && (
                       <div className="space-y-2">
                         <Label>Obras deste contato</Label>
                         <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-border p-2">

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format, addMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { AlertTriangle, CalendarIcon, ChevronDown, GripVertical, HardHat, Users, X, Check } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CalendarIcon, ChevronDown, GripVertical, HardHat, Users, X, Check } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
 import { diferencaDaRota } from '@/lib/rota-em-edicao';
@@ -88,6 +88,19 @@ interface NovaRotaVisitaDialogProps {
    * DIFERENÇA em vez de inserir tudo de novo — ver `useEditarRotaDeVisita`.
    */
   rotaParaEditar?: RotaDoDia | null;
+  /**
+   * Volta para a tela de onde este diálogo foi aberto, em vez de simplesmente fechar.
+   *
+   * Só o Calendário passa: lá a pessoa chega aqui de DENTRO do "Novo evento", pela aba
+   * "Visita a obra", e sem isto a única saída é Cancelar — que joga fora o evento que ela
+   * estava preenchendo. Quem abre pela tela de Obras não veio de lugar nenhum, não passa a
+   * propriedade, e o rodapé continua com os mesmos dois botões de sempre.
+   *
+   * 🔴 NÃO é "fechar": quem passa é que decide o que reabrir, e este diálogo NÃO chama
+   * `onOpenChange(false)` junto. Chamar os dois faria o rascunho do evento reaparecer
+   * enquanto esta janela ainda está no ar.
+   */
+  onVoltar?: () => void;
 }
 
 const DURACAO_PADRAO_MINUTOS = 60;
@@ -132,6 +145,7 @@ export function NovaRotaVisitaDialog({
   dataInicial,
   apresentacao = 'modal',
   rotaParaEditar = null,
+  onVoltar,
 }: NovaRotaVisitaDialogProps) {
   const ehPainel = apresentacao === 'painel';
   const editando = !!rotaParaEditar;
@@ -422,6 +436,14 @@ export function NovaRotaVisitaDialog({
         const encontrados = await buscarConflitosDeVisita({
           participantes,
           janelas: paradasEmOrdem.map(janelaDaParada),
+          // 🔴 EDITANDO, A ROTA NÃO PODE CHOCAR COM ELA MESMA. As paradas já gravadas continuam
+          // no banco no horário antigo; sem excluí-las, salvar QUALQUER edição — até só dar um
+          // título à rota — acusava conflito com as próprias paradas abertas na tela.
+          // Paradas acrescentadas agora não têm `grupoId` e ficam de fora da exclusão de
+          // propósito: essas ainda precisam ser conferidas.
+          excluirGrupoIds: (rotaParaEditar?.paradas ?? [])
+            .map((p) => p.grupoId)
+            .filter((g): g is string => !!g),
         });
         if (encontrados.length > 0) {
           setConflitos(encontrados);
@@ -447,22 +469,24 @@ export function NovaRotaVisitaDialog({
             <>
               <h2 className="flex items-center gap-2 text-lg font-semibold text-card-foreground">
                 <HardHat className="h-4 w-4 text-primary" />
-                Nova rota de visita
+                {editando ? 'Editar rota de visita' : 'Nova rota de visita'}
               </h2>
               <p className="text-sm text-muted-foreground">
-                Escolha as obras que farão parte da visita e a data. Cada obra vira um evento no
-                calendário e entra no histórico de visitas dela.
+                {editando
+                  ? 'Altere as obras, os horários e a data desta rota. A alteração vale para o calendário de todos os participantes.'
+                  : 'Escolha as obras que farão parte da visita e a data. Cada obra vira um evento no calendário e entra no histórico de visitas dela.'}
               </p>
             </>
           ) : (
             <>
               <DialogTitle className="flex items-center gap-2">
                 <HardHat className="h-4 w-4 text-primary" />
-                Nova rota de visita
+                {editando ? 'Editar rota de visita' : 'Nova rota de visita'}
               </DialogTitle>
               <DialogDescription>
-                Escolha as obras que farão parte da visita e a data. Cada obra vira um evento no
-                calendário e entra no histórico de visitas dela.
+                {editando
+                  ? 'Altere as obras, os horários e a data desta rota. A alteração vale para o calendário de todos os participantes.'
+                  : 'Escolha as obras que farão parte da visita e a data. Cada obra vira um evento no calendário e entra no histórico de visitas dela.'}
               </DialogDescription>
             </>
           )}
@@ -722,18 +746,44 @@ export function NovaRotaVisitaDialog({
         </CorpoDialogo>
 
         <RodapeDialogo>
+          {/* "Voltar" só aparece quando alguém abriu esta janela de dentro de outra (hoje, o
+              "Novo evento" do Calendário). Fica à ESQUERDA, longe de Cancelar, porque as duas
+              saídas têm consequências opostas: uma devolve o rascunho do evento, a outra o
+              descarta. Mesmo lugar e mesmo motivo do "Excluir" em `EventDialog.tsx:557`.
+
+              `sm:mr-auto` e não `mr-auto`: no celular o `DialogFooter` é `flex-col-reverse`, e
+              a margem automática ali faria este botão encolher e desalinhar dos outros dois. */}
+          {onVoltar && (
+            <Button variant="ghost" className="sm:mr-auto" onClick={onVoltar}>
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              Voltar
+            </Button>
+          )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          {/* O MESMO botão serve para criar e para editar (`rotaParaEditar`). Em edição ele diz
+              "Salvar", e `editarRota.isPending` tem de entrar no `disabled` junto com
+              `criarRota.isPending`: sem isso, gravar uma edição deixa o botão vivo, clicável e
+              ainda escrito "Criar rota" — dá para mandar a mesma alteração duas vezes. */}
           <Button
             onClick={handleSalvar}
-            disabled={criarRota.isPending || verificandoConflito || paradas.length === 0}
+            disabled={
+              criarRota.isPending ||
+              editarRota.isPending ||
+              verificandoConflito ||
+              paradas.length === 0
+            }
           >
             {verificandoConflito
               ? 'Verificando agenda...'
-              : criarRota.isPending
-                ? 'Criando...'
-                : paradas.length > 1
-                  ? 'Criar rota'
-                  : 'Criar visita'}
+              : criarRota.isPending || editarRota.isPending
+                ? editando
+                  ? 'Salvando...'
+                  : 'Criando...'
+                : editando
+                  ? 'Salvar'
+                  : paradas.length > 1
+                    ? 'Criar rota'
+                    : 'Criar visita'}
           </Button>
         </RodapeDialogo>
     </>
@@ -766,11 +816,15 @@ export function NovaRotaVisitaDialog({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
-              Já existe visita marcada nesse horário
+              Alguém desta rota já tem visita nesse horário
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-left">
-                <p>Pelo menos um participante já tem outra visita que colide com esta rota:</p>
+                <p>
+                  A mesma pessoa ficaria marcada em dois lugares ao mesmo tempo. Vendedores
+                  diferentes, em obras diferentes, no mesmo horário não caem aqui — isso é
+                  permitido e não avisa nada. O choque é este:
+                </p>
                 <ul className="space-y-1 rounded-md border bg-muted/40 p-2.5 text-xs">
                   {conflitos.map((c, i) => {
                     const nome =
@@ -786,7 +840,7 @@ export function NovaRotaVisitaDialog({
                     );
                   })}
                 </ul>
-                <p>Quer criar a rota mesmo assim?</p>
+                <p>{editando ? 'Quer salvar a rota mesmo assim?' : 'Quer criar a rota mesmo assim?'}</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -798,7 +852,7 @@ export function NovaRotaVisitaDialog({
                 criarRotaDeFato();
               }}
             >
-              Criar mesmo assim
+              {editando ? 'Salvar mesmo assim' : 'Criar mesmo assim'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
