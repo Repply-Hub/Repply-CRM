@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -46,6 +46,8 @@ import { ExportClientesButton } from '@/components/clientes/ExportClientesButton
 import { FilterButton } from '@/components/shared/FilterButton';
 import { StandardPopoverMenu } from '@/components/ui/standard-popover-menu';
 import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
+import { useClientesTipos, useCriarTipoDeCliente, useExcluirTipoDeCliente } from '@/hooks/use-clientes-tipos';
+import { rotuloDoTipo, tipoPadrao, opcoesDeFiltro } from '@/lib/tipos-de-cliente';
 
 
 const CLIENTE_FIELDS: ColumnDefinition[] = [
@@ -93,11 +95,8 @@ const EMPRESA_STEPS = [
 ];
 
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
-const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física', condominio: 'Condomínio', hospital: 'Hospital', distribuidor: 'Distribuidor', hotel: 'Hotel', escola: 'Escola', instalador: 'Instalador' };
-const baseTipos = ['construtora', 'loja', 'pessoa_fisica', 'condominio', 'hospital', 'distribuidor', 'hotel', 'escola', 'instalador'];
-
-const getTipoLabel = (value: string, customTipos: { value: string; label: string }[]) =>
-  tipoLabels[value] ?? customTipos.find(t => t.value === value)?.label ?? value;
+// O rótulo do tipo vem do banco (clientes_tipos), mas o ícone continua no código: ícone
+// não é algo que o gestor cadastra, e tipo fora desta lista cai em Building2.
 const getTipoIcon = (value: string) => tipoIcons[value] ?? Building2;
 
 const normalizeExtraKey = (value: string) => value
@@ -303,6 +302,17 @@ const Clientes = () => {
   // do delete em handleBulkDelete.
   const canDelete = ['gestor', 'admin', 'empresa'].includes(profile?.role);
   const empresaIdAtual = profile?.empresa_id ?? profile?.empresas?.id;
+  // A lista de tipos passou a ser da EMPRESA, guardada no banco: o que um gestor cria
+  // aparece para a equipe toda. Antes vivia no localStorage de cada navegador.
+  const { data: tiposDeCliente } = useClientesTipos(empresaIdAtual);
+  // useMemo para a lista não trocar de identidade a cada pintura: ela é dependência do
+  // efeito que preenche o campo Tipo, e um array novo por render o faria rodar sempre.
+  const tipos = useMemo(() => tiposDeCliente ?? [], [tiposDeCliente]);
+  const criarTipo = useCriarTipoDeCliente();
+  const excluirTipo = useExcluirTipoDeCliente();
+  // Mesma regra do canDelete logo acima: espelha public.is_gestor() só para esconder
+  // o controle na UI. A RLS continua sendo a autoridade real.
+  const podeGerenciarTipos = ['gestor', 'admin', 'empresa'].includes(profile?.role);
   const { data: camposConfigClientes } = useConfiguracoesCampos('clientes', empresaIdAtual);
   const { data: camposConfigContatos } = useConfiguracoesCampos('contatos', empresaIdAtual);
   // Helpers de leitura da config: campos que ainda não têm linha na config
@@ -351,7 +361,10 @@ const Clientes = () => {
   const { ligada: temEmails } = useSecaoLigada('emails');
   const { ligada: temObras } = useSecaoLigada('obras');
 
-  const [tipo, setTipo] = useState('construtora');
+  // Nasce vazio e recebe o primeiro tipo da empresa assim que a lista chega. Não dá
+  // para cravar 'construtora': depois que uma empresa personaliza a lista esse slug
+  // pode não existir mais lá, e o cadastro gravaria um tipo órfão.
+  const [tipo, setTipo] = useState('');
   const [cnpj, setCnpj] = useState('');
   const [cnpjStatus, setCnpjStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
   const [empresa, setEmpresa] = useState('');
@@ -366,81 +379,35 @@ const Clientes = () => {
   const [selectedContatoId, setSelectedContatoId] = useState('');
   const [contatoEmail, setContatoEmail] = useState('');
   const [contatoTelefone, setContatoTelefone] = useState('');
-  const [customTipos, setCustomTipos] = useState<{ value: string; label: string }[]>(() => {
-    const saved = localStorage.getItem('clientes_custom_tipos');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [hiddenTipos, setHiddenTipos] = useState<string[]>(() => {
-    const saved = localStorage.getItem('clientes_hidden_tipos');
-    return saved ? JSON.parse(saved) : [];
-  });
   const [newTipoOpen, setNewTipoOpen] = useState(false);
   const [newTipoName, setNewTipoName] = useState('');
   const [newTipoTarget, setNewTipoTarget] = useState<'form' | 'filter'>('form');
-  const [confirmDeleteTipo, setConfirmDeleteTipo] = useState<{ value: string; label: string } | null>(null);
+  // Guarda id (para excluir no banco), slug (para limpar filtro e formulário) e nome
+  // (para a pergunta do diálogo).
+  const [confirmDeleteTipo, setConfirmDeleteTipo] = useState<{ id: string; slug: string; nome: string } | null>(null);
 
-  const handleDeleteTipo = (value: string) => {
-    // Remove de personalizados, se for; senão, oculta o tipo padrão
-    const isCustom = customTipos.some(t => t.value === value);
-    if (isCustom) {
-      const next = customTipos.filter(t => t.value !== value);
-      setCustomTipos(next);
-      localStorage.setItem('clientes_custom_tipos', JSON.stringify(next));
-    } else {
-      const next = Array.from(new Set([...hiddenTipos, value]));
-      setHiddenTipos(next);
-      localStorage.setItem('clientes_hidden_tipos', JSON.stringify(next));
+  const handleCreateTipo = async () => {
+    try {
+      const slug = await criarTipo.mutateAsync({ nome: newTipoName });
+      if (newTipoTarget === 'form') setTipo(slug);
+      else setSelectedTipos(prev => (prev.includes(slug) ? prev : [...prev, slug]));
+      setNewTipoName('');
+      setNewTipoOpen(false);
+    } catch {
+      // O toast do erro real já sai no onError do hook — inclusive a frase que o banco
+      // devolve quando quem tentou não é gestor.
     }
-    // Recalcula próxima opção válida para tipo do form
-    const remaining = baseTipos.filter(v => v !== value && !(isCustom ? hiddenTipos : [...hiddenTipos, value]).includes(v));
-    const fallback = remaining[0] ?? customTipos.find(t => t.value !== value)?.value ?? '';
-    if (tipo === value) setTipo(fallback);
-    setSelectedTipos(prev => prev.filter(v => v !== value));
-    toast.success('Tipo excluído');
-    setConfirmDeleteTipo(null);
   };
 
-  const handleCreateTipo = () => {
-    const label = newTipoName.trim();
-    if (!label) {
-      toast.error('Informe um nome para o tipo');
-      return;
+  const handleDeleteTipo = async (id: string, slug: string) => {
+    try {
+      await excluirTipo.mutateAsync({ id });
+      if (tipo === slug) setTipo(tipoPadrao(tipos.filter(t => t.slug !== slug)));
+      setSelectedTipos(prev => prev.filter(v => v !== slug));
+      setConfirmDeleteTipo(null);
+    } catch {
+      // idem
     }
-    const value = label
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '');
-    if (!value) {
-      toast.error('Nome inválido');
-      return;
-    }
-    const baseTipos = ['construtora', 'loja', 'pessoa_fisica', 'condominio', 'hospital', 'distribuidor', 'hotel', 'escola', 'instalador'];
-    if (baseTipos.includes(value) || customTipos.some(t => t.value === value)) {
-      // Se for um padrão oculto, basta reexibi-lo
-      if (baseTipos.includes(value) && hiddenTipos.includes(value)) {
-        const next = hiddenTipos.filter(v => v !== value);
-        setHiddenTipos(next);
-        localStorage.setItem('clientes_hidden_tipos', JSON.stringify(next));
-        if (newTipoTarget === 'form') setTipo(value);
-        else setSelectedTipos(prev => prev.includes(value) ? prev : [...prev, value]);
-        setNewTipoName('');
-        setNewTipoOpen(false);
-        toast.success(`Tipo "${tipoLabels[value] ?? label}" reativado`);
-        return;
-      }
-      toast.error('Esse tipo já existe');
-      return;
-    }
-    const next = [...customTipos, { value, label }];
-    setCustomTipos(next);
-    localStorage.setItem('clientes_custom_tipos', JSON.stringify(next));
-    if (newTipoTarget === 'form') setTipo(value);
-    else setSelectedTipos(prev => prev.includes(value) ? prev : [...prev, value]);
-    setNewTipoName('');
-    setNewTipoOpen(false);
-    toast.success(`Tipo "${label}" criado`);
   };
 
   const empresasSettings = useTableSettings({
@@ -497,8 +464,8 @@ const Clientes = () => {
       let av: any = getColumnValue(a, column);
       let bv: any = getColumnValue(b, column);
       if (colId === 'tipo') {
-        av = getTipoLabel(a.tipo, customTipos);
-        bv = getTipoLabel(b.tipo, customTipos);
+        av = rotuloDoTipo(a.tipo, tipos);
+        bv = rotuloDoTipo(b.tipo, tipos);
       }
       if (colId === 'data_criacao' || column?.type === 'date') {
         const at = av ? new Date(av as string).getTime() : 0;
@@ -554,7 +521,7 @@ const Clientes = () => {
   const filteredEmpresas = sortRows(
     empresas.filter((c: any) => {
       const s = normalizarParaBusca(search);
-      const matchSearch = !s || buildRowSearchText(c, getTipoLabel(c.tipo, customTipos)).includes(s);
+      const matchSearch = !s || buildRowSearchText(c, rotuloDoTipo(c.tipo, tipos)).includes(s);
       const matchTipo = selectedTipos.length === 0 || selectedTipos.includes(c.tipo);
       const matchUf = selectedUfs.length === 0 || (c.uf && selectedUfs.includes(c.uf));
       const matchCidade = selectedCidades.length === 0 || (c.cidade && selectedCidades.includes(c.cidade));
@@ -604,22 +571,17 @@ const Clientes = () => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  // Muitas empresas (principalmente importadas) têm em `tipo` um valor de texto livre
-  // que nunca virou um tipo padrão nem um "customizado" (ex.: "construtora - 3 níveis",
-  // "condomínios", "cliente"). Sem incluir esses valores reais aqui, o filtro de Tipo
-  // nunca bate com eles — a empresa existe, mas nenhuma opção do filtro a alcança.
-  const tiposConhecidos = new Set([...baseTipos, ...customTipos.map(t => t.value)]);
-  const tiposNaoMapeados = Array.from(new Set(
-    empresas
-      .map((c: any) => c.tipo)
-      .filter((t: string) => t && !tiposConhecidos.has(t)),
-  )).sort((a: string, b: string) => a.localeCompare(b, 'pt-BR'));
+  // A lista vem do banco, então chega depois da primeira pintura da tela. Este efeito
+  // é quem dá ao campo Tipo o primeiro item da empresa; sem ele o Select ficaria vazio.
+  useEffect(() => {
+    if (!tipo && tipos.length > 0) setTipo(tipoPadrao(tipos));
+  }, [tipo, tipos]);
 
-  const tipoFilterOptions = [
-    ...baseTipos.filter(v => !hiddenTipos.includes(v)).map(v => ({ value: v, label: tipoLabels[v] })),
-    ...customTipos,
-    ...tiposNaoMapeados.map((v: string) => ({ value: v, label: v })),
-  ];
+  // Muitas empresas (principalmente importadas) têm em `tipo` um valor de texto livre
+  // que não está na lista da empresa (ex.: "construtora - 3 níveis", "condomínios").
+  // opcoesDeFiltro soma esses valores em uso à lista do banco: sem isso a empresa
+  // existe, mas nenhuma opção do filtro a alcança.
+  const tipoFilterOptions = opcoesDeFiltro(tipos, empresas.map((c: any) => c.tipo));
 
   const handleCnpjChange = (value: string) => {
     const masked = maskCnpj(value);
@@ -1020,16 +982,20 @@ const Clientes = () => {
                 <div className="flex flex-col h-full">
                   <div className="flex items-center justify-between px-3 pt-3 pb-1">
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tipo</p>
-                    <button
-                      className="text-[10px] font-bold text-primary hover:underline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setNewTipoTarget('filter');
-                        setNewTipoOpen(true);
-                      }}
-                    >
-                      Gerenciar
-                    </button>
+                    {/* A lista agora é da empresa inteira: para quem não é gestor o banco
+                        recusaria criar e excluir, então o atalho nem aparece. */}
+                    {podeGerenciarTipos && (
+                      <button
+                        className="text-[10px] font-bold text-primary hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNewTipoTarget('filter');
+                          setNewTipoOpen(true);
+                        }}
+                      >
+                        Gerenciar
+                      </button>
+                    )}
                   </div>
                   <FilterCheckboxList
                     options={tipoFilterOptions}
@@ -1204,39 +1170,32 @@ const Clientes = () => {
               {/* Lista gerenciável */}
               <div className="space-y-3 pt-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tipos existentes</p>
-                {(() => {
-                  const all = [
-                    ...baseTipos.filter(v => !hiddenTipos.includes(v)).map(v => ({ value: v, label: tipoLabels[v], custom: false })),
-                    ...customTipos.map(t => ({ ...t, custom: true })),
-                  ];
-                  if (all.length === 0) {
-                    return <p className="text-sm text-muted-foreground text-center py-3">Nenhum tipo cadastrado</p>;
-                  }
-                  return (
-                    <div className="space-y-1">
-                      {all.map(t => (
-                        <div key={t.value} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 hover:bg-muted/40 transition-colors">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-sm">{t.label}</span>
-                            {!t.custom && (
-                              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">padrão</span>
-                            )}
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => setConfirmDeleteTipo({ value: t.value, label: t.label })}
-                            title={`Excluir "${t.label}"`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                {tipos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-3">Nenhum tipo cadastrado</p>
+                ) : (
+                  <div className="space-y-1">
+                    {tipos.map(t => (
+                      <div key={t.id} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 hover:bg-muted/40 transition-colors">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm">{t.nome}</span>
+                          {t.is_sistema && (
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">padrão</span>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  );
-                })()}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setConfirmDeleteTipo({ id: t.id, slug: t.slug, nome: t.nome })}
+                          title={`Excluir "${t.nome}"`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end pt-3">
@@ -1279,13 +1238,13 @@ const Clientes = () => {
                           >
                             <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
                             <SelectContent>
-                              {baseTipos.filter(v => !hiddenTipos.includes(v)).map(v => (
-                                <SelectItem key={v} value={v}>{tipoLabels[v]}</SelectItem>
+                              {tipos.map(t => (
+                                <SelectItem key={t.id} value={t.slug}>{t.nome}</SelectItem>
                               ))}
-                              {customTipos.map(t => (
-                                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                              ))}
-                              <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo tipo…</SelectItem>
+                              {/* Só gestor cria tipo: para os demais a RLS recusaria a gravação. */}
+                              {podeGerenciarTipos && (
+                                <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo tipo…</SelectItem>
+                              )}
                             </SelectContent>
                           </Select>
                         </div>
@@ -1535,7 +1494,7 @@ const Clientes = () => {
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-sm text-card-foreground line-clamp-2">{client.empresa || 'Sem nome'}</p>
                         {visibleColumns.includes('tipo') && (
-                          <Badge variant="secondary" className="mt-1 text-[10px] font-medium">{getTipoLabel(client.tipo, customTipos)}</Badge>
+                          <Badge variant="secondary" className="mt-1 text-[10px] font-medium">{rotuloDoTipo(client.tipo, tipos)}</Badge>
                         )}
                       </div>
                     </div>
@@ -1660,7 +1619,7 @@ const Clientes = () => {
                           if (colId === 'tipo') {
                             return (
                               <td key={colId} className="py-1.5 px-2.5">
-                                <Badge variant="secondary" className="text-[10px] font-medium" onClick={onTextClick}>{getTipoLabel(client.tipo, customTipos)}</Badge>
+                                <Badge variant="secondary" className="text-[10px] font-medium" onClick={onTextClick}>{rotuloDoTipo(client.tipo, tipos)}</Badge>
                               </td>
                             );
                           }
@@ -1893,7 +1852,7 @@ const Clientes = () => {
                   <Icon className="h-5 w-5 text-primary shrink-0" />
                   <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate">{panelEmpresa.empresa}</span>
                 </SheetTitle>
-                <SheetDescription>{getTipoLabel(panelEmpresa.tipo, customTipos)}</SheetDescription>
+                <SheetDescription>{rotuloDoTipo(panelEmpresa.tipo, tipos)}</SheetDescription>
               </SheetHeader>
 
               <div className="py-6 space-y-6">
@@ -2084,15 +2043,15 @@ const Clientes = () => {
       <AlertDialog open={!!confirmDeleteTipo} onOpenChange={(o) => !o && setConfirmDeleteTipo(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir tipo "{confirmDeleteTipo?.label}"?</AlertDialogTitle>
+            <AlertDialogTitle>Excluir tipo "{confirmDeleteTipo?.nome}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              O tipo será removido dos seletores. Empresas já cadastradas com este tipo continuarão existindo, mas o rótulo deixará de aparecer. Tipos padrão podem ser reativados criando um novo tipo com o mesmo nome.
+              O tipo sai dos seletores para toda a equipe. Empresas já cadastradas com ele continuam existindo e continuam aparecendo no filtro. Para trazer o tipo de volta, basta criá-lo outra vez com o mesmo nome.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => confirmDeleteTipo && handleDeleteTipo(confirmDeleteTipo.value)}
+              onClick={() => confirmDeleteTipo && handleDeleteTipo(confirmDeleteTipo.id, confirmDeleteTipo.slug)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Excluir
