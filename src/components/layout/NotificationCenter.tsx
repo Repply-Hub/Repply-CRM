@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bell, CheckCheck, MessageCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -6,7 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNotificacoes, useUnreadCount, useMarkAsRead, useMarkAllAsRead, useUnreadEmails, type Notificacao } from '@/hooks/use-notificacoes';
 import { useSecaoLigada } from '@/hooks/use-secoes';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { buildWhatsAppUrl, getMessageTemplate } from '@/hooks/use-whatsapp';
@@ -75,6 +75,23 @@ export function NotificationCenter() {
   const markRead = useMarkAsRead();
   const markAllRead = useMarkAllAsRead();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // 🔴 O popover é controlado para ter como fechar SEMPRE. Sem isto, abrir um painel de
+  // detalhe (Sheet) de qualquer página com as notificações abertas prendia o popover: o
+  // Sheet é modal, cobre o sino com a sua camada e desliga o clique-fora do resto da tela,
+  // então não sobrava gesto que fechasse a lista. Agora ela fecha ao navegar, ao trocar de
+  // rota e pelo "X" do cabeçalho.
+  const [aberto, setAberto] = useState(false);
+
+  useEffect(() => {
+    setAberto(false);
+  }, [location.pathname]);
+
+  const irPara = (rota: string) => {
+    setAberto(false);
+    navigate(rota);
+  };
   const lastToastTime = useRef<number>(localStorage.getItem('last_notif_toast') ? parseInt(localStorage.getItem('last_notif_toast')!) : 0);
   const lastEmailCount = useRef<number>(parseInt(localStorage.getItem('last_email_count') || '0'));
 
@@ -121,7 +138,7 @@ export function NotificationCenter() {
   const isFollowupType = (n: Notificacao) => n.tipo === 'followup' || n.tipo === 'inatividade';
 
   return (
-    <Popover>
+    <Popover open={aberto} onOpenChange={setAberto}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full hover:bg-accent shrink-0">
           <Bell className="h-5 w-5 text-muted-foreground" />
@@ -135,23 +152,34 @@ export function NotificationCenter() {
       <PopoverContent align="end" className="w-80 p-0">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <p className="text-sm font-semibold">Notificações</p>
-          {unreadCount > 0 && (
+          <div className="flex items-center gap-1">
+            {unreadCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7 text-muted-foreground"
+                onClick={() => markAllRead.mutate()}
+              >
+                <CheckCheck className="h-3.5 w-3.5 mr-1" /> Marcar todas
+              </Button>
+            )}
             <Button
               variant="ghost"
-              size="sm"
-              className="text-xs h-7 text-muted-foreground"
-              onClick={() => markAllRead.mutate()}
+              size="icon"
+              className="h-7 w-7 text-muted-foreground"
+              aria-label="Fechar notificações"
+              onClick={() => setAberto(false)}
             >
-              <CheckCheck className="h-3.5 w-3.5 mr-1" /> Marcar todas
+              <X className="h-4 w-4" />
             </Button>
-          )}
+          </div>
         </div>
         <ScrollArea className="h-96">
           {unreadEmails > 0 && (
             <div className="px-4 py-3 bg-primary/5 border-b border-border">
-              <button 
+              <button
                 className="w-full text-left flex items-center gap-3"
-                onClick={() => navigate('/emails')}
+                onClick={() => irPara('/emails')}
               >
                 <div className="bg-primary/10 p-2 rounded-full">
                   <Bell className="h-4 w-4 text-primary" />
@@ -179,7 +207,7 @@ export function NotificationCenter() {
                     className="w-full text-left"
                     onClick={() => {
                       if (!n.lida) markRead.mutate(n.id);
-                      if (n.pedido_id) navigate(`/pedidos/${n.pedido_id}/editar`);
+                      if (n.pedido_id) irPara(`/pedidos/${n.pedido_id}/editar`);
                     }}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -214,10 +242,10 @@ export function NotificationCenter() {
                         variant="outline"
                         size="sm"
                         className="h-7 w-full text-[11px] gap-1.5 hover:bg-primary/5 border-primary/20"
-                        onClick={(e) => { 
-                          e.stopPropagation(); 
+                        onClick={(e) => {
+                          e.stopPropagation();
                           if (!n.lida) markRead.mutate(n.id);
-                          navigate(`/pedidos/${n.pedido_id}/editar`);
+                          irPara(`/pedidos/${n.pedido_id}/editar`);
                         }}
                       >
                         <MessageCircle className="h-3.5 w-3.5" /> Informações do negócio
