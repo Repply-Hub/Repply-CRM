@@ -16,10 +16,13 @@ export function useClientesTipos(empresaId?: string | null) {
   return useQuery<TipoDeCliente[]>({
     queryKey: ['clientes_tipos', empresaId ?? null],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('clientes_tipos')
-        .select('*')
-        .order('ordem', { ascending: true });
+      // A RLS libera "is_admin() OR empresa_id = get_my_empresa_id()": para conta
+      // admin da plataforma (suporte, sem ser membro da empresa) isso devolve os
+      // tipos de TODAS as empresas. O filtro aqui garante que a lista respeite o
+      // empresaId pedido mesmo nesse caso.
+      let query = supabase.from('clientes_tipos').select('*').order('ordem', { ascending: true });
+      if (empresaId) query = query.eq('empresa_id', empresaId);
+      const { data, error } = await query;
       if (error) throw error;
       return (data ?? []) as TipoDeCliente[];
     },
