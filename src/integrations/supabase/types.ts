@@ -980,6 +980,7 @@ export type Database = {
           data_criacao: string | null
           email: string | null
           empresa: string | null
+          empresa_id: string | null
           id: string
           logradouro: string | null
           nome_contato: string | null
@@ -1004,6 +1005,7 @@ export type Database = {
           data_criacao?: string | null
           email?: string | null
           empresa?: string | null
+          empresa_id?: string | null
           id?: string
           logradouro?: string | null
           nome_contato?: string | null
@@ -1028,6 +1030,7 @@ export type Database = {
           data_criacao?: string | null
           email?: string | null
           empresa?: string | null
+          empresa_id?: string | null
           id?: string
           logradouro?: string | null
           nome_contato?: string | null
@@ -1044,6 +1047,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contatos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
           {
