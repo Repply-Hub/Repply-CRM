@@ -509,6 +509,63 @@ linhas sãs mantiveram dia acima de 12 e o histograma continuou com cara normal.
 
 ---
 
+### 7.15 Tela que gira para sempre é TEMPO LIMITE, não lentidão
+
+O papel `authenticated` do Supabase tem **`statement_timeout = 8s`** (o `anon`, 3s). Consulta que
+passa disso não fica lenta: ela é **cancelada** com o erro `57014`, o TanStack Query refaz o
+pedido, e a tela gira indefinidamente.
+
+A diferença importa no diagnóstico. "Demora" e "nunca termina" têm causas diferentes, e o
+usuário descreve as duas como lentidão. **Quando ele disser que nunca termina, procure o tempo
+limite antes de procurar o gargalo** — e repare se o mesmo filtro, mais estreito, funciona: isso
+confirma corte por tempo em vez de erro de lógica.
+
+🔴 **Meça como usuário logado, ou você mede a coisa errada.** Pelo painel do Supabase você é
+administrador: sem RLS e **sem tempo limite**. A mesma consulta que mata a tela responde na hora
+para você. Para medir de verdade:
+
+```sql
+select set_config('request.jwt.claims','{"sub":"<user_id>","role":"authenticated"}',true),
+       set_config('role','authenticated',true),
+       set_config('statement_timeout','8s',true);
+explain (analyze, buffers) select ...;
+```
+
+### 7.16 Junção que só a busca usa é paga em toda chamada — e a RLS cobra por linha
+
+Medido em 01/09/2026: `pedidos_stats`, a função que alimenta o contador "N negócios · Total:
+R$ X" da tela de Negócios, juntava `pedidos` com `clientes`, `fabricantes` e `obras` em **toda**
+chamada — mesmo com `p_search` nulo, que é o caso comum. As três só existem para o `ILIKE` da
+busca por texto.
+
+O custo não é da junção: é da **política de segurança das tabelas juntadas**. `clientes_select`
+chama `get_my_usuario_id()` e `usuario_in_my_empresa()`, e `obras_select` roda um `EXISTS`
+correlacionado — tudo **por linha**. Sobre 12.790 negócios:
+
+| | tempo |
+|---|---|
+| contar `pedidos` sem as junções | **11 ms** |
+| a função como estava | **11.117 ms** (361.452 blocos) — morta aos 8.000 ms |
+| com as junções dentro do bloco da busca (`EXISTS`) | **54 ms** |
+
+O conserto foi trocar as três junções por `EXISTS` **dentro do próprio bloco do `p_search`**:
+sem busca, o `p_search IS NULL` decide primeiro e o Postgres não encosta nas outras tabelas
+(migration `20260901191455`).
+
+**A regra: em função de agregação, tabela que só um filtro opcional usa entra por `EXISTS`
+dentro daquele filtro, nunca por `JOIN` no `FROM`.** É parente do §7.9 — lá o problema é o
+predicado que cita duas colunas de data, aqui é a tabela juntada à toa —, e as duas se somam
+pelo mesmo motivo: a RLS de `pedidos` chama função uma vez por linha varrida.
+
+**Efeito colateral que confunde o diagnóstico:** isso derrubava a SELEÇÃO EM MASSA junto. A caixa
+do cabeçalho não age enquanto o total é desconhecido (`acaoDaCaixaDoCabecalho` devolve `'nada'`
+quando `totalConhecido` é falso, em `src/lib/selecao-em-massa.ts`). É a decisão certa — melhor
+calar do que prometer "selecionar todos os 12.790" e apagar outro número —, mas, como o total
+nunca chegava, a caixa ficava muda para sempre e o usuário relatou "não consigo selecionar", não
+"a conta está lenta".
+
+---
+
 ## 8. Identidade visual
 
 Sistema de marca já implementado em `src/index.css` ("Repply Brand System V2.0"). **Use os
@@ -590,6 +647,8 @@ Além disso, conforme o que mudou:
 - ❌ Parâmetro que escolhe entre duas colunas de data dentro de uma RPC (§7.9)
 - ❌ Tratar `prazo_resposta` como prazo (§4.4) — é a data de fechamento, e o nome mente
 - ❌ Construir gráfico novo sem perguntar ao Lucas se ele conta por criação ou por fechamento
+- ❌ `JOIN` no `FROM` por causa de filtro opcional em função de agregação (§7.16) — vira custo de RLS por linha em toda chamada
+- ❌ Medir desempenho como administrador no painel do Supabase (§7.15) — sem RLS e sem tempo limite, você mede outra coisa
 - ❌ `XLSX.read` fora de `src/lib/import/` (§7.14) — foi assim que o conserto de datas ficou num arquivo que nenhuma tela chamava
 - ❌ Limpar não-dígitos de identificador de WhatsApp
 - ❌ Painel que atribua culpa — ver o princípio "registra, não interpreta" (`SPEC.md` §3.5)
