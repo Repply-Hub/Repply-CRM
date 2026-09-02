@@ -45,7 +45,25 @@ export function useCriarContatoDaConversa() {
         throw new Error('Usuário não encontrado. Faça login novamente.');
       }
 
-      // ── 2. Criar o contato ────────────────────────────────────────────────
+      // ── 2. Resolver o NOME da empresa a partir do cliente escolhido ───────
+      //
+      // 🔴 As telas casam contato↔empresa pelo TEXTO `contatos.empresa`, não pelo
+      // `cliente_id`: a página da empresa (bloco "Contatos Adicionais" de
+      // ClienteDetalhe) e a do contato ("Vínculo Corporativo" de ContatoDetalhe)
+      // filtram por `c.empresa === cliente.empresa`. Se gravarmos só a chave, o
+      // contato fica ligado no banco mas invisível nas duas telas. Resolvemos o
+      // nome NO SERVIDOR para o texto nunca divergir da chave.
+      let empresaNome = dados.empresa?.trim() || null;
+      if (dados.clienteId) {
+        const { data: cli } = await supabase
+          .from('clientes')
+          .select('empresa')
+          .eq('id', dados.clienteId)
+          .single();
+        if (cli?.empresa) empresaNome = cli.empresa;
+      }
+
+      // ── 3. Criar o contato ────────────────────────────────────────────────
       //
       // `empresa_id` não vai no payload de propósito: um trigger no banco o preenche a
       // partir do login (get_my_empresa_id()), para o cliente nunca escolher a empresa.
@@ -57,7 +75,7 @@ export function useCriarContatoDaConversa() {
           email: dados.email?.trim() || null,
           cargo: dados.cargo?.trim() || null,
           cliente_id: dados.clienteId || null,
-          empresa: dados.empresa?.trim() || null,
+          empresa: empresaNome,
           data_criacao: new Date().toISOString(),
           usuario_id: usuarioId,
           criado_por_usuario_id: usuarioId,
@@ -66,7 +84,7 @@ export function useCriarContatoDaConversa() {
         .single();
       if (erroDoContato) throw erroDoContato;
 
-      // ── 3. Amarrar a conversa ao contato ──────────────────────────────────
+      // ── 4. Amarrar a conversa ao contato ──────────────────────────────────
       //
       // 🔴 DEPOIS de criar, e com a falha tratada à parte. Se esta segunda gravação falhar, o
       // contato JÁ EXISTE e está correto — o que se perde é só o atalho entre a conversa e a

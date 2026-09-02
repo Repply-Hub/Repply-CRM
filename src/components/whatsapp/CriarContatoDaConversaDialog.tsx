@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Search, UserPlus, Building2, AlertTriangle, Check } from 'lucide-react';
+import { Loader2, UserPlus, Building2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CargoSelect } from '@/components/shared/CargoSelect';
-import { cn } from '@/lib/utils';
+import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { useClientes } from '@/hooks/use-clientes';
 import { useCriarContatoDaConversa } from '@/hooks/use-criar-contato-da-conversa';
@@ -54,7 +54,6 @@ export function CriarContatoDaConversaDialog({
   const [email, setEmail] = useState('');
   const [cargo, setCargo] = useState('');
   const [clienteId, setClienteId] = useState<string | null>(null);
-  const [buscaDeCliente, setBuscaDeCliente] = useState('');
 
   // Recarrega a sugestão a cada abertura. Sem isto, abrir numa segunda conversa mostraria os
   // dados da primeira — e alguém cadastraria a pessoa errada com o telefone certo.
@@ -65,27 +64,19 @@ export function CriarContatoDaConversaDialog({
     setEmail('');
     setCargo('');
     setClienteId(null);
-    setBuscaDeCliente('');
   }, [aberto, sugestao.nome, sugestao.telefone]);
 
-  const clientesFiltrados = useMemo(() => {
-    const termo = buscaDeCliente
-      .trim()
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .toLowerCase();
+  // "Sem cliente" na frente para dar como desmarcar — o campo é opcional. O resto é a
+  // carteira inteira; a busca do próprio dropdown filtra na hora de digitar.
+  const opcoesDeCliente = useMemo(() => {
     const lista = (clientes ?? []) as Array<{ id: string; empresa?: string | null }>;
-    if (!termo) return lista.slice(0, 8);
-    return lista
-      .filter((c) =>
-        (c.empresa ?? '')
-          .normalize('NFD')
-          .replace(/[̀-ͯ]/g, '')
-          .toLowerCase()
-          .includes(termo),
-      )
-      .slice(0, 8);
-  }, [clientes, buscaDeCliente]);
+    return [
+      { value: '', label: 'Sem cliente' },
+      ...lista
+        .filter((c) => c.empresa)
+        .map((c) => ({ value: c.id, label: c.empresa as string })),
+    ];
+  }, [clientes]);
 
   const clienteEscolhido = (clientes ?? []).find(
     (c: { id: string }) => c.id === clienteId,
@@ -100,6 +91,10 @@ export function CriarContatoDaConversaDialog({
         email,
         cargo,
         clienteId,
+        // O nome vai junto para a ficha do contato e o bloco "Contatos Adicionais"
+        // da empresa mostrarem o vínculo — as duas telas casam pelo texto `empresa`,
+        // não pelo `cliente_id`. O hook reconfere no servidor a partir do id.
+        empresa: clienteEscolhido?.empresa ?? null,
       });
       toast.success(
         r.vinculou
@@ -188,52 +183,17 @@ export function CriarContatoDaConversaDialog({
                     caminho longo — sair do WhatsApp, cadastrar a construtora, voltar. Contato
                     sem cliente continua achável na busca e pode ser amarrado depois; contato
                     NÃO cadastrado não existe para o sistema. */}
-                {clienteEscolhido ? (
-                  <div className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
-                    <span className="truncate text-sm">{clienteEscolhido.empresa}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => setClienteId(null)}
-                    >
-                      Trocar
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        className="h-9 pl-9"
-                        placeholder="Buscar cliente (opcional)"
-                        value={buscaDeCliente}
-                        onChange={(e) => setBuscaDeCliente(e.target.value)}
-                      />
-                    </div>
-                    {clientesFiltrados.length > 0 && (
-                      <div className="max-h-36 space-y-0.5 overflow-y-auto rounded-md border border-border p-1">
-                        {clientesFiltrados.map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => setClienteId(c.id)}
-                            className={cn(
-                              'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent/50',
-                            )}
-                          >
-                            <Check className="h-3 w-3 opacity-0" />
-                            <span className="truncate">{c.empresa}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <p className="text-[11px] text-muted-foreground">
-                      Dá para deixar sem cliente e amarrar depois.
-                    </p>
-                  </>
-                )}
+                <SearchableSelect
+                  options={opcoesDeCliente}
+                  value={clienteId ?? ''}
+                  onValueChange={(v) => setClienteId(v || null)}
+                  placeholder="Selecione o cliente"
+                  searchPlaceholder="Buscar cliente..."
+                  emptyMessage="Nenhum cliente encontrado."
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Dá para deixar sem cliente e amarrar depois.
+                </p>
               </div>
             </>
           )}
