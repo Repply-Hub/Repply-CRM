@@ -31,6 +31,7 @@ import { ListPagination } from '@/components/shared/ListPagination';
 import { CargoSelect } from '@/components/shared/CargoSelect';
 import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEmailDialog';
 import { useObrasDoContato, useSalvarObrasDoContato } from '@/hooks/use-obra-contatos';
+import { useConversaDoContato } from '@/hooks/use-conversa-do-contato';
 import { Checkbox } from '@/components/ui/checkbox';
 
 /**
@@ -81,6 +82,14 @@ const ContatoDetalhe = () => {
   // coluna órfã em 27/08/2026) — ver `use-obra-contatos.ts`.
   const { data: obrasDoContato } = useObrasDoContato(contato?.id);
   const salvarObrasDoContato = useSalvarObrasDoContato();
+  // A conversa de WhatsApp desta pessoa, para o link "Ver conversa no WhatsApp" abrir direto.
+  // Casa pelo telefone (ver use-conversa-do-contato.ts); sem conversa, o link abre a caixa
+  // de entrada sem nada selecionado.
+  const { conversaId: conversaDoContatoId } = useConversaDoContato(
+    contato?.telefone,
+    contato?.id,
+    !!contato,
+  );
   const [vincularOpen, setVincularOpen] = useState(false);
   const [selectedEmpresaId, setSelectedEmpresaId] = useState('');
 
@@ -226,47 +235,17 @@ const ContatoDetalhe = () => {
               {(contato as any).cargo && <Badge variant="secondary" className="text-[10px]">{(contato as any).cargo}</Badge>}
             </div>
           </div>
-          <div className="flex gap-2 shrink-0 ml-auto">
-            <Button variant="outline" size="sm" onClick={openEdit}>
-              <Pencil className="h-4 w-4 mr-1" /> Editar
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
-                  <Trash2 className="h-4 w-4 mr-1" /> Excluir
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Excluir contato?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação não pode ser desfeita. O contato "{contato.nome_contato}" será removido permanentemente.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={async () => {
-                      try {
-                        await deleteContato.mutateAsync(id!);
-                        toast.success('Contato excluído com sucesso!');
-                        navigate('/clientes');
-                      } catch (err: any) {
-                        toast.error(err.message);
-                      }
-                    }}
-                  >
-                    Excluir
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
         </div>
       }
     >
       <div className="p-3 sm:p-4 md:p-6 space-y-6 w-full">
+        {/* Editar saiu do cabeçalho e ficou aqui, no corpo da página. */}
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={openEdit}>
+            <Pencil className="h-4 w-4 mr-1" /> Editar
+          </Button>
+        </div>
+
         <div className="grid gap-6 md:grid-cols-3">
           {/* Card: Perfil e Empresa */}
           <Card className="md:col-span-1">
@@ -381,9 +360,24 @@ const ContatoDetalhe = () => {
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-tight">Telefone / WhatsApp</p>
                     <p className="text-sm font-semibold text-foreground truncate">{contato.telefone || 'Não informado'}</p>
                     {contato.telefone && (
-                      <Button variant="link" className="p-0 h-auto text-[11px] mt-1" onClick={() => copyInfo('Telefone', contato.telefone)}>
-                        Copiar número
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-x-3 mt-1">
+                        <Button variant="link" className="p-0 h-auto text-[11px]" onClick={() => copyInfo('Telefone', contato.telefone)}>
+                          Copiar número
+                        </Button>
+                        <Button
+                          variant="link"
+                          className="p-0 h-auto text-[11px]"
+                          onClick={() =>
+                            navigate(
+                              conversaDoContatoId
+                                ? `/whatsapp?conversaId=${encodeURIComponent(conversaDoContatoId)}`
+                                : '/whatsapp',
+                            )
+                          }
+                        >
+                          Ver conversa no WhatsApp
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -542,6 +536,42 @@ const ContatoDetalhe = () => {
           </Card>
         </div>
         )}
+
+        {/* Excluir contato — no fim da página, fora do cabeçalho. */}
+        <div className="flex justify-end border-t pt-6">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm">
+                <Trash2 className="h-4 w-4 mr-1" /> Excluir contato
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir contato?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta ação não pode ser desfeita. O contato "{contato.nome_contato}" será removido permanentemente.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={async () => {
+                    try {
+                      await deleteContato.mutateAsync(id!);
+                      toast.success('Contato excluído com sucesso!');
+                      navigate('/clientes');
+                    } catch (err: any) {
+                      toast.error(err.message);
+                    }
+                  }}
+                >
+                  Excluir
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
 
         <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <ConteudoDialogo>
