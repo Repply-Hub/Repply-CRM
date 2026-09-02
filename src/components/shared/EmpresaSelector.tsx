@@ -29,6 +29,7 @@ import { useClientes } from '@/hooks/use-clientes';
 import { useCreateCliente } from '@/hooks/use-mutations';
 import { toast } from 'sonner';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits } from '@/lib/cnpj';
+import { correspondeBusca } from '@/lib/texto-busca';
 
 interface EmpresaSelectorProps {
   value: string;
@@ -56,11 +57,12 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
   const filteredClientes = useMemo(() => {
     if (!clientes) return [];
     if (!searchTerm) return clientes;
-    const search = searchTerm.toLowerCase();
-    return clientes.filter((c) => 
-      c.empresa?.toLowerCase().includes(search) || 
-      c.razao_social?.toLowerCase().includes(search) ||
-      c.cnpj?.includes(search)
+    // Busca sem acento e sem caixa: "jeronimo" acha "Jerônimo". O CNPJ casa pelos dígitos
+    // crus, que não têm acento.
+    return clientes.filter((c) =>
+      correspondeBusca(c.empresa, searchTerm) ||
+      correspondeBusca(c.razao_social, searchTerm) ||
+      c.cnpj?.includes(searchTerm.trim())
     );
   }, [clientes, searchTerm]);
 

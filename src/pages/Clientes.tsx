@@ -41,6 +41,7 @@ import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep'
 import { ListPagination } from '@/components/shared/ListPagination';
 import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEmailDialog';
 import { cn, slugify, hasTextSelection } from '@/lib/utils';
+import { normalizarParaBusca, correspondeBusca } from '@/lib/texto-busca';
 import { ExportClientesButton } from '@/components/clientes/ExportClientesButton';
 import { FilterButton } from '@/components/shared/FilterButton';
 import { StandardPopoverMenu } from '@/components/ui/standard-popover-menu';
@@ -231,7 +232,8 @@ const buildRowSearchText = (row: Record<string, any>, tipoLabel?: string) => {
       : [];
   return [...staticFields, ...extraValues]
     .filter((v) => v !== null && v !== undefined && v !== '')
-    .map((v) => String(v).toLowerCase())
+    // Sem acento: quem digita "jeronimo" na busca acha "Jerônimo".
+    .map((v) => normalizarParaBusca(String(v)))
     .join(' ');
 };
 
@@ -255,8 +257,8 @@ function FilterCheckboxList({
   searchPlaceholder?: string;
 }) {
   const [search, setSearch] = useState('');
-  const term = search.trim().toLowerCase();
-  const filteredOptions = term ? options.filter(o => o.label.toLowerCase().includes(term)) : options;
+  const term = normalizarParaBusca(search);
+  const filteredOptions = term ? options.filter(o => correspondeBusca(o.label, search)) : options;
 
   return (
     <div className="flex flex-col">
@@ -551,7 +553,7 @@ const Clientes = () => {
 
   const filteredEmpresas = sortRows(
     empresas.filter((c: any) => {
-      const s = search.toLowerCase();
+      const s = normalizarParaBusca(search);
       const matchSearch = !s || buildRowSearchText(c, getTipoLabel(c.tipo, customTipos)).includes(s);
       const matchTipo = selectedTipos.length === 0 || selectedTipos.includes(c.tipo);
       const matchUf = selectedUfs.length === 0 || (c.uf && selectedUfs.includes(c.uf));
@@ -567,7 +569,7 @@ const Clientes = () => {
 
   const filteredContatos = sortRows(
     contatos.filter(c => {
-      const s = search.toLowerCase();
+      const s = normalizarParaBusca(search);
       return !s || buildRowSearchText(c).includes(s);
     }),
     sortColumn,

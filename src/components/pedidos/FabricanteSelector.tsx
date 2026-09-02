@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Check, ChevronDown, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { correspondeBusca } from '@/lib/texto-busca';
 import { Button } from '@/components/ui/button';
 import {
   Command,
@@ -53,10 +54,10 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
   const filteredFabricantes = useMemo(() => {
     if (!fabricantes) return [];
     if (!searchTerm) return fabricantes;
-    const search = searchTerm.toLowerCase();
-    return fabricantes.filter((f) => 
-      f.nome?.toLowerCase().includes(search) || 
-      f.cnpj?.includes(search)
+    // Sem acento e sem caixa: "acos" acha "Aços". O CNPJ casa pelos dígitos crus.
+    return fabricantes.filter((f) =>
+      correspondeBusca(f.nome, searchTerm) ||
+      f.cnpj?.includes(searchTerm.trim())
     );
   }, [fabricantes, searchTerm]);
 

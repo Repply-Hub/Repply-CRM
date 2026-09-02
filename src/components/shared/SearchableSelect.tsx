@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Check, ChevronDown, Search, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { correspondeBusca } from "@/lib/texto-busca";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -95,12 +96,9 @@ export function SearchableSelect({
         align="start"
       >
         <div className="flex flex-col">
-          <Command 
+          <Command
             className="flex flex-col"
-            filter={(value, search) => {
-              if (value.toLowerCase().includes(search.toLowerCase())) return 1;
-              return 0;
-            }}
+            filter={(value, search) => (correspondeBusca(value, search) ? 1 : 0)}
           >
             <CommandInput placeholder={searchPlaceholder ?? `Buscar ${placeholder.toLowerCase()}...`} />
             <CommandList ref={listRef} className="max-h-[200px] overflow-y-auto overflow-x-hidden">

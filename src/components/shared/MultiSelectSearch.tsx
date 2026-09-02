@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { correspondeBusca } from "@/lib/texto-busca";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -82,10 +83,7 @@ export function MultiSelectSearch({
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command
           className="flex flex-col"
-          filter={(value, search) => {
-            if (value.toLowerCase().includes(search.toLowerCase())) return 1;
-            return 0;
-          }}
+          filter={(value, search) => (correspondeBusca(value, search) ? 1 : 0)}
         >
           <CommandInput placeholder={`Buscar ${placeholder.toLowerCase()}...`} />
           <CommandList className="max-h-[200px] overflow-y-auto overflow-x-hidden">
