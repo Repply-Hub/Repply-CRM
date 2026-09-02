@@ -980,7 +980,7 @@ export type Database = {
           data_criacao: string | null
           email: string | null
           empresa: string | null
-          empresa_id: string | null
+          empresa_id: string
           id: string
           logradouro: string | null
           nome_contato: string | null

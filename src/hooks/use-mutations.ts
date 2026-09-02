@@ -44,7 +44,11 @@ export function useCreateContato() {
       obra_id?: string | null;
       campos_extras?: Record<string, string>;
     }) => {
-      const { data: vid } = await supabase.rpc('get_my_vendedor_id');
+      const { data: vid, error: vidErr } = await supabase.rpc('get_my_vendedor_id');
+      // Sem dono resolvido, NÃO grava: `usuario_id` nulo cria um contato órfão que a
+      // regra de leitura vaza para todas as empresas (docs/divida-tecnica.md §58). Mesmo
+      // padrão de `use-tarefas.ts`.
+      if (vidErr || !vid) throw new Error('Usuário não encontrado. Faça login novamente.');
       // `.select().single()` para devolver o contato criado: quem cria contato de
       // dentro da obra precisa do id na hora, para já marcá-lo no vínculo.
       const { data: criado, error } = await supabase

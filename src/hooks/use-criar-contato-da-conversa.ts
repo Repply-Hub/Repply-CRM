@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/use-auth';
 
 /**
  * Abrir um contato no CRM a partir de uma conversa de WhatsApp, e amarrar os dois.
@@ -26,7 +25,6 @@ export interface NovoContatoDaConversa {
 }
 
 export function useCriarContatoDaConversa() {
-  const { profile } = useAuth();
   const qc = useQueryClient();
 
   return useMutation({
@@ -35,12 +33,22 @@ export function useCriarContatoDaConversa() {
       if (!nome) throw new Error('Escreva o nome do contato.');
       if (!dados.telefone?.trim()) throw new Error('O contato precisa de um telefone.');
 
-      // ── 1. Criar o contato ────────────────────────────────────────────────
+      // ── 1. Descobrir quem é o dono, NO SERVIDOR ───────────────────────────
       //
-      // 🔴 `usuario_id` é `usuarios.id` (a linha da nossa tabela), NÃO `usuarios.user_id` (o
-      // login). São identificadores diferentes da mesma pessoa e o nome da coluna não diz qual
-      // é qual — mandar o errado faz a chave estrangeira recusar a gravação inteira, e a tela
-      // mostra uma frase genérica sem nada explicando (CLAUDE.md §4.5).
+      // 🔴 Antes isto vinha de `profile?.id ?? null`, o estado do React. Numa sessão meio
+      // carregada `profile` é nulo, e o `?? null` gravava um contato SEM dono — que a regra
+      // de leitura de `contatos` mostrava para todas as empresas (docs/divida-tecnica.md §58).
+      // `get_my_vendedor_id()` lê o login (`auth.uid()`) no banco e devolve `usuarios.id`;
+      // se voltar vazio, a sessão não serve para gravar — mesmo padrão de `use-tarefas.ts`.
+      const { data: usuarioId, error: erroUsuario } = await supabase.rpc('get_my_vendedor_id');
+      if (erroUsuario || !usuarioId) {
+        throw new Error('Usuário não encontrado. Faça login novamente.');
+      }
+
+      // ── 2. Criar o contato ────────────────────────────────────────────────
+      //
+      // `empresa_id` não vai no payload de propósito: um trigger no banco o preenche a
+      // partir do login (get_my_empresa_id()), para o cliente nunca escolher a empresa.
       const { data: contato, error: erroDoContato } = await supabase
         .from('contatos')
         .insert({
@@ -51,14 +59,14 @@ export function useCriarContatoDaConversa() {
           cliente_id: dados.clienteId || null,
           empresa: dados.empresa?.trim() || null,
           data_criacao: new Date().toISOString(),
-          usuario_id: profile?.id ?? null,
-          criado_por_usuario_id: profile?.id ?? null,
+          usuario_id: usuarioId,
+          criado_por_usuario_id: usuarioId,
         })
         .select('id')
         .single();
       if (erroDoContato) throw erroDoContato;
 
-      // ── 2. Amarrar a conversa ao contato ──────────────────────────────────
+      // ── 3. Amarrar a conversa ao contato ──────────────────────────────────
       //
       // 🔴 DEPOIS de criar, e com a falha tratada à parte. Se esta segunda gravação falhar, o
       // contato JÁ EXISTE e está correto — o que se perde é só o atalho entre a conversa e a
