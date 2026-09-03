@@ -72,8 +72,12 @@ export function useResponsaveisDoNegocio(pedidoId: string | null | undefined) {
  * Invalidar tudo sempre seria mais simples e recarregaria oito painéis pesados a cada
  * participante acrescentado.
  */
-function invalidarLista(qc: QueryClient, pedidoId: string) {
-  qc.invalidateQueries({ queryKey: ['pedido_responsaveis', pedidoId] });
+function invalidarLista(qc: QueryClient) {
+  // O PREFIXO, não a chave exata: além da lista deste negócio, existe o mapa de participantes
+  // de todos os negócios (`use-participantes-dos-negocios.ts`), que alimenta o "+N" da lista,
+  // o cartão do Kanban e a exportação. Invalidar só a chave exata deixaria o "+N" mostrando
+  // número velho até a página ser recarregada.
+  qc.invalidateQueries({ queryKey: ['pedido_responsaveis'] });
   qc.invalidateQueries({ queryKey: ['pedidos'] });
 }
 
@@ -98,7 +102,7 @@ export function useAdicionarResponsavel(pedidoId: string) {
       }
     },
     onSuccess: () => {
-      invalidarLista(qc, pedidoId);
+      invalidarLista(qc);
       toast.success('Responsável adicionado.');
     },
     onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível adicionar o responsável.')),
@@ -120,7 +124,7 @@ export function useRemoverResponsavel(pedidoId: string) {
       if (error) throw error;
     },
     onSuccess: () => {
-      invalidarLista(qc, pedidoId);
+      invalidarLista(qc);
       toast.success('Responsável removido.');
     },
     onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível remover o responsável.')),
@@ -147,7 +151,7 @@ export function useDefinirPrincipal(pedidoId: string) {
       if (error) throw error;
     },
     onSuccess: () => {
-      invalidarLista(qc, pedidoId);
+      invalidarLista(qc);
       // Aqui o dinheiro mudou de dono: todos os painéis que contam por responsável ficaram
       // velhos no mesmo instante.
       invalidarPaineisDeNegocios(qc);

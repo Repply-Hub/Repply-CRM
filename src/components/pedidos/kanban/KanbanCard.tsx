@@ -170,8 +170,14 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
 
                 <div className="mt-2 pt-2 border-t border-border/40 flex items-center justify-between">
                   {(!visibleColumns || visibleColumns.includes('vendedor')) && (
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground">
+                    <span
+                      className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground"
+                      title={order.qtdParticipantes ? `Também responsáveis: ${order.nomesDosParticipantes}` : undefined}
+                    >
                       {order.vendedor}
+                      {!!order.qtdParticipantes && (
+                        <span className="ml-1 opacity-70">+{order.qtdParticipantes}</span>
+                      )}
                     </span>
                   )}
                   <div className="flex items-center gap-1">

@@ -10,6 +10,13 @@ export interface PedidoRow {
   obra?: string;
   fabricante: string;
   vendedor: string;
+  /**
+   * Os responsáveis ALÉM do principal, já em texto ("Ana Lima, Bruno Sá"). Vazio na maioria
+   * dos negócios, e é por isso que a COLUNA só aparece quando alguma linha tem alguém: um
+   * negócio com vários responsáveis é a exceção, e reservar largura de página para uma coluna
+   * de traços encolheria as outras em todo relatório de toda empresa.
+   */
+  participantes?: string;
   valor: number;
   etapa: string;
   data: string;
@@ -35,6 +42,8 @@ export async function generatePedidosPdf(
   opcoes: { comObra?: boolean } = {},
 ) {
   const comObra = opcoes.comObra !== false;
+  // Ver o comentário de `participantes` em PedidoRow: a coluna se paga só quando tem conteúdo.
+  const comParticipantes = pedidos.some(p => !!p.participantes);
   // `compress: true` no documento inteiro: sem isto o jsPDF embute cada imagem crua, e duas
   // logos num relatório de várias páginas passam de 10 MB — anexo que servidor de e-mail
   // recusa. Medido na versão 4.2.0.
@@ -73,12 +82,13 @@ export async function generatePedidosPdf(
     startY: 32,
     // Cabeçalho e corpo têm que cortar a coluna JUNTOS: tirar só um dos dois desloca todos
     // os valores uma casa para o lado e a tabela inteira sai trocada.
-    head: [['Cliente', ...(comObra ? ['Obra'] : []), 'Fabricante', 'Vendedor', 'Valor', 'Etapa', 'Data']],
+    head: [['Cliente', ...(comObra ? ['Obra'] : []), 'Fabricante', 'Vendedor', ...(comParticipantes ? ['Outros responsáveis'] : []), 'Valor', 'Etapa', 'Data']],
     body: pedidos.map(p => [
       p.cliente,
       ...(comObra ? [p.obra ?? '-'] : []),
       p.fabricante,
       p.vendedor,
+      ...(comParticipantes ? [p.participantes || '-'] : []),
       p.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
       p.etapa,
       // Sem `new Date()`: a data vem como texto AAAA-MM-DD, e o JavaScript lê

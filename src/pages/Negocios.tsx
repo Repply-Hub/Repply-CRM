@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { marcaDaEmpresa } from '@/lib/marca-da-empresa';
 import { useMinhaPermissao } from '@/hooks/use-minha-permissao';
 import { PainelDeResponsaveis } from '@/components/pedidos/PainelDeResponsaveis';
+import { useParticipantesDosNegocios } from '@/hooks/use-participantes-dos-negocios';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useDelayedLoading } from '@/hooks/use-delayed-loading';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
@@ -289,7 +290,9 @@ const PedidoRow = memo(({
   KANBAN_STAGES,
   getLabel,
   stageLabel,
-  temObras
+  temObras,
+  qtdParticipantes,
+  nomesDosParticipantes
 }: {
   pedido: any,
   selected: boolean,
@@ -304,6 +307,12 @@ const PedidoRow = memo(({
   // por negócio da tabela, e a resposta é a mesma para todas — perguntar uma vez lá em cima
   // custa menos que espalhar o hook por dezenas de cópias do mesmo componente.
   temObras: boolean | undefined
+  /**
+   * Quantos responsáveis ALÉM do principal. Número e texto, e não a lista: `PedidoRow` é
+   * memoizado, e um array novo a cada render desmontaria essa economia para todas as linhas.
+   */
+  qtdParticipantes: number,
+  nomesDosParticipantes: string,
 }) => {
   const camposExtras = pedido.campos_extras || {};
   const daysInStage = Math.floor((Date.now() - new Date(pedido.created_at).getTime()) / 86400000);
@@ -411,7 +420,22 @@ const PedidoRow = memo(({
               </TableCell>
             );
           case 'vendedor':
-            return <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">{pedido.vendedor?.nome ?? '-'}</TableCell>;
+            // O principal com "+N" ao lado, nunca uma coluna nova: coluna nova nasce visível
+            // para a empresa inteira de uma vez (`mergeMissingDefaultColumns`), mexendo na
+            // tela de quem não pediu nada.
+            return (
+              <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">
+                {pedido.vendedor?.nome ?? '-'}
+                {qtdParticipantes > 0 && (
+                  <span
+                    className="ml-1.5 text-xs text-muted-foreground"
+                    title={`Também responsáveis: ${nomesDosParticipantes}`}
+                  >
+                    +{qtdParticipantes}
+                  </span>
+                )}
+              </TableCell>
+            );
           case 'data_pedido':
             return (
               <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">
@@ -769,6 +793,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // termina em nada: sem isto, quem não pode apagar digita APAGAR e a tela fica igual.
   const { permitido: podeExcluir } = useMinhaPermissao('pedidos', 'excluir');
   const { permitido: podeEditar } = useMinhaPermissao('pedidos', 'editar');
+  // Os participantes de todos os negócios visíveis, num mapa. Uma consulta só para a tela
+  // inteira — o porquê (e os números medidos) está em use-participantes-dos-negocios.ts.
+  const { data: participantesPorNegocio } = useParticipantesDosNegocios();
   const isDeleting = bulkDeleteMutation.isPending;
 
   // Ação em massa (etapa + marcador num só bloco): o alvo é somente o que o usuário marcar no
@@ -1090,8 +1117,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     [kanbanPedidosByStage]
   );
   const pipelineOrders = useMemo(
-    () => kanbanPedidosFlat.map(mapPedidoToOrder),
-    [kanbanPedidosFlat]
+    () => kanbanPedidosFlat.map(p => {
+      const extras = participantesPorNegocio?.get(p.id) ?? [];
+      return {
+        ...mapPedidoToOrder(p),
+        qtdParticipantes: extras.length,
+        nomesDosParticipantes: extras.map(r => r.nome).join(', '),
+      };
+    }),
+    [kanbanPedidosFlat, participantesPorNegocio]
   );
 
   const hasPipelineFilters = selectedVendedores.length > 0 || selectedFabricantes.length > 0 || selectedMarcadores.length > 0 || showOnlyAttention || hideImportados || !!dateFrom || !!dateTo || selectedStages.length > 0;
@@ -1471,6 +1505,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           obra: p.obra?.nome_obra ?? '-',
           fabricante: p.fabricante?.nome ?? '-',
           vendedor: p.vendedor?.nome ?? '-',
+          participantes: (participantesPorNegocio?.get(p.id) ?? []).map(r => r.nome).join(', '),
           valor: p.valor_total ?? 0,
           etapa: stageLabel(p.status),
           data: p.data_pedido,
@@ -1486,6 +1521,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           obra: o.obra,
           fabricante: o.fabricante,
           vendedor: o.vendedor,
+          participantes: o.nomesDosParticipantes ?? '',
           valor: o.valor,
           etapa: stageLabel(o.stage),
           data: o.createdAt,
@@ -1500,6 +1536,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         obra: p.obra?.nome_obra ?? '-',
         fabricante: p.fabricante?.nome ?? '-',
         vendedor: p.vendedor?.nome ?? '-',
+        participantes: (participantesPorNegocio?.get(p.id) ?? []).map(r => r.nome).join(', '),
         valor: p.valor_total ?? 0,
         etapa: stageLabel(p.status),
         data: p.data_pedido,
@@ -2703,6 +2740,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                           getLabel={getLabel}
                           stageLabel={stageLabel}
                           temObras={temObras}
+                          qtdParticipantes={participantesPorNegocio?.get(p.id)?.length ?? 0}
+                          nomesDosParticipantes={(participantesPorNegocio?.get(p.id) ?? []).map(r => r.nome).join(', ')}
                         />
                       ))
 
@@ -3150,6 +3189,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                               getLabel={getLabel}
                               stageLabel={stageLabel}
                               temObras={temObras}
+                              qtdParticipantes={participantesPorNegocio?.get(p.id)?.length ?? 0}
+                              nomesDosParticipantes={(participantesPorNegocio?.get(p.id) ?? []).map(r => r.nome).join(', ')}
                             />
                           ))}
                         </TableBody>

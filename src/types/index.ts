@@ -12,6 +12,13 @@ export interface Order {
   daysInStage: number;
   alertDays: number;
   vendedor: string;
+  /**
+   * Quantos responsáveis ALÉM do principal, e os nomes deles. Ficam fora de `vendedor` de
+   * propósito: aquele campo vai direto para a planilha e para o PDF, e "Ana Lima +2" numa
+   * célula de planilha não é nome de ninguém.
+   */
+  qtdParticipantes?: number;
+  nomesDosParticipantes?: string;
   createdAt: string;
   campos_extras?: Record<string, any>;
   marcador?: { nome: string; cor: string } | null;
