@@ -11,6 +11,7 @@ import { useSecaoLigada } from '@/hooks/use-secoes';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
 import { useClientesTipos } from '@/hooks/use-clientes-tipos';
+import { GerenciarTiposDialog } from '@/components/clientes/GerenciarTiposDialog';
 import { rotuloDoTipo, ehPessoaFisica, slugDeTipo } from '@/lib/tipos-de-cliente';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { NovoNegocioDialog } from '@/components/pedidos/NovoNegocioDialog';
@@ -287,6 +288,9 @@ const ClienteDetalhe = () => {
   const { data: tiposDeCliente } = useClientesTipos(empresaId);
   // useMemo para a lista não trocar de identidade a cada pintura (mesmo motivo de Clientes.tsx).
   const tipos = useMemo(() => tiposDeCliente ?? [], [tiposDeCliente]);
+  // Espelha public.is_gestor() só para esconder o controle na UI, igual Clientes.tsx.
+  // A RLS continua sendo a autoridade real.
+  const podeGerenciarTipos = ['gestor', 'admin', 'empresa'].includes(profile?.role);
   const { data: tarefasKanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
   const tarefaKanbanStages = useMemo(
     () => tarefasKanbanColunas.map(c => ({ key: c.slug, label: c.nome })),
@@ -328,6 +332,7 @@ const ClienteDetalhe = () => {
   const deleteContato = useDeleteContato();
   const { data: contatos } = useContatos();
   const [editOpen, setEditOpen] = useState(false);
+  const [gerenciarTiposOpen, setGerenciarTiposOpen] = useState(false);
   const [viewOrderId, setViewOrderId] = useState<string | null>(null);
   const [addContatoOpen, setAddContatoOpen] = useState(false);
   const [addObraOpen, setAddObraOpen] = useState(false);
@@ -914,12 +919,37 @@ const ClienteDetalhe = () => {
             <form onSubmit={handleEditSubmit} className="space-y-4 mt-2">
               <div>
                 <Label>Tipo</Label>
-                <Select value={editData.tipo} onValueChange={v => setEditData(d => ({ ...d, tipo: v }))}>
+                <Select
+                  value={editData.tipo}
+                  onValueChange={v => {
+                    if (v === '__new__') {
+                      // 🔴 FECHA A EDIÇÃO ANTES DE ABRIR O GERENCIAR, em vez de empilhar os
+                      // dois diálogos. Dois modais do Radix abertos ao mesmo tempo disputam o
+                      // foco e o `pointer-events: none` que o de cima põe no <body>; quando o
+                      // de cima fecha, a tela pode ficar surda a cliques — e aqui não haveria
+                      // saída, porque este projeto desligou Esc e clique-fora
+                      // (ui/dialog.tsx:42) e só recarregar resolveria. É o mesmo motivo pelo
+                      // qual o EmpresaSelector não ganhou este botão.
+                      // Nada se perde no caminho: `editData` é estado do componente e não é
+                      // limpo ao fechar, e a volta usa `setEditOpen(true)` — nunca
+                      // `openEdit()`, que releria o cliente do banco e apagaria o que já
+                      // estava digitado.
+                      setEditOpen(false);
+                      setGerenciarTiposOpen(true);
+                      return;
+                    }
+                    setEditData(d => ({ ...d, tipo: v }));
+                  }}
+                >
                   <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
                   <SelectContent>
                     {opcoesDeEdicaoDeTipo.map(t => (
                       <SelectItem key={t.id} value={t.slug}>{t.nome}</SelectItem>
                     ))}
+                    {/* Só gestor cria ou renomeia tipo: para os demais a RLS recusaria a gravação. */}
+                    {podeGerenciarTipos && (
+                      <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo tipo…</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -966,6 +996,21 @@ const ClienteDetalhe = () => {
             </form>
           </ConteudoDialogo>
         </Dialog>
+
+        {/* O MESMO componente que a tela de Clientes usa — nada de uma segunda cópia do
+            diálogo. Fica FORA do <Dialog> de edição de propósito: ele precisa continuar
+            montado justamente enquanto a edição está fechada. */}
+        <GerenciarTiposDialog
+          open={gerenciarTiposOpen}
+          onOpenChange={(aberto) => {
+            setGerenciarTiposOpen(aberto);
+            // Fechou o gerenciar: a edição volta exatamente de onde parou.
+            if (!aberto) setEditOpen(true);
+          }}
+          empresaId={empresaId}
+          podeGerenciar={podeGerenciarTipos}
+          onTipoCriado={(slug) => setEditData(d => ({ ...d, tipo: slug }))}
+        />
 
         {/* Info Cards */}
         <div className="grid gap-4 md:grid-cols-3">

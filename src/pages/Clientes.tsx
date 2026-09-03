@@ -46,7 +46,8 @@ import { ExportClientesButton } from '@/components/clientes/ExportClientesButton
 import { FilterButton } from '@/components/shared/FilterButton';
 import { StandardPopoverMenu } from '@/components/ui/standard-popover-menu';
 import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
-import { useClientesTipos, useCriarTipoDeCliente, useExcluirTipoDeCliente } from '@/hooks/use-clientes-tipos';
+import { useClientesTipos } from '@/hooks/use-clientes-tipos';
+import { GerenciarTiposDialog } from '@/components/clientes/GerenciarTiposDialog';
 import { rotuloDoTipo, tipoPadrao, opcoesDeFiltro, slugDeTipo } from '@/lib/tipos-de-cliente';
 
 
@@ -307,12 +308,10 @@ const Clientes = () => {
   const empresaIdAtual = profile?.empresa_id ?? profile?.empresas?.id;
   // A lista de tipos passou a ser da EMPRESA, guardada no banco: o que um gestor cria
   // aparece para a equipe toda. Antes vivia no localStorage de cada navegador.
-  const { data: tiposDeCliente, isLoading: carregandoTipos, error: erroTipos } = useClientesTipos(empresaIdAtual);
+  const { data: tiposDeCliente } = useClientesTipos(empresaIdAtual);
   // useMemo para a lista não trocar de identidade a cada pintura: ela é dependência do
   // efeito que preenche o campo Tipo, e um array novo por render o faria rodar sempre.
   const tipos = useMemo(() => tiposDeCliente ?? [], [tiposDeCliente]);
-  const criarTipo = useCriarTipoDeCliente();
-  const excluirTipo = useExcluirTipoDeCliente();
   // Mesma regra do canDelete logo acima: espelha public.is_gestor() só para esconder
   // o controle na UI. A RLS continua sendo a autoridade real.
   const podeGerenciarTipos = ['gestor', 'admin', 'empresa'].includes(profile?.role);
@@ -383,35 +382,8 @@ const Clientes = () => {
   const [contatoEmail, setContatoEmail] = useState('');
   const [contatoTelefone, setContatoTelefone] = useState('');
   const [newTipoOpen, setNewTipoOpen] = useState(false);
-  const [newTipoName, setNewTipoName] = useState('');
+  // Qual campo recebe o tipo recém-criado: o Select do formulário ou o filtro da listagem.
   const [newTipoTarget, setNewTipoTarget] = useState<'form' | 'filter'>('form');
-  // Guarda id (para excluir no banco), slug (para limpar filtro e formulário) e nome
-  // (para a pergunta do diálogo).
-  const [confirmDeleteTipo, setConfirmDeleteTipo] = useState<{ id: string; slug: string; nome: string } | null>(null);
-
-  const handleCreateTipo = async () => {
-    try {
-      const slug = await criarTipo.mutateAsync({ nome: newTipoName });
-      if (newTipoTarget === 'form') setTipo(slug);
-      else setSelectedTipos(prev => (prev.includes(slug) ? prev : [...prev, slug]));
-      setNewTipoName('');
-      setNewTipoOpen(false);
-    } catch {
-      // O toast do erro real já sai no onError do hook — inclusive a frase que o banco
-      // devolve quando quem tentou não é gestor.
-    }
-  };
-
-  const handleDeleteTipo = async (id: string, slug: string) => {
-    try {
-      await excluirTipo.mutateAsync({ id });
-      if (tipo === slug) setTipo(tipoPadrao(tipos.filter(t => t.slug !== slug)));
-      setSelectedTipos(prev => prev.filter(v => v !== slug));
-      setConfirmDeleteTipo(null);
-    } catch {
-      // idem
-    }
-  };
 
   const empresasSettings = useTableSettings({
     key: 'clientes_empresas',
@@ -1155,71 +1127,25 @@ const Clientes = () => {
 
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
 
-          {/* Novo tipo dialog — criação + gerenciamento */}
-          <Dialog open={newTipoOpen} onOpenChange={(o) => { setNewTipoOpen(o); if (!o) setNewTipoName(''); }}>
-            <ConteudoDialogo className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Gerenciar tipos</DialogTitle>
-              </DialogHeader>
-
-              {/* Criação */}
-              <div className="space-y-2 pt-2 pb-3 border-b">
-                <Label htmlFor="new-tipo-name">Novo tipo</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="new-tipo-name"
-                    value={newTipoName}
-                    onChange={(e) => setNewTipoName(e.target.value)}
-                    placeholder="Ex: Indústria, Cooperativa…"
-                    autoFocus
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateTipo(); } }}
-                  />
-                  <Button size="sm" onClick={handleCreateTipo}>
-                    <Plus className="h-4 w-4 mr-1" /> Criar
-                  </Button>
-                </div>
-              </div>
-
-              {/* Lista gerenciável */}
-              <div className="space-y-3 pt-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tipos existentes</p>
-                {carregandoTipos ? (
-                  <p className="text-sm text-muted-foreground text-center py-3">Carregando tipos…</p>
-                ) : erroTipos ? (
-                  <p className="text-sm text-muted-foreground text-center py-3">Não foi possível carregar os tipos.</p>
-                ) : tipos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-3">Nenhum tipo cadastrado</p>
-                ) : (
-                  <div className="space-y-1">
-                    {tipos.map(t => (
-                      <div key={t.id} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 hover:bg-muted/40 transition-colors">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-sm">{t.nome}</span>
-                          {t.is_sistema && (
-                            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">padrão</span>
-                          )}
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setConfirmDeleteTipo({ id: t.id, slug: t.slug, nome: t.nome })}
-                          title={`Excluir "${t.nome}"`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-end pt-3">
-                <Button variant="outline" size="sm" onClick={() => setNewTipoOpen(false)}>Fechar</Button>
-              </div>
-            </ConteudoDialogo>
-          </Dialog>
+          {/* Criar e gerenciar tipos — o MESMO componente que a tela de editar cliente
+              usa (src/components/clientes/GerenciarTiposDialog.tsx). Duas cópias do
+              diálogo é como as listas de tipo divergiram da última vez. */}
+          <GerenciarTiposDialog
+            open={newTipoOpen}
+            onOpenChange={setNewTipoOpen}
+            empresaId={empresaIdAtual}
+            podeGerenciar={podeGerenciarTipos}
+            onTipoCriado={(slug) => {
+              // Quem abriu o diálogo decide onde o tipo novo cai: o Select do formulário
+              // ou a lista de marcados do filtro.
+              if (newTipoTarget === 'form') setTipo(slug);
+              else setSelectedTipos(prev => (prev.includes(slug) ? prev : [...prev, slug]));
+            }}
+            onTipoExcluido={(slug) => {
+              if (tipo === slug) setTipo(tipoPadrao(tipos.filter(t => t.slug !== slug)));
+              setSelectedTipos(prev => prev.filter(v => v !== slug));
+            }}
+          />
           <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" /> {activeTab === 'empresas' ? 'Nova Empresa' : 'Novo Contato'}</Button>
@@ -2056,26 +1982,6 @@ const Clientes = () => {
           </SheetContent>
         )}
       </Sheet>
-
-      <AlertDialog open={!!confirmDeleteTipo} onOpenChange={(o) => !o && setConfirmDeleteTipo(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir tipo "{confirmDeleteTipo?.nome}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O tipo sai dos seletores para toda a equipe. Empresas já cadastradas com ele continuam existindo e continuam aparecendo no filtro. Para trazer o tipo de volta, basta criá-lo outra vez com o mesmo nome.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => confirmDeleteTipo && handleDeleteTipo(confirmDeleteTipo.id, confirmDeleteTipo.slug)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <ConfirmarEnviarEmailDialog
         endereco={emailParaConfirmar}

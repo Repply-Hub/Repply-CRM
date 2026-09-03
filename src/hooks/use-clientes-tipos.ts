@@ -95,3 +95,39 @@ export function useExcluirTipoDeCliente() {
     onError: (err) => toast.error(mensagemDeErro(err, 'Não foi possível excluir o tipo')),
   });
 }
+
+/**
+ * Renomeia um tipo -- e SO o nome.
+ *
+ * 🔴 O `slug` NUNCA MUDA, de proposito. `clientes.tipo` guarda o SLUG, nao o id do
+ * tipo: nao ha chave estrangeira entre as duas tabelas. Se a renomeacao tambem
+ * recalculasse o slug, todo cliente ja classificado continuaria gravado com o slug
+ * VELHO -- que sumiria da lista -- e passaria a exibir um valor orfao (rotuloDoTipo
+ * cai no proprio valor quando nao acha na lista). O gestor veria "Construtora" virar
+ * "construtora" em centenas de fichas, sem erro nenhum na tela.
+ *
+ * E exatamente por isso que renomear e seguro e resolve o pedido do dono do produto:
+ * trocar o rotulo de um tipo NAO exige excluir e reclassificar os clientes. O slug
+ * segue sendo o identificador estavel; o nome e so a etiqueta que aparece.
+ */
+export function useRenomearTipoDeCliente() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; nome: string }) => {
+      const nome = input.nome.trim();
+      if (!nome) throw new Error('Informe um nome para o tipo');
+
+      // Só `nome` no update. Nenhuma outra coluna entra aqui -- ver o bloco acima.
+      const { error } = await supabase
+        .from('clientes_tipos')
+        .update({ nome })
+        .eq('id', input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clientes_tipos'] });
+      toast.success('Tipo renomeado');
+    },
+    onError: (err) => toast.error(mensagemDeErro(err, 'Não foi possível renomear o tipo')),
+  });
+}
