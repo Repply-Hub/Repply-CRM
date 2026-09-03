@@ -726,3 +726,83 @@ se define **quem edita**. Três eixos, três mecanismos, nenhum substitui o outr
 
 Nenhum arquivo de código em comum com a
 [blindagem do WhatsApp](plano-blindagem-whatsapp.md) — podem correr em paralelo.
+
+---
+
+## 13. ✅ ENTREGUE EM 03/09/2026 — e a decisão da planilha
+
+A Fase 3 está no ar. O que existe hoje, para o usuário:
+
+| onde | o que dá para fazer |
+|---|---|
+| Cadastro de negócio | pôr mais de uma pessoa no campo "Responsável"; quem cadastra já entra como principal |
+| Edição do negócio | ver os gravados, acrescentar, remover e trocar a estrela |
+| Ficha (painel de detalhe) | os mesmos gestos, gravando **na hora** — o painel não tem botão de salvar |
+| Lista e cartão do Kanban | `"Ana Lima +2"` ao lado do principal, com os nomes ao passar o mouse |
+| PDF de negócios | coluna "Outros responsáveis", que **só aparece** quando alguma linha tem alguém |
+
+### 13.1 A correção de rumo: UM CAMPO SÓ
+
+O plano original (§7) previa dois campos, "Responsável" e "Participantes". **O Lucas pediu
+um só**, com uma estrela marcando quem leva o valor, e a razão vale ficar registrada: a
+pessoa pensa "quem toca este negócio", não "quem é titular e quem é coadjuvante". Os dois
+campos obrigavam a decidir a hierarquia antes de decidir o time.
+
+A estrela continua obrigatória porque a decisão 2 (§2) não mudou: **o valor conta para uma
+pessoa só**. Sem a marca visível, alguém acrescenta um colega e move a comissão sem
+perceber — e o erro só apareceria no Dashboard, semanas depois.
+
+### 13.2 🔴 A planilha NÃO ganhou coluna de participantes — decisão do Lucas em 03/09/2026
+
+Perguntado se queria a coluna na planilha de Excel, ele escolheu **deixar como está**. O
+motivo não é preguiça de implementar: os cabeçalhos daquela planilha são **os mesmos que o
+assistente de importação reconhece** (`FIELDS`, em `importPedidosUtils.ts`), e é isso que
+permite exportar, ajustar no Excel e reimportar sem remapear coluna nenhuma.
+
+As três saídas, como foram apresentadas:
+
+1. **Deixar como está** (escolhida). Ida e volta com o Excel intacta. Os participantes
+   aparecem na lista, na ficha, no Kanban e no PDF.
+2. **Coluna só para ler.** Aparece na planilha, mas editar aquela coluna e reimportar não
+   faz nada: a importação começa com zero campos extras e ignora coluna que não conhece
+   (`ImportPedidosDialog.tsx:73`). Um campo que parece editável e não é.
+3. **Coluna + importação de verdade.** Casaria nome com pessoa da empresa e gravaria na
+   ligação, depois do `INSERT` (o aviso 2 da §6 já dizia isso). Trabalho bem maior, e abre
+   uma decisão nova: nome que não corresponde a ninguém da equipe — ignora ou avisa?
+
+Se um dia a resposta virar (3), o caminho está na §6 e a decisão pendente é a do nome que
+não casa.
+
+### 13.3 O número que decidiu a forma da consulta
+
+O "+N" e a coluna do PDF precisam saber quem são os participantes de cada negócio. Medido em
+produção em 03/09/2026, **como usuário logado** (CLAUDE.md §7.15), sobre 1.000 negócios:
+
+| caminho | tempo |
+|---|---|
+| a lista como era, sem responsáveis | 11 ms |
+| embutir os responsáveis no `select` da lista | **433 ms** |
+| pedir chapado, mandando os 1.000 ids | 65 ms |
+| **só os participantes, sem filtrar por id** (escolhido) | **137 ms** — uma vez, para a base inteira |
+
+O embed sai 38× mais caro porque a política de `pedido_responsaveis` reconsulta `pedidos`
+**uma vez por linha** — é a trava de inquilino da migration `20260831210000`, e ela é
+necessária. A exportação pagaria isso 12 vezes, uma por lote de mil. Parente do §7.16 do
+CLAUDE.md: junção que só um consumidor usa, cobrada em toda chamada.
+
+O caminho escolhido funciona porque **participante é a exceção, não a regra**: o principal
+já vem no próprio negócio, e só o excedente precisa de consulta. O filtro `principal = false`
+é barato e o Postgres o avalia primeiro — no plano, as funções de segurança caras aparecem
+como `never executed`.
+
+**Se essa premissa cair** (dezenas de milhares de participantes), o teto de 50 mil linhas em
+`use-participantes-dos-negocios.ts` para a varredura, e o certo passa a ser buscar por
+negócio. Não continuar varrendo calado.
+
+### 13.4 Fica em aberto
+
+- **Índice parcial `WHERE NOT principal`.** Os 137 ms são uma varredura sequencial de 12.453
+  linhas que só sobrevive porque o filtro barato roda primeiro. Um índice parcial tornaria a
+  consulta instantânea e à prova de crescimento. É mudança no banco de produção, então
+  precisa passar pelo Lucas (CLAUDE.md §11) — e hoje não dói.
+- **A importação de participantes**, se a decisão da §13.2 mudar.
