@@ -1,4 +1,11 @@
-import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -114,7 +121,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -634,7 +645,6 @@ function conversaNaoLida(
 function precisaAssumir(conv: WaConversa): boolean {
   return (conv.responsaveis ?? []).length === 0;
 }
-
 
 // Badge de não lidas. Quando a conversa está aberta (`ativa`) o contador não
 // zera mais sozinho — só some quando o usuário envia uma resposta — então aqui
@@ -1593,7 +1603,13 @@ function QuotedPreview({
 // de renderização de mensagens.
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
-function ReactionPicker({ onPick, visivel }: { onPick: (emoji: string) => void; visivel?: boolean }) {
+function ReactionPicker({
+  onPick,
+  visivel,
+}: {
+  onPick: (emoji: string) => void;
+  visivel?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -1603,7 +1619,9 @@ function ReactionPicker({ onPick, visivel }: { onPick: (emoji: string) => void; 
           title="Reagir"
           className={cn(
             "h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground transition-opacity",
-            open || visivel ? "opacity-100" : "opacity-0 group-hover/bubble:opacity-100",
+            open || visivel
+              ? "opacity-100"
+              : "opacity-0 group-hover/bubble:opacity-100",
           )}
         >
           <SmilePlus className="h-3.5 w-3.5" />
@@ -1805,12 +1823,17 @@ function DraggableBubble({
           onClick={() => onReply(msg)}
           className={cn(
             "h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground transition-opacity",
-            hovered ? "opacity-100" : "opacity-0 group-hover/bubble:opacity-100",
+            hovered
+              ? "opacity-100"
+              : "opacity-0 group-hover/bubble:opacity-100",
           )}
         >
           <Reply className="h-3.5 w-3.5" />
         </button>
-        <ReactionPicker onPick={(emoji) => onReact(msg, emoji)} visivel={hovered} />
+        <ReactionPicker
+          onPick={(emoji) => onReact(msg, emoji)}
+          visivel={hovered}
+        />
         {!msg.apagada_para_todos && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -1819,7 +1842,9 @@ function DraggableBubble({
                 title="Mais opções"
                 className={cn(
                   "h-6 w-6 rounded-full bg-background border border-border shadow-sm flex items-center justify-center text-muted-foreground transition-opacity",
-                  hovered ? "opacity-100" : "opacity-0 group-hover/bubble:opacity-100",
+                  hovered
+                    ? "opacity-100"
+                    : "opacity-0 group-hover/bubble:opacity-100",
                 )}
               >
                 <ChevronDown className="h-3.5 w-3.5" />
@@ -1898,10 +1923,20 @@ function ContatoCard({
         {inicial}
       </div>
       <div className="min-w-0 text-left">
-        <p className={cn("text-sm font-medium truncate", isSaida ? "text-white" : "text-foreground")}>
+        <p
+          className={cn(
+            "text-sm font-medium truncate",
+            isSaida ? "text-white" : "text-foreground",
+          )}
+        >
           {nome || "Contato"}
         </p>
-        <p className={cn("text-xs truncate", isSaida ? "text-white/80" : "text-muted-foreground")}>
+        <p
+          className={cn(
+            "text-xs truncate",
+            isSaida ? "text-white/80" : "text-muted-foreground",
+          )}
+        >
           {formatPhone(telefone)}
         </p>
       </div>
@@ -1944,7 +1979,11 @@ function ContatoCard({
             </button>
           )}
           {onConversar && onSalvar && (
-            <span className={isSaida ? "text-white/40" : "text-muted-foreground"}>·</span>
+            <span
+              className={isSaida ? "text-white/40" : "text-muted-foreground"}
+            >
+              ·
+            </span>
           )}
           {onSalvar && (
             <button
@@ -2035,7 +2074,9 @@ function MessageContent({
     return (
       <div className="flex flex-col gap-2 py-0.5">
         {itens.map((it, i) => {
-          const info = it.telefone ? resolverCartaoContato?.(it.telefone) : undefined;
+          const info = it.telefone
+            ? resolverCartaoContato?.(it.telefone)
+            : undefined;
           return (
             <ContatoCard
               key={i}
@@ -2044,7 +2085,11 @@ function MessageContent({
               isSaida={isSaida}
               onAbrir={
                 info?.contatoId
-                  ? () => onAbrirContato?.(info.contatoId as string, info.contatoNome || it.nome)
+                  ? () =>
+                      onAbrirContato?.(
+                        info.contatoId as string,
+                        info.contatoNome || it.nome,
+                      )
                   : undefined
               }
               onConversar={
@@ -2054,7 +2099,11 @@ function MessageContent({
               }
               onSalvar={
                 it.telefone && info && !info.contatoId
-                  ? () => onSalvarContatoRecebido?.({ nome: it.nome, telefone: it.telefone })
+                  ? () =>
+                      onSalvarContatoRecebido?.({
+                        nome: it.nome,
+                        telefone: it.telefone,
+                      })
                   : undefined
               }
             />
@@ -2839,7 +2888,12 @@ function LeadSheet({
       if (formato === "pdf") {
         const { generateConversaPdf } =
           await import("@/lib/generate-conversa-pdf");
-        await generateConversaPdf(linhas, marcaDaEmpresa(profile), nomeContato, periodoLabel);
+        await generateConversaPdf(
+          linhas,
+          marcaDaEmpresa(profile),
+          nomeContato,
+          periodoLabel,
+        );
       } else if (formato === "xlsx") {
         const { generateConversaExcel } =
           await import("@/lib/generate-conversa-excel");
@@ -3057,7 +3111,11 @@ function LeadSheet({
           type="button"
           className="relative aspect-square rounded-md overflow-hidden border border-border bg-black/5 hover:opacity-80 transition-opacity"
           onClick={() =>
-            window.open(enderecoDe(m.media_url)!, "_blank", "noopener,noreferrer")
+            window.open(
+              enderecoDe(m.media_url)!,
+              "_blank",
+              "noopener,noreferrer",
+            )
           }
           title={format(new Date(m.created_at), "dd/MM/yyyy HH:mm", {
             locale: ptBR,
@@ -4233,10 +4291,7 @@ export default function WhatsAppInbox() {
     let descricao = "";
     if (msgOrigem) {
       const quem = quotedNomeFor(msgOrigem) ?? "Contato";
-      const quando = format(
-        new Date(msgOrigem.created_at),
-        "dd/MM/yyyy HH:mm",
-      );
+      const quando = format(new Date(msgOrigem.created_at), "dd/MM/yyyy HH:mm");
       const corpo = (msgOrigem.conteudo ?? "").trim() || `[${msgOrigem.tipo}]`;
       descricao = `Mensagem de ${quem} (${quando}):\n"${corpo}"`;
     }
@@ -4293,9 +4348,10 @@ export default function WhatsAppInbox() {
   // --- Enviar contato (cartão vCard) ---
   const [enviarContatoOpen, setEnviarContatoOpen] = useState(false);
   // Aberto pelo botão "Salvar em Contatos" dentro de um cartão de contato recebido.
-  const [salvarContatoRecebido, setSalvarContatoRecebido] = useState<
-    { nome: string; telefone: string } | null
-  >(null);
+  const [salvarContatoRecebido, setSalvarContatoRecebido] = useState<{
+    nome: string;
+    telefone: string;
+  } | null>(null);
 
   async function salvarNotaManual() {
     if (!conversaAtiva || !notaTexto.trim()) {
@@ -4362,7 +4418,8 @@ export default function WhatsAppInbox() {
       const map = new Map<string, { id: string; nome: string }>();
       for (const c of data ?? []) {
         const k = chaveDeTelefone(c.telefone);
-        if (k && !map.has(k)) map.set(k, { id: c.id, nome: c.nome_contato ?? "" });
+        if (k && !map.has(k))
+          map.set(k, { id: c.id, nome: c.nome_contato ?? "" });
       }
       return map;
     },
@@ -4467,12 +4524,14 @@ export default function WhatsAppInbox() {
   }, [conversaAtiva?.is_group, conversaAtiva?.participantes, mensagens]);
   // Sugestões do dropdown de menção (@), filtradas pelo texto digitado depois
   // do "@". "Todos" é um item sintético (sem telefone real) que vira mentions:"all"
-  // no envio — mesmo atalho do "@Todos" do WhatsApp nativo.
+  // no envio — mesmo atalho do "@Todos" do WhatsApp nativo. Aparece com a query
+  // vazia ou quando o texto digitado é começo de "todos" OU do apelido em inglês
+  // "all" — assim "@all" também cai no item "Todos".
   const mentionSuggestions = useMemo(() => {
     if (mentionQuery === null) return [];
     const q = mentionQuery.trim().toLowerCase();
     const todos =
-      "todos".startsWith(q) || q === ""
+      q === "" || "todos".startsWith(q) || "all".startsWith(q)
         ? [{ telefone: "all", nome: "Todos" }]
         : [];
     const pessoas = participantesGrupo
@@ -4506,7 +4565,9 @@ export default function WhatsAppInbox() {
   // de "enviar nova". Some ao trocar de conversa (ver useEffect abaixo).
   const [msgEmEdicao, setMsgEmEdicao] = useState<WaMensagem | null>(null);
   // Mensagem escolhida para encaminhar — abre o EncaminharMensagemDialog.
-  const [msgParaEncaminhar, setMsgParaEncaminhar] = useState<WaMensagem | null>(null);
+  const [msgParaEncaminhar, setMsgParaEncaminhar] = useState<WaMensagem | null>(
+    null,
+  );
   const marcarLida = useWaMarcarLida();
   // Abrir a conversa só marca como lida quando quem abre é o responsável por ela —
   // gestor/admin entrando numa conversa que não é sua não deve alterar o estado de
@@ -5539,7 +5600,11 @@ export default function WhatsAppInbox() {
       if (formato === "pdf") {
         const { generateConversasPdf } =
           await import("@/lib/generate-conversa-pdf");
-        await generateConversasPdf(conversasComMensagens, marcaDaEmpresa(profile), periodoLabel);
+        await generateConversasPdf(
+          conversasComMensagens,
+          marcaDaEmpresa(profile),
+          periodoLabel,
+        );
       } else if (formato === "xlsx") {
         const { generateConversasExcel } =
           await import("@/lib/generate-conversa-excel");
@@ -8383,7 +8448,9 @@ export default function WhatsAppInbox() {
                                             onPreviewFile={setPreviewFile}
                                             conversaAtiva={conversaAtiva}
                                             enderecoDe={enderecoDaMidia}
-                                            resolverCartaoContato={resolverCartaoContato}
+                                            resolverCartaoContato={
+                                              resolverCartaoContato
+                                            }
                                             onAbrirConversa={setConversaAtivaId}
                                             onAbrirContato={(id, nome) =>
                                               navigate(
@@ -8542,7 +8609,9 @@ export default function WhatsAppInbox() {
                     <div className="mb-2 flex items-center gap-2 rounded-lg border border-border bg-muted/60 px-3 py-2 text-xs">
                       <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-foreground">Editando mensagem</p>
+                        <p className="font-medium text-foreground">
+                          Editando mensagem
+                        </p>
                         <p className="truncate text-muted-foreground">
                           {semMarcadorEncaminhada(msgEmEdicao.conteudo)}
                         </p>
@@ -8655,7 +8724,9 @@ export default function WhatsAppInbox() {
                       size="icon"
                       className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={isBusy || isRecording || !!pendingAudio || !!msgEmEdicao}
+                      disabled={
+                        isBusy || isRecording || !!pendingAudio || !!msgEmEdicao
+                      }
                       title="Anexar arquivo"
                     >
                       {isUploading ? (
@@ -8689,7 +8760,12 @@ export default function WhatsAppInbox() {
                           variant="ghost"
                           size="icon"
                           className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
-                          disabled={isBusy || isRecording || !!pendingAudio || !!msgEmEdicao}
+                          disabled={
+                            isBusy ||
+                            isRecording ||
+                            !!pendingAudio ||
+                            !!msgEmEdicao
+                          }
                           title="Adicionar"
                         >
                           <Plus className="h-4 w-4" />
