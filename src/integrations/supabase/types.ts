@@ -3014,6 +3014,52 @@ export type Database = {
           },
         ]
       }
+      pedido_responsaveis: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          pedido_id: string
+          principal: boolean
+          usuario_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          pedido_id: string
+          principal?: boolean
+          usuario_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          pedido_id?: string
+          principal?: boolean
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_responsaveis_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_responsaveis_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_responsaveis_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedidos_comentarios: {
         Row: {
           created_at: string
@@ -4406,6 +4452,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      definir_responsavel_principal: {
+        Args: { p_pedido_id: string; p_usuario_id: string }
+        Returns: undefined
+      }
       is_gestor: { Args: never; Returns: boolean }
       is_member_of_grupo: { Args: { _grupo_id: string }; Returns: boolean }
       minhas_secoes: {
