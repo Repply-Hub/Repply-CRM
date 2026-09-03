@@ -162,9 +162,10 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
   }
 
   return (
-    <div className="space-y-5">
-      {/* Cabeçalho: título do bloco à esquerda, presets alinhados à direita na mesma linha */}
-      <div className="flex flex-col lg:flex-row lg:items-start gap-3 lg:gap-4 justify-between">
+    <div className="flex h-full min-h-0 flex-col gap-5">
+      {/* Cabeçalho: título do bloco à esquerda, presets alinhados à direita na mesma
+          linha. `flex-none` = fica preso no topo enquanto a lista de módulos rola. */}
+      <div className="flex flex-none flex-col lg:flex-row lg:items-start gap-3 lg:gap-4 justify-between">
         <div className="min-w-0">
           <h2 className="text-2xl font-semibold tracking-tight text-foreground">
             Quem vê o quê<span className="text-primary">.</span>
@@ -222,19 +223,21 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
         </div>
       </div>
 
-      <PermissaoMatrizChecklist
-        getValue={modulo => {
-          const perm = getPermissao(modulo);
-          return {
-            pode_ver: perm?.pode_ver ?? true,
-            pode_criar: perm?.pode_criar ?? false,
-            pode_editar: perm?.pode_editar ?? false,
-            pode_excluir: perm?.pode_excluir ?? false,
-            funcionalidades: perm?.funcionalidades ?? {},
-          };
-        }}
-        onChange={(modulo, updates) => updatePermissao(modulo, updates)}
-      />
+      <div className="flex-1 min-h-0">
+        <PermissaoMatrizChecklist
+          getValue={modulo => {
+            const perm = getPermissao(modulo);
+            return {
+              pode_ver: perm?.pode_ver ?? true,
+              pode_criar: perm?.pode_criar ?? false,
+              pode_editar: perm?.pode_editar ?? false,
+              pode_excluir: perm?.pode_excluir ?? false,
+              funcionalidades: perm?.funcionalidades ?? {},
+            };
+          }}
+          onChange={(modulo, updates) => updatePermissao(modulo, updates)}
+        />
+      </div>
     </div>
   );
 }
@@ -531,7 +534,7 @@ function UserDetailPanel({ vendedor, isGestor, onEdit, onDelete, currentUserId, 
       {/* Section content */}
       {isGestor && activeSection === 'permissoes' && (
         <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <CardContent className="p-4 sm:p-6 flex-1 min-h-0 overflow-y-auto">
+          <CardContent className="p-4 sm:p-6 flex-1 min-h-0 flex flex-col overflow-hidden">
             <InlinePermissaoEditor vendedor={vendedor} />
           </CardContent>
         </Card>
