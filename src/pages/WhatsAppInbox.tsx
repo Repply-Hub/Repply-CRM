@@ -6898,7 +6898,7 @@ export default function WhatsAppInbox() {
                       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground text-sm gap-2 px-4 text-center">
                         <MessageCircle className="h-8 w-8 opacity-30" />
                         {semNumero
-                          ? "Você ainda não atende nenhum número. Conecte o seu WhatsApp em Configurações ou peça a um gestor para ligar você a um número da equipe."
+                          ? "Você ainda não atende nenhum número. Conecte um em Configurações ou peça a um gestor."
                           : "Nenhuma conversa ainda"}
                       </div>
                     )
@@ -7449,7 +7449,7 @@ export default function WhatsAppInbox() {
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground text-sm gap-2 px-4 text-center">
                           <MessageCircle className="h-8 w-8 opacity-30" />
                           {semNumero
-                            ? "Você ainda não atende nenhum número. Conecte o seu WhatsApp em Configurações ou peça a um gestor para ligar você a um número da equipe."
+                            ? "Você ainda não atende nenhum número. Conecte um em Configurações ou peça a um gestor."
                             : "Nenhuma conversa ainda"}
                         </div>
                       )
@@ -8530,14 +8530,10 @@ export default function WhatsAppInbox() {
                   {semNumero && (
                     <div className="mb-2 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 px-2">
                       <Settings className="h-3.5 w-3.5" />
-                      Você precisa de um número para enviar mensagens
-                      <Button
-                        variant="link"
-                        className="h-auto p-0 text-xs"
-                        onClick={() => setShowConfig(true)}
-                      >
-                        Conectar
-                      </Button>
+                      {/* Sem botão de conectar: ele levava ao diálogo da instância, que
+                          para um gestor mostra o número de outra pessoa como se fosse dele
+                          (ver o vazio do painel). Conectar é ação de Configurações. */}
+                      Você não atende nenhum número — peça a um gestor em Configurações
                     </div>
                   )}
 
@@ -8786,27 +8782,23 @@ export default function WhatsAppInbox() {
                   <MessageCircle className="h-8 w-8 text-green-600" />
                 </div>
                 {semNumero ? (
-                  <>
-                    <div className="max-w-md text-center space-y-2">
-                      <p className="font-medium text-foreground">
-                        Você ainda não atende nenhum número de WhatsApp
-                      </p>
-                      <p className="text-sm">
-                        As conversas aparecem por número, e você ainda não está ligado a
-                        nenhum. Por isso esta tela está vazia — não é erro, e nada foi apagado.
-                      </p>
-                      <p className="text-sm">
-                        Se você vai usar um número seu, conecte o WhatsApp em Configurações. Se
-                        a sua equipe já usa um número, peça a um gestor da sua empresa para
-                        ligar você a ele. Assim que isso for feito, esta tela se atualiza
-                        sozinha.
-                      </p>
-                    </div>
-                    <Button variant="outline" onClick={() => setShowConfig(true)}>
-                      <Settings className="h-4 w-4 mr-2" />
-                      Conectar meu WhatsApp
-                    </Button>
-                  </>
+                  /* 🔴 SEM BOTÃO DE CONECTAR AQUI, de propósito.
+                     Ele abria o diálogo de configuração da instância, e para um gestor —
+                     que enxerga os números da empresa inteira — aquela tela mostrava o
+                     número de OUTRA pessoa como se fosse dele. Relatado pelo Lucas em
+                     03/09/2026: clicou e apareceu a instância de uma colega. Nada foi
+                     gravado, mas o caminho não devia existir a partir daqui.
+                     Conectar número é ação de Configurações → WhatsApp, onde o gestor vê
+                     de quem é cada um. */
+                  <div className="max-w-sm text-center space-y-2">
+                    <p className="font-medium text-foreground">
+                      Você ainda não atende nenhum número
+                    </p>
+                    <p className="text-sm">
+                      Conecte um número em Configurações → WhatsApp, ou peça a um gestor da sua
+                      empresa para ligar você a um número da equipe.
+                    </p>
+                  </div>
                 ) : (
                   <>
                     <div className="text-center">
@@ -8815,12 +8807,12 @@ export default function WhatsAppInbox() {
                         Selecione uma conversa para começar
                       </p>
                     </div>
-                    {!config && (
-                      <Button variant="outline" onClick={() => setShowConfig(true)}>
-                        <Settings className="h-4 w-4 mr-2" />
-                        Configurar uazapi
-                      </Button>
-                    )}
+                    {/* O botão "Configurar uazapi" que ficava aqui foi removido em
+                        03/09/2026. Depois que "não tenho número" ganhou ramo próprio (acima),
+                        este `!config` só alcança quem TEM vínculo e não enxerga os dados do
+                        número — quem usa uma instância de outra pessoa. Para essa pessoa o
+                        botão era duas vezes errado: dizia para configurar o que já está
+                        configurado, e abria um diálogo que ofereceria criar OUTRA instância. */}
                   </>
                 )}
               </div>
