@@ -306,11 +306,17 @@ export async function chamarNylas<T>(
 ): Promise<{ ok: boolean; status: number; body: RespostaNylas<T>; texto: string }> {
   const { timeoutMs = 30_000, ...resto } = init;
 
+  // Corpo `FormData` = envio multipart (anexo acima de 3 MB, exigência do Nylas).
+  // Nesse caso NÃO fixar `Content-Type`: o `fetch` precisa escrever o header com
+  // o `boundary` que ele mesmo gera. Fixar `application/json` aqui quebra o
+  // parser do outro lado sem erro claro.
+  const ehMultipart = resto.body instanceof FormData;
+
   const res = await fetch(`${nylasBase()}${caminho}`, {
     ...resto,
     headers: {
       Authorization: `Bearer ${nylasApiKey()}`,
-      "Content-Type": "application/json",
+      ...(ehMultipart ? {} : { "Content-Type": "application/json" }),
       ...(resto.headers ?? {}),
     },
     signal: AbortSignal.timeout(timeoutMs),

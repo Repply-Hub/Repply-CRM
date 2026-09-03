@@ -1,7 +1,9 @@
-import { Loader2, Mail, Send, Trash2 } from 'lucide-react';
+import { useRef } from 'react';
+import { Loader2, Mail, Paperclip, Send, Trash2, Undo2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { tamanhoLegivel } from '@/lib/fabricante-arquivos';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +38,26 @@ interface Props {
    * prévia existir.
    */
   assinaturaPreviewHtml: string;
+  /**
+   * Se a assinatura entra NESTE e-mail. Começa `true`; a pessoa pode
+   * remover e voltar atrás quantas vezes quiser antes de enviar. É escolha
+   * por composição — não altera a assinatura salva em Configurações — e
+   * vale só enquanto o compositor está aberto: reabrir um rascunho salvo
+   * volta com a assinatura marcada.
+   */
+  incluirAssinatura: boolean;
+  onIncluirAssinaturaChange: (incluir: boolean) => void;
+  /**
+   * Anexos já presos ao rascunho deste e-mail. A lista vem do
+   * `email_rascunho_anexos`; o binário mora no balde privado e só a função
+   * de servidor `email-enviar` o alcança no envio.
+   */
+  anexos: Array<{ id: string; nome_arquivo: string; tamanho: number }>;
+  /** Recebe os arquivos escolhidos no seletor — a validação (tipo/tamanho) é de quem trata. */
+  onAnexar: (arquivos: File[]) => void;
+  onRemoverAnexo: (id: string) => void;
+  /** `true` enquanto um upload está em curso: trava o Enviar para o arquivo não ficar de fora. */
+  anexando: boolean;
 }
 
 /**
@@ -69,7 +91,14 @@ export function CompositorEmail({
   isEnviando,
   titulo = 'Nova mensagem',
   assinaturaPreviewHtml,
+  incluirAssinatura,
+  onIncluirAssinaturaChange,
+  anexos,
+  onAnexar,
+  onRemoverAnexo,
+  anexando,
 }: Props) {
+  const inputArquivoRef = useRef<HTMLInputElement>(null);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* `gap-0`: o DialogContent é um grid com `gap-4`. Com `p-0`, essa calha de
@@ -152,6 +181,76 @@ export function CompositorEmail({
             />
           </div>
 
+          {/* Anexos. O seletor de arquivo é escondido e disparado pelo botão —
+              `<input type="file">` cru não aceita estilo e some no meio de um
+              formulário sem moldura. `multiple`: dá pra escolher vários de uma
+              vez. Depois de escolher, `value = ''` para o mesmo arquivo poder
+              ser re-selecionado se a pessoa remover e mudar de ideia. */}
+          <div className="border-t px-6 py-3">
+            <input
+              ref={inputArquivoRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const lista = Array.from(e.target.files ?? []);
+                if (lista.length) onAnexar(lista);
+                e.target.value = '';
+              }}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                onClick={() => inputArquivoRef.current?.click()}
+                disabled={anexando}
+                title="Anexar arquivos a este e-mail"
+              >
+                {anexando ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Paperclip className="h-3.5 w-3.5" />
+                )}
+                {anexando ? 'Enviando arquivo…' : 'Anexar'}
+              </Button>
+              {anexos.length > 0 && (
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {anexos.length} {anexos.length === 1 ? 'anexo' : 'anexos'}
+                </span>
+              )}
+            </div>
+
+            {anexos.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {anexos.map((a) => (
+                  <li
+                    key={a.id}
+                    className="flex items-center gap-2 rounded-md border bg-muted/40 px-2 py-1.5 text-sm"
+                  >
+                    <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate">{a.nome_arquivo}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {tamanhoLegivel(a.tamanho)}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 shrink-0 text-muted-foreground"
+                      onClick={() => onRemoverAnexo(a.id)}
+                      title={`Remover ${a.nome_arquivo}`}
+                      aria-label={`Remover ${a.nome_arquivo}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {/* Prévia fixa do rodapé — não é campo do formulário, só mostra o
               que `sendEmailMutation` vai colar embaixo do corpo no envio.
               `bg-white`/`colorScheme: light` fixos: o HTML do rodapé usa
@@ -164,19 +263,57 @@ export function CompositorEmail({
               mas o wrapper precisa continuar recebendo roda do mouse/arraste
               pra rolar — `pointer-events-none` aqui fora desativava a régua
               de rolagem inteira (aparecia a barrinha, mas nada respondia). */}
+          {/* A assinatura é colada no envio, não editada aqui — mas dá para
+              tirá-la DESTE e-mail. É escolha por composição: não mexe na
+              assinatura salva em Configurações, e volta a valer no próximo
+              e-mail (ou aqui mesmo, no "Adicionar de volta"). */}
           <div className="border-t px-6 py-3">
-            <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Assinatura (adicionada automaticamente ao enviar)
-            </p>
-            <div
-              className="max-h-40 overflow-y-auto rounded-md border bg-white p-3 text-sm"
-              style={{ colorScheme: 'light' }}
-            >
-              <div
-                className="pointer-events-none"
-                dangerouslySetInnerHTML={{ __html: assinaturaPreviewHtml }}
-              />
-            </div>
+            {incluirAssinatura ? (
+              <>
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Assinatura (adicionada automaticamente ao enviar)
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 gap-1 px-2 text-xs text-muted-foreground"
+                    onClick={() => onIncluirAssinaturaChange(false)}
+                    title="Remover a assinatura deste e-mail"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Remover
+                  </Button>
+                </div>
+                <div
+                  className="max-h-40 overflow-y-auto rounded-md border bg-white p-3 text-sm"
+                  style={{ colorScheme: 'light' }}
+                >
+                  <div
+                    className="pointer-events-none"
+                    dangerouslySetInnerHTML={{ __html: assinaturaPreviewHtml }}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Assinatura removida deste e-mail.
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 gap-1 px-2 text-xs text-muted-foreground"
+                  onClick={() => onIncluirAssinaturaChange(true)}
+                  title="Voltar a incluir a assinatura neste e-mail"
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                  Adicionar de volta
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Rodapé no padrão do app (NovoNegocioDialog/EventDialog): `border-t` e
@@ -233,7 +370,12 @@ export function CompositorEmail({
                  "Escrever" que abre este compositor —, então este botão só
                  volta a carregar o mesmo débito de contraste que o resto do
                  app já carrega, não um novo. */
-              <Button type="submit" disabled={isEnviando} className="gap-2">
+              <Button
+                type="submit"
+                disabled={isEnviando || anexando}
+                title={anexando ? 'Aguarde o anexo terminar de subir' : undefined}
+                className="gap-2"
+              >
                 {isEnviando ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (

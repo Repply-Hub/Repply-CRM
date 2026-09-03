@@ -62,6 +62,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSearchParams } from "react-router-dom";
 import { useEmailEmpresa } from "@/hooks/use-email-empresa";
+import { useEmailAnexos } from "@/hooks/use-email-anexos";
+import {
+  validarSelecaoDeAnexos,
+  mensagemDeRejeicao,
+} from "@/lib/email-anexos";
 import { erroLegivelDaFunction } from "@/lib/erro-edge-function";
 import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
 import { LeitorEmail, type EmailAberto } from "@/components/email/LeitorEmail";
@@ -345,6 +350,15 @@ const Emails = () => {
   });
   /** Id do rascunho em `email_rascunhos` sendo editado; nulo enquanto o autosave ainda não gravou a primeira vez. */
   const [rascunhoId, setRascunhoId] = useState<string | null>(null);
+  /**
+   * Se a assinatura entra NESTE e-mail. Começa `true` em toda composição
+   * nova ou resposta; a pessoa pode remover e voltar atrás quantas vezes
+   * quiser antes de enviar. É por composição — não altera a assinatura
+   * salva em Configurações — e vale só enquanto o compositor está aberto:
+   * a escolha não é gravada no rascunho, então reabrir um rascunho salvo
+   * começa com a assinatura marcada de novo.
+   */
+  const [incluirAssinatura, setIncluirAssinatura] = useState(true);
 
   const { data: perfil } = useQuery({
     queryKey: ["meu_perfil"],
@@ -434,6 +448,7 @@ const Emails = () => {
       // Contexto novo (endereço veio de fora, não de um rascunho salvo): não
       // continuar amarrado a um rascunho de uma composição anterior.
       setRascunhoId(null);
+      setIncluirAssinatura(true);
       setIsComposeOpen(true);
     }
   }, [searchParams]);
@@ -496,6 +511,68 @@ const Emails = () => {
       queryClient.invalidateQueries({ queryKey: ["email_rascunhos"] });
     },
   });
+
+  // Anexos do rascunho aberto. A lista é por `rascunhoId` — quando ele muda
+  // (nova composição, resposta, outro rascunho), a lista acompanha sozinha.
+  const anexosCtrl = useEmailAnexos(rascunhoId, {
+    empresaId: perfil?.empresa_id,
+    usuarioId: perfil?.id,
+  });
+
+  /**
+   * Anexar: precisa de um `rascunhoId` para prender o arquivo. Se o autosave
+   * ainda não criou o rascunho, cria AGORA (é a mesma gravação do autosave,
+   * só que forçada) e usa o id que volta. Depois valida tipo/tamanho e sobe
+   * o que passou.
+   */
+  const aoAnexar = async (arquivos: File[]) => {
+    if (!perfil?.id || !perfil?.empresa_id) {
+      toast.error("Recarregue a página e tente de novo.");
+      return;
+    }
+
+    const { aceitos, rejeitados } = validarSelecaoDeAnexos(
+      anexosCtrl.anexos.map((a) => ({ nome_arquivo: a.nome_arquivo, tamanho: a.tamanho })),
+      arquivos,
+    );
+    if (rejeitados.length) toast.warning(mensagemDeRejeicao(rejeitados));
+    if (!aceitos.length) return;
+
+    let alvo = rascunhoId;
+    if (!alvo) {
+      const { destinatario, assunto, corpo } = formData;
+      alvo = await salvarRascunhoMutation.mutateAsync({
+        id: null,
+        destinatario,
+        assunto,
+        corpo,
+      });
+      if (!alvo) {
+        toast.error("Não consegui preparar o rascunho para receber o anexo.");
+        return;
+      }
+      setRascunhoId(alvo);
+    }
+
+    try {
+      await anexosCtrl.subir(aceitos, alvo);
+    } catch (e) {
+      toast.error(
+        "Não foi possível anexar: " +
+          (e instanceof Error ? e.message : "tente de novo"),
+      );
+    }
+  };
+
+  const aoRemoverAnexo = async (id: string) => {
+    const anexo = anexosCtrl.anexos.find((a) => a.id === id);
+    if (!anexo) return;
+    try {
+      await anexosCtrl.remover(anexo);
+    } catch {
+      toast.error("Não foi possível remover o anexo.");
+    }
+  };
 
   /**
    * Autosave da composição: 2s depois da última tecla, grava (insere na
@@ -902,28 +979,35 @@ const Emails = () => {
       // não passa cru.
       const assinaturaNormalizada = normalizarAssinaturaAntiga(perfil?.assinatura_email);
 
+      // Quem escreve pode ter removido a assinatura DESTE e-mail (botão
+      // "Remover" no compositor). Nesse caso o e-mail sai só com o corpo
+      // digitado — sem rodapé de nome/logo/assinatura.
+      const rodapeHtml = incluirAssinatura
+        ? montarRodapeEmailHtml({
+            nome: perfil?.nome ?? "",
+            assinaturaHtml: assinaturaNormalizada,
+            // A logo já vem com `?v=` do momento em que foi enviada — ver `CampoDeLogoDaEmpresa`.
+            logoUrl: marcaDaMinhaEmpresa.logoUrl,
+            nomeDaEmpresa: marcaDaMinhaEmpresa.nome,
+            // Assinatura em modo imagem já é autossuficiente — mostrar a logo
+            // da empresa em cima dela seria redundante/poluído.
+            mostrarLogo: !ehAssinaturaImagem(assinaturaNormalizada),
+            // Só vale no modo imagem — no modo texto o nome e a empresa sempre
+            // aparecem, como sempre apareceram.
+            mostrarNome:
+              !ehAssinaturaImagem(assinaturaNormalizada) ||
+              (perfil?.assinatura_imagem_mostrar_nome ?? true),
+            mostrarNomeEmpresa:
+              !ehAssinaturaImagem(assinaturaNormalizada) ||
+              (perfil?.assinatura_imagem_mostrar_empresa ?? true),
+          })
+        : "";
+
       const htmlBody = `
         <div style="font-family: sans-serif; font-size: 16px; color: #333; line-height: 1.5;">
           ${data.corpo.replace(/\n/g, "<br>")}
         </div>
-        ${montarRodapeEmailHtml({
-          nome: perfil?.nome ?? "",
-          assinaturaHtml: assinaturaNormalizada,
-          // A logo já vem com `?v=` do momento em que foi enviada — ver `CampoDeLogoDaEmpresa`.
-          logoUrl: marcaDaMinhaEmpresa.logoUrl,
-          nomeDaEmpresa: marcaDaMinhaEmpresa.nome,
-          // Assinatura em modo imagem já é autossuficiente — mostrar a logo
-          // da empresa em cima dela seria redundante/poluído.
-          mostrarLogo: !ehAssinaturaImagem(assinaturaNormalizada),
-          // Só vale no modo imagem — no modo texto o nome e a empresa sempre
-          // aparecem, como sempre apareceram.
-          mostrarNome:
-            !ehAssinaturaImagem(assinaturaNormalizada) ||
-            (perfil?.assinatura_imagem_mostrar_nome ?? true),
-          mostrarNomeEmpresa:
-            !ehAssinaturaImagem(assinaturaNormalizada) ||
-            (perfil?.assinatura_imagem_mostrar_empresa ?? true),
-        })}
+        ${rodapeHtml}
       `;
 
       // O registro em email_mensagens é feito pela Edge Function, que é quem
@@ -934,6 +1018,9 @@ const Emails = () => {
         data.assunto,
         htmlBody,
         respondendoA,
+        // A função de servidor puxa os anexos deste rascunho, monta o
+        // multipart pro Nylas e depois apaga balde + linhas.
+        rascunhoId,
       );
     },
     onSuccess: () => {
@@ -946,8 +1033,12 @@ const Emails = () => {
         assunto: "",
         corpo: "",
       });
+      setIncluirAssinatura(true);
       // Enviado com sucesso: o rascunho que o alimentava não serve mais.
+      // Os anexos (balde + linhas) já foram apagados pela função de servidor
+      // depois que o Nylas aceitou; aqui só cai a linha do rascunho.
       if (rascunhoId) {
+        queryClient.invalidateQueries({ queryKey: ["email_rascunho_anexos", rascunhoId] });
         descartarRascunhoMutation.mutate(rascunhoId);
         setRascunhoId(null);
       }
@@ -1180,6 +1271,8 @@ const Emails = () => {
     // Contexto novo: uma resposta não continua o rascunho de outra
     // composição — o autosave (abaixo) cria uma linha própria para ela.
     setRascunhoId(null);
+    // Resposta também nasce com a assinatura incluída — a pessoa remove se quiser.
+    setIncluirAssinatura(true);
     // O e-mail aberto CONTINUA aberto atrás do compositor. Fechá-lo aqui era o
     // que jogava a pessoa de volta para a caixa de entrada no meio da resposta.
     setRespondendo(true);
@@ -1198,6 +1291,7 @@ const Emails = () => {
     setRespondendoA(null);
     setRespondendo(false);
     setRascunhoId(null);
+    setIncluirAssinatura(true);
     setIsComposeOpen(true);
   };
 
@@ -1221,10 +1315,13 @@ const Emails = () => {
         corpo: maisRecente.corpo ?? "",
       });
       setRascunhoId(maisRecente.id);
+      // A escolha de assinatura não é gravada no rascunho — sempre começa incluída.
+      setIncluirAssinatura(true);
       toast.info("Rascunho recuperado.");
     } else {
       setFormData({ destinatario: "", assunto: "", corpo: "" });
       setRascunhoId(null);
+      setIncluirAssinatura(true);
     }
     setRespondendoA(null);
     setRespondendo(false);
@@ -1244,13 +1341,17 @@ const Emails = () => {
       corpo: r.corpo ?? "",
     });
     setRascunhoId(r.id);
+    setIncluirAssinatura(true);
     setRespondendoA(null);
     setRespondendo(false);
     setIsComposeOpen(true);
   };
 
   /** Descarta um rascunho a partir da lista, sem precisar abrir o compositor. */
-  const descartarRascunhoDaLista = (id: string) => {
+  const descartarRascunhoDaLista = async (id: string) => {
+    // Os arquivos no balde não somem por cascade — apagar ANTES de a linha do
+    // rascunho cair (que leva as linhas de anexo junto).
+    await anexosCtrl.limparBaldeDoRascunho(id).catch(() => {});
     descartarRascunhoMutation.mutate(id);
     if (rascunhoId === id) setRascunhoId(null);
   };
@@ -1494,19 +1595,29 @@ const Emails = () => {
       valores={formData}
       onChange={setFormData}
       onEnviar={handleSubmit}
-      onDescartar={() => {
+      onDescartar={async () => {
         // Diferente de fechar o compositor (que preserva o rascunho para
         // retomar depois), este botão é a exclusão explícita — some da aba
-        // Rascunhos também.
-        if (rascunhoId) descartarRascunhoMutation.mutate(rascunhoId);
+        // Rascunhos também, e leva os anexos do balde junto.
+        if (rascunhoId) {
+          await anexosCtrl.limparBaldeDoRascunho(rascunhoId).catch(() => {});
+          descartarRascunhoMutation.mutate(rascunhoId);
+        }
         setRascunhoId(null);
         setFormData({ destinatario: "", assunto: "", corpo: "" });
+        setIncluirAssinatura(true);
         fecharCompositor(false);
       }}
       isConnected={isConnected}
       isEnviando={sendEmailMutation.isPending}
       titulo={respondendo ? "Responder" : "Nova mensagem"}
       assinaturaPreviewHtml={assinaturaPreviewHtml}
+      incluirAssinatura={incluirAssinatura}
+      onIncluirAssinaturaChange={setIncluirAssinatura}
+      anexos={anexosCtrl.anexos}
+      onAnexar={aoAnexar}
+      onRemoverAnexo={aoRemoverAnexo}
+      anexando={anexosCtrl.subindo}
     />
   );
 

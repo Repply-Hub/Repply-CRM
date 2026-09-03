@@ -1583,6 +1583,64 @@ export type Database = {
           },
         ]
       }
+      email_rascunho_anexos: {
+        Row: {
+          caminho: string
+          created_at: string
+          empresa_id: string
+          id: string
+          mime: string | null
+          nome_arquivo: string
+          rascunho_id: string
+          tamanho: number
+          usuario_id: string
+        }
+        Insert: {
+          caminho: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          mime?: string | null
+          nome_arquivo: string
+          rascunho_id: string
+          tamanho: number
+          usuario_id: string
+        }
+        Update: {
+          caminho?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          mime?: string | null
+          nome_arquivo?: string
+          rascunho_id?: string
+          tamanho?: number
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_rascunho_anexos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_rascunho_anexos_rascunho_id_fkey"
+            columns: ["rascunho_id"]
+            isOneToOne: false
+            referencedRelation: "email_rascunhos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_rascunho_anexos_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_rascunhos: {
         Row: {
           assunto: string | null

@@ -156,6 +156,57 @@ serve(async (req) => {
       return json({ error: "Credencial da caixa não encontrada. Reconecte.", code: "sem_grant" }, 409);
     }
 
+    // ---- anexos do rascunho --------------------------------------------------
+    // A tela manda `rascunho_id`; os arquivos estão presos a ele em
+    // `email_rascunho_anexos`, com o binário no balde PRIVADO `email-anexos`.
+    //
+    // A leitura das linhas é pelo `userClient` de propósito: a RLS de
+    // `email_rascunho_anexos` é pessoal, então isso já garante que o rascunho é
+    // de quem está enviando — sem uma segunda regra em TypeScript. O download do
+    // binário é com a chave de serviço porque o balde é privado.
+    const rascunhoId =
+      typeof body?.rascunho_id === "string" && body.rascunho_id ? body.rascunho_id : null;
+
+    type AnexoParaEnviar = { nome: string; mime: string; blob: Blob; caminho: string };
+    const anexos: AnexoParaEnviar[] = [];
+    const TETO_ANEXOS = 20 * 1024 * 1024;
+
+    if (rascunhoId) {
+      const { data: linhas, error: erroAnexos } = await userClient
+        .from("email_rascunho_anexos")
+        .select("caminho, nome_arquivo, mime, tamanho")
+        .eq("rascunho_id", rascunhoId);
+
+      if (erroAnexos) {
+        console.error("[email-enviar] falha ao ler anexos:", erroAnexos);
+        return json({ error: "Não consegui ler os anexos deste e-mail." }, 503);
+      }
+
+      const total = (linhas ?? []).reduce((s, l) => s + (Number(l.tamanho) || 0), 0);
+      if (total > TETO_ANEXOS) {
+        return json(
+          { error: "Os anexos passam de 20 MB no total. Remova algum e tente de novo." },
+          413,
+        );
+      }
+
+      for (const l of linhas ?? []) {
+        const { data: bin, error: erroDownload } = await supabase.storage
+          .from("email-anexos")
+          .download(l.caminho);
+        if (erroDownload || !bin) {
+          console.error(`[email-enviar] falha ao baixar anexo ${l.caminho}:`, erroDownload);
+          return json({ error: `Não consegui carregar o anexo "${l.nome_arquivo}".` }, 502);
+        }
+        anexos.push({
+          nome: l.nome_arquivo || "anexo",
+          mime: l.mime || "application/octet-stream",
+          blob: bin,
+          caminho: l.caminho,
+        });
+      }
+    }
+
     // ---- envio ------------------------------------------------------------
     const payload: Record<string, unknown> = {
       to: para,
@@ -227,12 +278,42 @@ serve(async (req) => {
       cabecalhos["Idempotency-Key"] = body.idempotency_key.slice(0, 256);
     }
 
+    // Sem anexo: JSON puro, como sempre foi. Com anexo: multipart/form-data —
+    // exigência do Nylas acima de 3 MB, e mais simples do que decidir o limiar.
+    // O campo `message` leva o JSON; cada arquivo é um part próprio, com o nome
+    // do arquivo no Content-Disposition (3º argumento do `append`). O nome do
+    // CAMPO é sufixado com o índice para dois anexos de mesmo nome não colidirem.
+    let corpoDaChamada: BodyInit;
+    if (anexos.length === 0) {
+      corpoDaChamada = JSON.stringify(payload);
+    } else {
+      // O `message` leva o JSON, com um manifesto `attachments` (nome + tipo +
+      // tamanho) — é o que o SDK oficial do Nylas manda, e alguns backends só
+      // casam o part com a entrada do manifesto. Cada arquivo vai num part
+      // próprio, nome de campo com índice (dois anexos homônimos não colidem) e
+      // o nome do arquivo no Content-Disposition (3º arg do `append`).
+      const payloadMultipart = {
+        ...payload,
+        attachments: anexos.map((a) => ({
+          filename: a.nome,
+          content_type: a.mime,
+          size: a.blob.size,
+        })),
+      };
+      const form = new FormData();
+      form.append("message", JSON.stringify(payloadMultipart));
+      anexos.forEach((a, i) => {
+        form.append(`attachment${i}`, a.blob, a.nome);
+      });
+      corpoDaChamada = form;
+    }
+
     const resp = await chamarNylas<MensagemNylas>(
       `/v3/grants/${grantRow.grant_id}/messages/send`,
       {
         method: "POST",
         headers: cabecalhos,
-        body: JSON.stringify(payload),
+        body: corpoDaChamada,
         // 150s por recomendação da doc do Nylas: o envio é síncrono e Exchange
         // self-hosted chega a levar 2 minutos.
         timeoutMs: 150_000,
@@ -299,6 +380,7 @@ serve(async (req) => {
           lido: true,
           envio_status: "enviado",
           enviado_por: caller.id,
+          ...(anexos.length ? { tem_anexo: true } : {}),
           data_mensagem: new Date((enviada.date ?? Math.floor(Date.now() / 1000)) * 1000).toISOString(),
         },
         { onConflict: "conta_id,nylas_message_id" },
@@ -308,6 +390,24 @@ serve(async (req) => {
       // O e-mail SAIU. Falhar a resposta agora faria o usuário reenviar e o
       // destinatário receber duas vezes — o registro local é o que perdemos.
       console.error("[email-enviar] enviado mas não registrado:", erroInsert);
+    }
+
+    // ---- faxina dos anexos ----------------------------------------------------
+    // O e-mail saiu com os anexos embutidos; as cópias no balde não servem mais.
+    // Best-effort: falhar aqui não pode virar erro na tela (o e-mail JÁ foi). As
+    // linhas somem sozinhas quando a tela descarta o rascunho (cascade), mas
+    // apagar já aqui evita anexo pendurado se a pessoa deixar o rascunho aberto.
+    if (rascunhoId && anexos.length) {
+      const { error: erroBalde } = await supabase.storage
+        .from("email-anexos")
+        .remove(anexos.map((a) => a.caminho));
+      if (erroBalde) console.error("[email-enviar] falha ao limpar o balde:", erroBalde);
+
+      const { error: erroLinhas } = await supabase
+        .from("email_rascunho_anexos")
+        .delete()
+        .eq("rascunho_id", rascunhoId);
+      if (erroLinhas) console.error("[email-enviar] falha ao apagar linhas de anexo:", erroLinhas);
     }
 
     return json({ ok: true, id: enviada.id, thread_id: enviada.thread_id ?? null });

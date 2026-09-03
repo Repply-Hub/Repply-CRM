@@ -249,6 +249,12 @@ export function useEmailEmpresa() {
       cc?: string[];
       bcc?: string[];
       reply_to_message_id?: string;
+      /**
+       * Rascunho de onde puxar os anexos. A função de servidor lê
+       * `email_rascunho_anexos` desse id (pela RLS do usuário, então só
+       * anexo dele passa), baixa do balde e monta o multipart pro Nylas.
+       */
+      rascunho_id?: string | null;
     }) => {
       const { data, error } = await supabase.functions.invoke('email-enviar', {
         body: {
@@ -260,6 +266,7 @@ export function useEmailEmpresa() {
           ...(params.reply_to_message_id
             ? { reply_to_message_id: params.reply_to_message_id }
             : {}),
+          ...(params.rascunho_id ? { rascunho_id: params.rascunho_id } : {}),
           // Chave de idempotência gerada aqui: o envio no Nylas é síncrono e sem
           // retry automático. Se a rede cair depois de o Nylas aceitar, o retry
           // não pode fazer o destinatário receber duas vezes.
@@ -323,12 +330,14 @@ export function useEmailEmpresa() {
       subject: string,
       body: string,
       respondendoA?: string | null,
+      rascunhoId?: string | null,
     ) =>
       enviarMutation.mutateAsync({
         to,
         subject,
         body,
         ...(respondendoA ? { reply_to_message_id: respondendoA } : {}),
+        ...(rascunhoId ? { rascunho_id: rascunhoId } : {}),
       }),
     enviar: enviarMutation.mutateAsync,
 
