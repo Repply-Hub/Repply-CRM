@@ -304,7 +304,7 @@ const Clientes = () => {
   const empresaIdAtual = profile?.empresa_id ?? profile?.empresas?.id;
   // A lista de tipos passou a ser da EMPRESA, guardada no banco: o que um gestor cria
   // aparece para a equipe toda. Antes vivia no localStorage de cada navegador.
-  const { data: tiposDeCliente } = useClientesTipos(empresaIdAtual);
+  const { data: tiposDeCliente, isLoading: carregandoTipos, error: erroTipos } = useClientesTipos(empresaIdAtual);
   // useMemo para a lista não trocar de identidade a cada pintura: ela é dependência do
   // efeito que preenche o campo Tipo, e um array novo por render o faria rodar sempre.
   const tipos = useMemo(() => tiposDeCliente ?? [], [tiposDeCliente]);
@@ -799,6 +799,16 @@ const Clientes = () => {
         return;
       }
     }
+    // `clientes.tipo` é NOT NULL sem valor padrão no banco: gravar sem tipo escolhido
+    // ou grava string vazia (cliente que nenhuma opção do filtro alcança, já que
+    // opcoesDeFiltro descarta valor vazio) ou o banco recusa com erro feio de NOT NULL.
+    // O <select> nasce vazio e só é preenchido quando a lista de tipos chega do banco
+    // (efeito acima); se a consulta falhar ou a tabela ainda não existir, ele continua
+    // vazio — por isso a trava aqui, em vez de cravar um valor padrão para contornar.
+    if (!tipo.trim()) {
+      toast.error('Escolha o tipo do cliente.');
+      return;
+    }
     const enderecoStr = enderecoToString(endereco);
     try {
       const createdCliente = await createCliente.mutateAsync({
@@ -1170,7 +1180,11 @@ const Clientes = () => {
               {/* Lista gerenciável */}
               <div className="space-y-3 pt-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tipos existentes</p>
-                {tipos.length === 0 ? (
+                {carregandoTipos ? (
+                  <p className="text-sm text-muted-foreground text-center py-3">Carregando tipos…</p>
+                ) : erroTipos ? (
+                  <p className="text-sm text-muted-foreground text-center py-3">Não foi possível carregar os tipos.</p>
+                ) : tipos.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-3">Nenhum tipo cadastrado</p>
                 ) : (
                   <div className="space-y-1">
