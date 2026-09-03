@@ -1243,19 +1243,50 @@ export function useWaMarcarNaoLida() {
 
 // --- Configuração uazapi ---
 
-export function useWaConfig() {
-  return useQuery<WaConfig | null>({
+/**
+ * O vínculo da pessoa com um número de WhatsApp, e os dados desse número.
+ *
+ * 🔴 SÃO DUAS COISAS DIFERENTES, e tratá-las como uma só é um bug que já existe hoje.
+ *
+ * A junção `instancia:configuracoes_wapi(*)` passa pela regra de segurança de
+ * `configuracoes_wapi`, que só mostra a instância ao DONO dela, ao admin e a gestor. Desde
+ * 20260620000000 a instância é reaproveitada entre pessoas: a segunda, a terceira e a décima
+ * ganham vínculo mas não viram donas. Para elas a linha do vínculo vem e o `instancia`
+ * embutido volta NULO.
+ *
+ * Ou seja: `config === null` NÃO significa "não tenho número". Hoje esse vendedor lê
+ * "Configure o uazapi para enviar mensagens" (WhatsAppInbox.tsx) enquanto o envio dele
+ * funciona — e usar esse sinal para o aviso novo acusaria justamente as pessoas erradas.
+ *
+ * `instancia_id` vem na MESMA consulta (uma coluna a mais, zero ida ao servidor a mais) e é o
+ * sinal honesto: a linha existe, logo o vínculo existe.
+ */
+interface WaVinculoEConfig {
+  /** Tem pelo menos um número atribuído a mim. */
+  vinculado: boolean;
+  /** Os dados do número — nulo para quem não é dono da instância. */
+  config: WaConfig | null;
+}
+
+function opcoesDoVinculoWa() {
+  return {
     queryKey: ['wa_config'],
-    queryFn: async () => {
+    queryFn: async (): Promise<WaVinculoEConfig> => {
       const usuarioId = await getUsuarioId();
-      if (!usuarioId) return null;
+      if (!usuarioId) return { vinculado: false, config: null };
       const { data } = await supabase
         .from('wapi_instancia_usuarios')
-        .select('instancia:configuracoes_wapi(*)')
+        // 🔴 `usuario_auth_id` é da família `auth.users(id)`, e `getUsuarioId()` devolve
+        // exatamente isso (o nome dela engana). Trocar por `usuarios.id` não daria erro:
+        // daria zero linhas, e todo mundo veria o aviso de "sem número".
+        .select('instancia_id, instancia:configuracoes_wapi(*)')
         .eq('usuario_auth_id', usuarioId)
         .limit(1)
         .maybeSingle();
-      return (data?.instancia as WaConfig | null) ?? null;
+      return {
+        vinculado: !!data?.instancia_id,
+        config: (data?.instancia as WaConfig | null) ?? null,
+      };
     },
     // Este dado decide se a tela deixa a pessoa digitar e enviar. Com o padrão
     // global (1 minuto de validade e sem revalidar ao focar a janela), uma aba
@@ -1263,9 +1294,34 @@ export function useWaConfig() {
     // verificação da tela passava, o envio saía e só a função — que lê o banco na
     // hora — recusava, já com a mensagem digitada perdida. A consulta é barata e
     // o custo de errar é uma mensagem que não sai.
+    //
+    // De brinde, é o que faz a tela de quem não tem número se curar sozinha assim que um
+    // gestor o vincular: basta voltar para a aba.
     staleTime: 15_000,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
+  };
+}
+
+/**
+ * Tenho algum número de WhatsApp atribuído a mim?
+ *
+ * MESMA `queryKey` do `useWaConfig`, então o TanStack Query faz UMA consulta só e os dois
+ * hooks leem dela. Não acrescenta ida ao servidor nenhuma.
+ */
+export function useWaTenhoVinculo() {
+  return useQuery({
+    ...opcoesDoVinculoWa(),
+    select: (d: WaVinculoEConfig) => d.vinculado,
+  });
+}
+
+/** Os dados do número. Nulo para quem tem vínculo mas não é dono da instância — para saber
+ *  se a pessoa TEM número, use `useWaTenhoVinculo`. */
+export function useWaConfig() {
+  return useQuery({
+    ...opcoesDoVinculoWa(),
+    select: (d: WaVinculoEConfig) => d.config,
   });
 }
 

@@ -248,6 +248,10 @@ serve(async (req) => {
      * legado) — nesses casos não há "número do cliente" ainda estabelecido.
      */
     let config: ConfigInstancia | null = null;
+    // Guarda se a instância veio da CONVERSA (e não do vínculo de quem está enviando). Só
+    // nesse caso é preciso conferir o vínculo depois: no caminho do fallback, o vínculo já é
+    // a origem do dado.
+    let instanciaVeioDaConversa = false;
     if (conversaExistente?.instancia_id) {
       const { data: instDaConversa } = await supabase
         .from("configuracoes_wapi")
@@ -256,6 +260,7 @@ serve(async (req) => {
         .eq("empresa_id", userData.empresa_id)
         .maybeSingle();
       config = (instDaConversa ?? null) as ConfigInstancia | null;
+      instanciaVeioDaConversa = !!config;
     }
     if (!config) {
       const { data: instLink } = await supabase
@@ -270,6 +275,40 @@ serve(async (req) => {
       return await recusar(supabase, "sem_instancia_vinculada", "Seu usuário não tem WhatsApp vinculado. Peça ao gestor para liberar em Configurações.", 400,
         { user_id: user.id, usuario_id: userData.id });
     }
+    /**
+     * 🔴 QUEM ENVIA PRECISA ATENDER O NÚMERO.
+     *
+     * Desde 02/09/2026 a conversa pertence ao número (migration
+     * 20260902170000_conversa_de_whatsapp_pertence_ao_numero.sql), e a regra de segurança do
+     * banco já esconde as conversas dos números que a pessoa não atende. Mas ESTA função corre
+     * por fora dela: `ensureResponsavel` grava com a chave de serviço e pula a regra inteira.
+     *
+     * Sem esta conferência, um envio para conversa de outro número tornaria a pessoa
+     * responsável por ela — e ser responsável é uma das portas de leitura. Ou seja: a função de
+     * envio devolveria exatamente o acesso que a regra acabou de tirar.
+     *
+     * "Mas ninguém adivinha o identificador da conversa" não vale, e o próprio comentário mais
+     * acima neste arquivo já responde: segurança por sorteio não é segurança. Os identificadores
+     * vazam por exportação, por aba aberta com lista antiga em memória e por resultado de busca
+     * de antes da mudança.
+     *
+     * Só no caminho da conversa: no fallback, a instância JÁ veio do vínculo de quem envia, e
+     * conferir de novo criaria falso negativo para conversa sem número registrado.
+     */
+    if (instanciaVeioDaConversa) {
+      const { data: vinculoDoRemetente } = await supabase
+        .from("wapi_instancia_usuarios")
+        .select("instancia_id")
+        .eq("instancia_id", config.id)
+        // `usuario_auth_id` é da família auth.users — o mesmo `user.id` usado no fallback acima.
+        .eq("usuario_auth_id", user.id)
+        .maybeSingle();
+      if (!vinculoDoRemetente) {
+        return await recusar(supabase, "instancia_nao_vinculada", "Você não atende este número. Peça a um gestor da sua empresa para vincular você a ele em Configurações.", 403,
+          { instancia_id: config.id, instance_name: config.instance_name, user_id: user.id, usuario_id: userData.id });
+      }
+    }
+
     if (config.status !== "connected") {
       return await recusar(supabase, "instancia_desconectada", "O WhatsApp desta conversa está desconectado. Reconecte em Configurações e tente de novo.", 400,
         { instancia_id: config.id, instance_name: config.instance_name, status_instancia: config.status });

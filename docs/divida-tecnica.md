@@ -4,7 +4,8 @@ O que está quebrado, mal resolvido ou pendente neste sistema, com **o custo rea
 ordem de conserto**. Escrito para que ninguém precise redescobrir cada item.
 
 Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu. Itens 22 a 31
-acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026.
+acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 61 ao 65 em
+02 e 03/09/2026.
 
 > **Este documento não é lista de desejos.** Cada item aqui já tem consequência medida ou
 > observada. Melhoria que ainda é opinião não entra.
@@ -76,6 +77,12 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026.
 | 58 | [Contato sem responsável aparece para TODAS as empresas](#58-contato-sem-responsável-aparece-para-todas-as-empresas) | **Alta** | Latente — 0 órfãos hoje, mas 3 caminhos podem criar um |
 | 59 | [O link de redefinir senha aponta para `localhost`](#59-o-link-de-redefinir-senha-aponta-para-localhost) | **Alta** | **Sim — ninguém consegue redefinir a própria senha hoje.** O conserto é de painel |
 | 60 | [O ranking de vendedores chega inteiro no navegador de todo mundo](#60-o-ranking-de-vendedores-chega-inteiro-no-navegador-de-todo-mundo) | **Alta** | Não — mas entrega pela porta dos fundos o que foi fechado pela da frente em 31/08 |
+| 63 | [`plano_vendas_progresso` não checa permissão nenhuma](#63-plano_vendas_progresso-não-checa-permissão-nenhuma) | Média | Não — não atravessa empresa, mas fura a permissão de módulo |
+| 64 | [Regra de banco alterada à mão diverge do código](#64-regra-de-banco-alterada-à-mão-volta-a-divergir-do-código-e-ninguém-percebe) | Média | Não — mas `create or replace` a partir do arquivo desfaz a correção em silêncio |
+| 65 | [As duas telas mais delicadas do calendário não têm teste](#65-as-duas-telas-mais-delicadas-do-calendário-não-têm-teste-nenhum) | Baixa | Não |
+
+> ⚠️ Os itens **61 e 62** existem no corpo deste documento mas não têm linha aqui — quem os
+> escreveu esqueceu a tabela. Vale acrescentar ao passar por perto.
 
 ---
 
@@ -2502,6 +2509,81 @@ fechá-lo e reabri-lo.
 
 **Custo:** baixo a médio. O componente de gerenciar já existe e é compartilhado; o
 trabalho é decidir onde ele mora e religar as portas de entrada.
+
+---
+
+## 63. `plano_vendas_progresso` não checa permissão nenhuma
+
+**Gravidade: média. Em produção. Não é vazamento entre empresas.**
+
+Achado em 31/08/2026, de passagem. Estava enterrado dentro do item 60; vira item próprio porque
+é outro conserto, em outro arquivo, com outro risco.
+
+As **duas assinaturas** de `plano_vendas_progresso` são `SECURITY INVOKER` e não chamam
+`has_permission` nem `has_funcionalidade` em lugar nenhum. `EXECUTE` está concedido a
+`authenticated`. Um vendedor com o módulo Plano de Vendas **desligado** recebe os dados
+chamando a função direto — a tela esconde, o servidor entrega.
+
+Não atravessa a fronteira de empresa (a RLS das tabelas que ela lê segura isso). O que ela fura
+é a permissão de MÓDULO, que hoje só existe na tela. Contraria a regra 6.1 do `CLAUDE.md`.
+
+**Alarme falso descartado no caminho:** chegou-se a suspeitar de uma segunda versão de
+`plano_vendas_progresso_por_vendedor(p_ano, p_mes, …)` sem proteção. Ela é um invólucro que
+chama a assinatura por data, então **herda** o gate. Não é furo.
+
+---
+
+## 64. Regra de banco alterada à mão volta a divergir do código, e ninguém percebe
+
+**Gravidade: média. É um padrão, não um defeito isolado — e já causou dois problemas.**
+
+Duas vezes em uma semana uma regra do banco foi alterada **direto em produção**, sem migration,
+e o repositório ficou descrevendo outra coisa:
+
+1. **O módulo `pipeline`, entre 29 e 31/08/2026.** A migration `20260727130000` emite um módulo
+   `pipeline` na função de presets de permissão; a função em produção não emitia mais — as três
+   funcionalidades dele tinham sido passadas para dentro de `pedidos`. Era fusão deliberada, e a
+   outra sessão completou o lado do código em `752e28e8`. Mas por dias o arquivo e o banco
+   diziam coisas diferentes, e quem lesse o arquivo para escrever a próxima migration
+   reverteria a fusão sem saber.
+
+2. **Três políticas de `whatsapp_conversa_responsaveis`**, descobertas em 02/09/2026:
+   `responsaveis_select`, `responsaveis_insert` e `responsaveis_delete` existiam em produção e
+   em **migration nenhuma**. Como políticas permissivas se somam com OR, a mais frouxa vencia, e
+   qualquer pessoa da empresa se atribuía a qualquer conversa. Removidas na
+   `20260902170000`, com o texto exato colhido do banco e guardado no cabeçalho.
+
+**O custo real** não é a divergência: é que **`create or replace` a partir do arquivo desfaz em
+silêncio a correção que alguém aplicou à mão.** Quem for mexer numa função de banco deve ler
+`pg_get_functiondef` do BANCO, nunca o arquivo — e é o que a `20260902170000` fez.
+
+**O que falta:** ninguém varreu `pg_proc` inteiro comparando com a pasta de migrations. Podem
+existir outras divergências, e cada uma é uma armadilha do mesmo tipo. Isso é uma varredura de
+uma hora e não foi feita.
+
+---
+
+## 65. As duas telas mais delicadas do calendário não têm teste nenhum
+
+**Gravidade: baixa. Não quebra nada hoje — mas nada avisa quando quebrar.**
+
+`EventDialog.tsx` e `NovaRotaVisitaDialog.tsx` não têm teste automatizado. Os fluxos que
+passam por eles só se verificam à mão:
+
+- preencher um evento, ir para "Visita a obra" pela aba e **voltar** — o que foi digitado tem
+  que sobreviver;
+- editar uma rota e conferir que cada parada mostra o próprio estado de "visita realizada" com
+  o comentário gravado;
+- desmarcar uma visita e conferir que **o comentário não é apagado**.
+
+O terceiro é o que mais preocupa: o contrato de que "campo ausente significa não mexa, nunca
+apague" está fixado em teste na função pura (`src/lib/rota-em-edicao.test.ts`), mas **o caminho
+da tela até ela não está**. Se alguém trocar o que a tela envia, os testes seguem verdes e a
+anotação de campo some.
+
+O caminho já apontado pelo `CLAUDE.md` §14 é extrair de `WhatsAppInbox.tsx`/`NovaRotaVisitaDialog`
+a decisão para uma função pura em `src/lib/`, com teste ao lado — o mesmo que já foi feito com
+`rota-em-edicao.ts` e `ordem-das-paradas.ts`.
 
 ---
 

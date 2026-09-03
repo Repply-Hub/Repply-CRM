@@ -11,6 +11,7 @@ import {
   useWaMarcarLida,
   useWaMarcarNaoLida,
   useWaConfig,
+  useWaTenhoVinculo,
   useWaNovaConversa,
   useWaCriarGrupo,
   useWaLimparConversa,
@@ -4042,6 +4043,12 @@ export default function WhatsAppInbox() {
   const { data: conversas = [], isLoading: loadingConversas } =
     useWaConversas();
   const { data: config } = useWaConfig();
+  // 🔴 TER NÚMERO e TER OS DADOS DO NÚMERO são coisas diferentes: quem está vinculado a uma
+  // instância de outra pessoa recebe `config` nulo mesmo tendo vínculo (ver `useWaConfig`).
+  // Desde 02/09/2026 a conversa pertence ao número, então quem não tem número não vê nada —
+  // e é este sinal, não o `config`, que decide se a tela explica isso ou fica muda.
+  const { data: temVinculo, isSuccess: vinculoResolvido } = useWaTenhoVinculo();
+  const semNumero = vinculoResolvido && temVinculo === false;
   const { data: instancias = [] } = useWaInstancias();
   // Controla o badge de apelido e o filtro "Instância" — aparecem já com 1
   // instância cadastrada, desde que ela tenha apelido/nome conhecido.
@@ -6890,7 +6897,9 @@ export default function WhatsAppInbox() {
                     busca.trim().length >= 2 ? null : (
                       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground text-sm gap-2 px-4 text-center">
                         <MessageCircle className="h-8 w-8 opacity-30" />
-                        Nenhuma conversa ainda
+                        {semNumero
+                          ? "Você ainda não atende nenhum número. Conecte o seu WhatsApp em Configurações ou peça a um gestor para ligar você a um número da equipe."
+                          : "Nenhuma conversa ainda"}
                       </div>
                     )
                   ) : (
@@ -7439,7 +7448,9 @@ export default function WhatsAppInbox() {
                       busca.trim().length >= 2 ? null : (
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground text-sm gap-2 px-4 text-center">
                           <MessageCircle className="h-8 w-8 opacity-30" />
-                          Nenhuma conversa ainda
+                          {semNumero
+                            ? "Você ainda não atende nenhum número. Conecte o seu WhatsApp em Configurações ou peça a um gestor para ligar você a um número da equipe."
+                            : "Nenhuma conversa ainda"}
                         </div>
                       )
                     ) : (
@@ -8511,16 +8522,21 @@ export default function WhatsAppInbox() {
                       </button>
                     </div>
                   )}
-                  {!config && (
+                  {/* 🔴 `semNumero`, NÃO `!config`. Quem está vinculado a uma instância de
+                      outra pessoa recebe `config` nulo mesmo tendo número (a junção passa pela
+                      regra de segurança de `configuracoes_wapi`, que só mostra a instância ao
+                      dono dela). Com `!config`, este aviso aparecia para quem envia sem
+                      problema nenhum — e some justamente para quem precisa dele. */}
+                  {semNumero && (
                     <div className="mb-2 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 px-2">
                       <Settings className="h-3.5 w-3.5" />
-                      Configure o uazapi para enviar mensagens
+                      Você precisa de um número para enviar mensagens
                       <Button
                         variant="link"
                         className="h-auto p-0 text-xs"
                         onClick={() => setShowConfig(true)}
                       >
-                        Configurar
+                        Conectar
                       </Button>
                     </div>
                   )}
@@ -8769,17 +8785,43 @@ export default function WhatsAppInbox() {
                 <div className="h-16 w-16 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
                   <MessageCircle className="h-8 w-8 text-green-600" />
                 </div>
-                <div className="text-center">
-                  <p className="font-medium text-foreground">WhatsApp CRM</p>
-                  <p className="text-sm mt-1">
-                    Selecione uma conversa para começar
-                  </p>
-                </div>
-                {!config && (
-                  <Button variant="outline" onClick={() => setShowConfig(true)}>
-                    <Settings className="h-4 w-4 mr-2" />
-                    Configurar uazapi
-                  </Button>
+                {semNumero ? (
+                  <>
+                    <div className="max-w-md text-center space-y-2">
+                      <p className="font-medium text-foreground">
+                        Você ainda não atende nenhum número de WhatsApp
+                      </p>
+                      <p className="text-sm">
+                        As conversas aparecem por número, e você ainda não está ligado a
+                        nenhum. Por isso esta tela está vazia — não é erro, e nada foi apagado.
+                      </p>
+                      <p className="text-sm">
+                        Se você vai usar um número seu, conecte o WhatsApp em Configurações. Se
+                        a sua equipe já usa um número, peça a um gestor da sua empresa para
+                        ligar você a ele. Assim que isso for feito, esta tela se atualiza
+                        sozinha.
+                      </p>
+                    </div>
+                    <Button variant="outline" onClick={() => setShowConfig(true)}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Conectar meu WhatsApp
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-center">
+                      <p className="font-medium text-foreground">WhatsApp CRM</p>
+                      <p className="text-sm mt-1">
+                        Selecione uma conversa para começar
+                      </p>
+                    </div>
+                    {!config && (
+                      <Button variant="outline" onClick={() => setShowConfig(true)}>
+                        <Settings className="h-4 w-4 mr-2" />
+                        Configurar uazapi
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             )}
