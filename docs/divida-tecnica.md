@@ -2425,32 +2425,38 @@ decisão dele sobre qual dos três caminhos seguir, antes de qualquer código.
 
 ---
 
-## 61. Tipos de cliente: duas telas ainda gravam lista fixa própria
+## 61. Tipos de cliente: as duas telas convertidas não avisam quando a lista falha ou demora
 
-Desde 02/09/2026 a lista de tipos de cliente é uma lista **por empresa**, na tabela
-`clientes_tipos`, lida por `src/pages/Clientes.tsx` através de `useClientesTipos`.
-Antes eram 9 valores fixos no código mais o que cada pessoa criava no `localStorage`
-do próprio navegador — nada disso era compartilhado com a equipe.
+**Resolvido o essencial em 02/09/2026.** `src/pages/ClienteDetalhe.tsx` e
+`src/components/shared/EmpresaSelector.tsx` passaram a ler `useClientesTipos` — a lista
+**por empresa**, tabela `clientes_tipos` — como `src/pages/Clientes.tsx` já fazia. As
+listas fixas embutidas que este item descrevia (3 opções em ClienteDetalhe, 6 em
+EmpresaSelector) não existem mais em nenhuma das duas.
 
-**Outras duas telas ficaram de fora, por decisão de escopo, e continuam com listas
-fixas embutidas:**
+Na mesma leva foram fechados os dois efeitos colaterais que a troca, sozinha, teria
+deixado abertos:
 
-| Arquivo | O que faz | Estrago |
-|---|---|---|
-| `src/pages/ClienteDetalhe.tsx` (~50, ~892-896) | Select com **3 opções fixas** e `tipoLabels` próprio | Editar um cliente por essa tela **desfaz a classificação**: numa empresa que personalizou a lista, o tipo escolhido vira um dos 3 valores fixos |
-| `src/components/shared/EmpresaSelector.tsx` (~227) | Select com **6 opções fixas**; cadastra cliente de verdade via `useCreateCliente`. Usado em **6 telas** (NovoNegocioDialog, Clientes, ContatoDetalhe, EditarPedido, Obras) | Vendedor que cadastra cliente pelo atalho do negócio grava `construtora` — um slug que a empresa pode não ter na lista |
+- **`EmpresaSelector.tsx` podia gravar `tipo: ''`.** O campo nasce vazio e só é
+  preenchido quando a lista da empresa chega; se a consulta ainda não tivesse voltado no
+  momento do envio (conta sem empresa resolvida, consulta lenta ou com erro), o cadastro
+  seguia em frente — string vazia satisfaz o `NOT NULL` da coluna, e `opcoesDeFiltro`
+  descarta valor vazio, então o cliente ficava invisível no filtro de Tipo. Ganhou a
+  mesma trava que `Clientes.tsx` já tinha: sem tipo escolhido, não grava.
+- **O Select de edição de `ClienteDetalhe.tsx` abria em branco** — nem o placeholder
+  aparecia — quando o cliente tinha um tipo que não está mais na lista da empresa (tipo
+  removido depois, ou importação com valor novo). As opções passaram a somar esse valor
+  à lista, mesma ideia de `opcoesDeFiltro`. Não havia perda de dado (salvar sem tocar já
+  preservava o tipo), só a aparência de tela quebrada.
 
-Nenhum dos dois quebra a tela: `rotuloDoTipo` cai no valor cru e `opcoesDeFiltro` soma
-os tipos em uso, então o cliente continua legível e encontrável pelo filtro. O que se
-perde é a classificação correta — em silêncio.
-
-Isso é parente da armadilha §7.14 do `CLAUDE.md` (o conserto certo no arquivo errado):
-mexer só na tela de Clientes deixa o dia a dia passando pelas outras duas.
-
-**Conserto:** as duas passarem a ler `useClientesTipos`, como `Clientes.tsx` faz.
-
-**Custo:** baixo. As funções puras (`src/lib/tipos-de-cliente.ts`) e o hook já existem;
-é trocar a lista fixa pela lista do banco em dois pontos.
+**O que fica pendente:** nenhuma das duas telas dá sinal de carregando ou de erro da
+lista de tipos — ao contrário de `Clientes.tsx`, que mostra "Carregando tipos…" e "Não
+foi possível carregar os tipos." no diálogo de gerenciar tipos. Em `ClienteDetalhe.tsx`
+e `EmpresaSelector.tsx`, se a consulta demorar ou falhar, o Select de Tipo simplesmente
+fica sem opções (ou com menos opções do que devia), sem nada na tela dizer que o motivo é
+a lista que não chegou — a pessoa só vê um campo que não deixa escolher nada. Baixo
+custo, baixo risco (não perde dado, `EmpresaSelector.tsx` já recusa gravar sem tipo): dá
+para copiar o mesmo par `isLoading`/`error` de `useClientesTipos` que `Clientes.tsx` já
+lê, se algum dia sobrar tempo.
 
 ---
 

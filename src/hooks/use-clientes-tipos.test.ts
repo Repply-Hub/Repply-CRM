@@ -71,4 +71,13 @@ describe('ehPessoaFisica', () => {
     expect(ehPessoaFisica('')).toBe(false);
     expect(ehPessoaFisica('pessoa juridica')).toBe(false);
   });
+
+  it('nao estoura com null ou undefined -- volta false em vez de derrubar a ficha do cliente', () => {
+    // `cliente.tipo` pode chegar nulo (linha antiga, importação incompleta). O TypeScript
+    // do projeto está com strictNullChecks desligado, então nada aqui barra a chamada --
+    // sem guarda, `.toLowerCase()` dentro de slugDeTipo lança TypeError e a tela inteira
+    // cai, em vez de só mostrar "CNPJ" no lugar de "CPF".
+    expect(ehPessoaFisica(null as unknown as string)).toBe(false);
+    expect(ehPessoaFisica(undefined as unknown as string)).toBe(false);
+  });
 });

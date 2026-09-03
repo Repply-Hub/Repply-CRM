@@ -47,7 +47,7 @@ import { FilterButton } from '@/components/shared/FilterButton';
 import { StandardPopoverMenu } from '@/components/ui/standard-popover-menu';
 import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
 import { useClientesTipos, useCriarTipoDeCliente, useExcluirTipoDeCliente } from '@/hooks/use-clientes-tipos';
-import { rotuloDoTipo, tipoPadrao, opcoesDeFiltro } from '@/lib/tipos-de-cliente';
+import { rotuloDoTipo, tipoPadrao, opcoesDeFiltro, slugDeTipo } from '@/lib/tipos-de-cliente';
 
 
 const CLIENTE_FIELDS: ColumnDefinition[] = [
@@ -97,7 +97,10 @@ const EMPRESA_STEPS = [
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
 // O rótulo do tipo vem do banco (clientes_tipos), mas o ícone continua no código: ícone
 // não é algo que o gestor cadastra, e tipo fora desta lista cai em Building2.
-const getTipoIcon = (value: string) => tipoIcons[value] ?? Building2;
+// slugDeTipo normaliza antes de consultar: o valor gravado pode ser 'pessoa fisica' (com
+// espaço, sem acento -- o que a importação de planilha grava), enquanto a chave do
+// dicionário é 'pessoa_fisica'. Sem a normalização esses clientes caem no ícone de prédio.
+const getTipoIcon = (value: string) => tipoIcons[slugDeTipo(value)] ?? Building2;
 
 const normalizeExtraKey = (value: string) => value
   .toLowerCase()

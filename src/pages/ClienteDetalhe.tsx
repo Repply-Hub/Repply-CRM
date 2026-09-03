@@ -11,7 +11,7 @@ import { useSecaoLigada } from '@/hooks/use-secoes';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
 import { useClientesTipos } from '@/hooks/use-clientes-tipos';
-import { rotuloDoTipo, ehPessoaFisica } from '@/lib/tipos-de-cliente';
+import { rotuloDoTipo, ehPessoaFisica, slugDeTipo } from '@/lib/tipos-de-cliente';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { NovoNegocioDialog } from '@/components/pedidos/NovoNegocioDialog';
 import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra, useUpdateContato } from '@/hooks/use-mutations';
@@ -575,6 +575,16 @@ const ClienteDetalhe = () => {
   const [editEndereco, setEditEndereco] = useState<EnderecoFields>(emptyEndereco);
   const [editCamposExtras, setEditCamposExtras] = useState<Record<string, string>>({});
 
+  // Opções do Select de edição = a lista da empresa + o tipo atual do cliente, quando ele
+  // não estiver nela (gestor excluiu o tipo depois, ou uma importação gravou um valor que a
+  // lista não tem). Sem isso o Select abre TOTALMENTE em branco -- nem o placeholder aparece
+  // -- e não há como reescolher aquele valor sem antes trocar por outro. Mesma ideia de
+  // `opcoesDeFiltro` (soma os valores em uso aos da lista), só que para um único valor.
+  const opcoesDeEdicaoDeTipo = useMemo(() => {
+    if (!editData.tipo || tipos.some(t => t.slug === editData.tipo)) return tipos;
+    return [...tipos, { id: editData.tipo, slug: editData.tipo, nome: rotuloDoTipo(editData.tipo, tipos) }];
+  }, [tipos, editData.tipo]);
+
   const { data: camposConfigClientes } = useConfiguracoesCampos('clientes', empresaId);
   const { data: camposConfigContatos } = useConfiguracoesCampos('contatos', empresaId);
 
@@ -636,7 +646,10 @@ const ClienteDetalhe = () => {
     setEditData({
       empresa: cliente.empresa ?? '',
       razao_social: (cliente as any).razao_social ?? '',
-      tipo: cliente.tipo ?? 'construtora',
+      // Vazio, nunca um slug cravado: 'construtora' pode não existir na lista da empresa
+      // (ela é por empresa, tabela clientes_tipos), e o Select de edição lidaria com um
+      // valor que nenhuma opção representa.
+      tipo: cliente.tipo ?? '',
       cnpj: cliente.cnpj ?? '',
       email: cliente.email ?? '',
       telefone: cliente.telefone ?? '',
@@ -715,7 +728,11 @@ const ClienteDetalhe = () => {
     );
   }
 
-  const Icon = tipoIcons[cliente.tipo] ?? Building2;
+  // slugDeTipo normaliza antes de consultar o dicionário: o valor gravado pode ser
+  // 'pessoa fisica' (com espaço, sem acento -- o que a importação de planilha grava, e o
+  // que 129 clientes da MD têm hoje), enquanto a chave do dicionário é 'pessoa_fisica'.
+  // Sem a normalização, esses clientes caem no Building2 (prédio) em vez do ícone de pessoa.
+  const Icon = tipoIcons[slugDeTipo(cliente.tipo)] ?? Building2;
   // Mesma construção de classe que Negocios.tsx:97 usa para a etiqueta de etapa.
   const stageBadgeClass = (key: string) =>
     `bg-${KANBAN_STAGES.find(s => s.key === key)?.color || 'muted-foreground'} text-white`;
@@ -900,7 +917,7 @@ const ClienteDetalhe = () => {
                 <Select value={editData.tipo} onValueChange={v => setEditData(d => ({ ...d, tipo: v }))}>
                   <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
                   <SelectContent>
-                    {tipos.map(t => (
+                    {opcoesDeEdicaoDeTipo.map(t => (
                       <SelectItem key={t.id} value={t.slug}>{t.nome}</SelectItem>
                     ))}
                   </SelectContent>

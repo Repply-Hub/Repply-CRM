@@ -54,9 +54,14 @@ export function tipoPadrao(tipos: Pick<TipoDeCliente, 'slug'>[]): string {
  * '===' contra uma das duas formas deixa a outra caindo em CNPJ por engano.
  * Reaproveita `slugDeTipo` (mesma normalizacao de acento e separador) em vez de escrever
  * outra regra: as duas grafias, e qualquer variacao de caixa, normalizam para o mesmo slug.
+ *
+ * `slug ?? ''` porque `cliente.tipo` pode chegar nulo (linha antiga, importacao
+ * incompleta) e o projeto esta com strictNullChecks desligado -- nada barra a chamada em
+ * tempo de compilacao. Sem a guarda, o '.toLowerCase()' de slugDeTipo estoura TypeError e
+ * derruba a ficha do cliente inteira, em vez de so cair no caminho de CNPJ.
  */
 export function ehPessoaFisica(slug: string): boolean {
-  return slugDeTipo(slug) === 'pessoa_fisica';
+  return slugDeTipo(slug ?? '') === 'pessoa_fisica';
 }
 
 /**

@@ -110,6 +110,15 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
       toast.error('O telefone da empresa é obrigatório');
       return;
     }
+    // `clientes.tipo` é NOT NULL no banco, mas string vazia SATISFAZ essa trava -- e
+    // `opcoesDeFiltro` descarta valor vazio, então o cliente ficaria invisível no filtro
+    // de Tipo. O campo nasce vazio e só é preenchido quando a lista da empresa chega (efeito
+    // acima); se a consulta falhar ou demorar, ele continua vazio. Sem esta trava, o cadastro
+    // rápido gravaria o cliente mesmo assim e ainda mostraria "sucesso".
+    if (!newEmpresa.tipo.trim()) {
+      toast.error('Escolha o tipo do cliente.');
+      return;
+    }
 
     try {
       const result = await createCliente.mutateAsync({
