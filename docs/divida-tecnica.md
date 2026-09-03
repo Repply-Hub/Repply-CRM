@@ -2425,6 +2425,35 @@ decisão dele sobre qual dos três caminhos seguir, antes de qualquer código.
 
 ---
 
+## 61. Tipos de cliente: duas telas ainda gravam lista fixa própria
+
+Desde 02/09/2026 a lista de tipos de cliente é uma lista **por empresa**, na tabela
+`clientes_tipos`, lida por `src/pages/Clientes.tsx` através de `useClientesTipos`.
+Antes eram 9 valores fixos no código mais o que cada pessoa criava no `localStorage`
+do próprio navegador — nada disso era compartilhado com a equipe.
+
+**Outras duas telas ficaram de fora, por decisão de escopo, e continuam com listas
+fixas embutidas:**
+
+| Arquivo | O que faz | Estrago |
+|---|---|---|
+| `src/pages/ClienteDetalhe.tsx` (~50, ~892-896) | Select com **3 opções fixas** e `tipoLabels` próprio | Editar um cliente por essa tela **desfaz a classificação**: numa empresa que personalizou a lista, o tipo escolhido vira um dos 3 valores fixos |
+| `src/components/shared/EmpresaSelector.tsx` (~227) | Select com **6 opções fixas**; cadastra cliente de verdade via `useCreateCliente`. Usado em **6 telas** (NovoNegocioDialog, Clientes, ContatoDetalhe, EditarPedido, Obras) | Vendedor que cadastra cliente pelo atalho do negócio grava `construtora` — um slug que a empresa pode não ter na lista |
+
+Nenhum dos dois quebra a tela: `rotuloDoTipo` cai no valor cru e `opcoesDeFiltro` soma
+os tipos em uso, então o cliente continua legível e encontrável pelo filtro. O que se
+perde é a classificação correta — em silêncio.
+
+Isso é parente da armadilha §7.14 do `CLAUDE.md` (o conserto certo no arquivo errado):
+mexer só na tela de Clientes deixa o dia a dia passando pelas outras duas.
+
+**Conserto:** as duas passarem a ler `useClientesTipos`, como `Clientes.tsx` faz.
+
+**Custo:** baixo. As funções puras (`src/lib/tipos-de-cliente.ts`) e o hook já existem;
+é trocar a lista fixa pela lista do banco em dois pontos.
+
+---
+
 ## Resolvidos
 
 ### 21/08/2026 — seleção em massa na lista de Negócios
