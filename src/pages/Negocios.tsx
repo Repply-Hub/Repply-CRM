@@ -805,6 +805,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // trocar de página no picker (a página anterior não fica mais carregada em memória).
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkSelected, setBulkSelected] = useState<Map<string, { nome: string; status: string }>>(new Map());
+  // Modo "todos os filtrados" DENTRO do modal de Ação em massa: em vez de milhares de ids no
+  // navegador, guarda "está tudo marcado" + a lista de EXCEÇÕES, e o UPDATE roda no servidor com
+  // o mesmo recorte do picker (mesma mecânica do "Todos (N)" da lista de Negócios). O checkbox do
+  // cabeçalho da tabela pergunta qual dos dois o usuário quer.
+  const [bulkPickerTodosFiltrados, setBulkPickerTodosFiltrados] = useState(false);
+  const [bulkPickerExcluidos, setBulkPickerExcluidos] = useState<Set<string>>(new Set());
+  // Referência do `bulkPickerFilters` (useMemo) no instante em que "Todos" foi escolhido —
+  // serve pro useEffect abaixo perceber quando o filtro mudou e a seleção ficou órfã.
+  const [bulkFiltroDaSelecao, setBulkFiltroDaSelecao] = useState<PedidosFilters | null>(null);
+  const [bulkSelectAllDialogOpen, setBulkSelectAllDialogOpen] = useState(false);
+  const [bulkDesmarcarDialogOpen, setBulkDesmarcarDialogOpen] = useState(false);
   const [bulkPickerPage, setBulkPickerPage] = useState(1);
   const [bulkPickerPageSize, setBulkPickerPageSize] = useState(10);
   // Busca própria do picker do modal — independente dos filtros ativos na tela (etapa, vendedor,
@@ -949,15 +960,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // (ver usePedidos), trocar de página/busca já mantém a página anterior visível instantaneamente
   // enquanto busca a próxima — usar isFetching aqui apagava a tabela inteira a cada clique de
   // paginação, mesmo com os dados já em cache, dando a impressão de estar lento.
+  // A ETAPA entra pelo argumento posicional `stages`, não por `bulkPickerFilters.stages`:
+  // `montarQueryDeNegocios` e `usePedidosStats` só leem o parâmetro dedicado e ignoram o campo
+  // `stages` de dentro de `filters` — passá-lo só no filtro deixava o recorte por etapa sem efeito
+  // nenhum na lista e na contagem do picker.
   const { data: bulkPickerData, isLoading: isBulkPickerLoading, isFetching: isBulkPickerFetching } = usePedidos(
     empresaId,
     bulkPickerPage - 1,
     bulkPickerPageSize,
-    undefined,
+    bulkPickerFilters.stages,
     bulkPickerFilters,
     bulkEditOpen,
   );
-  const { data: bulkPickerStats } = usePedidosStats(empresaId, undefined, bulkPickerFilters, bulkEditOpen);
+  const { data: bulkPickerStats } = usePedidosStats(empresaId, bulkPickerFilters.stages, bulkPickerFilters, bulkEditOpen);
   const bulkPickerTotalCount = bulkPickerStats?.count ?? 0;
   const isLoading = isUserLoading || (!showKanban && isPedidosLoading);
   // Com `placeholderData: keepPreviousData`, trocar de página/filtro/busca mantém o conteúdo
@@ -973,6 +988,142 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const totalCount = pedidosStats?.count ?? 0;
   const totalValor = pedidosStats?.valor ?? 0;
   const bulkPickerTotalPages = Math.max(1, Math.ceil(bulkPickerTotalCount / bulkPickerPageSize));
+
+  // ── Checkbox "selecionar todos" no cabeçalho da tabela de Ação em massa ──────────────────
+  // Dois modos, iguais aos da lista de Negócios (ver src/lib/selecao-em-massa.ts):
+  //  • normal: cada negócio marcado é um id em `bulkSelected`.
+  //  • "todos os filtrados": `bulkPickerTodosFiltrados` + `bulkPickerExcluidos` (exceções).
+  const bulkPickerPagina = bulkPickerData?.data ?? [];
+  const bulkSelecionadosNaPagina = bulkPickerTodosFiltrados
+    ? bulkPickerPagina.filter(p => !bulkPickerExcluidos.has(p.id)).length
+    : bulkPickerPagina.filter(p => bulkSelected.has(p.id)).length;
+  const bulkPaginaTodaSelecionada =
+    bulkPickerPagina.length > 0 && bulkSelecionadosNaPagina === bulkPickerPagina.length;
+  // Quantos negócios o "Aplicar" vai atingir: no modo por filtro é o total do recorte menos as
+  // exceções; no modo normal é o tamanho da lista marcada.
+  const bulkApplyCount = bulkPickerTodosFiltrados
+    ? Math.max(0, bulkPickerTotalCount - bulkPickerExcluidos.size)
+    : bulkSelected.size;
+
+  // "Todos os filtrados" é DEFINIDO pelo recorte do picker; se o filtro muda depois de escolher
+  // "Todos", o conjunto vira outro que ninguém pediu — zera o modo pra não aplicar no alvo errado
+  // (mesma proteção do useEffect equivalente da lista). `bulkPickerFilters` é um useMemo, então a
+  // referência guardada só difere quando algum filtro do picker realmente mudou.
+  useEffect(() => {
+    if (!bulkPickerTodosFiltrados) return;
+    if (bulkFiltroDaSelecao === bulkPickerFilters) return;
+    setBulkPickerTodosFiltrados(false);
+    setBulkPickerExcluidos(new Set());
+    setBulkFiltroDaSelecao(null);
+    toast.info('A seleção "Todos" foi limpa porque o filtro do modal mudou.');
+  }, [bulkPickerFilters, bulkPickerTodosFiltrados, bulkFiltroDaSelecao]);
+
+  const bulkLimparSelecao = () => {
+    setBulkSelected(new Map());
+    setBulkPickerExcluidos(new Set());
+    setBulkPickerTodosFiltrados(false);
+    setBulkFiltroDaSelecao(null);
+  };
+  const bulkMarcarPaginaIds = () => {
+    if (bulkPickerTodosFiltrados) {
+      setBulkPickerExcluidos(prev => {
+        const next = new Set(prev);
+        bulkPickerPagina.forEach(p => next.delete(p.id));
+        return next;
+      });
+    } else {
+      setBulkSelected(prev => {
+        const next = new Map(prev);
+        bulkPickerPagina.forEach(p => next.set(p.id, { nome: getNomeNegocio(p), status: p.status }));
+        return next;
+      });
+    }
+  };
+  const bulkSelecionarPaginaSomente = () => {
+    setBulkPickerTodosFiltrados(false);
+    setBulkPickerExcluidos(new Set());
+    setBulkFiltroDaSelecao(null);
+    setBulkSelected(prev => {
+      const next = new Map(prev);
+      bulkPickerPagina.forEach(p => next.set(p.id, { nome: getNomeNegocio(p), status: p.status }));
+      return next;
+    });
+    setBulkSelectAllDialogOpen(false);
+  };
+  const bulkSelecionarTodosFiltrados = () => {
+    setBulkSelected(new Map());
+    setBulkPickerExcluidos(new Set());
+    setBulkPickerTodosFiltrados(true);
+    setBulkFiltroDaSelecao(bulkPickerFilters);
+    setBulkSelectAllDialogOpen(false);
+  };
+  const bulkDesmarcarPaginaSomente = () => {
+    if (bulkPickerTodosFiltrados) {
+      setBulkPickerExcluidos(prev => {
+        const next = new Set(prev);
+        bulkPickerPagina.forEach(p => next.add(p.id));
+        return next;
+      });
+    } else {
+      setBulkSelected(prev => {
+        const next = new Map(prev);
+        bulkPickerPagina.forEach(p => next.delete(p.id));
+        return next;
+      });
+    }
+    setBulkDesmarcarDialogOpen(false);
+  };
+  const bulkLimparSelecaoPeloDialogo = () => {
+    bulkLimparSelecao();
+    setBulkDesmarcarDialogOpen(false);
+  };
+
+  // Mesma decisão de SETE resultados travada por teste em src/lib/selecao-em-massa.ts.
+  const bulkToggleTodos = () => {
+    const acao = acaoDaCaixaDoCabecalho({
+      modoTodosFiltrados: bulkPickerTodosFiltrados,
+      paginaInteiraSelecionada: bulkPaginaTodaSelecionada,
+      totalConhecido: bulkPickerStats !== undefined,
+      totalFiltrado: bulkPickerTotalCount,
+      itensNaPagina: bulkPickerPagina.length,
+      selecionadosNaPagina: bulkSelecionadosNaPagina,
+      selecionadosNoTotal: bulkApplyCount,
+    });
+    switch (acao) {
+      case 'nada':
+        return;
+      case 'limpar-tudo':
+        bulkLimparSelecao();
+        return;
+      case 'perguntar-desmarcar':
+        setBulkDesmarcarDialogOpen(true);
+        return;
+      case 'reincluir-pagina':
+        setBulkPickerExcluidos(prev => {
+          const next = new Set(prev);
+          bulkPickerPagina.forEach(p => next.delete(p.id));
+          return next;
+        });
+        return;
+      case 'desmarcar-pagina':
+        setBulkSelected(prev => {
+          const next = new Map(prev);
+          bulkPickerPagina.forEach(p => next.delete(p.id));
+          return next;
+        });
+        return;
+      case 'marcar-pagina':
+        setBulkSelected(prev => {
+          const next = new Map(prev);
+          bulkPickerPagina.forEach(p => next.set(p.id, { nome: getNomeNegocio(p), status: p.status }));
+          return next;
+        });
+        return;
+      case 'perguntar-marcar':
+        setBulkSelectAllDialogOpen(true);
+        return;
+    }
+  };
 
   useEffect(() => {
     if (!kanbanColunas || !funilId) return;
@@ -1446,9 +1597,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     }
   };
 
-  // Alvo é exatamente o que foi marcado no checklist do próprio modal — envia os ids
-  // explicitamente, igual ao fluxo de "Excluir Selecionados" com seleção manual.
-  const bulkApplyCount = bulkSelected.size;
+  // `bulkApplyCount` é definido lá em cima (junto com bulkPickerTodosFiltrados), porque o
+  // checkbox do cabeçalho também precisa dele.
   // Agrupa os selecionados pela etapa atual (De:) — como a seleção pode misturar negócios de
   // etapas diferentes, mostra cada etapa de origem presente (com a contagem) em vez de assumir
   // uma origem única, para deixar claro o que vai mudar antes de aplicar o "Para:".
@@ -1470,10 +1620,19 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     if (Object.keys(updates).length === 0) return;
 
     try {
-      const updated = await bulkUpdateMutation.mutateAsync({
-        target: { ids: Array.from(bulkSelected.keys()) },
-        updates,
-      });
+      // Dois formatos de alvo, iguais aos da exclusão em massa: ids explícitos (seleção manual)
+      // ou "todos os filtrados" resolvido no servidor com o mesmo recorte do picker.
+      const target = bulkPickerTodosFiltrados
+        ? {
+            empresaId,
+            // Etapa vai no campo `stages` do alvo (o mesmo que a lista/contagem usam), não em
+            // `filters.stages`, que a mutation também ignora.
+            stages: bulkPickerFilters.stages,
+            filters: bulkPickerFilters,
+            excludeIds: bulkPickerExcluidos.size > 0 ? Array.from(bulkPickerExcluidos) : undefined,
+          }
+        : { ids: Array.from(bulkSelected.keys()) };
+      const updated = await bulkUpdateMutation.mutateAsync({ target, updates });
       if (updated > 0) {
         toast.success(`${updated} negócio(s) atualizado(s) com sucesso!`);
       }
@@ -1484,7 +1643,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       setBulkNewStatus('');
       setBulkNewMarcadorId('');
       setBulkNewVendedorId('');
-      setBulkSelected(new Map());
+      bulkLimparSelecao();
     } catch (err: any) {
       console.error('[bulk-update pedidos]', err);
       toast.error(err?.message || 'Erro inesperado ao aplicar a alteração em massa');
@@ -1807,6 +1966,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
             disabled={!empresaId}
             onClick={() => {
               setBulkSelected(new Map());
+              setBulkPickerTodosFiltrados(false);
+              setBulkPickerExcluidos(new Set());
+              setBulkFiltroDaSelecao(null);
               setBulkPickerPage(1);
               setBulkPickerSearch('');
               setBulkPickerStages([]);
@@ -2882,6 +3044,39 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Mesma pergunta, agora para o checkbox do cabeçalho da tabela DENTRO do modal de Ação em massa. */}
+      <AlertDialog open={bulkSelectAllDialogOpen} onOpenChange={setBulkSelectAllDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Selecionar negócios</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja selecionar apenas os {bulkPickerPagina.length} negócio(s) desta página ou todos os {bulkPickerTotalCount} negócio(s) do recorte atual?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="outline" onClick={bulkSelecionarPaginaSomente}>Apenas esta página ({bulkPickerPagina.length})</Button>
+            <Button variant="default" onClick={bulkSelecionarTodosFiltrados}>Todos ({bulkPickerTotalCount})</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDesmarcarDialogOpen} onOpenChange={setBulkDesmarcarDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desmarcar negócios</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja desmarcar apenas os {bulkSelecionadosNaPagina} negócio(s) desta página ou limpar a seleção inteira, com {bulkApplyCount} negócio(s)?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <Button variant="outline" onClick={bulkDesmarcarPaginaSomente}>Apenas esta página ({bulkSelecionadosNaPagina})</Button>
+            <Button variant="default" onClick={bulkLimparSelecaoPeloDialogo}>Limpar tudo ({bulkApplyCount})</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={!!blockedMove} onOpenChange={(open) => { if (!open) setBlockedMove(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -2922,11 +3117,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   size="sm"
                   variant="ghost"
                   className="h-6 px-2 text-xs"
-                  onClick={() => setBulkSelected(prev => {
-                    const next = new Map(prev);
-                    (bulkPickerData?.data ?? []).forEach(p => next.set(p.id, { nome: getNomeNegocio(p), status: p.status }));
-                    return next;
-                  })}
+                  onClick={bulkMarcarPaginaIds}
                 >
                   Selecionar página
                 </Button>
@@ -3162,7 +3353,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                       <Table wrapperClassName="h-80">
                         <TableHeader className="sticky top-0 z-10 bg-muted">
                           <TableRow className="bg-muted/50">
-                            <TableHead className="w-10 px-2.5" />
+                            <TableHead className="w-10 px-2.5">
+                              {/* Marcar aqui pergunta "só esta página ou todos os N?" quando há mais
+                                  de uma página; a decisão das 7 respostas vive em selecao-em-massa.ts. */}
+                              <Checkbox
+                                checked={bulkPaginaTodaSelecionada}
+                                aria-label="Selecionar todos"
+                                onCheckedChange={bulkToggleTodos}
+                              />
+                            </TableHead>
                             {columns.filter(col => tableVisibleColumns.includes(col.id)).map(col => (
                               <TableHead key={col.id} className="whitespace-nowrap px-2.5 text-xs font-semibold">
                                 {getLabel(col.id)}
@@ -3175,13 +3374,24 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                             <PedidoRow
                               key={p.id}
                               pedido={p}
-                              selected={bulkSelected.has(p.id)}
-                              onToggle={() => setBulkSelected(prev => {
-                                const next = new Map(prev);
-                                if (next.has(p.id)) next.delete(p.id);
-                                else next.set(p.id, { nome: getNomeNegocio(p), status: p.status });
-                                return next;
-                              })}
+                              selected={bulkPickerTodosFiltrados ? !bulkPickerExcluidos.has(p.id) : bulkSelected.has(p.id)}
+                              onToggle={() => {
+                                if (bulkPickerTodosFiltrados) {
+                                  setBulkPickerExcluidos(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(p.id)) next.delete(p.id);
+                                    else next.add(p.id);
+                                    return next;
+                                  });
+                                } else {
+                                  setBulkSelected(prev => {
+                                    const next = new Map(prev);
+                                    if (next.has(p.id)) next.delete(p.id);
+                                    else next.set(p.id, { nome: getNomeNegocio(p), status: p.status });
+                                    return next;
+                                  });
+                                }
+                              }}
                               onClick={() => setViewOrderId(p.id)}
                               visibleColumns={tableVisibleColumns}
                               columns={columns}
@@ -3218,16 +3428,31 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               <div className="flex items-center justify-between gap-2">
                 <p className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   Selecionados
-                  <Badge className="font-normal normal-case">{bulkSelected.size}</Badge>
+                  <Badge className="font-normal normal-case">{bulkApplyCount}</Badge>
                 </p>
-                {bulkSelected.size > 0 && (
-                  <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setBulkSelected(new Map())}>
+                {(bulkPickerTodosFiltrados || bulkSelected.size > 0) && (
+                  <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={bulkLimparSelecao}>
                     Limpar
                   </Button>
                 )}
               </div>
               <div className="h-80 overflow-y-auto space-y-1">
-                {bulkSelected.size === 0 ? (
+                {bulkPickerTodosFiltrados ? (
+                  <div className="space-y-2 rounded-md border bg-background px-2.5 py-2 text-xs">
+                    <p className="font-medium text-foreground">
+                      Todos os {bulkPickerTotalCount.toLocaleString('pt-BR')} negócios do recorte atual
+                    </p>
+                    {bulkPickerExcluidos.size > 0 && (
+                      <p className="text-muted-foreground">
+                        menos {bulkPickerExcluidos.size} desmarcado(s) à mão
+                      </p>
+                    )}
+                    <p className="text-muted-foreground">
+                      A alteração roda no servidor com os filtros do picker. Para escolher um a um,
+                      desmarque a caixa do cabeçalho da tabela.
+                    </p>
+                  </div>
+                ) : bulkSelected.size === 0 ? (
                   <p className="py-10 text-center text-xs text-muted-foreground px-2">
                     Marque negócios na lista ao lado para adicioná-los aqui.
                   </p>
@@ -3278,7 +3503,17 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   cegas sem saber de onde os negócios selecionados estão saindo. */}
               <div className="flex flex-wrap items-center gap-2 pl-7">
                 <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider shrink-0">De:</span>
-                {bulkOriginStages.length === 0 ? (
+                {bulkPickerTodosFiltrados ? (
+                  bulkPickerStages.length > 0 ? (
+                    bulkPickerStages.map(status => (
+                      <Badge key={status} className={cn(getStageBadgeClass(stageColorToken(status)), "font-normal normal-case")}>
+                        {stageLabel(status)}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground italic">todas as etapas do recorte</span>
+                  )
+                ) : bulkOriginStages.length === 0 ? (
                   <span className="text-xs text-muted-foreground italic">selecione negócios na lista</span>
                 ) : (
                   bulkOriginStages.map(({ status, count }) => (
