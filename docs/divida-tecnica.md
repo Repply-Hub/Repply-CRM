@@ -2460,6 +2460,51 @@ lê, se algum dia sobrar tempo.
 
 ---
 
+## 62. Gerenciar tipos de cliente não alcança o atalho de cadastro rápido
+
+Desde 02/09/2026 dá para **criar, renomear e excluir** tipos de cliente pelo diálogo
+`src/components/clientes/GerenciarTiposDialog.tsx`, aberto pela opção "+ Criar novo
+tipo…" do Select. Ele está em **duas** das três telas que cadastram cliente:
+
+| Tela | Lê a lista da empresa | Abre o "Gerenciar tipos" |
+|---|---|---|
+| `src/pages/Clientes.tsx` | sim | **sim** |
+| `src/pages/ClienteDetalhe.tsx` (editar) | sim | **sim** |
+| `src/components/shared/EmpresaSelector.tsx` | sim | **não** |
+
+`EmpresaSelector` é o atalho "cadastrar empresa na hora", usado em **seis** telas
+(`NovoNegocioDialog`, `Clientes`, `ContatoDetalhe`, `EditarPedido`, `Obras`). Quem
+cadastra um cliente por ali escolhe da lista certa, mas **não consegue criar um tipo
+novo sem sair e ir até a tela de Clientes**.
+
+**Por que ficou de fora, e por que não é só acrescentar o botão:** o `EmpresaSelector`
+já é renderizado **dentro** de outro diálogo. Empilhar um terceiro modal do Radix é
+fonte conhecida de tela travada neste projeto — e aqui é pior que na média, porque
+`src/components/ui/dialog.tsx` **desliga Esc e clique-fora** (ver §7.11 do `CLAUDE.md`):
+se o foco ou o `pointer-events` do `<body>` ficarem presos, a pessoa só sai
+recarregando a página.
+
+Em `ClienteDetalhe.tsx` o problema foi contornado **fechando** o diálogo de edição antes
+de abrir o de gerenciar e reabrindo depois com o formulário intacto (`setEditOpen(true)`,
+nunca `openEdit()`, que releria o cliente e apagaria o digitado). Esse truque **não se
+transporta**: o `EmpresaSelector` não é dono do diálogo que o contém, então não tem como
+fechá-lo e reabri-lo.
+
+**Caminhos possíveis, a decidir:**
+
+1. **Aba em Configurações** — a gestão de tipos sai de dentro dos formulários e vira uma
+   tela própria, ao lado de Etapas e Marcadores. É o padrão que o projeto já usa para
+   lista por empresa, e resolve as três telas de uma vez. Os botões nos formulários
+   passariam a levar para lá.
+2. **Painel lateral (`Sheet`) em vez de diálogo** — não empilha modal, então conviveria
+   com o diálogo que já está aberto.
+3. **Deixar como está** e aceitar que criar tipo é uma ação da tela de Clientes.
+
+**Custo:** baixo a médio. O componente de gerenciar já existe e é compartilhado; o
+trabalho é decidir onde ele mora e religar as portas de entrada.
+
+---
+
 ## Resolvidos
 
 ### 21/08/2026 — seleção em massa na lista de Negócios
