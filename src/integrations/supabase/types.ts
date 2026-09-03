@@ -229,6 +229,36 @@ export type Database = {
           },
         ]
       }
+      cargos_contato: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          is_sistema: boolean
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          is_sistema?: boolean
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          is_sistema?: boolean
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       chat_geral_config: {
         Row: {
           created_at: string
@@ -2874,6 +2904,47 @@ export type Database = {
             columns: ["marcador_id"]
             isOneToOne: false
             referencedRelation: "marcadores_obras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      origens_pedido: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          is_sistema: boolean
+          nome: string
+          ordem: number
+          updated_at: string
+          valor: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          is_sistema?: boolean
+          nome: string
+          ordem?: number
+          updated_at?: string
+          valor: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          is_sistema?: boolean
+          nome?: string
+          ordem?: number
+          updated_at?: string
+          valor?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "origens_pedido_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
         ]
