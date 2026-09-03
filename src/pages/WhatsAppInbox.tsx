@@ -64,6 +64,8 @@ import { useTarefasKanbanColunas } from "@/hooks/use-tarefas-kanban-colunas";
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
 import { ChatMessageSearch } from "@/components/chat/ChatMessageSearch";
 import { EncaminharMensagemDialog } from "@/components/chat/EncaminharMensagemDialog";
+import { FigurinhasPopover } from "@/components/chat/FigurinhasPopover";
+import { useSalvarFigurinha } from "@/hooks/use-figurinhas-whatsapp";
 import { EnviarContatoDialog } from "@/components/whatsapp/EnviarContatoDialog";
 import { SalvarContatoRecebidoDialog } from "@/components/whatsapp/SalvarContatoRecebidoDialog";
 import { ProjetoSelect } from "@/components/tarefas/ProjetoSelect";
@@ -237,6 +239,7 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn, autoResizeTextarea, slugify } from "@/lib/utils";
+import { arquivoParaFigurinhaWebp, sha256Hex } from "@/lib/figurinha";
 import { downloadFile } from "@/lib/download-file";
 import { useArquivosPrivados } from "@/hooks/use-arquivo-privado";
 import { linkifyText } from "@/lib/linkify";
@@ -1723,6 +1726,7 @@ function DraggableBubble({
   onEditar,
   onEncaminhar,
   onCriarTarefa,
+  onSalvarFigurinha,
   children,
 }: {
   msg: WaMensagem;
@@ -1735,6 +1739,8 @@ function DraggableBubble({
   // Só é passada quando a empresa tem a seção "Tarefas" ligada — sem ela, o
   // item "Criar tarefa" nem aparece no menu da bolha.
   onCriarTarefa?: (msg: WaMensagem) => void;
+  // Só faz sentido em mensagem de figurinha — guarda a figurinha na coleção do número.
+  onSalvarFigurinha?: (msg: WaMensagem) => void;
   children: React.ReactNode;
 }) {
   const [dragX, setDragX] = useState(0);
@@ -1868,6 +1874,15 @@ function DraggableBubble({
                   Encaminhar
                 </DropdownMenuItem>
               )}
+              {onSalvarFigurinha &&
+                msg.tipo === "sticker" &&
+                !!msg.media_url &&
+                !msg.is_nota_interna && (
+                  <DropdownMenuItem onClick={() => onSalvarFigurinha(msg)}>
+                    <Sticker className="h-3.5 w-3.5 mr-2" />
+                    Salvar figurinha
+                  </DropdownMenuItem>
+                )}
               {onCriarTarefa && !msg.is_nota_interna && (
                 <DropdownMenuItem onClick={() => onCriarTarefa(msg)}>
                   <ListTodo className="h-3.5 w-3.5 mr-2" />
@@ -5214,6 +5229,8 @@ export default function WhatsAppInbox() {
     { file: File; previewUrl: string | null }[]
   >([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [figurinhasOpen, setFigurinhasOpen] = useState(false);
+  const [enviandoFigurinha, setEnviandoFigurinha] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const dragCounterRef = useRef(0);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
@@ -6081,6 +6098,92 @@ export default function WhatsAppInbox() {
       // Adia pro próximo tick: o textarea ainda está com `disabled` no DOM neste
       // ponto (React só remove o atributo depois de commitar o novo estado), e
       // .focus() em elemento disabled não faz nada.
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }
+
+  // Guarda na coleção do número uma figurinha que apareceu no chat.
+  const salvarFigurinha = useSalvarFigurinha(conversaAtiva?.instancia_id);
+  function handleSalvarFigurinha(msg: WaMensagem) {
+    if (!msg.media_url) return;
+    if (!conversaAtiva?.instancia_id) {
+      toast.error("Este número ainda não está pronto para salvar figurinhas.");
+      return;
+    }
+    salvarFigurinha.mutate({
+      mediaUrl: msg.media_url,
+      enderecoParaHash: enderecoDaMidia(msg.media_url) ?? msg.media_url,
+      mediaMime: msg.media_mime,
+      origem: msg.direcao === "saida" ? "enviada" : "recebida",
+    });
+  }
+
+  // Envia uma figurinha que já está na coleção do número.
+  async function enviarFigurinha(fig: { media_url: string; media_mime: string | null }) {
+    if (!conversaAtiva || enviandoFigurinha) return;
+    if (!config || config.status !== "connected") {
+      toast.error("WhatsApp desconectado. Verifique as configurações.");
+      return;
+    }
+    const conversaId = conversaAtiva.id;
+    const quoted = quotedParamsFor(respondendoA);
+    setFigurinhasOpen(false);
+    setRespondendoA(null);
+    setEnviandoFigurinha(true);
+    try {
+      await sendMessage.mutateAsync({
+        telefone: conversaAtiva.telefone,
+        mensagem: "",
+        conversa_id: conversaId,
+        tipo: "sticker",
+        media_url: fig.media_url,
+        media_mime: fig.media_mime,
+        ...quoted,
+      });
+      marcarLida.mutate(conversaId);
+    } catch (err) {
+      console.error("[whatsapp] falha ao enviar figurinha:", err);
+    } finally {
+      setEnviandoFigurinha(false);
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }
+
+  // Converte a imagem escolhida para webp 512x512, sobe e envia como figurinha.
+  // Depois de enviada, o servidor a registra na coleção do número (whatsapp_figurinhas).
+  async function enviarImagemComoFigurinha(file: File) {
+    if (!conversaAtiva || enviandoFigurinha) return;
+    if (!config || config.status !== "connected") {
+      toast.error("WhatsApp desconectado. Verifique as configurações.");
+      return;
+    }
+    const conversaId = conversaAtiva.id;
+    const quoted = quotedParamsFor(respondendoA);
+    setFigurinhasOpen(false);
+    setRespondendoA(null);
+    setEnviandoFigurinha(true);
+    try {
+      const webp = await arquivoParaFigurinhaWebp(file);
+      const [mediaUrl, mediaHash] = await Promise.all([
+        uploadWaMedia(webp, conversaId),
+        sha256Hex(webp),
+      ]);
+      await sendMessage.mutateAsync({
+        telefone: conversaAtiva.telefone,
+        mensagem: "",
+        conversa_id: conversaId,
+        tipo: "sticker",
+        media_url: mediaUrl,
+        media_mime: "image/webp",
+        media_hash: mediaHash,
+        ...quoted,
+      });
+      marcarLida.mutate(conversaId);
+    } catch (err) {
+      console.error("[whatsapp] falha ao enviar imagem como figurinha:", err);
+      toast.error("Não foi possível preparar essa imagem como figurinha.");
+    } finally {
+      setEnviandoFigurinha(false);
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }
@@ -8344,6 +8447,7 @@ export default function WhatsAppInbox() {
                                             ? abrirNovaTarefa
                                             : undefined
                                         }
+                                        onSalvarFigurinha={handleSalvarFigurinha}
                                       >
                                         <div
                                           className={cn(
@@ -8751,6 +8855,19 @@ export default function WhatsAppInbox() {
                         <Mic className="h-4 w-4 text-muted-foreground" />
                       )}
                     </Button>
+                    {/* Figurinhas que já circularam neste número (recebidas ou enviadas),
+                        mais o atalho de enviar uma imagem nova como figurinha. */}
+                    <FigurinhasPopover
+                      instanciaId={conversaAtiva?.instancia_id}
+                      open={figurinhasOpen}
+                      onOpenChange={setFigurinhasOpen}
+                      disabled={
+                        isBusy || isRecording || !!pendingAudio || !!msgEmEdicao
+                      }
+                      enviando={enviandoFigurinha}
+                      onEnviarFigurinha={enviarFigurinha}
+                      onEnviarImagem={enviarImagemComoFigurinha}
+                    />
                     {/* Nova tarefa (sem FK pra clientes/contatos, ver use-tarefas.ts) ou
                       nota interna (is_nota_interna, nunca enviada ao WhatsApp) */}
                     <DropdownMenu>
@@ -8784,6 +8901,15 @@ export default function WhatsAppInbox() {
                         <DropdownMenuItem onClick={() => setNovaNotaOpen(true)}>
                           <StickyNote className="h-4 w-4 mr-2" />
                           Adicionar nota
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            // Deixa o menu fechar antes de abrir o popover (Radix).
+                            setTimeout(() => setFigurinhasOpen(true), 0);
+                          }}
+                        >
+                          <Sticker className="h-4 w-4 mr-2" />
+                          Figurinhas
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => setEnviarContatoOpen(true)}

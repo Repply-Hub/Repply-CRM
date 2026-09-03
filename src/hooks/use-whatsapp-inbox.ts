@@ -699,7 +699,7 @@ export async function uploadWaMedia(file: File, conversaId: string): Promise<str
   return publicUrl;
 }
 
-export type WaMidiaTipo = 'texto' | 'imagem' | 'audio' | 'video' | 'documento';
+export type WaMidiaTipo = 'texto' | 'imagem' | 'audio' | 'video' | 'documento' | 'sticker';
 
 // --- Enviar mensagem (com update otimista) ---
 
@@ -716,6 +716,9 @@ export function useWaSendMessage() {
       media_url?: string | null;
       media_mime?: string | null;
       nome_arquivo?: string;
+      // Só para tipo='sticker': sha256 do arquivo (calculado no navegador), usado
+      // como chave de deduplicação da coleção de figurinhas do número.
+      media_hash?: string;
       ptt?: boolean;
       mentions?: string;
       quoted_wamid?: string | null;
@@ -744,6 +747,7 @@ export function useWaSendMessage() {
             media_url: params.media_url ?? null,
             media_mime: params.media_mime ?? null,
             nome_arquivo: params.nome_arquivo ?? null,
+            media_hash: params.media_hash ?? null,
             ptt: params.ptt ?? false,
             mentions: params.mentions ?? null,
             quoted_wamid: params.quoted_wamid ?? null,

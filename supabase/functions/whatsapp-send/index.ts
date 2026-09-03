@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeWhatsappPhone, varianteDoNumero } from "../_shared/whatsapp.ts";
 import { enderecoParaQuemBaixaDeFora } from "../_shared/arquivo-privado.ts";
+import { registrarFigurinha } from "../_shared/figurinhas.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +15,7 @@ const PLACEHOLDER: Record<string, string> = {
   video: '[Vídeo]',
   documento: '[Documento]',
   contato: '[Contato]',
+  sticker: '[Sticker]',
 };
 
 // Prefixa a mensagem enviada ao WhatsApp com "*Nome*" para que quem recebe saiba
@@ -178,6 +180,9 @@ serve(async (req) => {
 
     const {
       telefone, mensagem, conversa_id, tipo = 'texto', media_url, media_mime, nome_arquivo, ptt = false,
+      // Só para tipo='sticker': sha256 do arquivo, calculado no navegador antes do upload.
+      // Serve de chave de deduplicação na coleção de figurinhas do número (whatsapp_figurinhas).
+      media_hash,
       mentions, quoted_wamid, quoted_conteudo, quoted_tipo, quoted_remetente_nome,
       // Cartão de contato (tipo='contato'): um contato por chamada — o frontend
       // repete o envio para cada contato selecionado.
@@ -393,6 +398,9 @@ serve(async (req) => {
         audio: ptt ? 'ptt' : 'audio',
         video: 'video',
         documento: 'document',
+        // A uazapi recebe a imagem (já convertida para webp pelo frontend) e a
+        // entrega como figurinha. Sem legenda, sem docName.
+        sticker: 'sticker',
       };
       wapiUrl = `${baseUrl}/send/media`;
       // O que a operadora recebe é um LINK que ela vai baixar — não o arquivo. Por isso o
@@ -404,7 +412,7 @@ serve(async (req) => {
         type: typeMap[tipo] ?? 'document',
         file: arquivoParaOperadora,
       };
-      if (mensagem) wapiBody.text = assinarRemetente ? withRemetente(userData.nome, mensagem) : mensagem;
+      if (mensagem && tipo !== 'sticker') wapiBody.text = assinarRemetente ? withRemetente(userData.nome, mensagem) : mensagem;
       if (tipo === 'documento' && nome_arquivo) wapiBody.docName = nome_arquivo;
       if (media_mime) wapiBody.mimetype = media_mime;
       if (quoted_wamid) wapiBody.replyid = rawMessageId(quoted_wamid);
@@ -695,6 +703,15 @@ serve(async (req) => {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+    }
+
+    // Figurinha enviada entra na coleção do número, para reaparecer no seletor.
+    // Best-effort: nunca afeta a resposta do envio (já concluído acima).
+    if (tipo === 'sticker' && media_url) {
+      await registrarFigurinha(
+        supabase, config.id, userData.empresa_id, media_url, media_mime, 'enviada',
+        typeof media_hash === 'string' ? media_hash : null,
+      );
     }
 
     return new Response(JSON.stringify({ ok: true, wamid, conversa_id: conversaId }), {

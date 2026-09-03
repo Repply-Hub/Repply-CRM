@@ -3961,6 +3961,60 @@ export type Database = {
           },
         ]
       }
+      whatsapp_figurinhas: {
+        Row: {
+          criada_em: string
+          empresa_id: string
+          id: string
+          instancia_id: string
+          media_hash: string
+          media_mime: string | null
+          media_url: string
+          origem: string
+          removida_em: string | null
+          ultima_vez_em: string
+        }
+        Insert: {
+          criada_em?: string
+          empresa_id: string
+          id?: string
+          instancia_id: string
+          media_hash: string
+          media_mime?: string | null
+          media_url: string
+          origem: string
+          removida_em?: string | null
+          ultima_vez_em?: string
+        }
+        Update: {
+          criada_em?: string
+          empresa_id?: string
+          id?: string
+          instancia_id?: string
+          media_hash?: string
+          media_mime?: string | null
+          media_url?: string
+          origem?: string
+          removida_em?: string | null
+          ultima_vez_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_figurinhas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_figurinhas_instancia_id_fkey"
+            columns: ["instancia_id"]
+            isOneToOne: false
+            referencedRelation: "configuracoes_wapi"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_conversa_responsaveis: {
         Row: {
           conversa_id: string

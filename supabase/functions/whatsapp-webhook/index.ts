@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeWhatsappPhone } from "../_shared/whatsapp.ts";
+import { registrarFigurinha } from "../_shared/figurinhas.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1246,6 +1247,20 @@ async function handleIncomingMessage(
 
   if (msgError) {
     console.error("[webhook] insert mensagem:", msgError);
+  }
+
+  // Figurinha que circulou neste número entra na coleção (whatsapp_figurinhas),
+  // para aparecer no seletor de figurinhas do compositor. Best-effort: sem hash
+  // conhecido, o helper baixa o arquivo já guardado no nosso Storage e calcula.
+  if (tipo === "sticker" && mediaUrl && conversa?.id) {
+    await registrarFigurinha(
+      supabase,
+      config.id,
+      empresaId,
+      mediaUrl,
+      mediaMime,
+      sentByOtherChannel ? "enviada" : "recebida",
+    );
   }
 }
 
