@@ -664,6 +664,47 @@ export type Database = {
           },
         ]
       }
+      clientes_tipos: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          is_sistema: boolean
+          nome: string
+          ordem: number
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          is_sistema?: boolean
+          nome: string
+          ordem?: number
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          is_sistema?: boolean
+          nome?: string
+          ordem?: number
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_tipos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       colunas_customizadas: {
         Row: {
           created_at: string
