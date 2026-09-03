@@ -459,6 +459,7 @@ const Dashboard = () => {
             // da consulta acima não teria como adivinhar que a faixa dependia dele.
             whatsappConversas={isGestor && temWhatsapp === true && whatsappStats ? { abertas: whatsappStats.conversas_abertas, fechadas: whatsappStats.conversas_fechadas } : null}
             whatsappTempoResposta={whatsappStats?.tempo_resposta_atendente ?? []}
+            whatsappAtribuicoes={whatsappStats?.conversas_atribuidas_atendente ?? []}
             whatsappError={isGestor && temWhatsapp === true && whatsappIsError}
           />
         </Suspense>

@@ -5,7 +5,7 @@ import {
   Tooltip, Area, AreaChart,
 } from 'recharts';
 import type { TooltipProps } from 'recharts';
-import { TrendingUp, Factory, MessageCircle, Clock } from 'lucide-react';
+import { TrendingUp, Factory, MessageCircle, Clock, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/DashboardChartTooltip';
@@ -132,6 +132,10 @@ interface DashboardChartsProps {
   // de verdade para a mesma pergunta, e um dia elas discordariam.
   whatsappConversas: { abertas: number; fechadas: number } | null;
   whatsappTempoResposta: { atendente: string; minutos: number }[];
+  // Quantas conversas cada responsável recebeu no período (por data da
+  // atribuição). Só é desenhado quando whatsappConversas != null — mesmo portão
+  // de gestor/admin + seção contratada do resto da faixa WhatsApp.
+  whatsappAtribuicoes: { atendente: string; quantidade: number }[];
   // true quando a busca dessas métricas falhou (pro gestor/admin) — mostra um aviso
   // no lugar dos gráficos em vez de deixá-los sumir sem explicação nenhuma.
   whatsappError?: boolean;
@@ -145,6 +149,7 @@ export function DashboardCharts({
   rendimentoVendedor,
   whatsappConversas,
   whatsappTempoResposta,
+  whatsappAtribuicoes,
   whatsappError,
 }: DashboardChartsProps) {
   // Largura do eixo calculada a partir do nome mais longo, para o YAxis
@@ -175,6 +180,15 @@ export function DashboardCharts({
     );
     return Math.max(80, Math.ceil(maxWidth) + 12);
   }, [whatsappTempoResposta]);
+
+  // Idem para o gráfico de conversas atribuídas por responsável.
+  const atribuicaoAxisWidth = useMemo(() => {
+    const maxWidth = whatsappAtribuicoes.reduce(
+      (max, v) => Math.max(max, getVendedorNameWidth(v.atendente ?? '')),
+      0,
+    );
+    return Math.max(80, Math.ceil(maxWidth) + 12);
+  }, [whatsappAtribuicoes]);
 
   // Mostra todas as fábricas na pizza — sem cortar as menores, só agrupa o
   // excedente em "Outros" (com o detalhe de cada uma disponível no hover via
@@ -356,11 +370,14 @@ export function DashboardCharts({
           </CardContent>
         </Card>
 
-        {/* Rendimento por Responsável — ocupa a linha inteira porque sobraram
-            três cartões nesta grade de duas colunas; sem isso o último ficaria
-            com metade da linha vazia ao lado, o que na tela parece gráfico que
-            não carregou. */}
-        <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300 lg:col-span-2">
+        {/* Rendimento por Responsável — ao lado dele fica "Conversas Atribuídas
+            por Responsável" (WhatsApp), fechando a grade em 2x2. Esse cartão
+            vizinho só existe para gestor/admin de empresa com a seção WhatsApp
+            contratada (whatsappConversas != null); sem ele, sobram três cartões
+            nesta grade de duas colunas e este passa a ocupar a linha inteira,
+            senão o último ficaria com metade da linha vazia ao lado — na tela
+            isso parece gráfico que não carregou. */}
+        <Card className={`shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300${whatsappConversas ? '' : ' lg:col-span-2'}`}>
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-primary" /> Rendimento por Responsável
@@ -392,6 +409,47 @@ export function DashboardCharts({
             </ResponsiveContainer>
           </CardContent>
         </Card>
+
+        {/* Conversas Atribuídas por Responsável (WhatsApp) — quantas conversas
+            caíram no colo de cada vendedor DENTRO do período, contadas pela data
+            da atribuição. Fica ao lado de "Rendimento por Responsável" a pedido
+            do dono do produto: as duas leituras de "carga de cada responsável"
+            lado a lado. Mesmo portão da faixa WhatsApp lá embaixo — só aparece
+            quando whatsappConversas != null. */}
+        {whatsappConversas && (
+          <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+            <CardHeader className="pb-1">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" /> Conversas Atribuídas por Responsável
+              </CardTitle>
+              <CardDescription className="text-xs">Conversas de WhatsApp recebidas por responsável no período (por data da atribuição). Conversa fechada antes desta métrica existir não aparece.</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={whatsappAtribuicoes} layout="vertical" barCategoryGap="20%">
+                  <defs>
+                    <linearGradient id="gradientConversasAtribuidas" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={chartColors.primary} stopOpacity={0.7} />
+                      <stop offset="100%" stopColor={chartColors.primary} stopOpacity={1} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid {...commonGridProps} vertical horizontal={false} />
+                  <XAxis type="number" {...commonAxisProps} allowDecimals={false} />
+                  <YAxis dataKey="atendente" type="category" {...commonAxisProps} width={atribuicaoAxisWidth} tick={renderVendedorTick} interval={0} />
+                  <Tooltip content={<ChartTooltip formatValue={(v) => `${v} conversa(s)`} />} />
+                  <Bar
+                    dataKey="quantidade"
+                    name="Conversas atribuídas"
+                    fill="url(#gradientConversasAtribuidas)"
+                    radius={[0, 8, 8, 0]}
+                    animationDuration={1000}
+                    animationEasing="ease-out"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
 

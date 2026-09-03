@@ -4015,6 +4015,52 @@ export type Database = {
           },
         ]
       }
+      whatsapp_conversa_atribuicoes: {
+        Row: {
+          atribuido_em: string
+          conversa_id: string
+          empresa_id: string
+          id: string
+          usuario_id: string
+        }
+        Insert: {
+          atribuido_em?: string
+          conversa_id: string
+          empresa_id: string
+          id?: string
+          usuario_id: string
+        }
+        Update: {
+          atribuido_em?: string
+          conversa_id?: string
+          empresa_id?: string
+          id?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_conversa_atribuicoes_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversa_atribuicoes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversa_atribuicoes_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_conversa_responsaveis: {
         Row: {
           conversa_id: string
@@ -4559,6 +4605,7 @@ export type Database = {
           conversas_abertas: number
           conversas_fechadas: number
           tempo_resposta_atendente: Json
+          conversas_atribuidas_atendente: Json
         }[]
       }
       delete_current_user: { Args: never; Returns: undefined }

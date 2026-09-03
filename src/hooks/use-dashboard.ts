@@ -208,6 +208,11 @@ export interface DashboardWhatsappStats {
   conversas_abertas: number;
   conversas_fechadas: number;
   tempo_resposta_atendente: { atendente: string; minutos: number }[];
+  // Quantas conversas foram ATRIBUÍDAS a cada atendente dentro do período (conta
+  // pela data da atribuição, não pela criação da conversa). Vem do log
+  // whatsapp_conversa_atribuicoes — ver migration 20260903160000. Já ordenado
+  // desc pela RPC.
+  conversas_atribuidas_atendente: { atendente: string; quantidade: number }[];
 }
 
 // Métricas de atendimento via WhatsApp pro gestor/admin acompanhar a equipe —
@@ -236,6 +241,7 @@ export function useDashboardWhatsappStats(
         conversas_abertas: 0,
         conversas_fechadas: 0,
         tempo_resposta_atendente: [],
+        conversas_atribuidas_atendente: [],
       }) as DashboardWhatsappStats;
     },
     enabled: !!empresaId,
