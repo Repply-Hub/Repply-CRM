@@ -144,7 +144,7 @@ export function useUpdateContato() {
       nome_contato?: string;
       email?: string;
       telefone?: string;
-      cargo?: string;
+      cargo?: string | null;
       empresa?: string;
       cliente_id?: string | null;
       obra_id?: string | null;

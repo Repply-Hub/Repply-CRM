@@ -1,11 +1,13 @@
 import { useState } from 'react';
+import { Settings2, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { useAuth } from '@/hooks/use-auth';
+import { useCargosContato } from '@/hooks/use-cargos-contato';
+import { CentralDeCargosDialog } from '@/components/shared/CentralDeCargosDialog';
 
+// Lista usada só como rede enquanto a consulta de `cargos_contato` não volta (ou antes
+// da migration 20260903140000 rodar). Depois disso a lista vem do banco, por empresa, e
+// o gestor a edita na Central de Cargos. Mantida em sincronia com a seed da migration.
 const BASE_CARGOS = [
   'Comprador',
   'Engenheiro',
@@ -18,7 +20,10 @@ const BASE_CARGOS = [
   'Almoxarife',
 ];
 
-const CUSTOM_CARGOS_KEY = 'contatos_custom_cargos';
+const ABRIR_CENTRAL = '__central__';
+// Radix Select não aceita item com value vazio, então "desmarcar" usa um valor
+// sentinela que o onValueChange traduz de volta para '' (sem cargo).
+const SEM_CARGO = '__nenhum__';
 
 interface CargoSelectProps {
   value: string;
@@ -27,85 +32,70 @@ interface CargoSelectProps {
 }
 
 export function CargoSelect({ value, onValueChange, placeholder = 'Selecione o cargo' }: CargoSelectProps) {
-  const [customCargos, setCustomCargos] = useState<string[]>(() => {
-    const saved = localStorage.getItem(CUSTOM_CARGOS_KEY);
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [newCargoOpen, setNewCargoOpen] = useState(false);
-  const [newCargoName, setNewCargoName] = useState('');
+  const { profile } = useAuth();
+  const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
+  const ehGestor =
+    profile?.role === 'gestor' || profile?.role === 'admin' || profile?.role === 'empresa';
 
-  // Cargos cadastrados como texto livre antes desse campo virar uma lista (ou digitados
-  // por fora dos presets) continuam aparecendo selecionados em vez de sumir da tela.
-  const allCargos = [...BASE_CARGOS, ...customCargos];
-  const isUnknownValue = value && !allCargos.some(c => c.toLowerCase() === value.toLowerCase());
+  const { data: cargosDoBanco } = useCargosContato(empresaId);
+  const [centralOpen, setCentralOpen] = useState(false);
 
-  const handleCreate = () => {
-    const label = newCargoName.trim();
-    if (!label) {
-      toast.error('Informe um nome para o cargo');
-      return;
-    }
-    if (allCargos.some(c => c.toLowerCase() === label.toLowerCase())) {
-      toast.error('Esse cargo já existe');
-      return;
-    }
-    const next = [...customCargos, label];
-    setCustomCargos(next);
-    localStorage.setItem(CUSTOM_CARGOS_KEY, JSON.stringify(next));
-    onValueChange(label);
-    setNewCargoName('');
-    setNewCargoOpen(false);
-    toast.success(`Cargo "${label}" criado`);
-  };
+  // Antes da migration / enquanto carrega, cai na lista embutida para o campo não ficar vazio.
+  const nomes =
+    cargosDoBanco && cargosDoBanco.length > 0
+      ? cargosDoBanco.map((c) => c.nome)
+      : BASE_CARGOS;
+
+  // Cargo gravado como texto livre (antes desse campo virar lista, ou digitado por fora)
+  // continua aparecendo selecionado em vez de sumir da tela.
+  const isUnknownValue = value && !nomes.some((n) => n.toLowerCase() === value.toLowerCase());
 
   return (
     <>
       <Select
         value={value}
         onValueChange={(v) => {
-          if (v === '__new__') {
-            setNewCargoOpen(true);
+          if (v === ABRIR_CENTRAL) {
+            setCentralOpen(true);
             return;
           }
-          onValueChange(v);
+          onValueChange(v === SEM_CARGO ? '' : v);
         }}
       >
         <SelectTrigger><SelectValue placeholder={placeholder} /></SelectTrigger>
         <SelectContent>
+          {value && (
+            <SelectItem value={SEM_CARGO} className="text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <X className="h-3.5 w-3.5" />
+                Sem cargo
+              </span>
+            </SelectItem>
+          )}
           {isUnknownValue && (
             <SelectItem key={value} value={value}>{value}</SelectItem>
           )}
-          {BASE_CARGOS.map(c => (
-            <SelectItem key={c} value={c}>{c}</SelectItem>
+          {nomes.map((n) => (
+            <SelectItem key={n} value={n}>{n}</SelectItem>
           ))}
-          {customCargos.map(c => (
-            <SelectItem key={c} value={c}>{c}</SelectItem>
-          ))}
-          <SelectItem value="__new__" className="text-primary font-medium">+ Criar novo cargo…</SelectItem>
+          {ehGestor && (
+            <SelectItem value={ABRIR_CENTRAL} className="text-primary font-medium">
+              <span className="flex items-center gap-1.5">
+                <Settings2 className="h-3.5 w-3.5" />
+                Central de cargos
+              </span>
+            </SelectItem>
+          )}
         </SelectContent>
       </Select>
 
-      <Dialog open={newCargoOpen} onOpenChange={setNewCargoOpen}>
-        <DialogContent className="sm:max-w-[380px]">
-          <DialogHeader>
-            <DialogTitle>Novo Cargo</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label>Nome do cargo</Label>
-            <Input
-              value={newCargoName}
-              onChange={e => setNewCargoName(e.target.value)}
-              placeholder="Ex: Comprador Técnico"
-              onKeyDown={e => { if (e.key === 'Enter') handleCreate(); }}
-              autoFocus
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewCargoOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreate}>Criar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {ehGestor && (
+        <CentralDeCargosDialog
+          open={centralOpen}
+          onOpenChange={setCentralOpen}
+          empresaId={empresaId}
+        />
+      )}
     </>
   );
 }
