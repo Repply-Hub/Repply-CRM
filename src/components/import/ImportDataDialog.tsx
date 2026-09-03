@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
@@ -60,7 +59,6 @@ export function ImportDataDialog({ open, onOpenChange, importType }: Props) {
 
   const { importClientes, importNegocios, importing, progress } = useBulkImport();
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   const fields = importType === 'clientes' ? CLIENTES_FIELDS : NEGOCIOS_FIELDS;
 
@@ -212,17 +210,6 @@ export function ImportDataDialog({ open, onOpenChange, importType }: Props) {
               </div>
             )}
 
-            {result.ignored > 0 && (
-              <div className="text-center">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { handleClose(); navigate('/importacao/ignoradas'); }}
-                >
-                  Ver linhas ignoradas
-                </Button>
-              </div>
-            )}
           </div>
         )}
 

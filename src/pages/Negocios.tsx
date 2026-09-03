@@ -40,7 +40,7 @@ import {
   Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, EyeOff, Loader2, Pencil, FileDown,
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
   LayoutGrid, List as ListIcon, Building2, Factory, DollarSign, Clock, User, FileText,
-  ChevronRight, FileWarning, FileSpreadsheet, FolderKanban, Rows3, History, Tag, ArrowRightLeft,
+  ChevronRight, FileSpreadsheet, FolderKanban, Rows3, History, Tag, ArrowRightLeft,
   ListChecks, ArrowRight
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
@@ -1944,12 +1944,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               setImportDialogMounted(true);
               setImportOpen(true);
             }}
-          />
-
-          <ColumnSettingsItem
-            label="Linhas Ignoradas"
-            icon={FileWarning}
-            onClick={() => navigate('/importacao/ignoradas')}
           />
 
           <ColumnSettingsItem

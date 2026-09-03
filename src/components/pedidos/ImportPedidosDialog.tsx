@@ -1,5 +1,4 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -65,7 +64,6 @@ interface ImportPedidosDialogProps {
 const ETAPAS_FINAIS = new Set(['fechamento', 'perdido']);
 
 export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogProps) {
-  const navigate = useNavigate();
   const [rawData, setRawData] = useState<Record<string, any>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<FieldKey, string | string[]>>(createEmptyMapping());
@@ -109,7 +107,6 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     totalValidados: number;
     totalIgnoradosValidacao: number;
     totalInseridos: number;
-    totalDuplicados: number;
     totalFalharam: number;
     motivosFalha: Record<string, number>;
   } | null>(null);
@@ -505,8 +502,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         totalValidados: rows.length,
         totalIgnoradosValidacao: ignoredRowsData.length,
         totalInseridos: summary.inserted,
-        totalDuplicados: summary.duplicados,
-        totalFalharam: (summary.ignored - summary.duplicados) + dateErrorRows.length,
+        totalFalharam: summary.ignored + dateErrorRows.length,
         motivosFalha: summary.motivosFalha,
       });
       setStep('done');
@@ -944,12 +940,6 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                   <div className="text-xs text-amber-600 mt-1">Sem cliente ou fabricante</div>
                 </div>
               )}
-              {importResult.totalDuplicados > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-blue-700">{importResult.totalDuplicados}</div>
-                  <div className="text-xs text-blue-600 mt-1">Duplicados ignorados</div>
-                </div>
-              )}
               {importResult.totalFalharam > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
                   <div className="text-3xl font-bold text-red-700">{importResult.totalFalharam}</div>
@@ -972,12 +962,6 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                   ))}
                 </div>
               </div>
-            )}
-
-            {(importResult.totalIgnoradosValidacao > 0 || importResult.totalDuplicados > 0 || importResult.totalFalharam > 0) && (
-              <p className="text-xs text-muted-foreground text-center">
-                Linhas ignoradas ficam disponíveis para revisão em <strong>Ações → Linhas Ignoradas</strong>.
-              </p>
             )}
           </div>
         )}
@@ -1018,19 +1002,6 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
         {step === 'done' && (
           <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
-            {importResult && (importResult.totalIgnoradosValidacao > 0 || importResult.totalDuplicados > 0 || importResult.totalFalharam > 0) && (
-              <Button
-                variant="outline"
-                className="h-10 px-6 font-bold"
-                onClick={() => {
-                  reset();
-                  onOpenChange(false);
-                  navigate('/importacao/ignoradas');
-                }}
-              >
-                Ver Linhas Ignoradas
-              </Button>
-            )}
             <Button onClick={() => { reset(); onOpenChange(false); }} className="h-10 px-6 font-bold">
               Fechar
             </Button>

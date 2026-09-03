@@ -36,7 +36,6 @@ const Tarefas = lazyComRetry(() => import("./pages/Tarefas"));
 const Chat = lazyComRetry(() => import("./pages/Chat"));
 const Emails = lazyComRetry(() => import("./pages/Emails"));
 const WhatsAppInbox = lazyComRetry(() => import("./pages/WhatsAppInbox"));
-const LinhasIgnoradas = lazyComRetry(() => import("./pages/LinhasIgnoradas"));
 const AdminWhatsAppInstancias = lazyComRetry(
   () => import("./pages/AdminWhatsAppInstancias"),
 );
@@ -639,14 +638,6 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <Emails />
-        </ProtectedRoute>
-      }
-    />
-    <Route
-      path="/importacao/ignoradas"
-      element={
-        <ProtectedRoute>
-          <LinhasIgnoradas />
         </ProtectedRoute>
       }
     />

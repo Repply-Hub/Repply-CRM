@@ -12,7 +12,6 @@ export interface ImportSummary {
   total: number;
   inserted: number;
   ignored: number;
-  duplicados: number;
   motivosFalha: Record<string, number>;
 }
 
@@ -105,17 +104,17 @@ export function useBulkImport() {
 
       toast({
         title: 'Importação concluída',
-        description: `${inserted} de ${payload.length} clientes importados${ignored ? ` — ${ignored} foram para Linhas Ignoradas` : ''}`,
+        description: `${inserted} de ${payload.length} clientes importados${ignored ? ` — ${ignored} não importado(s)` : ''}`,
       });
 
-      return { total: payload.length, inserted, ignored, duplicados: 0, motivosFalha };
+      return { total: payload.length, inserted, ignored, motivosFalha };
     } finally {
       setImporting(false);
       setProgress(0);
     }
   }
 
-  async function importNegocios(payload: Record<string, unknown>[], nomeArquivo?: string, funilIdParam?: string, empresaId?: string, options?: { ignoreDuplicateCheck?: boolean }): Promise<ImportSummary> {
+  async function importNegocios(payload: Record<string, unknown>[], nomeArquivo?: string, funilIdParam?: string, empresaId?: string): Promise<ImportSummary> {
     const vendedorId = await getVendedorId();
     resetResolveCache();
 
@@ -140,8 +139,10 @@ export function useBulkImport() {
     // reconhecida cair sempre em "Novo Lead").
     let kanbanColunas: ImportKanbanColuna[] = [];
 
-    // Computa hashes, pré-carrega entidades, resolve PDFs de cotação do Bitrix e busca as
-    // colunas do funil em paralelo — são independentes entre si.
+    // Computa hashes (só para gravar em `import_hash`, que marca o negócio como vindo de
+    // importação — usado pelo filtro `p_hide_importados`; NÃO é mais usado para deduplicar:
+    // linha repetida é cadastrada mesmo assim), pré-carrega entidades, resolve PDFs de
+    // cotação do Bitrix e busca as colunas do funil em paralelo — são independentes entre si.
     let rowHashes: string[] = [];
     let pdfResults: Array<ResolvePdfResult | undefined> = [];
     try {
@@ -169,23 +170,8 @@ export function useBulkImport() {
       console.error('Erro ao computar hashes ou pré-carregar entidades:', (err as Error).message);
     }
 
-    // Carrega hashes já existentes no banco (chunks de 200 para não estourar URL do PostgREST).
-    // Pulado quando ignoreDuplicateCheck está ativo (reenvio deliberado de uma linha que o
-    // usuário confirmou manter mesmo sendo idêntica a um negócio já importado).
-    const existingHashes = new Set<string>();
-    if (!options?.ignoreDuplicateCheck) {
-      const HASH_CHUNK = 200;
-      for (let i = 0; i < rowHashes.length; i += HASH_CHUNK) {
-        const chunk = rowHashes.slice(i, i + HASH_CHUNK).filter(Boolean);
-        if (chunk.length === 0) continue;
-        const { data } = await supabase.from('pedidos').select('import_hash').in('import_hash', chunk);
-        data?.forEach(r => { if (r.import_hash) existingHashes.add(r.import_hash); });
-      }
-    }
-
     let inserted = 0;
     let ignored = 0;
-    let duplicados = 0;
     const motivosFalha: Record<string, number> = {};
 
     const trackFalha = (motivo: string) => {
@@ -210,11 +196,9 @@ export function useBulkImport() {
      */
     async function processBatch(batch: Record<string, unknown>[], batchHashes: string[], batchPdfResults: Array<ResolvePdfResult | undefined>): Promise<{
       inserted: number;
-      duplicados: number;
       failures: Array<{ row: Record<string, unknown>; motivo: string; logToIgnoradas: boolean }>;
     }> {
       let batchInserted = 0;
-      let batchDuplicados = 0;
       const failures: Array<{ row: Record<string, unknown>; motivo: string; logToIgnoradas: boolean }> = [];
       const batchPayloads: Record<string, unknown>[] = [];
 
@@ -225,15 +209,8 @@ export function useBulkImport() {
         try {
           if ((row as any).__dateError) throw new Error((row as any).__dateError as string);
 
-          // Deduplicação: hash já visto no banco ou em linhas anteriores deste import
-          if (hash && existingHashes.has(hash)) {
-            batchDuplicados++;
-            // __import_hash vai junto em dados_originais só para a página de Linhas
-            // Ignoradas conseguir localizar o pedido já existente e montar a comparação
-            // lado a lado — não é um campo real da planilha.
-            failures.push({ row: { ...row, __import_hash: hash }, motivo: 'Duplicado: linha idêntica já importada anteriormente', logToIgnoradas: true });
-            continue;
-          }
+          // Sem deduplicação: linha repetida (dentro do arquivo ou idêntica a um negócio já
+          // importado antes) é cadastrada como um negócio novo, por decisão de produto.
 
           const clienteNome = String(row.cliente ?? '').trim();
           const fabricanteNome = String(row.fabricante ?? '').trim();
@@ -250,9 +227,6 @@ export function useBulkImport() {
           const fabricanteId = await resolveFabricanteId(fabricanteNome);
           const marcadorNome = String(row.marcador ?? '').trim();
           const marcadorId = marcadorNome && empresaId ? await resolveMarcadorId(marcadorNome, empresaId) : undefined;
-
-          // Reserva o hash antes do insert — evita duplicatas dentro do próprio arquivo
-          if (hash) existingHashes.add(hash);
 
           // Anexo do negócio: se veio do Bitrix, resolveEspelhoPdfUrls já tentou baixar e
           // reidratar no Storage (resolveEspelhoPdfUrl). Falha no download não trava a
@@ -286,7 +260,7 @@ export function useBulkImport() {
         }
       }
 
-      if (batchPayloads.length === 0) return { inserted: batchInserted, duplicados: batchDuplicados, failures };
+      if (batchPayloads.length === 0) return { inserted: batchInserted, failures };
 
       // INSERT em lote — se lançar (não só retornar {error}), cai no retry linha-a-linha
       // abaixo em vez de propagar e abortar o import inteiro silenciosamente.
@@ -318,7 +292,7 @@ export function useBulkImport() {
         batchInserted += batchPayloads.length;
       }
 
-      return { inserted: batchInserted, duplicados: batchDuplicados, failures };
+      return { inserted: batchInserted, failures };
     }
 
     setImporting(true);
@@ -339,7 +313,6 @@ export function useBulkImport() {
             console.error(`[import-pedidos] Lote falhou inesperadamente (${b.rows.length} linhas), isolando do restante do import:`, (err as Error).message);
             return {
               inserted: 0,
-              duplicados: 0,
               failures: b.rows.map(row => ({
                 row,
                 motivo: errorToMotivo(err, 'Falha inesperada ao processar o lote'),
@@ -354,7 +327,6 @@ export function useBulkImport() {
         // Agrega resultados e grava falhas em linhas_ignoradas (sequencial pós-grupo)
         for (const result of groupResults) {
           inserted += result.inserted;
-          duplicados += result.duplicados;
           for (const { row, motivo, logToIgnoradas } of result.failures) {
             ignored++;
             trackFalha(motivo);
@@ -367,10 +339,10 @@ export function useBulkImport() {
 
       toast({
         title: 'Importação concluída',
-        description: `${inserted} de ${payload.length} negócios importados${duplicados ? ` — ${duplicados} duplicados ignorados` : ''}${ignored - duplicados > 0 ? ` — ${ignored - duplicados} foram para Linhas Ignoradas` : ''}`,
+        description: `${inserted} de ${payload.length} negócios importados${ignored > 0 ? ` — ${ignored} não importado(s)` : ''}`,
       });
 
-      return { total: payload.length, inserted, ignored, duplicados, motivosFalha };
+      return { total: payload.length, inserted, ignored, motivosFalha };
     } finally {
       setImporting(false);
       setProgress(0);

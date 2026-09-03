@@ -14,7 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ConteudoDialogo, CabecalhoAssistente, CorpoDialogo, RodapeDialogo, RodapeAssistente } from '@/components/shared/DialogoResponsivo';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -24,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ChevronDown, FileWarning, Calendar, Briefcase, ExternalLink, IdCard, Tag, UserCheck } from 'lucide-react';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ChevronDown, Briefcase, Tag, UserCheck } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/clientes/ImportClientesDialog';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
@@ -39,10 +38,9 @@ import { EnderecoForm } from '@/components/clientes/EnderecoForm';
 import { ContatoSelector } from '@/components/clientes/ContatoSelector';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/shared/ListPagination';
-import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEmailDialog';
 import { cn, slugify, hasTextSelection } from '@/lib/utils';
 import { normalizarParaBusca, correspondeBusca } from '@/lib/texto-busca';
-import { ExportClientesButton } from '@/components/clientes/ExportClientesButton';
+import { exportarClientes } from '@/components/clientes/ExportClientesButton';
 import { FilterButton } from '@/components/shared/FilterButton';
 import { StandardPopoverMenu } from '@/components/ui/standard-popover-menu';
 import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
@@ -354,13 +352,10 @@ const Clientes = () => {
   const [typedConfirmText, setTypedConfirmText] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [panelEmpresa, setPanelEmpresa] = useState<any | null>(null);
-  const [panelContato, setPanelContato] = useState<any | null>(null);
-  const [emailParaConfirmar, setEmailParaConfirmar] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Cascata das seções: um hook só serve os dois painéis laterais e a tabela, porque tudo
   // isto vive dentro do mesmo componente.
-  const { ligada: temEmails } = useSecaoLigada('emails');
   const { ligada: temObras } = useSecaoLigada('obras');
 
   // Nasce vazio e recebe o primeiro tipo da empresa assim que a lista chega. Não dá
@@ -1087,29 +1082,16 @@ const Clientes = () => {
           >
             <div className="flex flex-col border-border/50">
               <ColumnSettingsPopover label="Ações" icon={Plus}>
-                <ExportClientesButton 
-                  data={activeTab === 'empresas' ? filteredEmpresas : filteredContatos} 
-                  type={activeTab} 
-                  renderTrigger={(onClick, exporting) => (
-                    <ColumnSettingsItem 
-                      label={exporting ? "Exportando..." : "Exportar"} 
-                      icon={exporting ? Loader2 : FileDown} 
-                      onClick={onClick} 
-                      disabled={exporting}
-                    />
-                  )}
+                <ColumnSettingsItem
+                  label="Exportar"
+                  icon={FileDown}
+                  onClick={() => setExportOpen(true)}
                 />
 
                 <ColumnSettingsItem
                   label="Importar"
                   icon={Upload}
                   onClick={() => setImportOpen(true)}
-                />
-
-                <ColumnSettingsItem
-                  label="Linhas Ignoradas"
-                  icon={FileWarning}
-                  onClick={() => navigate('/importacao/ignoradas')}
                 />
 
                 {selected.size > 0 && canDelete && (
@@ -1126,6 +1108,47 @@ const Clientes = () => {
           </ColumnSettings>
 
           <ImportClientesDialog open={importOpen} onOpenChange={setImportOpen} hideTrigger target={activeTab} />
+
+          {/* Exportar: um item só no menu abre este modal com os formatos. */}
+          <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+            <ConteudoDialogo className="sm:max-w-md">
+              <CabecalhoAssistente
+                titulo="Exportar"
+                descricao={`${(activeTab === 'empresas' ? filteredEmpresas : filteredContatos).length} ${activeTab === 'empresas' ? 'empresa(s)' : 'contato(s)'} — escolha o formato do arquivo.`}
+              />
+              <CorpoDialogo className="py-2">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      exportarClientes(activeTab === 'empresas' ? filteredEmpresas : filteredContatos, activeTab, 'xlsx');
+                      setExportOpen(false);
+                    }}
+                    className="flex flex-col items-center gap-2 rounded-xl border border-border/60 p-5 text-center transition-all hover:border-primary/50 hover:bg-primary/[0.03] active:scale-[0.98]"
+                  >
+                    <FileSpreadsheet className="h-8 w-8 text-primary" />
+                    <span className="text-sm font-semibold">Excel</span>
+                    <span className="text-xs text-muted-foreground">Planilha .xlsx</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      exportarClientes(activeTab === 'empresas' ? filteredEmpresas : filteredContatos, activeTab, 'csv');
+                      setExportOpen(false);
+                    }}
+                    className="flex flex-col items-center gap-2 rounded-xl border border-border/60 p-5 text-center transition-all hover:border-primary/50 hover:bg-primary/[0.03] active:scale-[0.98]"
+                  >
+                    <FileText className="h-8 w-8 text-primary" />
+                    <span className="text-sm font-semibold">CSV</span>
+                    <span className="text-xs text-muted-foreground">Arquivo .csv</span>
+                  </button>
+                </div>
+              </CorpoDialogo>
+              <RodapeDialogo>
+                <Button variant="outline" onClick={() => setExportOpen(false)}>Cancelar</Button>
+              </RodapeDialogo>
+            </ConteudoDialogo>
+          </Dialog>
 
           {/* Criar e gerenciar tipos — o MESMO componente que a tela de editar cliente
               usa (src/components/clientes/GerenciarTiposDialog.tsx). Duas cópias do
@@ -1417,7 +1440,7 @@ const Clientes = () => {
                 return (
                   <div
                     key={client.id}
-                    onClick={() => { if (!hasTextSelection()) setPanelEmpresa(client); }}
+                    onClick={() => { if (!hasTextSelection()) navigate(`/clientes/${slugify(client.empresa || 'cliente')}-${client.id}`); }}
                     className={cn(
                       'rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-[var(--shadow-card)] cursor-pointer transition-all',
                       selected.has(client.id) && 'ring-1 ring-primary/30 bg-primary/5'
@@ -1517,11 +1540,9 @@ const Clientes = () => {
                     const Icon = getTipoIcon(client.tipo);
                     const camposExtras = (client as any).campos_extras || {};
 
-                    // Clique em cima do texto de qualquer coluna abre a página de detalhe
-                    // (stopPropagation evita que o clique também dispare o painel lateral);
-                    // clique na linha fora do texto (padding, espaços vazios da célula) abre
-                    // o painel. Ambos ignoram o clique se ele foi o fim de uma seleção de
-                    // texto (usuário copiando um valor da célula).
+                    // Clicar em qualquer parte da linha abre a página de detalhe da empresa.
+                    // Ignora o clique se ele foi o fim de uma seleção de texto (usuário
+                    // copiando um valor da célula).
                     const openEmpresaDetail = () => {
                       if (hasTextSelection()) return;
                       const slug = slugify(client.empresa || 'cliente');
@@ -1531,13 +1552,9 @@ const Clientes = () => {
                       e.stopPropagation();
                       openEmpresaDetail();
                     };
-                    const openEmpresaPainel = () => {
-                      if (hasTextSelection()) return;
-                      setPanelEmpresa(client);
-                    };
 
                     return (
-                      <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`} onClick={openEmpresaPainel}>
+                      <tr key={client.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(client.id) ? 'bg-primary/5' : ''}`} onClick={openEmpresaDetail}>
                         <td className="py-1.5 px-2.5 w-10" onClick={e => e.stopPropagation()}>
                           <Checkbox checked={selected.has(client.id)} onCheckedChange={() => toggleOne(client.id)} aria-label={`Selecionar ${client.empresa}`} />
                         </td>
@@ -1624,7 +1641,7 @@ const Clientes = () => {
               ) : paginatedContatos.map(contato => (
                 <div
                   key={contato.id}
-                  onClick={() => { if (!hasTextSelection()) setPanelContato(contato); }}
+                  onClick={() => { if (!hasTextSelection()) navigate(`/contatos/${slugify(contato.nome_contato || 'contato')}-${contato.id}`); }}
                   className={cn(
                     'rounded-xl border border-border/60 bg-card p-4 space-y-3 shadow-[var(--shadow-card)] cursor-pointer transition-all',
                     selected.has(contato.id) && 'ring-1 ring-primary/30 bg-primary/5'
@@ -1716,13 +1733,9 @@ const Clientes = () => {
                       e.stopPropagation();
                       openContatoDetail();
                     };
-                    const openContatoPainel = () => {
-                      if (hasTextSelection()) return;
-                      setPanelContato(contato);
-                    };
 
                     return (
-                      <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`} onClick={openContatoPainel}>
+                      <tr key={contato.id} className={`border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors ${selected.has(contato.id) ? 'bg-primary/5' : ''}`} onClick={openContatoDetail}>
                         <td className="py-1.5 px-2.5 w-10" onClick={e => e.stopPropagation()}>
                           <Checkbox checked={selected.has(contato.id)} onCheckedChange={() => toggleOne(contato.id)} aria-label={`Selecionar ${contato.nome_contato}`} />
                         </td>
@@ -1784,210 +1797,6 @@ const Clientes = () => {
         )}
       </div>
 
-      {/* Painel lateral de detalhe rápido de Empresa (clique na linha fora do texto) */}
-      <Sheet open={!!panelEmpresa} onOpenChange={(open) => !open && setPanelEmpresa(null)}>
-        {panelEmpresa && (() => {
-          const Icon = getTipoIcon(panelEmpresa.tipo);
-          return (
-            <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-              <SheetHeader className="pb-6 border-b">
-                <SheetTitle className="flex items-center gap-2">
-                  <Icon className="h-5 w-5 text-primary shrink-0" />
-                  <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate">{panelEmpresa.empresa}</span>
-                </SheetTitle>
-                <SheetDescription>{rotuloDoTipo(panelEmpresa.tipo, tipos)}</SheetDescription>
-              </SheetHeader>
-
-              <div className="py-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                  {panelEmpresa.razao_social && (
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Building2 className="h-3 w-3" /> Razão social
-                      </Label>
-                      <p className="text-sm font-medium">{panelEmpresa.razao_social}</p>
-                    </div>
-                  )}
-                  {panelEmpresa.cnpj && (
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <IdCard className="h-3 w-3" /> CNPJ / CPF
-                      </Label>
-                      <p className="text-sm font-medium">{panelEmpresa.cnpj}</p>
-                    </div>
-                  )}
-                  {panelEmpresa.email && (
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Mail className="h-3 w-3" /> E-mail
-                      </Label>
-                      {/* O endereço é dado cadastral do cliente e continua na tela; o que
-                          sai sem o módulo de E-mail é o atalho de envio, que levaria a uma
-                          tela que a rota recusa. Vira texto simples, sem cara de link. */}
-                      {temEmails === true ? (
-                        <button
-                          type="button"
-                          className="text-sm font-medium text-left hover:underline hover:text-primary"
-                          onClick={() => setEmailParaConfirmar(panelEmpresa.email)}
-                        >
-                          {panelEmpresa.email}
-                        </button>
-                      ) : (
-                        <p className="text-sm font-medium">{panelEmpresa.email}</p>
-                      )}
-                    </div>
-                  )}
-                  {panelEmpresa.telefone && (
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Phone className="h-3 w-3" /> Telefone
-                      </Label>
-                      <p className="text-sm font-medium">{panelEmpresa.telefone}</p>
-                    </div>
-                  )}
-                  {panelEmpresa.endereco && (
-                    <div className="space-y-1 md:col-span-2">
-                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <MapPin className="h-3 w-3" /> Endereço
-                      </Label>
-                      <p className="text-sm font-medium">{panelEmpresa.endereco}</p>
-                    </div>
-                  )}
-                  {/* Contagem de obras: sem a seção, é um "0" que nunca sai do lugar. */}
-                  {temObras === true && (
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Users className="h-3 w-3" /> Obras vinculadas
-                      </Label>
-                      <p className="text-sm font-medium">{panelEmpresa.obras?.length ?? 0}</p>
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Calendar className="h-3 w-3" /> Data de cadastro
-                    </Label>
-                    <p className="text-sm font-medium">{formatDateBR(panelEmpresa.created_at) || '—'}</p>
-                  </div>
-                </div>
-              </div>
-
-              <SheetFooter className="border-t pt-6 gap-3 sm:gap-0 mt-8">
-                <div className="flex w-full justify-end gap-2">
-                  <Button variant="outline" onClick={() => setPanelEmpresa(null)}>Fechar</Button>
-                  <Button
-                    className="gap-2"
-                    onClick={() => {
-                      const slug = slugify(panelEmpresa.empresa || 'cliente');
-                      navigate(`/clientes/${slug}-${panelEmpresa.id}`);
-                    }}
-                  >
-                    <ExternalLink className="h-4 w-4" /> Abrir página completa
-                  </Button>
-                </div>
-              </SheetFooter>
-            </SheetContent>
-          );
-        })()}
-      </Sheet>
-
-      {/* Painel lateral de detalhe rápido de Contato (clique na linha fora do texto) */}
-      <Sheet open={!!panelContato} onOpenChange={(open) => !open && setPanelContato(null)}>
-        {panelContato && (
-          <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-            <SheetHeader className="pb-6 border-b">
-              <SheetTitle className="flex items-center gap-2">
-                <User className="h-5 w-5 text-primary shrink-0" />
-                <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate">{panelContato.nome_contato || 'Sem nome'}</span>
-              </SheetTitle>
-              <SheetDescription>Detalhes do contato.</SheetDescription>
-            </SheetHeader>
-
-            <div className="py-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                {panelContato.cliente?.empresa && (
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Building2 className="h-3 w-3" /> Empresa
-                    </Label>
-                    <p
-                      className="text-sm font-medium hover:text-primary transition-colors cursor-pointer"
-                      onClick={() => {
-                        const slug = slugify(panelContato.cliente.empresa || 'cliente');
-                        navigate(`/clientes/${slug}-${panelContato.cliente.id}`);
-                      }}
-                    >
-                      {panelContato.cliente.empresa}
-                    </p>
-                  </div>
-                )}
-                {panelContato.cargo && (
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Briefcase className="h-3 w-3" /> Cargo
-                    </Label>
-                    <p className="text-sm font-medium">{panelContato.cargo}</p>
-                  </div>
-                )}
-                {panelContato.email && (
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Mail className="h-3 w-3" /> E-mail
-                    </Label>
-                    {/* Mesmo critério do painel da empresa: o endereço fica, o atalho de
-                        envio sai junto com o módulo de E-mail. */}
-                    {temEmails === true ? (
-                      <button
-                        type="button"
-                        className="text-sm font-medium text-left hover:underline hover:text-primary"
-                        onClick={() => setEmailParaConfirmar(panelContato.email)}
-                      >
-                        {panelContato.email}
-                      </button>
-                    ) : (
-                      <p className="text-sm font-medium">{panelContato.email}</p>
-                    )}
-                  </div>
-                )}
-                {panelContato.telefone && (
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Phone className="h-3 w-3" /> Telefone
-                    </Label>
-                    <p className="text-sm font-medium">{panelContato.telefone}</p>
-                  </div>
-                )}
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <Calendar className="h-3 w-3" /> Data de cadastro
-                  </Label>
-                  <p className="text-sm font-medium">{formatDateBR(panelContato.created_at) || '—'}</p>
-                </div>
-              </div>
-            </div>
-
-            <SheetFooter className="border-t pt-6 gap-3 sm:gap-0 mt-8">
-              <div className="flex w-full justify-end gap-2">
-                <Button variant="outline" onClick={() => setPanelContato(null)}>Fechar</Button>
-                <Button
-                  className="gap-2"
-                  onClick={() => {
-                    const slug = slugify(panelContato.nome_contato || 'contato');
-                    navigate(`/contatos/${slug}-${panelContato.id}`);
-                  }}
-                >
-                  <ExternalLink className="h-4 w-4" /> Abrir página completa
-                </Button>
-              </div>
-            </SheetFooter>
-          </SheetContent>
-        )}
-      </Sheet>
-
-      <ConfirmarEnviarEmailDialog
-        endereco={emailParaConfirmar}
-        onCancelar={() => setEmailParaConfirmar(null)}
-        onConfirmar={(endereco) => navigate(`/emails?to=${encodeURIComponent(endereco)}`)}
-      />
     </AppLayout>
   );
 };
