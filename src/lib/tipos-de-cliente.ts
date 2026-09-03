@@ -48,6 +48,18 @@ export function tipoPadrao(tipos: Pick<TipoDeCliente, 'slug'>[]): string {
 }
 
 /**
+ * Decide CPF x CNPJ. O valor gravado no banco tem DUAS grafias: 'pessoa_fisica' (o slug
+ * usado pelo codigo) e 'pessoa fisica', com espaco e sem acento -- e o que a importacao
+ * de planilha produz, e o que 129 clientes da MD tem gravado hoje. Comparar so com
+ * '===' contra uma das duas formas deixa a outra caindo em CNPJ por engano.
+ * Reaproveita `slugDeTipo` (mesma normalizacao de acento e separador) em vez de escrever
+ * outra regra: as duas grafias, e qualquer variacao de caixa, normalizam para o mesmo slug.
+ */
+export function ehPessoaFisica(slug: string): boolean {
+  return slugDeTipo(slug) === 'pessoa_fisica';
+}
+
+/**
  * Opcoes do FILTRO = a lista da empresa + os tipos realmente gravados que nao estao
  * nela. Sem essa soma, um cliente com tipo fora da lista (importacao, ou tipo
  * removido depois) fica inalcancavel pelo filtro -- defeito que ja existiu e foi

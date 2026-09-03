@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { slugDeTipo, rotuloDoTipo, tipoPadrao, opcoesDeFiltro } from '@/lib/tipos-de-cliente';
+import { slugDeTipo, rotuloDoTipo, tipoPadrao, opcoesDeFiltro, ehPessoaFisica } from '@/lib/tipos-de-cliente';
 
 const LISTA = [
   { slug: 'construtora_ativa', nome: 'Construtora Ativa' },
@@ -52,5 +52,23 @@ describe('opcoesDeFiltro', () => {
   it('nao duplica um tipo que esta na lista e em uso', () => {
     const opcoes = opcoesDeFiltro(LISTA, ['construtora_ativa']);
     expect(opcoes).toHaveLength(3);
+  });
+});
+
+describe('ehPessoaFisica', () => {
+  it('reconhece as duas grafias gravadas no banco e variacoes de caixa/acento', () => {
+    // 'pessoa fisica' (com espaco, sem acento) e o que a importacao de planilha grava --
+    // e o valor real em 129 clientes da MD. 'pessoa_fisica' e o slug usado no codigo.
+    expect(ehPessoaFisica('pessoa_fisica')).toBe(true);
+    expect(ehPessoaFisica('pessoa fisica')).toBe(true);
+    expect(ehPessoaFisica('Pessoa Física')).toBe(true);
+    expect(ehPessoaFisica('PESSOA FISICA')).toBe(true);
+  });
+
+  it('nao confunde com outros tipos, nem com pessoa juridica', () => {
+    expect(ehPessoaFisica('construtora')).toBe(false);
+    expect(ehPessoaFisica('construtora_ativa')).toBe(false);
+    expect(ehPessoaFisica('')).toBe(false);
+    expect(ehPessoaFisica('pessoa juridica')).toBe(false);
   });
 });

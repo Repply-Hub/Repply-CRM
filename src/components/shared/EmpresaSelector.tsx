@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Check, ChevronDown, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useClientes } from '@/hooks/use-clientes';
 import { useCreateCliente } from '@/hooks/use-mutations';
+import { useAuth } from '@/hooks/use-auth';
+import { useClientesTipos } from '@/hooks/use-clientes-tipos';
+import { tipoPadrao } from '@/lib/tipos-de-cliente';
 import { toast } from 'sonner';
 import { maskCnpj, unmaskCnpj, isValidCnpjDigits } from '@/lib/cnpj';
 import { correspondeBusca } from '@/lib/texto-busca';
@@ -42,10 +45,11 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Create cliente state
+  // Create cliente state. Tipo começa vazio -- a lista de tipos vem do banco e ainda não
+  // chegou na primeira pintura; o efeito abaixo preenche assim que ela carregar.
   const [newEmpresa, setNewEmpresa] = useState({
     empresa: '',
-    tipo: 'construtora',
+    tipo: '',
     cnpj: '',
     email: '',
     telefone: '',
@@ -53,6 +57,21 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
 
   const { data: clientes, isLoading } = useClientes();
   const createCliente = useCreateCliente();
+  const { profile } = useAuth();
+  const empresaIdAtual = profile?.empresa_id ?? profile?.empresas?.id;
+  // A lista de tipos é da EMPRESA (tabela clientes_tipos), igual Clientes.tsx: este atalho
+  // de cadastro rápido cria cliente de verdade, então não pode oferecer uma lista fixa
+  // diferente da tela de Clientes.
+  const { data: tiposDeCliente } = useClientesTipos(empresaIdAtual);
+  const tipos = useMemo(() => tiposDeCliente ?? [], [tiposDeCliente]);
+
+  // A lista chega depois da primeira pintura: este efeito dá ao campo Tipo o primeiro
+  // item da empresa assim que ela carrega, no lugar do "construtora" cravado no código.
+  useEffect(() => {
+    if (!newEmpresa.tipo && tipos.length > 0) {
+      setNewEmpresa(prev => ({ ...prev, tipo: tipoPadrao(tipos) }));
+    }
+  }, [tipos, newEmpresa.tipo]);
 
   const filteredClientes = useMemo(() => {
     if (!clientes) return [];
@@ -102,7 +121,7 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
       if (result?.id) {
         onValueChange(result.id);
       }
-      setNewEmpresa({ empresa: '', tipo: 'construtora', cnpj: '', email: '', telefone: '' });
+      setNewEmpresa({ empresa: '', tipo: tipoPadrao(tipos), cnpj: '', email: '', telefone: '' });
     } catch (error: any) {
       toast.error('Erro ao cadastrar empresa: ' + error.message);
     }
@@ -222,12 +241,9 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
                   <SelectValue placeholder="Selecione o tipo" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="construtora">Construtora</SelectItem>
-                  <SelectItem value="loja">Loja</SelectItem>
-                  <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
-                  <SelectItem value="condominio">Condomínio</SelectItem>
-                  <SelectItem value="hospital">Hospital</SelectItem>
-                  <SelectItem value="distribuidor">Distribuidor</SelectItem>
+                  {tipos.map(t => (
+                    <SelectItem key={t.id} value={t.slug}>{t.nome}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

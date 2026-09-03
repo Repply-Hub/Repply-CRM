@@ -10,6 +10,8 @@ import { useTarefas } from '@/hooks/use-tarefas';
 import { useSecaoLigada } from '@/hooks/use-secoes';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
+import { useClientesTipos } from '@/hooks/use-clientes-tipos';
+import { rotuloDoTipo, ehPessoaFisica } from '@/lib/tipos-de-cliente';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { NovoNegocioDialog } from '@/components/pedidos/NovoNegocioDialog';
 import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra, useUpdateContato } from '@/hooks/use-mutations';
@@ -46,8 +48,9 @@ import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEm
 import { slugify } from '@/lib/utils';
 import { LinkAnexoPrivado } from '@/components/shared/LinkAnexoPrivado';
 
+// O icone continua vindo do codigo -- so o ROTULO passou a vir da lista de tipos da
+// empresa (rotuloDoTipo). Um slug que a empresa criou e não está aqui cai no Building2.
 const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, loja: Store, pessoa_fisica: User, condominio: Building2, hospital: Building2, distribuidor: Store, hotel: Building2, escola: Building2, instalador: User };
-const tipoLabels: Record<string, string> = { construtora: 'Construtora', loja: 'Loja', pessoa_fisica: 'Pessoa Física', condominio: 'Condomínio', hospital: 'Hospital', distribuidor: 'Distribuidor', hotel: 'Hotel', escola: 'Escola', instalador: 'Instalador' };
 
 // Colunas da tabela de negócios da ficha do cliente. Os ids são os MESMOS de PEDIDOS_COLUMNS
 // (Negocios.tsx), pensando no dia em que essa tabela virar um componente compartilhado.
@@ -278,6 +281,12 @@ const ClienteDetalhe = () => {
   const { ligada: temObras } = useSecaoLigada('obras');
   const { profile } = useAuth();
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
+  // A lista de tipos e da EMPRESA (tabela clientes_tipos), igual Clientes.tsx: sem isso
+  // esta tela mostrava so 3 opcoes fixas e, ao salvar, desfazia a classificacao de quem
+  // tinha um tipo proprio da empresa (ex.: "Construtora Ativa" virava "construtora").
+  const { data: tiposDeCliente } = useClientesTipos(empresaId);
+  // useMemo para a lista não trocar de identidade a cada pintura (mesmo motivo de Clientes.tsx).
+  const tipos = useMemo(() => tiposDeCliente ?? [], [tiposDeCliente]);
   const { data: tarefasKanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
   const tarefaKanbanStages = useMemo(
     () => tarefasKanbanColunas.map(c => ({ key: c.slug, label: c.nome })),
@@ -869,7 +878,7 @@ const ClienteDetalhe = () => {
               {(cliente as any).razao_social && (cliente as any).razao_social !== cliente.empresa && (
                 <span className="text-xs sm:text-sm text-muted-foreground truncate">{cliente.empresa}</span>
               )}
-              <Badge variant="secondary" className="text-[10px]">{tipoLabels[cliente.tipo] ?? cliente.tipo}</Badge>
+              <Badge variant="secondary" className="text-[10px]">{rotuloDoTipo(cliente.tipo, tipos)}</Badge>
             </div>
           </div>
           <Button variant="outline" size="sm" className="shrink-0 ml-auto" onClick={openEdit}>
@@ -891,15 +900,15 @@ const ClienteDetalhe = () => {
                 <Select value={editData.tipo} onValueChange={v => setEditData(d => ({ ...d, tipo: v }))}>
                   <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="construtora">Construtora</SelectItem>
-                    <SelectItem value="loja">Loja</SelectItem>
-                    <SelectItem value="pessoa_fisica">Pessoa Física</SelectItem>
+                    {tipos.map(t => (
+                      <SelectItem key={t.id} value={t.slug}>{t.nome}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>{editData.tipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ'}</Label>
-                <Input value={editData.cnpj} onChange={e => setEditData(d => ({ ...d, cnpj: e.target.value }))} placeholder={editData.tipo === 'pessoa_fisica' ? '000.000.000-00' : '00.000.000/0000-00'} />
+                <Label>{ehPessoaFisica(editData.tipo) ? 'CPF' : 'CNPJ'}</Label>
+                <Input value={editData.cnpj} onChange={e => setEditData(d => ({ ...d, cnpj: e.target.value }))} placeholder={ehPessoaFisica(editData.tipo) ? '000.000.000-00' : '00.000.000/0000-00'} />
               </div>
               <div>
                 <Label>Nome</Label>
@@ -948,18 +957,18 @@ const ClienteDetalhe = () => {
               role="button"
               tabIndex={0}
               className="border-border/40 cursor-pointer transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => copyInfo(cliente.tipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ', cliente.cnpj)}
+              onClick={() => copyInfo(ehPessoaFisica(cliente.tipo) ? 'CPF' : 'CNPJ', cliente.cnpj)}
               onKeyDown={e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  copyInfo(cliente.tipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ', cliente.cnpj);
+                  copyInfo(ehPessoaFisica(cliente.tipo) ? 'CPF' : 'CNPJ', cliente.cnpj);
                 }
               }}
             >
                <CardContent className="pt-4 flex items-center gap-3 overflow-hidden">
                  <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
                  <div className="min-w-0">
-                   <p className="text-xs text-muted-foreground">{cliente.tipo === 'pessoa_fisica' ? 'CPF' : 'CNPJ'}</p>
+                   <p className="text-xs text-muted-foreground">{ehPessoaFisica(cliente.tipo) ? 'CPF' : 'CNPJ'}</p>
                    <p className="text-sm font-medium text-foreground break-all">{cliente.cnpj}</p>
                  </div>
               </CardContent>
@@ -1343,7 +1352,7 @@ const ClienteDetalhe = () => {
         {/* Removed extra closing brace */}
 
         {/* Contatos extras (apenas para empresas, não pessoa física) */}
-        {cliente.tipo !== 'pessoa_fisica' && (
+        {!ehPessoaFisica(cliente.tipo) && (
           <Card className="border-border/40">
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-base flex items-center gap-2">
