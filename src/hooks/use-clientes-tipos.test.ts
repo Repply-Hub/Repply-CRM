@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { slugDeTipo, rotuloDoTipo, tipoPadrao, opcoesDeFiltro, ehPessoaFisica } from '@/lib/tipos-de-cliente';
+import {
+  slugDeTipo,
+  rotuloDoTipo,
+  tipoPadrao,
+  opcoesDeFiltro,
+  ehPessoaFisica,
+  decidirRenomeacao,
+} from '@/lib/tipos-de-cliente';
 
 const LISTA = [
   { slug: 'construtora_ativa', nome: 'Construtora Ativa' },
@@ -79,5 +86,51 @@ describe('ehPessoaFisica', () => {
     // cai, em vez de só mostrar "CNPJ" no lugar de "CPF".
     expect(ehPessoaFisica(null as unknown as string)).toBe(false);
     expect(ehPessoaFisica(undefined as unknown as string)).toBe(false);
+  });
+});
+
+describe('decidirRenomeacao', () => {
+  // A migration semeou nome = slug para toda empresa que já existia -- por isso, antes de
+  // qualquer renomeação, o tipo "construtora" tem nome literal "construtora" (minúsculo).
+  const CONSTRUTORA = { id: 't1', nome: 'construtora' };
+  const LOJA = { id: 't2', nome: 'Loja Ativa' };
+  const LISTA = [CONSTRUTORA, LOJA];
+
+  it("'' e '   ' sao nome vazio", () => {
+    expect(decidirRenomeacao('', CONSTRUTORA, LISTA)).toBe('vazio');
+    expect(decidirRenomeacao('   ', CONSTRUTORA, LISTA)).toBe('vazio');
+  });
+
+  it('nome identico ao atual (mesmo texto) e sem mudanca', () => {
+    expect(decidirRenomeacao('construtora', CONSTRUTORA, LISTA)).toBe('sem-mudanca');
+  });
+
+  it('ARMADILHA: "construtora" -> "Construtora" no PRÓPRIO tipo é renomeação válida', () => {
+    // Este é o caso real da MD: o nome novo, normalizado, é IGUAL ao slug do próprio
+    // tipo (porque a migration copiou um no outro). Uma comparação que confundisse nome
+    // com slug, ou que não ignorasse o próprio id, bloquearia a primeira renomeação
+    // legítima do sistema. A comparação certa é nome x nome, excluindo o próprio id.
+    expect(decidirRenomeacao('Construtora', CONSTRUTORA, LISTA)).toBe('renomear');
+  });
+
+  it('nome novo que nao existe e renomeacao valida', () => {
+    expect(decidirRenomeacao('Distribuidora', CONSTRUTORA, LISTA)).toBe('renomear');
+  });
+
+  it('nome igual ao de outro tipo e duplicado', () => {
+    expect(decidirRenomeacao('Loja Ativa', CONSTRUTORA, LISTA)).toBe('duplicado');
+  });
+
+  it('nome igual ao de outro tipo com caixa/acento diferentes tambem e duplicado', () => {
+    // 'CONSTRUTORA' e 'Construtóra' são grafias que o gestor pode digitar sem perceber
+    // que já existe um tipo "Construtora" -- a comparação tem que normalizar as duas
+    // para bater com o tipo já existente, mesmo sem o texto literal ser igual.
+    const outraLista = [CONSTRUTORA, { id: 't3', nome: 'Construtora' }];
+    expect(decidirRenomeacao('CONSTRUTORA', CONSTRUTORA, outraLista)).toBe('duplicado');
+    expect(decidirRenomeacao('Construtóra', CONSTRUTORA, outraLista)).toBe('duplicado');
+  });
+
+  it('lista com um tipo so (o proprio) e renomeacao valida', () => {
+    expect(decidirRenomeacao('Construtora', CONSTRUTORA, [CONSTRUTORA])).toBe('renomear');
   });
 });

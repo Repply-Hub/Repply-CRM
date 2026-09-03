@@ -65,6 +65,46 @@ export function ehPessoaFisica(slug: string): boolean {
 }
 
 /**
+ * Decide o que fazer com uma renomeacao de tipo, ANTES de chamar o banco.
+ *
+ * useCriarTipoDeCliente ja barra nome repetido ('Esse tipo ja existe'); renomear nao
+ * barrava nada, e o banco tambem nao -- so ha UNIQUE (empresa_id, slug), nada sobre
+ * `nome`. Sem essa checagem, o gestor podia renomear "Loja" para "Construtora" com um
+ * tipo "Construtora" ja existindo, e os dois Selects passavam a mostrar duas opcoes com
+ * o MESMO rotulo e significados diferentes, sem como distinguir.
+ *
+ * 🔴 ARMADILHA que uma guarda ingenua cai: a migration semeou `nome = slug` para toda
+ * empresa que ja existia. Entao a primeira renomeacao legitima de "construtora" e para
+ * "Construtora" -- o nome novo, normalizado, e IGUAL ao slug do PROPRIO tipo. Por isso
+ * a comparacao aqui:
+ *   - compara NOME com NOME (nunca nome com slug -- o slug nem entra nesta funcao);
+ *   - IGNORA o proprio tipo que esta sendo renomeado (filtra por `id`, nao por nome);
+ *   - usa `slugDeTipo` so para COMPARAR (maiuscula/minuscula e acento nao contam como
+ *     tipo diferente), nunca para decidir o que grava -- quem grava e o hook, com o
+ *     texto exatamente como foi digitado.
+ * Assim "construtora" -> "Construtora" no proprio tipo passa (mudou so a caixa, e
+ * renomeacao valida), mas "Loja" -> "Construtora" com outro tipo chamado "Construtora"
+ * cai como duplicado.
+ */
+export function decidirRenomeacao(
+  nomeDigitado: string,
+  tipoAtual: Pick<TipoDeCliente, 'id' | 'nome'>,
+  tipos: Pick<TipoDeCliente, 'id' | 'nome'>[],
+): 'vazio' | 'sem-mudanca' | 'duplicado' | 'renomear' {
+  const nome = nomeDigitado.trim();
+  if (!nome) return 'vazio';
+  if (nome === tipoAtual.nome) return 'sem-mudanca';
+
+  const slugNovo = slugDeTipo(nome);
+  const colide = tipos.some(
+    t => t.id !== tipoAtual.id && slugDeTipo(t.nome) === slugNovo,
+  );
+  if (colide) return 'duplicado';
+
+  return 'renomear';
+}
+
+/**
  * Opcoes do FILTRO = a lista da empresa + os tipos realmente gravados que nao estao
  * nela. Sem essa soma, um cliente com tipo fora da lista (importacao, ou tipo
  * removido depois) fica inalcancavel pelo filtro -- defeito que ja existiu e foi

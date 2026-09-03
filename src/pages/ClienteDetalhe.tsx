@@ -12,7 +12,7 @@ import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
 import { useClientesTipos } from '@/hooks/use-clientes-tipos';
 import { GerenciarTiposDialog } from '@/components/clientes/GerenciarTiposDialog';
-import { rotuloDoTipo, ehPessoaFisica, slugDeTipo } from '@/lib/tipos-de-cliente';
+import { rotuloDoTipo, ehPessoaFisica, slugDeTipo, tipoPadrao } from '@/lib/tipos-de-cliente';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { NovoNegocioDialog } from '@/components/pedidos/NovoNegocioDialog';
 import { useUpdateCliente, useDeleteCliente, useCreateContato, useDeleteContato, useCreateObra, useUpdateContato } from '@/hooks/use-mutations';
@@ -1010,6 +1010,14 @@ const ClienteDetalhe = () => {
           empresaId={empresaId}
           podeGerenciar={podeGerenciarTipos}
           onTipoCriado={(slug) => setEditData(d => ({ ...d, tipo: slug }))}
+          onTipoExcluido={(slug) => {
+            // Mesma regra de Clientes.tsx: se o tipo excluído era o que estava
+            // selecionado no formulário, cai no padrão -- senão o Select mostraria o
+            // slug cru e "Salvar Alterações" gravaria um tipo órfão.
+            if (editData.tipo === slug) {
+              setEditData(d => ({ ...d, tipo: tipoPadrao(tipos.filter(t => t.slug !== slug)) }));
+            }
+          }}
         />
 
         {/* Info Cards */}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ import {
   ConteudoDialogo,
   CorpoDialogo,
   Dialog,
+  DialogDescription,
   DialogTitle,
   RodapeDialogo,
 } from '@/components/shared/DialogoResponsivo';
@@ -28,6 +30,7 @@ import {
   useExcluirTipoDeCliente,
   useRenomearTipoDeCliente,
 } from '@/hooks/use-clientes-tipos';
+import { decidirRenomeacao } from '@/lib/tipos-de-cliente';
 
 /**
  * O diálogo "Gerenciar tipos" — criar, RENOMEAR e excluir os tipos de cliente da
@@ -117,12 +120,25 @@ export function GerenciarTiposDialog({
 
   const handleRenomear = async () => {
     if (!emEdicao) return;
-    // Nada mudou: só fecha o campo, sem ir ao banco nem mostrar "Tipo renomeado".
-    const original = tipos.find(t => t.id === emEdicao.id)?.nome ?? '';
-    if (emEdicao.nome.trim() === original) {
-      setEmEdicao(null);
-      return;
+    const tipoAtual = tipos.find(t => t.id === emEdicao.id);
+    if (!tipoAtual) return;
+
+    // decidirRenomeacao (src/lib/tipos-de-cliente.ts) concentra a regra -- é a mesma
+    // função que o teste em use-clientes-tipos.test.ts cobre, sem precisar mockar o
+    // Supabase. Aqui só se reage ao veredito.
+    switch (decidirRenomeacao(emEdicao.nome, tipoAtual, tipos)) {
+      case 'sem-mudanca':
+        // Nada mudou: só fecha o campo, sem ir ao banco nem mostrar "Tipo renomeado".
+        setEmEdicao(null);
+        return;
+      case 'vazio':
+        toast.error('Informe um nome para o tipo');
+        return;
+      case 'duplicado':
+        toast.error('Esse tipo já existe');
+        return;
     }
+
     try {
       await renomearTipo.mutateAsync({ id: emEdicao.id, nome: emEdicao.nome });
       setEmEdicao(null);
@@ -148,6 +164,11 @@ export function GerenciarTiposDialog({
         <ConteudoDialogo className="sm:max-w-md">
           <CabecalhoDialogo>
             <DialogTitle>Gerenciar tipos</DialogTitle>
+            <DialogDescription>
+              Renomear só troca o rótulo: os clientes já classificados com este tipo
+              continuam exatamente como estão. Excluir tira o tipo dos seletores, mas não
+              reclassifica ninguém.
+            </DialogDescription>
           </CabecalhoDialogo>
 
           <CorpoDialogo>
