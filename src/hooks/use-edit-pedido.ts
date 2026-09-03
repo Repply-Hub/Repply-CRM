@@ -48,6 +48,11 @@ export interface UpdatePedidoPayload {
   campos_extras?: Record<string, string>;
   /** Valor de negociação. Ausente = não mexe no que está gravado. */
   valor_total?: number;
+  /**
+   * A lista final dos responsáveis ALÉM do principal. O principal é o `usuario_id` acima.
+   * Ausente (`undefined`) = não mexe em responsável nenhum; lista vazia = ficou só o principal.
+   */
+  participantes?: string[];
 }
 
 export function useUpdatePedidoCompleto() {
@@ -110,10 +115,72 @@ export function useUpdatePedidoCompleto() {
       // encontrar, ao apagar item, o valor do negócio virando a soma dos itens restantes.
       // Ver docs/operacao/catalogo-de-produtos-removido.md.
 
+      // 2. Os responsáveis além do principal.
+      //
+      // 🔴 LÊ O ESTADO ATUAL DO BANCO em vez de confiar na foto tirada quando a tela abriu.
+      // Entre abrir e salvar, alguém pode ter mexido na lista pelo painel de detalhe do
+      // negócio — e comparar com foto velha desfaria a mudança da outra pessoa sem ninguém
+      // ter pedido.
+      //
+      // 🔴 E A LEITURA VEM DEPOIS DO UPDATE, de propósito. Trocar `pedidos.usuario_id` move a
+      // estrela sozinho, pelo espelho do banco: quem era principal virou participante e
+      // vice-versa. Ler antes veria a configuração velha e tentaria remover o principal —
+      // que é justamente o que o banco recusa.
+      if (payload.participantes) {
+        const { data: atuais, error: leituraErr } = await supabase
+          .from('pedido_responsaveis')
+          .select('usuario_id, principal')
+          .eq('pedido_id', payload.pedido_id);
+        if (leituraErr) throw leituraErr;
+
+        const desejados = new Set(
+          payload.participantes.filter((id) => id && id !== payload.usuario_id),
+        );
+        // Só os participantes entram na conta: o principal nunca é removido por aqui (o
+        // banco recusaria), e ele já foi definido pelo próprio `usuario_id` do passo 1.
+        const participantesAtuais = (atuais ?? [])
+          .filter((r) => !r.principal)
+          .map((r) => r.usuario_id);
+
+        const paraEntrar = [...desejados].filter((id) => !participantesAtuais.includes(id));
+        const paraSair = participantesAtuais.filter((id) => !desejados.has(id));
+
+        // Se a lista de responsáveis falhar, o negócio JÁ FOI SALVO no passo 1. Recarregar os
+        // painéis antes de reclamar é o que evita a tela mostrar dado velho de um negócio que
+        // mudou de verdade. Diferente do cadastro, aqui salvar de novo é inofensivo — não
+        // nasce negócio duplicado —, então vale interromper e deixar a pessoa tentar outra vez.
+        const reclamar = (frase: string) => {
+          invalidarPaineisDeNegocios(qc);
+          throw new Error(frase);
+        };
+
+        if (paraEntrar.length > 0) {
+          const { error } = await supabase.from('pedido_responsaveis').insert(
+            paraEntrar.map((usuarioId) => ({
+              pedido_id: payload.pedido_id,
+              usuario_id: usuarioId,
+              principal: false,
+            })),
+          );
+          if (error) reclamar('O negócio foi salvo, mas não foi possível acrescentar os responsáveis novos. Tente salvar de novo.');
+        }
+
+        if (paraSair.length > 0) {
+          const { error } = await supabase
+            .from('pedido_responsaveis')
+            .delete()
+            .eq('pedido_id', payload.pedido_id)
+            .in('usuario_id', paraSair);
+          if (error) reclamar('O negócio foi salvo, mas não foi possível remover os responsáveis retirados. Tente salvar de novo.');
+        }
+      }
+
       return { id: payload.pedido_id };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pedido_completo'] });
+      // A lista de responsáveis do negócio, que a ficha e o painel de detalhe leem.
+      qc.invalidateQueries({ queryKey: ['pedido_responsaveis'] });
       // O valor e a etapa entram nos totais do funil e em todos os painéis; sem isso, o
       // número novo só aparecia lá depois de recarregar a página. A lista mora em
       // use-pedidos.ts para não existirem duas versões dela.

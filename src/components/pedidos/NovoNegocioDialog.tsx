@@ -32,6 +32,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { CampoDeResponsaveis, type ResponsavelSelecionado } from '@/components/pedidos/CampoDeResponsaveis';
 import { CampoMoeda } from '@/components/shared/CampoMoeda';
 import { CampoCnpj } from '@/components/shared/CampoCnpj';
 import { SeletorMarcadorObra } from '@/components/obras/SeletorMarcadorObra';
@@ -132,6 +133,29 @@ function NovoNegocioFormContent({
   const [obraId, setObraId] = useState('');
   const [fabricanteId, setFabricanteId] = useState('');
   const [vendedorId, setVendedorId] = useState('');
+
+  /**
+   * Os responsáveis ALÉM do principal.
+   *
+   * 🔴 `vendedorId` CONTINUA SENDO O PRINCIPAL, e não virou um item da lista. É ele que a
+   * validação de campo obrigatório exige e que vai em `usuario_id` na gravação — mantê-lo
+   * intacto é o que deixou o resto deste formulário sem uma linha de mudança.
+   */
+  const [participantes, setParticipantes] = useState<string[]>([]);
+
+  const responsaveis = useMemo<ResponsavelSelecionado[]>(
+    () => [
+      ...(vendedorId ? [{ usuarioId: vendedorId, principal: true }] : []),
+      ...participantes.map((id) => ({ usuarioId: id, principal: false })),
+    ],
+    [vendedorId, participantes],
+  );
+
+  const aplicarResponsaveis = (proximo: ResponsavelSelecionado[]) => {
+    const principal = proximo.find((r) => r.principal);
+    setVendedorId(principal?.usuarioId ?? '');
+    setParticipantes(proximo.filter((r) => !r.principal).map((r) => r.usuarioId));
+  };
   const [dataPedido, setDataPedido] = useState<Date>(new Date());
   const [prazoResposta, setPrazoResposta] = useState<Date | undefined>();
   const [origemLead, setOrigemLead] = useState('');
@@ -337,6 +361,7 @@ function NovoNegocioFormContent({
         cliente_id: clienteId,
         fabricante_id: fabricanteId,
         usuario_id: vendedorId,
+        participantes,
         funil_id: resolvedFunilId,
         obra_id: obraId || undefined,
         status: status,
@@ -598,15 +623,14 @@ function NovoNegocioFormContent({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Vendedor */}
+                {/* Responsáveis — um campo só, com a estrela marcando quem leva o valor. */}
                 <div className="space-y-2">
                   <Label>Responsável{obrigatorio('vendedor_id', true) && ' *'}</Label>
-                  <SearchableSelect
-                    options={(vendedores ?? []).map(v => ({ value: v.id, label: v.nome }))}
-                    value={vendedorId}
-                    onValueChange={setVendedorId}
-                    placeholder="Selecionar responsável"
-                    className={!isGestor ? "opacity-50 pointer-events-none" : ""}
+                  <CampoDeResponsaveis
+                    pessoas={(vendedores ?? []).map(v => ({ id: v.id, nome: v.nome, avatarUrl: v.avatar_url }))}
+                    value={responsaveis}
+                    onChange={aplicarResponsaveis}
+                    disabled={!isGestor}
                   />
                 </div>
 

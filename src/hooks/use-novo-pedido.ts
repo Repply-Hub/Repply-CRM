@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { invalidarPaineisDeNegocios } from './use-pedidos';
 
@@ -59,6 +60,11 @@ export interface NovoPedidoPayload {
   valor_total?: number;
   proximo_contato?: string;
   campos_extras?: Record<string, string>;
+  /**
+   * Os responsáveis ALÉM do principal. O principal é o `usuario_id` acima — ele não entra
+   * aqui, porque o gatilho do banco já cria a linha dele sozinho.
+   */
+  participantes?: string[];
 }
 
 export function useCreatePedidoCompleto() {
@@ -105,6 +111,38 @@ export function useCreatePedidoCompleto() {
       // real, e apagá-la destruiria o único registro que alguém um dia pode perguntar por quê.
       // Ela só deixou de receber linha nova. Ver docs/operacao/catalogo-de-produtos-removido.md.
 
+      // 2b. Os responsáveis além do principal.
+      //
+      // 🔴 O PRINCIPAL NÃO ENTRA AQUI. O gatilho `trg_semeia_responsavel` já criou a linha
+      // dele no INSERT acima. Mandá-lo de novo violaria a chave primária e derrubaria a
+      // criação inteira — e "consertar" isso com `upsert` seria pior: o caminho de UPDATE
+      // rebaixaria o principal, e o negócio ficaria sem quem leva o valor, em silêncio.
+      const extras = (payload.participantes ?? []).filter((id) => id && id !== payload.usuario_id);
+      let avisoDeParticipantes: string | null = null;
+
+      if (extras.length > 0) {
+        const { error: errParticipantes } = await supabase.from('pedido_responsaveis').insert(
+          extras.map((usuarioId) => ({
+            pedido_id: pedido.id,
+            usuario_id: usuarioId,
+            principal: false,
+          })),
+        );
+
+        // 🔴 FALHA AQUI NÃO DERRUBA A CRIAÇÃO, e isso é deliberado. O negócio JÁ EXISTE neste
+        // ponto; lançar o erro deixaria o formulário aberto e preenchido, e o próximo clique
+        // criaria um negócio DUPLICADO. Além disso, gravar responsável exige a permissão de
+        // EDITAR negócios — régua mais dura que a de criar —, então um vendedor comum pode
+        // ser recusado justamente aqui, depois de o negócio já ter nascido.
+        //
+        // O negócio fica com o principal certo (o gatilho garantiu) e quem faltou pode ser
+        // acrescentado na edição. O aviso diz isso em vez de sumir com a informação.
+        if (errParticipantes) {
+          avisoDeParticipantes =
+            'O negócio foi criado, mas não foi possível gravar os outros responsáveis. Acrescente-os pela edição do negócio.';
+        }
+      }
+
       // 3. Insert historico_contatos if proximo_contato set
       if (payload.proximo_contato) {
         await supabase.from('historico_contatos').insert({
@@ -116,9 +154,11 @@ export function useCreatePedidoCompleto() {
         });
       }
 
-      return pedido;
+      return { ...pedido, avisoDeParticipantes };
     },
-    onSuccess: () => {
+    onSuccess: (resultado) => {
+      // O negócio nasceu; o aviso só conta o que ficou faltando dentro dele.
+      if (resultado?.avisoDeParticipantes) toast.warning(resultado.avisoDeParticipantes, { duration: 8000 });
       // Um negócio novo pode nascer já em Fechamento (venda registrada depois do fato), então
       // mexe em tudo — inclusive nos painéis que esta lista não invalidava (o total do
       // cabeçalho de Negócios, os cartões do Dashboard e o Plano de Vendas). A lista mora em

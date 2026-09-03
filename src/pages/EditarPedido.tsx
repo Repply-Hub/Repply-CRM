@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -44,6 +44,8 @@ import { filenameFromUrl } from '@/lib/download-file';
 import { FilePreviewDialog, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
 import { Badge } from '@/components/ui/badge';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { CampoDeResponsaveis, type ResponsavelSelecionado } from '@/components/pedidos/CampoDeResponsaveis';
+import { useResponsaveisDoNegocio } from '@/hooks/use-responsaveis-do-negocio';
 import { CampoMoeda } from '@/components/shared/CampoMoeda';
 import { CampoCnpj } from '@/components/shared/CampoCnpj';
 import { SeletorMarcadorObra } from '@/components/obras/SeletorMarcadorObra';
@@ -82,6 +84,7 @@ const EditarPedido = () => {
   const { data: kanbanColunas } = useKanbanColunas(undefined, pedidoData?.pedido?.funil_id);
   const { data: historicoStatus } = usePedidoHistoricoStatus(id ?? null);
   const updatePedido = useUpdatePedidoCompleto();
+  const { data: responsaveisGravados } = useResponsaveisDoNegocio(id ?? null);
   const createObraMutation = useCreateObra();
   // Cascata da secao Obras. `=== true` e deliberado: enquanto a resposta nao chega, o
   // campo fica escondido — campo que aparece e some no meio da edicao e pior de usar que
@@ -119,6 +122,26 @@ const EditarPedido = () => {
   const [obraId, setObraId] = useState('');
   const [fabricanteId, setFabricanteId] = useState('');
   const [vendedorId, setVendedorId] = useState('');
+
+  /**
+   * Os responsáveis ALÉM do principal. Como no cadastro, `vendedorId` continua sendo o
+   * principal — é ele que a validação exige e que vai em `usuario_id`.
+   */
+  const [participantes, setParticipantes] = useState<string[]>([]);
+
+  const responsaveis = useMemo<ResponsavelSelecionado[]>(
+    () => [
+      ...(vendedorId ? [{ usuarioId: vendedorId, principal: true }] : []),
+      ...participantes.map((uid) => ({ usuarioId: uid, principal: false })),
+    ],
+    [vendedorId, participantes],
+  );
+
+  const aplicarResponsaveis = (proximo: ResponsavelSelecionado[]) => {
+    const principal = proximo.find((r) => r.principal);
+    setVendedorId(principal?.usuarioId ?? '');
+    setParticipantes(proximo.filter((r) => !r.principal).map((r) => r.usuarioId));
+  };
   const [status, setStatus] = useState('novo_lead');
   const [marcadorId, setMarcadorId] = useState('');
   const [dataPedido, setDataPedido] = useState<Date>(new Date());
@@ -177,6 +200,20 @@ const EditarPedido = () => {
       setInitialized(true);
     }
   }, [pedidoData, initialized]);
+
+  // Os participantes gravados entram no estado quando a lista chega. Só o principal NÃO vem
+  // por aqui: ele já vem de `pedidos.usuario_id`, no efeito acima, e as duas fontes concordam
+  // porque o banco espelha uma na outra.
+  //
+  // 🔴 SEMEIA UMA VEZ SÓ. A consulta é refeita sozinha quando a pessoa volta o foco para a
+  // janela, e a cada vez ela devolve um array novo — sem esta trava, alguém que acrescentasse
+  // um responsável, fosse olhar outra aba e voltasse encontraria a mudança desfeita, sem aviso.
+  const semeouResponsaveis = useRef(false);
+  useEffect(() => {
+    if (!responsaveisGravados || semeouResponsaveis.current) return;
+    semeouResponsaveis.current = true;
+    setParticipantes(responsaveisGravados.filter((r) => !r.principal).map((r) => r.usuarioId));
+  }, [responsaveisGravados]);
 
   // Derived
   const selectedCliente = useMemo(() => clientes?.find(c => c.id === clienteId), [clientes, clienteId]);
@@ -311,6 +348,7 @@ const EditarPedido = () => {
         cliente_id: clienteId,
         fabricante_id: fabricanteId,
         usuario_id: vendedorId,
+        participantes,
         obra_id: obraId || undefined,
         status: status,
         marcador_id: marcadorId || null,
@@ -592,12 +630,11 @@ const EditarPedido = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Responsável *</Label>
-                    <SearchableSelect
-                      options={(vendedores ?? []).map(v => ({ value: v.id, label: v.nome }))}
-                      value={vendedorId}
-                      onValueChange={setVendedorId}
-                      placeholder="Selecionar responsável"
-                      className={!isGestor ? "opacity-50 pointer-events-none" : ""}
+                    <CampoDeResponsaveis
+                      pessoas={(vendedores ?? []).map(v => ({ id: v.id, nome: v.nome, avatarUrl: v.avatar_url }))}
+                      value={responsaveis}
+                      onChange={aplicarResponsaveis}
+                      disabled={!isGestor}
                     />
                   </div>
                   <div className="space-y-2">

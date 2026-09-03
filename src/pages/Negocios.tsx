@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { marcaDaEmpresa } from '@/lib/marca-da-empresa';
 import { useMinhaPermissao } from '@/hooks/use-minha-permissao';
+import { PainelDeResponsaveis } from '@/components/pedidos/PainelDeResponsaveis';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useDelayedLoading } from '@/hooks/use-delayed-loading';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
@@ -767,6 +768,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // Não protege nada — quem recusa é o Postgres. Serve para não oferecer um caminho que
   // termina em nada: sem isto, quem não pode apagar digita APAGAR e a tela fica igual.
   const { permitido: podeExcluir } = useMinhaPermissao('pedidos', 'excluir');
+  const { permitido: podeEditar } = useMinhaPermissao('pedidos', 'editar');
   const isDeleting = bulkDeleteMutation.isPending;
 
   // Ação em massa (etapa + marcador num só bloco): o alvo é somente o que o usuário marcar no
@@ -2201,19 +2203,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <User className="h-3 w-3" /> Vendedor Responsável
+                  <User className="h-3 w-3" /> Responsáveis
                 </p>
-                {selectedViewOrder.vendedor ? (
-                  <button 
-                    onClick={() => navigate(`/usuarios/${selectedViewOrder.vendedor?.id}`)}
-                    className="text-sm font-medium hover:text-primary transition-colors text-left flex items-center gap-1 group"
-                  >
-                    {selectedViewOrder.vendedor.nome}
-                    <div className="h-1.5 w-1.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </button>
-                ) : (
-                  <p className="text-sm font-medium">-</p>
-                )}
+                {/*
+                  Aqui a estrela grava NA HORA: este painel não tem botão de salvar, e um clique
+                  que não valesse na hora faria a pessoa fechar o painel achando que mudou algo.
+                  Toda troca de estrela entra no histórico de atividades do negócio.
+
+                  🔴 O nome deixou de ser um atalho para a ficha da pessoa. Com vários
+                  responsáveis, um link só teria de escolher um deles — e o painel passaria a
+                  responder "quem é o titular" em vez de "quem toca este negócio", que é a
+                  pergunta que o campo único existe para responder. A ficha da pessoa continua
+                  a um clique em Usuários.
+                */}
+                <PainelDeResponsaveis pedidoId={selectedViewOrder.id} somenteLeitura={!podeEditar} />
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
