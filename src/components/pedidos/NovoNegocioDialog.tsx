@@ -40,13 +40,7 @@ import { validarCnpjDaObra } from '@/lib/obra-cnpj';
 import type { CnpjData } from '@/lib/cnpj';
 
 import { getNomeNegocioAutomatico } from '@/lib/nome-negocio';
-
-const DEFAULT_ORIGENS = [
-  { value: 'recompra', label: 'Recompra' },
-  { value: 'prospeccao_ativa', label: 'Prospecção Ativa' },
-  { value: 'indicacao', label: 'Indicação' },
-  { value: 'obra_nova', label: 'Obra Nova' },
-];
+import { OrigemLeadSelect } from '@/components/shared/OrigemLeadSelect';
 
 export interface NovoNegocioDialogProps {
   open: boolean;
@@ -111,20 +105,6 @@ function NovoNegocioFormContent({
   const [newObraMarcadorId, setNewObraMarcadorId] = useState('');
   const [newObraCnpjErro, setNewObraCnpjErro] = useState<string | null>(null);
   const [newObraNomeVeioDoCnpj, setNewObraNomeVeioDoCnpj] = useState(false);
-
-  const [origens, setOrigens] = useState(() => {
-    const saved = localStorage.getItem('custom_origens');
-    if (saved) {
-      try {
-        return [...DEFAULT_ORIGENS, ...JSON.parse(saved)];
-      } catch (e) {
-        return DEFAULT_ORIGENS;
-      }
-    }
-    return DEFAULT_ORIGENS;
-  });
-  const [origemDialogOpen, setOrigemDialogOpen] = useState(false);
-  const [newOrigemLabel, setNewOrigemLabel] = useState('');
 
   const [step, setStep] = useState(1);
 
@@ -479,27 +459,6 @@ function NovoNegocioFormContent({
     }
   };
 
-  const handleCreateOrigem = () => {
-    if (!newOrigemLabel.trim()) {
-      toast.error('Informe o nome da origem');
-      return;
-    }
-
-    const newValue = newOrigemLabel.toLowerCase().replace(/\s+/g, '_');
-    const newOrigem = { value: newValue, label: newOrigemLabel };
-
-    const updatedOrigens = [...origens, newOrigem];
-    setOrigens(updatedOrigens);
-
-    const customOnly = updatedOrigens.filter(o => !DEFAULT_ORIGENS.some(d => d.value === o.value));
-    localStorage.setItem('custom_origens', JSON.stringify(customOnly));
-
-    setOrigemLead(newValue);
-    setOrigemDialogOpen(false);
-    setNewOrigemLabel('');
-    toast.success('Nova origem adicionada!');
-  };
-
   return (
     <>
       <ConteudoDialogo className="sm:max-w-4xl p-0">
@@ -637,32 +596,11 @@ function NovoNegocioFormContent({
                 {/* Origem */}
                 <div className="space-y-2">
                   <Label>Origem{obrigatorio('origem_lead', false) && ' *'}</Label>
-                  <Select value={origemLead} onValueChange={setOrigemLead}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecionar origem" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <div className="max-h-[200px] overflow-y-auto">
-                        {origens.map(o => (
-                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                        ))}
-                      </div>
-                      <div className="p-1 border-t mt-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-start text-xs font-medium text-primary hover:text-primary hover:bg-primary/10 h-8"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setOrigemDialogOpen(true);
-                          }}
-                        >
-                          <Plus className="h-3 w-3 mr-2" /> Nova Origem
-                        </Button>
-                      </div>
-                    </SelectContent>
-                  </Select>
+                  <OrigemLeadSelect
+                    value={origemLead}
+                    onValueChange={setOrigemLead}
+                    className="w-full"
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -940,31 +878,6 @@ function NovoNegocioFormContent({
             <Button variant="outline" onClick={fecharDialogoObra}>Cancelar</Button>
             <Button onClick={handleCreateObra} disabled={createObraMutation.isPending}>
               {createObraMutation.isPending ? 'Criando...' : 'Criar Obra'}
-            </Button>
-          </RodapeDialogo>
-        </ConteudoDialogo>
-      </Dialog>
-      <Dialog open={origemDialogOpen} onOpenChange={setOrigemDialogOpen}>
-        <ConteudoDialogo>
-          <CabecalhoDialogo>
-            <DialogTitle>Nova Origem</DialogTitle>
-          </CabecalhoDialogo>
-          <CorpoDialogo>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Nome da Origem *</Label>
-                <Input
-                  value={newOrigemLabel}
-                  onChange={(e) => setNewOrigemLabel(e.target.value)}
-                  placeholder="Ex: Evento de Construção"
-                />
-              </div>
-            </div>
-          </CorpoDialogo>
-          <RodapeDialogo>
-            <Button variant="outline" onClick={() => setOrigemDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreateOrigem}>
-              Criar Origem
             </Button>
           </RodapeDialogo>
         </ConteudoDialogo>
