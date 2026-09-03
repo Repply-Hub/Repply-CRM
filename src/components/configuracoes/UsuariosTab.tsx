@@ -26,7 +26,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { PerfilSelect } from './PerfilSelect';
 import { CodigoAcessoButton } from './CodigoAcessoButton';
-import { PermissaoMatrixEditor } from './PermissaoMatrixEditor';
+import { PermissaoMatrizChecklist } from './PermissaoMatrizChecklist';
 import { PermissaoPresetsDialog } from './PermissaoPresetsDialog';
 
 // ─── Role utils ───
@@ -91,9 +91,12 @@ function EditVendedorDialog({ vendedor, onClose }: { vendedor: { id: string; nom
 // ─── Inline Permissions Editor (card-based) ───
 function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: string; role: string; empresa_id?: string | null } }) {
   const { data: permissoes, isLoading } = usePermissoes(vendedor.id);
+  const { data: todosUsuarios } = useVendedores();
   const upsert = useUpsertPermissao();
   const { user, profile } = useAuth();
   const isGestor = vendedor.role === 'gestor' || vendedor.role === 'admin' || vendedor.role === 'empresa';
+  const roleConfig = getRoleConfig(vendedor.role);
+  const usuariosNoPapel = (todosUsuarios ?? []).filter(u => u.role === vendedor.role).length;
   const empresaId = vendedor.empresa_id ?? profile?.empresa_id;
   const { data: presets } = usePermissaoPresets(empresaId);
   const applyPreset = useApplyPermissaoPreset();
@@ -159,12 +162,16 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Cabeçalho: título do bloco à esquerda, presets alinhados à direita na mesma linha */}
       <div className="flex flex-col lg:flex-row lg:items-start gap-3 lg:gap-4 justify-between">
         <div className="min-w-0">
-          <h3 className="text-sm font-medium">Permissões por Módulo</h3>
-          <p className="text-xs text-muted-foreground">Controle granular de acesso para {vendedor.nome}</p>
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+            Quem vê o quê<span className="text-primary">.</span>
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Perfil {roleConfig.label} · {usuariosNoPapel} usuário{usuariosNoPapel === 1 ? '' : 's'} neste papel
+          </p>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap lg:justify-end lg:shrink-0">
           <span className="text-xs text-muted-foreground">Presets:</span>
@@ -215,7 +222,7 @@ function InlinePermissaoEditor({ vendedor }: { vendedor: { id: string; nome: str
         </div>
       </div>
 
-      <PermissaoMatrixEditor
+      <PermissaoMatrizChecklist
         getValue={modulo => {
           const perm = getPermissao(modulo);
           return {

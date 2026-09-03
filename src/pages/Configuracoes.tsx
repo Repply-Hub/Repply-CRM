@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 import { Button } from '@/components/ui/button';
@@ -42,6 +41,14 @@ const themeOptions = [
   { value: 'dark' as const, label: 'Escuro', icon: Moon, desc: 'Reduz o brilho da tela' },
   { value: 'system' as const, label: 'Sistema', icon: Monitor, desc: 'Segue a preferência do SO' },
 ];
+
+// Item da navegação vertical de Configurações. Ativo = leve tinta laranja +
+// texto laranja (o `tailwind-merge` do `cn` deixa estas classes vencerem as do
+// primitivo `TabsTrigger`, que centraliza e usa `bg-background`/`text-foreground`).
+const NAV_TRIGGER =
+  "justify-start gap-2 lg:w-full rounded-md px-3 py-2 text-sm font-medium text-left h-auto whitespace-nowrap transition-colors " +
+  "data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none " +
+  "data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-accent data-[state=inactive]:hover:text-foreground";
 
 function CustomizeTab() {
   const { theme, setTheme } = useTheme();
@@ -716,71 +723,93 @@ const Configuracoes = () => {
       mainClassName={noPageScroll ? "flex-1 overflow-hidden flex flex-col" : "flex-1 overflow-auto"}
     >
       <div className={cn("p-6", noPageScroll && "flex-1 flex flex-col min-h-0")}>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className={cn(noPageScroll && "flex-1 flex flex-col min-h-0")}>
-          <TabsList className={cn(TOGGLE_LIST_CLASS, noPageScroll && "flex-none self-start")}>
-            <TabsTrigger value="perfil" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><UserCircle className="h-4 w-4" /> Perfil</TabsTrigger>
+        {/* Navegação vertical à esquerda, conteúdo à direita. O Radix cuida da
+            navegação por seta com `orientation="vertical"`; a URL continua sendo a
+            única fonte da aba (ver o comentário no topo do componente). No celular
+            a coluna vira uma tira que rola de lado, para as abas não sumirem. */}
+        <Tabs
+          orientation="vertical"
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className={cn(
+            "flex flex-col lg:flex-row gap-6 lg:gap-10",
+            noPageScroll && "flex-1 min-h-0",
+          )}
+        >
+          {/* `lg:sticky` + `lg:self-start`: a coluna encolhe até a altura dos itens e
+              gruda no topo enquanto o conteúdo à direita rola dentro do <main>
+              (que é quem tem overflow). Sem `self-start` o item flex esticaria na
+              altura toda da linha e o sticky não teria para onde deslizar. */}
+          <TabsList className={cn(
+            "flex lg:flex-col h-auto shrink-0 items-stretch justify-start gap-0.5 bg-transparent p-0 lg:w-56",
+            "lg:sticky lg:top-6 lg:self-start",
+            "max-lg:overflow-x-auto max-lg:[scrollbar-width:none] max-lg:[&::-webkit-scrollbar]:hidden max-lg:[&>*]:shrink-0",
+          )}>
+            <TabsTrigger value="perfil" className={NAV_TRIGGER}><UserCircle className="h-4 w-4 shrink-0" /> Perfil</TabsTrigger>
+            {abaEmpresaLiberada && (
+              <TabsTrigger value="empresas" className={NAV_TRIGGER}><Building2 className="h-4 w-4 shrink-0" /> Empresa</TabsTrigger>
+            )}
             {isGestor && (
-              <TabsTrigger value="vendedores" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><Users className="h-4 w-4" /> Usuários</TabsTrigger>
+              <TabsTrigger value="vendedores" className={NAV_TRIGGER}><Users className="h-4 w-4 shrink-0" /> Usuários e permissões</TabsTrigger>
+            )}
+            {isGestor && (
+              <TabsTrigger value="campos" className={NAV_TRIGGER}><ListChecks className="h-4 w-4 shrink-0" /> Campos do formulário</TabsTrigger>
             )}
             {isGestor && temWhatsapp === true && (
-              <TabsTrigger value="whatsapp" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><Smartphone className="h-4 w-4" /> WhatsApp</TabsTrigger>
+              <TabsTrigger value="whatsapp" className={NAV_TRIGGER}><Smartphone className="h-4 w-4 shrink-0" /> WhatsApp</TabsTrigger>
             )}
             {isGestor && temHoje === true && (
-              <TabsTrigger value="automacao" className={TOGGLE_TRIGGER_CLASS}>Automação</TabsTrigger>
-            )}
-            {isGestor && (
-              <TabsTrigger value="campos" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><ListChecks className="h-4 w-4" /> Campos</TabsTrigger>
-            )}
-            {abaEmpresaLiberada && (
-              <TabsTrigger value="empresas" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><Building2 className="h-4 w-4" /> Empresa</TabsTrigger>
+              <TabsTrigger value="automacao" className={NAV_TRIGGER}><span className="w-4 shrink-0" /> Automação</TabsTrigger>
             )}
             {podeVerPagamentos && (
-              <TabsTrigger value="pagamentos" className={cn(TOGGLE_TRIGGER_CLASS, 'gap-1.5')}><CreditCard className="h-4 w-4" /> Pagamentos</TabsTrigger>
+              <TabsTrigger value="pagamentos" className={NAV_TRIGGER}><CreditCard className="h-4 w-4 shrink-0" /> Assinatura</TabsTrigger>
             )}
           </TabsList>
 
-          <TabsContent value="perfil" className="mt-4"><ProfileTab /></TabsContent>
+          <div className={cn("flex-1 min-w-0", noPageScroll && "flex flex-col min-h-0")}>
+            <TabsContent value="perfil" className="mt-0"><ProfileTab /></TabsContent>
 
-          {isGestor && (
-            <TabsContent value="vendedores" className="mt-4 flex-1 min-h-0 flex flex-col overflow-hidden data-[state=inactive]:hidden">
-              <UsuariosTab />
-            </TabsContent>
-          )}
+            {isGestor && (
+              <TabsContent value="vendedores" className="mt-0 flex-1 min-h-0 flex flex-col overflow-hidden data-[state=inactive]:hidden">
+                <UsuariosTab />
+              </TabsContent>
+            )}
 
-          {/* O conteúdo some junto com o gatilho: sem isto, a URL direta ainda
-              renderizaria o provisionamento de instâncias de uma seção que a
-              empresa não contratou. */}
-          {isGestor && temWhatsapp === true && (
-            <TabsContent value="whatsapp" className="mt-4">
-              <WhatsAppInstanciasTab />
-            </TabsContent>
-          )}
+            {/* O conteúdo some junto com o gatilho: sem isto, a URL direta ainda
+                renderizaria o provisionamento de instâncias de uma seção que a
+                empresa não contratou. */}
+            {isGestor && temWhatsapp === true && (
+              <TabsContent value="whatsapp" className="mt-0">
+                <WhatsAppInstanciasTab />
+              </TabsContent>
+            )}
 
-          {isGestor && (
-            <TabsContent value="campos" className="mt-4">
-              <CamposTab />
-            </TabsContent>
-          )}
+            {isGestor && (
+              <TabsContent value="campos" className="mt-0">
+                <CamposTab />
+              </TabsContent>
+            )}
 
-          {/* O conteúdo some junto com o gatilho, pelo mesmo motivo do WhatsApp acima. */}
-          {isGestor && temHoje === true && (
-            <TabsContent value="automacao" className="mt-4">
-              <AutomacaoTab empresaId={profile?.empresa_id ?? profile?.empresas?.id ?? undefined} />
-            </TabsContent>
-          )}
-          {abaEmpresaLiberada && (
-            <TabsContent value="empresas" className="mt-4">
-              <EmpresasTab mode={isAdmin ? 'admin' : 'empresa'} />
-            </TabsContent>
-          )}
-          {/* O conteúdo some junto com o gatilho: sem isto, a URL direta
-              `/configuracoes?tab=pagamentos` mostraria preço e botão de assinar para um
-              vendedor comum — que a função do servidor recusaria depois, no clique. */}
-          {podeVerPagamentos && (
-            <TabsContent value="pagamentos" className="mt-4">
-              <PagamentosTab />
-            </TabsContent>
-          )}
+            {/* O conteúdo some junto com o gatilho, pelo mesmo motivo do WhatsApp acima. */}
+            {isGestor && temHoje === true && (
+              <TabsContent value="automacao" className="mt-0">
+                <AutomacaoTab empresaId={profile?.empresa_id ?? profile?.empresas?.id ?? undefined} />
+              </TabsContent>
+            )}
+            {abaEmpresaLiberada && (
+              <TabsContent value="empresas" className="mt-0">
+                <EmpresasTab mode={isAdmin ? 'admin' : 'empresa'} />
+              </TabsContent>
+            )}
+            {/* O conteúdo some junto com o gatilho: sem isto, a URL direta
+                `/configuracoes?tab=pagamentos` mostraria preço e botão de assinar para um
+                vendedor comum — que a função do servidor recusaria depois, no clique. */}
+            {podeVerPagamentos && (
+              <TabsContent value="pagamentos" className="mt-0">
+                <PagamentosTab />
+              </TabsContent>
+            )}
+          </div>
         </Tabs>
       </div>
     </AppLayout>
