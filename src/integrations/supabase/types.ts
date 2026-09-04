@@ -4030,6 +4030,7 @@ export type Database = {
           media_url: string
           origem: string
           removida_em: string | null
+          salva_em: string | null
           ultima_vez_em: string
         }
         Insert: {
@@ -4042,6 +4043,7 @@ export type Database = {
           media_url: string
           origem: string
           removida_em?: string | null
+          salva_em?: string | null
           ultima_vez_em?: string
         }
         Update: {
@@ -4054,6 +4056,7 @@ export type Database = {
           media_url?: string
           origem?: string
           removida_em?: string | null
+          salva_em?: string | null
           ultima_vez_em?: string
         }
         Relationships: [

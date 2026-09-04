@@ -4,7 +4,7 @@ O que está quebrado, mal resolvido ou pendente neste sistema, com **o custo rea
 ordem de conserto**. Escrito para que ninguém precise redescobrir cada item.
 
 Levantado em 19/08/2026, ao assumir o projeto da agência que o construiu. Itens 22 a 31
-acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 61 ao 65 em
+acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 61 ao 66 em
 02 e 03/09/2026.
 
 > **Este documento não é lista de desejos.** Cada item aqui já tem consequência medida ou
@@ -80,6 +80,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 63 | [`plano_vendas_progresso` não checa permissão nenhuma](#63-plano_vendas_progresso-não-checa-permissão-nenhuma) | Média | Não — não atravessa empresa, mas fura a permissão de módulo |
 | 64 | [Regra de banco alterada à mão diverge do código](#64-regra-de-banco-alterada-à-mão-volta-a-divergir-do-código-e-ninguém-percebe) | Média | Não — mas `create or replace` a partir do arquivo desfaz a correção em silêncio |
 | 65 | [As duas telas mais delicadas do calendário não têm teste](#65-as-duas-telas-mais-delicadas-do-calendário-não-têm-teste-nenhum) | Baixa | Não |
+| 66 | [A grade de figurinhas usa endereço público cru](#66-a-grade-de-figurinhas-usa-endereço-público-cru-e-para-quando-o-balde-fechar) | Média | Não hoje — **sim** no dia em que `whatsapp-media` fechar |
 
 > ⚠️ Os itens **61 e 62** existem no corpo deste documento mas não têm linha aqui — quem os
 > escreveu esqueceu a tabela. Vale acrescentar ao passar por perto.
@@ -2584,6 +2585,41 @@ anotação de campo some.
 O caminho já apontado pelo `CLAUDE.md` §14 é extrair de `WhatsAppInbox.tsx`/`NovaRotaVisitaDialog`
 a decisão para uma função pura em `src/lib/`, com teste ao lado — o mesmo que já foi feito com
 `rota-em-edicao.ts` e `ordem-das-paradas.ts`.
+
+---
+
+## 66. A grade de figurinhas usa endereço público cru, e para quando o balde fechar
+
+**Gravidade: média. Funciona hoje — e para de funcionar no dia da blindagem, em dois lugares
+ao mesmo tempo.**
+
+A grade de figurinhas põe o endereço gravado direto no `<img>`:
+
+```tsx
+<img src={fig.media_url} alt="figurinha" loading="lazy" ... />
+```
+(`src/components/chat/FigurinhasPopover.tsx`)
+
+As mensagens da mesma tela **não** fazem isso: elas passam por `useArquivosPrivados`
+(`src/hooks/use-arquivo-privado.ts`), que troca o endereço público por um link assinado de
+uma hora. A grade ficou de fora dessa passagem.
+
+Enquanto o balde `whatsapp-media` for público, os dois caminhos funcionam e a diferença não
+aparece. O Passo 7 do [plano dos baldes privados](operacao/plano-baldes-privados.md) fecha o
+balde — e nesse dia a grade fica **em branco**, sem erro, para todo mundo.
+
+E não é só a tela. `registrarFigurinha` (`supabase/functions/_shared/figurinhas.ts`) faz
+`fetch(mediaUrl)` no endereço cru para calcular o sha256 quando o chamador não manda o hash
+pronto — que é o caso do webhook. Com o balde fechado, esse `fetch` volta 400, o helper
+registra no log e **engole** (é best-effort de propósito, para nunca derrubar a mensagem).
+Resultado: figurinha nova para de entrar na grade, em silêncio.
+
+O conserto é o mesmo dos dois lados e já existe pronto: `useArquivosPrivados` na tela, e
+`enderecoParaQuemBaixaDeFora` (`supabase/functions/_shared/arquivo-privado.ts`) no helper —
+a mesma função que o `whatsapp-send` já usa para entregar mídia à operadora.
+
+**Fazer junto com o Passo 7, não depois.** Depois significa descobrir pelo relato de quem
+abriu a grade e não viu nada.
 
 ---
 

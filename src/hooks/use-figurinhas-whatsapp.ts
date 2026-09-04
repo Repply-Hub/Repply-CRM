@@ -6,11 +6,17 @@ import { sha256Hex } from '@/lib/figurinha';
 import { useAuth } from '@/hooks/use-auth';
 
 /**
- * Figurinhas que já circularam num número de WhatsApp (recebidas ou enviadas).
+ * Figurinhas que já SAÍRAM de um número de WhatsApp.
  *
- * A tabela `whatsapp_figurinhas` é populada pelas functions do servidor
- * (whatsapp-webhook e whatsapp-send). Aqui o app só LÊ a grade e marca
- * `removida_em` quando o atendente tira uma da grade.
+ * A tabela `whatsapp_figurinhas` é populada pelas functions do servidor: a
+ * `whatsapp-send` quando o CRM envia, e a `whatsapp-webhook` quando o WhatsApp
+ * ecoa uma figurinha mandada do próprio celular. Desde 03/09/2026 a figurinha
+ * RECEBIDA de cliente não entra sozinha — só pelo "Salvar figurinha" no menu da
+ * mensagem, que é escolha de gente.
+ *
+ * Aqui o app só LÊ a grade, salva uma figurinha avulsa e marca `removida_em`.
+ * Tirar da grade é de gestor (`podeGerenciarFigurinhas`), porque some para todos
+ * que atendem o número.
  */
 
 export interface FigurinhaWa {
@@ -33,6 +39,11 @@ export function useFigurinhasDoNumero(instanciaId: string | null | undefined) {
         .select('id, media_url, media_mime, ultima_vez_em')
         .eq('instancia_id', instanciaId as string)
         .is('removida_em', null)
+        // A grade é o que SAI do número, mais o que alguém escolheu guardar. Figurinha que
+        // um cliente mandou e ninguém salvou fica na tabela (guardando o dedupe) e fora da
+        // grade. `origem` sozinha não separa isso: o botão "Salvar figurinha" numa mensagem
+        // recebida também grava origem = 'recebida' — quem separa é `salva_em`.
+        .or('origem.eq.enviada,salva_em.not.is.null')
         .order('ultima_vez_em', { ascending: false })
         .limit(120);
       if (error) throw error;
@@ -82,6 +93,10 @@ export function useSalvarFigurinha(instanciaId: string | null | undefined) {
           ultima_vez_em: new Date().toISOString(),
           // Salvar é ação explícita: se estava fora da grade, volta.
           removida_em: null,
+          // O que faz a figurinha aparecer na grade quando ela foi RECEBIDA de um cliente.
+          // As functions do servidor nunca escrevem esta coluna — é a marca de que uma
+          // pessoa escolheu guardar, e é o que separa isso de "o robô guardou sozinho".
+          salva_em: new Date().toISOString(),
         },
         { onConflict: 'instancia_id,media_hash' },
       );

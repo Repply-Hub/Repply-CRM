@@ -3,9 +3,18 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 /**
  * Registra uma figurinha na coleção do número (tabela `whatsapp_figurinhas`).
  *
- * Chamado dos DOIS lados do fluxo de mensagem:
- *   · `whatsapp-webhook`  — quando chega uma figurinha de um contato
+ * Chamado dos dois lados do fluxo de mensagem, mas SÓ para figurinha que SAI do número:
  *   · `whatsapp-send`     — quando o CRM envia uma figurinha
+ *   · `whatsapp-webhook`  — só no eco do WhatsApp, isto é, figurinha mandada do próprio
+ *                           celular (`sentByOtherChannel`). Até 03/09/2026 ele também
+ *                           registrava a figurinha RECEBIDA de um contato; não registra
+ *                           mais, por decisão de produto — a grade se enche só com o que
+ *                           sai do número, e recebida entra uma a uma pelo botão "Salvar
+ *                           figurinha" no menu da mensagem, que grava pelo cliente.
+ *
+ * 🔴 Se você chegou aqui investigando "a figurinha que o cliente mandou não apareceu na
+ * grade": não é defeito de download nem de hash. É a trava do parágrafo acima, no `if` de
+ * `handleIncomingMessage`.
  *
  * É sempre "faça o seu melhor": qualquer falha aqui é registrada e engolida, para
  * nunca derrubar o processamento da mensagem em si (a mensagem já foi entregue /

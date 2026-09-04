@@ -1249,17 +1249,29 @@ async function handleIncomingMessage(
     console.error("[webhook] insert mensagem:", msgError);
   }
 
-  // Figurinha que circulou neste número entra na coleção (whatsapp_figurinhas),
-  // para aparecer no seletor de figurinhas do compositor. Best-effort: sem hash
-  // conhecido, o helper baixa o arquivo já guardado no nosso Storage e calcula.
-  if (tipo === "sticker" && mediaUrl && conversa?.id) {
+  /**
+   * A grade se enche SÓ com o que SAI do número — nunca com figurinha de cliente.
+   *
+   * `sentByOtherChannel` é o eco do WhatsApp: a figurinha que a pessoa mandou do próprio
+   * celular. É justamente ela que faz a grade parecer "as figurinhas do aparelho", que é o
+   * que se pede quando se pede sincronia (a uazapi não expõe a gaveta de figurinhas do
+   * telefone — 132 rotas na especificação, nenhuma lê figurinha salva).
+   *
+   * Registrar também a RECEBIDA, como era até 03/09/2026, enchia a grade de figurinha que
+   * cliente mandou: na MD eram 181 contra 8 próprias. Recebida agora entra uma a uma, pelo
+   * "Salvar figurinha" no menu da mensagem — decisão de gente, nunca automática.
+   *
+   * Best-effort: sem hash conhecido, o helper baixa o arquivo já guardado no nosso Storage
+   * e calcula.
+   */
+  if (tipo === "sticker" && mediaUrl && conversa?.id && sentByOtherChannel) {
     await registrarFigurinha(
       supabase,
       config.id,
       empresaId,
       mediaUrl,
       mediaMime,
-      sentByOtherChannel ? "enviada" : "recebida",
+      "enviada",
     );
   }
 }

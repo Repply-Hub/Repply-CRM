@@ -239,7 +239,11 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn, autoResizeTextarea, slugify } from "@/lib/utils";
-import { arquivoParaFigurinhaWebp, sha256Hex } from "@/lib/figurinha";
+import {
+  arquivoParaFigurinhaWebp,
+  podeGerenciarFigurinhas,
+  sha256Hex,
+} from "@/lib/figurinha";
 import { downloadFile } from "@/lib/download-file";
 import { useArquivosPrivados } from "@/hooks/use-arquivo-privado";
 import { linkifyText } from "@/lib/linkify";
@@ -8855,8 +8859,10 @@ export default function WhatsAppInbox() {
                         <Mic className="h-4 w-4 text-muted-foreground" />
                       )}
                     </Button>
-                    {/* Figurinhas que já circularam neste número (recebidas ou enviadas),
-                        mais o atalho de enviar uma imagem nova como figurinha. */}
+                    {/* Figurinhas que já SAÍRAM deste número — inclusive as mandadas do
+                        celular, que o webhook grava como saída. Recebida de cliente só
+                        entra pelo "Salvar figurinha" no menu da mensagem. Mais o atalho
+                        de enviar uma imagem nova como figurinha. */}
                     <FigurinhasPopover
                       instanciaId={conversaAtiva?.instancia_id}
                       open={figurinhasOpen}
@@ -8867,6 +8873,7 @@ export default function WhatsAppInbox() {
                       enviando={enviandoFigurinha}
                       onEnviarFigurinha={enviarFigurinha}
                       onEnviarImagem={enviarImagemComoFigurinha}
+                      podeGerenciar={podeGerenciarFigurinhas(profile?.role)}
                     />
                     {/* Nova tarefa (sem FK pra clientes/contatos, ver use-tarefas.ts) ou
                       nota interna (is_nota_interna, nunca enviada ao WhatsApp) */}
