@@ -61,8 +61,8 @@ import { slugify } from "@/lib/utils";
 import { formatarTelefone } from "@/lib/telefone";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { usePedidos } from "@/hooks/use-pedidos";
-import { useHistoricoContatos } from "@/hooks/use-pedidos";
+import { usePedidosPorCliente } from "@/hooks/use-pedidos";
+import { clienteDoContato } from "@/lib/vinculo-contato-cliente";
 import {
   Table,
   TableBody,
@@ -119,23 +119,37 @@ const ContatoDetalhe = () => {
     null,
   );
   const { data: contatos, isLoading } = useContatos();
-
-  // Debug log
-  console.log("ContatoDetalhe - slug:", slug, "extracted id:", id);
-  if (contatos) {
-    const found = contatos.find((c) => c.id === id);
-    console.log("ContatoDetalhe - contato encontrado:", !!found);
-  }
   const { data: clientes } = useClientes();
-  const { data: todosPedidosResult } = usePedidos(undefined, 0, 500);
-  const todosPedidos = todosPedidosResult?.data ?? [];
   const updateContato = useUpdateContato();
   const deleteContato = useDeleteContato();
   const [editOpen, setEditOpen] = useState(false);
 
   const contato = contatos?.find((c) => c.id === id);
-  const clienteVinculado = clientes?.find(
-    (c) => c.empresa === contato?.empresa,
+
+  // 🔴 A empresa do contato vem da CHAVE (`cliente_id`), não do texto do nome.
+  //
+  // Até 04/09/2026 esta linha era `clientes?.find(c => c.empresa === contato?.empresa)`, e ela
+  // casava em ZERO de 2.013 contatos: os contatos vieram da importação sem acento
+  // ("LMT Construcoes") e os clientes têm acento ("Construções"). Como este `find` é a raiz de
+  // SEIS coisas desta tela — negócios, tarefas, o botão de ver a empresa, a empresa pré-selecionada
+  // na edição, a empresa que vai junto ao criar tarefa e as obras marcáveis —, todas as seis
+  // estavam vazias para todo mundo, em silêncio.
+  //
+  // Os 456 contatos sem `cliente_id` continuam sem empresa à vista: medido, o texto alcançava 0
+  // deles, então a troca não tirou nada de ninguém.
+  //
+  // A regra mora em `src/lib/vinculo-contato-cliente.ts` porque ela estava copiada em três lugares
+  // e foi assim que os três divergiram sem ninguém notar.
+  const clienteVinculado = clienteDoContato(clientes, contato);
+
+  // Os negócios saem de uma consulta filtrada NO BANCO por cliente.
+  //
+  // Antes era `usePedidos(undefined, 0, 500)` — e aquilo nunca chegou a rodar: `usePedidos` tem
+  // `enabled: !!empresaId && enabled` e o primeiro argumento ia vazio. O teto de 500 nunca foi o
+  // limitador; a lista era sempre vazia. `usePedidosPorCliente` já existe, já é usado na ficha da
+  // empresa, e traz todos os negócios do cliente (sem teto, de propósito — ver use-pedidos.ts).
+  const { data: pedidosRelacionados = [] } = usePedidosPorCliente(
+    contato?.cliente_id,
   );
   // As obras vêm da tabela de vínculo, não mais de `contatos.obra_id` (que virou
   // coluna órfã em 27/08/2026) — ver `use-obra-contatos.ts`.
@@ -152,9 +166,6 @@ const ContatoDetalhe = () => {
   const [vincularOpen, setVincularOpen] = useState(false);
   const [selectedEmpresaId, setSelectedEmpresaId] = useState("");
 
-  const pedidosRelacionados =
-    todosPedidos?.filter((p) => p.cliente_id === clienteVinculado?.id) || [];
-  const { data: historico } = useHistoricoContatos(null); // Just for structure, we might need a specific filter or mock if no direct link exists yet.
 
   const { profile } = useAuth();
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
@@ -370,7 +381,10 @@ const ContatoDetalhe = () => {
               <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
                 <p className="text-xs text-muted-foreground mb-1">Empresa</p>
                 <p className="text-base font-bold text-foreground truncate">
-                  {contato.empresa || "Não informada"}
+                  {/* O nome do cliente VINCULADO vem primeiro; `contato.empresa` é texto solto que
+                      envelhece (veio da importação sem acento e não acompanha renomeação do
+                      cliente). Ele continua como reserva para os contatos sem vínculo. */}
+                  {clienteVinculado?.empresa || contato.empresa || "Não informada"}
                 </p>
                 {clienteVinculado ? (
                   <Button

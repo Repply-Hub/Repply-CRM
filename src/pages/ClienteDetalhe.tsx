@@ -22,6 +22,7 @@ import { SeletorMarcadorObra } from '@/components/obras/SeletorMarcadorObra';
 import { CampoCnpj } from '@/components/shared/CampoCnpj';
 import { validarCnpjDaObra } from '@/lib/obra-cnpj';
 import type { CnpjData } from '@/lib/cnpj';
+import { contatosDoCliente, contatosForaDoCliente } from '@/lib/vinculo-contato-cliente';
 import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -560,11 +561,23 @@ const ClienteDetalhe = () => {
     pedidosOrdenados.slice((pedidosPage - 1) * pedidosPageSize, pedidosPage * pedidosPageSize),
     [pedidosOrdenados, pedidosPage, pedidosPageSize]
   );
-  const contatosExtras = (contatos ?? []).filter((c: any) => cliente && c.empresa === cliente.empresa);
+  // 🔴 Quem é contato DESTE cliente sai da CHAVE (`cliente_id`), não do texto do nome da empresa.
+  //
+  // Até 04/09/2026 as duas listas comparavam `c.empresa === cliente.empresa` — texto contra texto,
+  // sem tirar acento. Medido em produção: casava em ZERO, então este bloco estava **vazio nas 2.176
+  // fichas de cliente**, e o espelho de baixo oferecia TODO MUNDO para vincular, inclusive quem já
+  // estava vinculado. É assim que nasce cadastro duplicado.
+  //
+  // As duas listas são complementares por construção: mexer numa só faria um contato aparecer nas
+  // duas ao mesmo tempo, ou em nenhuma. Por isso mudam juntas.
+  const contatosExtras = useMemo(
+    () => contatosDoCliente(contatos, cliente?.id),
+    [contatos, cliente?.id]
+  );
   // Candidatos a vincular: todo mundo que ainda não está neste cliente.
   const contatosParaVincular = useMemo(
-    () => (contatos ?? []).filter((c: any) => c.empresa !== cliente?.empresa),
-    [contatos, cliente?.empresa]
+    () => contatosForaDoCliente(contatos, cliente?.id),
+    [contatos, cliente?.id]
   );
   const tarefasCliente = useMemo(() => (tarefas ?? []).filter(t => t.cliente_id === id), [tarefas, id]);
   const totalTarefasPages = Math.max(1, Math.ceil(tarefasCliente.length / tarefasPageSize));
