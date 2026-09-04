@@ -172,3 +172,47 @@ export function useVincularContatoExistente() {
     },
   });
 }
+
+/**
+ * Desfaz o vínculo de uma conversa com o contato e a empresa.
+ *
+ * 🔴 POR QUE ISTO PRECISOU EXISTIR ANTES DE QUALQUER MUTIRÃO. Até 04/09/2026 **nenhum ponto do
+ * sistema gravava `contato_id: null`**: dava para amarrar uma conversa a uma pessoa, nunca para
+ * desamarrar. E o estrago de um vínculo errado é pior do que parece — o bloco de reconhecimento
+ * (`CadastroDoLead`) só é desenhado quando NÃO há vínculo, então, assim que alguém clicava em
+ * "Vincular" no contato errado, o convite sumia da tela e o painel passava a apontar para a ficha
+ * errada sem nenhum caminho de volta.
+ *
+ * Era o cenário que o comentário de `useVincularContatoExistente` já descrevia — "o vínculo errado
+ * é pior que vínculo nenhum, porque some da vista" — só que sem conserto.
+ *
+ * 🔴 APAGA OS DOIS, empresa e pessoa, de propósito. Limpar só a pessoa deixaria a conversa com
+ * empresa e sem contato, e nesse estado o bloco de reconhecimento continua escondido — ou seja, o
+ * "desvincular" não devolveria a conversa ao estado de onde ela veio, que é o único ponto de fazer
+ * isto existir.
+ */
+export function useDesvincularConversa() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ conversaId }: { conversaId: string }) => {
+      const { data, error } = await supabase
+        .from('whatsapp_conversas')
+        .update({ contato_id: null, cliente_id: null })
+        .eq('id', conversaId)
+        // Mesma guarda do vincular: update que não casa linha nenhuma NÃO devolve erro no
+        // PostgREST. Sem isto a tela diria "desvinculado" sobre coisa que continua vinculada.
+        .select('id');
+      if (error) throw error;
+      if (!data?.length) {
+        throw new Error('A regra de segurança do banco recusou a alteração desta conversa.');
+      }
+      return data[0];
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['wa_conversas'] });
+      qc.invalidateQueries({ queryKey: ['wa_lead_contato'] });
+      qc.invalidateQueries({ queryKey: ['wa_lead_cliente'] });
+    },
+  });
+}

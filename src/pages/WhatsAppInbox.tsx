@@ -74,6 +74,7 @@ import { MarcadoresMultiSelect } from "@/components/tarefas/MarcadoresMultiSelec
 import { useAuth } from "@/hooks/use-auth";
 import { marcaDaEmpresa } from "@/lib/marca-da-empresa";
 import { CriarContatoDaConversaDialog } from "@/components/whatsapp/CriarContatoDaConversaDialog";
+import { DesvincularConversa } from "@/components/whatsapp/DesvincularConversa";
 import { CadastroDoLead } from "@/components/whatsapp/CadastroDoLead";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -3308,14 +3309,21 @@ function LeadSheet({
 
   const { data: contato } = useQuery({
     queryKey: ["wa_lead_contato", conversa.contato_id],
-    enabled: !!conversa.contato_id && !conversa.cliente_id,
+    // 🔴 EMPRESA E PESSOA NÃO SÃO ALTERNATIVAS — o painel mostra as duas.
+    //
+    // Até 04/09/2026 esta linha era `!!conversa.contato_id && !conversa.cliente_id`: a consulta
+    // da PESSOA se desligava sozinha assim que a conversa tinha empresa. Como as duas telas que
+    // criam o vínculo gravam empresa e pessoa AO MESMO TEMPO, o caso normal do sistema era
+    // exatamente o que o painel não sabia mostrar — aparecia só "Empresa", e o nome de quem está
+    // do outro lado da conversa sumia.
+    enabled: !!conversa.contato_id,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contatos")
         // `contatos` não tem `nome` nem `slug`: o nome da pessoa está em
         // `nome_contato`. Pedir colunas inexistentes fazia a consulta ser
         // recusada inteira e o painel "Dados do lead" ficava sempre vazio.
-        .select("id, nome_contato, email, telefone")
+        .select("id, nome_contato, email, telefone, cliente_id")
         .eq("id", conversa.contato_id!)
         .maybeSingle();
       if (error) throw error;
@@ -3482,9 +3490,18 @@ function LeadSheet({
 
           {(cliente || contato) && (
             <div className="space-y-4">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                Dados do lead
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Dados do lead
+                </p>
+                {/* Sem isto, amarrar a pessoa errada não tinha volta pela tela — e o bloco de
+                    reconhecimento, que só aparece quando NÃO há vínculo, sumia junto. */}
+                <DesvincularConversa
+                  conversaId={conversa.id}
+                  nomeDoContato={contato?.nome_contato}
+                  nomeDaEmpresa={cliente?.empresa}
+                />
+              </div>
               <div className="grid grid-cols-2 gap-x-6 gap-y-4">
                 {cliente && (
                   <div className="space-y-1 col-span-2">
