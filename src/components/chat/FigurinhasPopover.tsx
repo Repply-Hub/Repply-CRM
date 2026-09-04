@@ -90,9 +90,17 @@ export function FigurinhasPopover({
         </PopoverTrigger>
 
         <PopoverContent side="top" align="start" className="w-[300px] p-2">
-          <p className="px-1 pb-1.5 text-xs font-medium text-muted-foreground">
-            Figurinhas deste número
-          </p>
+          <div className="px-1 pb-1.5">
+            <p className="text-xs font-medium text-muted-foreground">
+              Figurinhas deste número
+            </p>
+            {/* A pergunta que todo mundo faz ao abrir isto pela primeira vez é "de onde
+                vêm estas figurinhas?". A resposta em uma linha, sempre visível — e não só
+                no estado vazio, que quem já tem figurinha nunca vê. */}
+            <p className="text-[11px] leading-snug text-muted-foreground/80">
+              As que você manda pelo celular entram aqui sozinhas.
+            </p>
+          </div>
 
           <input
             ref={inputRef}
@@ -165,10 +173,8 @@ export function FigurinhasPopover({
 
             {!isLoading && (figurinhas ?? []).length === 0 && (
               <p className="px-1 py-6 text-center text-xs text-muted-foreground">
-                Nenhuma figurinha ainda. Toda figurinha enviada por este número
-                entra aqui — inclusive as mandadas pelo celular. Para guardar
-                uma que um cliente mandou, use "Salvar figurinha" no menu da
-                mensagem.
+                Nenhuma figurinha ainda. Para guardar uma que um cliente mandou,
+                use "Salvar figurinha" no menu da mensagem.
               </p>
             )}
           </ScrollArea>
