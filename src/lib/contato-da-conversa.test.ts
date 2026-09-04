@@ -4,6 +4,7 @@ import {
   telefoneParaCadastro,
   nomeParaCadastro,
   chaveDeTelefone,
+  chavesDeTelefone,
   contatosComMesmoTelefone,
 } from './contato-da-conversa';
 
@@ -219,5 +220,63 @@ describe('contatosComMesmoTelefone', () => {
     expect(contatosComMesmoTelefone('5584999887766', [])).toEqual([]);
     expect(contatosComMesmoTelefone('5584999887766', null)).toEqual([]);
     expect(contatosComMesmoTelefone(null, contatos)).toEqual([]);
+  });
+});
+
+describe('chavesDeTelefone — o campo com mais de um número', () => {
+  it('🔴 quebra o campo com dois números; antes ele devolvia NADA', () => {
+    // Caso real da base: 79 contatos guardam mais de um número no mesmo campo. Como
+    // `chaveDeTelefone` junta todos os dígitos, isso virava 25 dígitos e caía no portão dos
+    // 11 — o mesmo portão que barra identificador de grupo. Resultado: contato invisível.
+    const campo = '5511996763986, 551196763986';
+    expect(chaveDeTelefone(campo)).toBeNull();
+    expect(chavesDeTelefone(campo)).toEqual(['1196763986']);
+  });
+
+  it('devolve as duas chaves quando os números são de verdade diferentes', () => {
+    expect(chavesDeTelefone('(84) 99988-7766 / (84) 3220-0008')).toEqual([
+      '8499887766',
+      '8432200008',
+    ]);
+  });
+
+  it('aceita ponto-e-vírgula e barra como separador', () => {
+    expect(chavesDeTelefone('84999887766; 8432200008')).toHaveLength(2);
+    expect(chavesDeTelefone('84999887766 / 8432200008')).toHaveLength(2);
+  });
+
+  it('🔴 NÃO quebra em hífen — o identificador antigo de grupo tem hífen', () => {
+    // Quebrar aqui inventaria números que não existem (CLAUDE.md §7.2).
+    expect(chavesDeTelefone('120363123456789-1616161616')).toEqual([]);
+  });
+
+  it('não repete a mesma chave quando o campo traz o número duas vezes', () => {
+    // É o formato mais comum dos 79: o mesmo número com e sem o nono dígito.
+    expect(chavesDeTelefone('5584999887766, 558499887766')).toEqual(['8499887766']);
+  });
+
+  it('campo vazio, nulo ou só lixo devolve lista vazia', () => {
+    expect(chavesDeTelefone('')).toEqual([]);
+    expect(chavesDeTelefone(null)).toEqual([]);
+    expect(chavesDeTelefone('abc, def')).toEqual([]);
+  });
+});
+
+describe('contatosComMesmoTelefone — com o campo de vários números', () => {
+  it('🔴 acha o contato pelo SEGUNDO número do campo dele', () => {
+    const contatos = [
+      { id: 'c1', nome_contato: 'Fixo e celular', telefone: '(84) 3220-0008, (84) 99988-7766' },
+    ];
+    // A conversa chega pelo celular; o cadastro tem o fixo primeiro.
+    expect(contatosComMesmoTelefone('5584999887766', contatos).map((c) => c.id)).toEqual(['c1']);
+    // E também pelo fixo.
+    expect(contatosComMesmoTelefone('558432200008', contatos).map((c) => c.id)).toEqual(['c1']);
+  });
+
+  it('não casa com número que não está no campo', () => {
+    const contatos = [
+      { id: 'c1', nome_contato: 'Fixo e celular', telefone: '(84) 3220-0008, (84) 99988-7766' },
+    ];
+    expect(contatosComMesmoTelefone('5584911112222', contatos)).toEqual([]);
   });
 });

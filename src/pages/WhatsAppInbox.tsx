@@ -75,6 +75,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { marcaDaEmpresa } from "@/lib/marca-da-empresa";
 import { CriarContatoDaConversaDialog } from "@/components/whatsapp/CriarContatoDaConversaDialog";
 import { DesvincularConversa } from "@/components/whatsapp/DesvincularConversa";
+import { chaveDeTelefone, chavesDeTelefone } from "@/lib/contato-da-conversa";
 import { CadastroDoLead } from "@/components/whatsapp/CadastroDoLead";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -284,13 +285,11 @@ function formatPhone(phone: string) {
   return phone;
 }
 
-// Chave tolerante para casar telefones apesar da bagunça do 9º dígito: DDI fora,
-// DDD + os últimos 8 dígitos. Serve só para heurística de UI (mostrar/esconder
-// botão no cartão de contato), não para envio.
-function chaveDeTelefone(telefone: string | null | undefined): string {
-  const d = (telefone ?? "").replace(/\D/g, "").replace(/^55/, "");
-  return d.length >= 10 ? d.slice(0, 2) + d.slice(-8) : d;
-}
+// 🔴 A CHAVE DE TELEFONE VEM DE `src/lib/contato-da-conversa.ts`, e esta tela já teve a sua
+// própria cópia. A cópia fazia `.replace(/^55/, "")` INCONDICIONAL, então cortava o DDD 55 (Rio
+// Grande do Sul) como se fosse código de país — exatamente a armadilha que o teste
+// `contato-da-conversa.test.ts:166` existe para impedir. Duas regras para a mesma coisa é como o
+// nono dígito virou bug em duas frentes (CLAUDE.md §7.1).
 
 const TIPO_MENSAGEM_LABELS: Record<string, string> = {
   texto: "Texto",
@@ -4453,9 +4452,11 @@ export default function WhatsAppInbox() {
       if (error) throw error;
       const map = new Map<string, { id: string; nome: string }>();
       for (const c of data ?? []) {
-        const k = chaveDeTelefone(c.telefone);
-        if (k && !map.has(k))
-          map.set(k, { id: c.id, nome: c.nome_contato ?? "" });
+        // Todas as chaves: 79 contatos guardam mais de um número no mesmo campo, e antes
+        // nenhum deles era encontrado.
+        for (const k of chavesDeTelefone(c.telefone)) {
+          if (!map.has(k)) map.set(k, { id: c.id, nome: c.nome_contato ?? "" });
+        }
       }
       return map;
     },

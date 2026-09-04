@@ -216,5 +216,34 @@ export function contatosComMesmoTelefone<T extends ContatoCadastrado>(
 ): T[] {
   const chave = chaveDeTelefone(telefoneDaConversa);
   if (!chave || !contatos?.length) return [];
-  return contatos.filter((c) => chaveDeTelefone(c.telefone) === chave);
+  return contatos.filter((c) => chavesDeTelefone(c.telefone).includes(chave));
+}
+
+/**
+ * TODAS as chaves de um campo de telefone — porque um contato pode guardar mais de um número
+ * no mesmo campo.
+ *
+ * 🔴 O QUE ISTO DESTRAVA. `chaveDeTelefone` junta todos os dígitos do texto numa string só, e
+ * o portão dos 11 dígitos (que existe para barrar identificador de grupo) mata qualquer campo
+ * com dois números: `"5511996763986, 551196763986"` vira 25 dígitos e devolve `null`. Medido em
+ * produção: **79 contatos guardam mais de um número**, em 170 pedaços, e todos eles eram
+ * invisíveis para o reconhecimento. Passar a quebrar antes leva o casamento de 42 para 73
+ * conversas.
+ *
+ * Quebra em vírgula, ponto-e-vírgula e barra. **Hífen NÃO entra na lista**, de propósito: o
+ * identificador antigo de grupo do WhatsApp tem hífen (`120363...-123456`), e quebrá-lo
+ * inventaria números que não existem — a armadilha do §7.2 do CLAUDE.md.
+ *
+ * Medido antes de escolher a régua: dos 170 pedaços, **170 têm DDD**. Nenhum vem só com o
+ * número solto, então não há por que herdar o DDD do pedaço anterior — adivinhação que casaria
+ * gente de estado diferente.
+ */
+export function chavesDeTelefone(bruto: string | null | undefined): string[] {
+  const partes = (bruto ?? '').split(/[,;/]/);
+  const chaves = new Set<string>();
+  for (const parte of partes) {
+    const chave = chaveDeTelefone(parte);
+    if (chave) chaves.add(chave);
+  }
+  return [...chaves];
 }
