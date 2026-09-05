@@ -6,6 +6,8 @@ import {
   chaveDeTelefone,
   chavesDeTelefone,
   contatosComMesmoTelefone,
+  contatosComNomeParecido,
+  palavrasDoNome,
 } from './contato-da-conversa';
 
 describe('telefoneParaCadastro', () => {
@@ -278,5 +280,68 @@ describe('contatosComMesmoTelefone — com o campo de vários números', () => {
       { id: 'c1', nome_contato: 'Fixo e celular', telefone: '(84) 3220-0008, (84) 99988-7766' },
     ];
     expect(contatosComMesmoTelefone('5584911112222', contatos)).toEqual([]);
+  });
+});
+
+describe('palavrasDoNome', () => {
+  it('tira acento e caixa, para "Victoria" casar com "Vitoria"', () => {
+    expect(palavrasDoNome('Victória Alves')).toEqual(palavrasDoNome('victoria alves'));
+  });
+
+  it('descarta sufixo de razão social, que não distingue ninguém', () => {
+    expect(palavrasDoNome('Anae - Qualita Construcoes e Servicos')).toEqual(['anae', 'qualita']);
+  });
+
+  it('descarta palavra de duas letras e não repete a mesma palavra', () => {
+    expect(palavrasDoNome('ML ML Tavares Tavares')).toEqual(['tavares']);
+  });
+});
+
+describe('contatosComNomeParecido', () => {
+  const contatos = [
+    { id: 'c1', nome_contato: 'Anae - Qualita Construcoes e Servicos', telefone: '(84) 3333-1111' },
+    { id: 'c2', nome_contato: 'Arthur - ML Tavares', telefone: '(84) 3333-2222' },
+    { id: 'c3', nome_contato: 'Gilkleber - Mirantes ML2', telefone: '(84) 3333-3333' },
+    { id: 'c4', nome_contato: 'Lucas Dutra - Macam Empreendimentos', telefone: '(84) 3333-4444' },
+    { id: 'c5', nome_contato: 'Lucas Ferreira - Macam Engenharia', telefone: '(84) 3333-5555' },
+  ];
+
+  it('🔴 acha quem o telefone não acha: mesma pessoa, número diferente', () => {
+    // Caso real: a agenda da MD salva "Nome - Empresa", e é isso que dá a segunda palavra.
+    expect(contatosComNomeParecido('Anae - Qualita', contatos).map((c) => c.id)).toEqual(['c1']);
+  });
+
+  it('🔴 UMA palavra em comum NÃO basta — seria a loteria do "Lucas casa com todo Lucas"', () => {
+    // "Arthur" sozinho tem uma palavra em comum com c2 e nada mais. Não sugere.
+    expect(contatosComNomeParecido('Arthur', contatos)).toEqual([]);
+    // Com a empresa junto, aí sim.
+    expect(contatosComNomeParecido('Arthur - ML Tavares', contatos).map((c) => c.id)).toEqual(['c2']);
+  });
+
+  it('🔴 quando erra, erra assim: mesma construtora, pessoa diferente', () => {
+    // Este é o engano mais perigoso, e ele PASSA na régua. Está fixado em teste de propósito,
+    // para ninguém "melhorar" a régua achando que ela é confiável: é palpite, e a tela precisa
+    // dizer isso. Ver o aviso em CadastroDoLead.
+    const sugeridos = contatosComNomeParecido('Alexsandro - Mirantes ML2', contatos);
+    expect(sugeridos.map((c) => c.id)).toEqual(['c3']);
+    expect(sugeridos[0].nome_contato).toContain('Gilkleber');
+  });
+
+  it('sufixo de empresa sozinho não casa — senão toda construtora casaria com toda construtora', () => {
+    expect(contatosComNomeParecido('Fulano - Construcoes e Servicos', contatos)).toEqual([]);
+  });
+
+  it('ordena pelo casamento mais forte e respeita o teto', () => {
+    const dois = contatosComNomeParecido('Lucas Dutra Ferreira - Macam', contatos, 2);
+    expect(dois).toHaveLength(2);
+    // c4 e c5 empatam em duas palavras; o teto corta em 2 e ninguém mais entra.
+    expect(dois.every((c) => ['c4', 'c5'].includes(c.id))).toBe(true);
+  });
+
+  it('nome vazio, curto ou lista vazia devolvem nada', () => {
+    expect(contatosComNomeParecido('', contatos)).toEqual([]);
+    expect(contatosComNomeParecido('Ana', contatos)).toEqual([]);
+    expect(contatosComNomeParecido('Anae - Qualita', [])).toEqual([]);
+    expect(contatosComNomeParecido(null, contatos)).toEqual([]);
   });
 });

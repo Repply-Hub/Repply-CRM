@@ -247,3 +247,69 @@ export function chavesDeTelefone(bruto: string | null | undefined): string[] {
   }
   return [...chaves];
 }
+
+/**
+ * Palavras que não distinguem ninguém, e por isso não contam no casamento por nome.
+ *
+ * Quase todas são sufixo de razão social ou rótulo de função: se "construções" contasse, metade
+ * das construtoras casaria com a outra metade. "Junior", "neto" e "filho" entram pelo mesmo
+ * motivo — são o segundo termo de milhares de nomes e criariam par onde só há homonímia.
+ */
+const PALAVRAS_QUE_NAO_DISTINGUEM = new Set([
+  'ltda', 'eireli', 'spe', 'construcoes', 'construcao', 'engenharia', 'empreendimentos',
+  'incorporacoes', 'incorp', 'constr', 'com', 'das', 'dos', 'pessoa', 'fisica', 'compras',
+  'obra', 'vendas', 'financeiro', 'contas', 'receber', 'empresa', 'servicos', 'sem', 'nome',
+  'junior', 'neto', 'filho', 'sra', 'atualizado', 'imobiliarios', 'participacoes', 'industria',
+  'comercio', 'distribuidora', 'adm', 'escritorio', 'condominio', 'residencial',
+]);
+
+/** As palavras de um nome que valem para comparação: sem acento, minúsculas, 3+ letras. */
+export function palavrasDoNome(nome: string | null | undefined): string[] {
+  const semAcento = (nome ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  const palavras = semAcento.split(/[^a-z0-9]+/).filter(Boolean);
+  return [...new Set(palavras.filter((p) => p.length >= 3 && !PALAVRAS_QUE_NAO_DISTINGUEM.has(p)))];
+}
+
+/**
+ * Quem, no CRM, tem NOME PARECIDO com o da conversa — para o caso do telefone que não bate.
+ *
+ * 🔴 ISTO É PALPITE, E O PALPITE ERRA. Aferido à mão numa amostra de 14 casos reais: acerta
+ * cerca de **2 em cada 3**. O terço que erra tem uma cara perigosa — "Alexsandro - Mirantes ML2"
+ * casa com "Gilkleber - Mirantes ML2": **mesma construtora, pessoa errada**, que é o engano mais
+ * fácil de aceitar sem perceber. Por isso quem chama NUNCA pode amarrar sozinho: só sugerir, com
+ * aviso, e deixar a pessoa decidir.
+ *
+ * 🔴 DUAS PALAVRAS EM COMUM, NÃO UMA. Medido sobre as 871 conversas cujo telefone não casa com
+ * ninguém:
+ *
+ *   1 palavra em comum ... 593 casam, mas 403 delas apontam MAIS DE TRÊS pessoas (pior caso: 75)
+ *   2 palavras em comum ... 169 casam, e 118 apontam UMA só (pior caso: 7)
+ *
+ * Com uma palavra é ruído: "Lucas" casa com todo Lucas, e uma lista de 75 nomes não é sugestão,
+ * é loteria. O que fornece a segunda palavra de graça é a disciplina da agenda da MD, que salva
+ * como "Nome - Empresa" — 445 das 968 conversas soltas têm esse formato.
+ *
+ * O `limite` existe porque lista longa é onde se clica no errado.
+ */
+export function contatosComNomeParecido<T extends ContatoCadastrado>(
+  nomeDaConversa: string | null | undefined,
+  contatos: readonly T[] | null | undefined,
+  limite = 3,
+): T[] {
+  const daConversa = palavrasDoNome(nomeDaConversa);
+  if (daConversa.length < 2 || !contatos?.length) return [];
+
+  const emComum = (nome: string | null | undefined) =>
+    palavrasDoNome(nome).filter((p) => daConversa.includes(p)).length;
+
+  return contatos
+    .map((c) => ({ c, quantas: emComum(c.nome_contato) }))
+    .filter((x) => x.quantas >= 2)
+    // Mais palavras em comum primeiro: o casamento mais forte fica no topo.
+    .sort((a, b) => b.quantas - a.quantas)
+    .slice(0, limite)
+    .map((x) => x.c);
+}

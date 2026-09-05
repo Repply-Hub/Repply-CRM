@@ -1,7 +1,11 @@
 import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { contatosComMesmoTelefone, chaveDeTelefone } from '@/lib/contato-da-conversa';
+import {
+  contatosComMesmoTelefone,
+  contatosComNomeParecido,
+  chaveDeTelefone,
+} from '@/lib/contato-da-conversa';
 
 /**
  * Reconhecer, pelo telefone, quem já está no CRM — e amarrar a conversa a essa ficha.
@@ -117,6 +121,44 @@ export function useContatosComEsteTelefone(
   );
 
   return { encontrados, carregando: consulta.isLoading, temChave };
+}
+
+/**
+ * Quem, no CRM, tem NOME parecido com o desta conversa — a segunda camada de reconhecimento.
+ *
+ * 🔴 O CASO QUE ISTO ATENDE, levantado pelo dono do produto em 04/09/2026: a pessoa fala do
+ * celular pessoal e o cadastro tem o fixo da empresa. O telefone nunca casa, a tela afirma "esta
+ * pessoa não está no CRM", e nasce a ficha repetida.
+ *
+ * 🔴 É PALPITE, e a tela precisa dizer isso. Aferido à mão: acerta ~2 em cada 3, e o terço que
+ * erra costuma apontar um COLEGA DA MESMA CONSTRUTORA — o engano mais fácil de aceitar sem
+ * perceber. Ver `contatosComNomeParecido` para a régua e os números.
+ *
+ * Reaproveita EXATAMENTE a mesma busca do reconhecimento por telefone (mesma `queryKey`), então
+ * não custa consulta nenhuma a mais: o TanStack devolve o que já está em cache.
+ *
+ * Diferente do de telefone, este não exige chave de telefone válida — é justamente quando o
+ * número é estranho que o nome é a única pista que sobra.
+ */
+export function useContatosParecidos(
+  nomeDaConversa: string | null | undefined,
+  habilitado: boolean,
+) {
+  const consulta = useQuery({
+    queryKey: ['contatos_para_reconhecimento'],
+    queryFn: buscarContatosParaReconhecimento,
+    enabled: habilitado,
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
+    refetchOnWindowFocus: false,
+  });
+
+  const parecidos = useMemo(
+    () => contatosComNomeParecido(nomeDaConversa, consulta.data),
+    [nomeDaConversa, consulta.data],
+  );
+
+  return { parecidos, carregando: consulta.isLoading };
 }
 
 /**
