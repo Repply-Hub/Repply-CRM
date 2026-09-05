@@ -22,10 +22,12 @@ import { chaveDeTelefone } from '@/lib/contato-da-conversa';
  * caixa de entrada sem conversa selecionada, e a pessoa procura ou inicia por lá.
  */
 
-interface ConversaCrua {
+export interface ConversaCrua {
   id: string;
   telefone: string | null;
   contato_id: string | null;
+  /** Quando foi a última mensagem — alimenta a linha-resumo no histórico do negócio. */
+  ultima_mensagem_at: string | null;
 }
 
 const TAMANHO_DA_PAGINA = 1000;
@@ -37,7 +39,7 @@ async function buscarConversasParaCasarPorTelefone(): Promise<ConversaCrua[]> {
   for (;;) {
     const { data, error } = await supabase
       .from('whatsapp_conversas')
-      .select('id, telefone, contato_id')
+      .select('id, telefone, contato_id, ultima_mensagem_at')
       .range(de, de + TAMANHO_DA_PAGINA - 1);
     if (error) throw error;
 
@@ -72,19 +74,57 @@ export function useConversaDoContato(
     refetchOnWindowFocus: false,
   });
 
-  const conversaId = useMemo(() => {
+  const conversa = useMemo(() => {
     const conversas = consulta.data;
     if (!conversas?.length) return null;
 
     if (contatoId) {
       const ligada = conversas.find((c) => c.contato_id === contatoId);
-      if (ligada) return ligada.id;
+      if (ligada) return ligada;
     }
 
     const chave = chaveDeTelefone(telefone);
     if (!chave) return null;
-    return conversas.find((c) => chaveDeTelefone(c.telefone) === chave)?.id ?? null;
+    return conversas.find((c) => chaveDeTelefone(c.telefone) === chave) ?? null;
   }, [consulta.data, telefone, contatoId]);
 
-  return { conversaId, carregando: consulta.isLoading };
+  // `conversaId` continua no retorno porque é o que os atalhos usam; `conversa` é para quem
+  // precisa também da data da última mensagem (a linha-resumo no histórico do negócio).
+  return { conversaId: conversa?.id ?? null, conversa, carregando: consulta.isLoading };
+}
+
+/**
+ * Quantas mensagens cada conversa tem.
+ *
+ * 🔴 UMA CONTAGEM POR CONVERSA, e não uma varredura. `whatsapp_mensagens` tem 73.456 linhas;
+ * trazer as linhas para contar no navegador seria absurdo, e o PostgREST não sabe agrupar. O
+ * caminho barato é `head: true` com `count: 'exact'`: o servidor devolve só o número, sem linha
+ * nenhuma, e existe índice por `conversa_id` (`idx_whatsapp_mensagens_conversa`).
+ *
+ * São poucas chamadas porque um negócio tem poucos contatos — a mediana é 1 conversa. Se um dia
+ * um cliente tiver dezenas, o certo passa a ser uma função de banco que agrupa; até lá, isto não
+ * paga complexidade que ninguém usa.
+ */
+export function useContagemDeMensagens(conversaIds: string[]) {
+  // Ordenado para a chave de cache não mudar só porque a ordem da lista mudou.
+  const chave = [...conversaIds].sort().join(',');
+
+  return useQuery({
+    queryKey: ['contagem-de-mensagens', chave],
+    enabled: conversaIds.length > 0,
+    staleTime: 1000 * 60 * 5,
+    queryFn: async () => {
+      const pares = await Promise.all(
+        conversaIds.map(async (id) => {
+          const { count, error } = await supabase
+            .from('whatsapp_mensagens')
+            .select('id', { count: 'exact', head: true })
+            .eq('conversa_id', id);
+          if (error) throw error;
+          return [id, count ?? 0] as const;
+        }),
+      );
+      return new Map(pares);
+    },
+  });
 }

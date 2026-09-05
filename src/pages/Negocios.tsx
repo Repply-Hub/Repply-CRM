@@ -19,9 +19,10 @@ import { MarcadoresDialog } from '@/components/pedidos/MarcadoresDialog';
 import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
 import { ComentariosNegocio } from '@/components/pedidos/ComentariosNegocio';
 import { ContatosDoNegocio } from '@/components/pedidos/ContatosDoNegocio';
+import { HistoricoDoNegocio } from '@/components/pedidos/HistoricoDoNegocio';
 import { useFunis } from '@/hooks/use-funis';
 import { useConfiguracoesCampos, isCampoObrigatorioNaEtapa, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
-import { usePedidos, usePedidosStats, useSearchMatches, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, buscarNegociosDoRecorte, PEDIDOS_EXPORTACAO_AVISO, PEDIDOS_LOTE_EXPORTACAO, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField, type PedidosSort, type PedidosSortColumn } from '@/hooks/use-pedidos';
+import { usePedidos, usePedidosStats, useSearchMatches, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, buscarNegociosDoRecorte, PEDIDOS_EXPORTACAO_AVISO, PEDIDOS_LOTE_EXPORTACAO, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField, type PedidosSort, type PedidosSortColumn } from '@/hooks/use-pedidos';
 import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
 import { useSecaoLigada } from '@/hooks/use-secoes';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
@@ -271,7 +272,6 @@ function FilterCheckboxList({
   );
 }
 
-const contactIcons: Record<string, typeof Mail> = { email: Mail, telefone: Phone, whatsapp: MessageSquare, visita: Eye };
 
 type PageMode = 'pipeline' | 'negocios';
 type PipelineView = 'kanban' | 'lista';
@@ -683,12 +683,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const [importDialogMounted, setImportDialogMounted] = useState(false);
   const [importAiOpen, setImportAiOpen] = useState(false);
   const [selectedStages, setSelectedStages] = useState<string[]>(() => parseListParam(searchParams.get('stages')));
-  const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   // `?negocio=<id>` abre o painel de visualização já na chegada. É como a tela "Hoje"
   // manda a pessoa para um negócio: ela quer VER o negócio, não editá-lo — mandar para
   // /pedidos/:id/editar abre um formulário para quem só queria olhar.
   const [viewOrderId, setViewOrderId] = useState<string | null>(() => searchParams.get('negocio'));
-  const { data: contatos } = useHistoricoContatos(selectedOrder || viewOrderId);
   const { data: tarefasNegocio } = useTarefasPorPedido(viewOrderId);
   const { ligada: temTarefas } = useSecaoLigada('tarefas');
   // `=== true` em todo uso abaixo, nunca `!== false`: enquanto a resposta não chega, a cascata
@@ -2519,6 +2517,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               empresaNome={selectedViewOrder.cliente?.empresa}
             />
 
+            {/* O que aconteceu com este negócio: o que alguém anotou à mão, e um resumo por
+                conversa de WhatsApp. O card antigo dependia de um `selectedOrder` que ninguém
+                preenchia, e a consulta dele quebraria se rodasse. */}
+            <HistoricoDoNegocio
+              pedidoId={viewOrderId}
+              clienteId={selectedViewOrder.cliente_id}
+              empresaNome={selectedViewOrder.cliente?.empresa}
+            />
+
             {/* Tarefas / Observações do negócio — some quando a empresa não contratou a
                 seção. Os irmãos acima e abaixo são blocos independentes no mesmo
                 empilhamento, então o espaçamento se fecha sozinho. */}
@@ -2926,47 +2933,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 />
               </div>
             </div>
-            {selectedOrder && (
-              <div className="w-full xl:w-80 xl:shrink-0">
-                <Card className="xl:sticky xl:top-6">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">Histórico de Contatos</CardTitle>
-                    <p className="text-xs text-muted-foreground">
-                      {(() => {
-                        const p = pedidos?.find(p => p.id === selectedOrder);
-                        return p ? getNomeNegocio(p) : '';
-                      })()}
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <ScrollArea className="h-80">
-                      <div className="space-y-4">
-                        {!contatos?.length ? (
-                          <p className="text-xs text-muted-foreground text-center py-8">Nenhum contato registrado</p>
-                        ) : (
-                          contatos.map(contact => {
-                            const Icon = contactIcons[contact.tipo] ?? MessageSquare;
-                            return (
-                              <div key={contact.id} className="flex gap-3">
-                                <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                  <Icon className="h-3.5 w-3.5 text-primary" />
-                                </div>
-                                <div>
-                                  <p className="text-xs text-card-foreground">{contact.descricao}</p>
-                                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                                    {new Date(contact.data_contato).toLocaleDateString('pt-BR')} · {(contact.vendedor as any)?.nome}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
           </div>
         )}
       </div>

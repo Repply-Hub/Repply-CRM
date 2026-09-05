@@ -1177,6 +1177,34 @@ export function usePedidoHistoricoStatus(pedidoId: string | null) {
   });
 }
 
+export interface ContatoRegistrado {
+  id: string;
+  pedido_id: string;
+  usuario_id: string | null;
+  tipo: string;
+  descricao: string | null;
+  data_contato: string;
+  proximo_contato_em: string | null;
+  usuario: { nome: string | null } | null;
+}
+
+/**
+ * O que alguém registrou À MÃO sobre este negócio: visita, ligação, e-mail, WhatsApp.
+ *
+ * 🔴 ESTA CONSULTA ESTAVA QUEBRADA E NINGUÉM VIA. Ela pedia `vendedor:vendedores(nome)`, e a
+ * tabela `vendedores` foi renomeada para `usuarios` em abril/2026 — medido em 04/09/2026 contra
+ * produção, o PostgREST responde `PGRST200: no foreign key relationship between
+ * 'historico_contatos' and 'vendedores'` e recusa a consulta INTEIRA.
+ *
+ * Passou meses sem sintoma porque o único lugar que desenhava isto dependia de um `selectedOrder`
+ * que NUNCA era preenchido: a consulta nunca chegava a rodar. Um defeito escondido atrás do
+ * outro. O "Retomar depois" da Pauta chega a gravar aqui, com um comentário dizendo que "o painel
+ * do negócio mostra" — e o painel nunca mostrou nada.
+ *
+ * ⚠️ A coluna é `usuario_id`, mas a CHAVE ESTRANGEIRA ainda se chama
+ * `historico_contatos_vendedor_id_fkey` (resto da mesma renomeação). Como é a única ligação desta
+ * tabela para `usuarios`, o embed simples basta e não fica ambíguo.
+ */
 export function useHistoricoContatos(pedidoId: string | null) {
   return useQuery({
     queryKey: ['historico_contatos', pedidoId],
@@ -1184,11 +1212,11 @@ export function useHistoricoContatos(pedidoId: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('historico_contatos')
-        .select('*, vendedor:vendedores(nome)')
+        .select('*, usuario:usuarios(nome)')
         .eq('pedido_id', pedidoId!)
         .order('data_contato', { ascending: false });
       if (error) throw error;
-      return data;
+      return (data ?? []) as unknown as ContatoRegistrado[];
     },
   });
 }
