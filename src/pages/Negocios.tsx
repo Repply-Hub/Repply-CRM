@@ -2287,21 +2287,27 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   const selectedViewOrder = negocioLocal ?? negocioBuscado ?? undefined;
 
+  // Os três caminhos de saída do painel passam por aqui. O `onOpenChange` do Radix só dispara
+  // em fechamento iniciado pelo usuário — o botão "Fechar" do rodapé mexe no estado direto e
+  // não passa por ele. Sem uma saída só, um dos caminhos deixa `?negocio=` no endereço e
+  // recarregar reabre o que a pessoa acabou de fechar.
+  const fecharPainel = useCallback(() => {
+    setViewOrderId(null);
+    if (searchParams.get('negocio')) {
+      setSearchParams(prev => {
+        const p = new URLSearchParams(prev);
+        p.delete('negocio');
+        return p;
+      }, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   const viewOrderSheet = (
     <Sheet
       open={!!viewOrderId}
       onOpenChange={(open) => {
         if (open) return;
-        setViewOrderId(null);
-        // Sem tirar o parâmetro, recarregar a página reabre o painel que a pessoa acabou
-        // de fechar — e o botão "voltar" do navegador vira um laço.
-        if (searchParams.get('negocio')) {
-          setSearchParams(prev => {
-            const p = new URLSearchParams(prev);
-            p.delete('negocio');
-            return p;
-          }, { replace: true });
-        }
+        fecharPainel();
       }}
     >
       <ConteudoDoPainel className="sm:max-w-xl">
@@ -2634,22 +2640,32 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <RodapeDoPainel
           esquerda={
             <>
-              <Button onClick={() => navigate(`/pedidos/${viewOrderId}/editar`)}>
-                <Pencil className="mr-2 h-4 w-4" /> Editar
-              </Button>
-              <Button variant="outline" onClick={() => setViewOrderId(null)}>
+              {selectedViewOrder && (
+                <Button onClick={() => navigate(`/pedidos/${viewOrderId}/editar`)}>
+                  <Pencil className="mr-2 h-4 w-4" /> Editar
+                </Button>
+              )}
+              <Button variant="outline" onClick={fecharPainel}>
                 Fechar
               </Button>
             </>
           }
         >
-          <Button
-            variant="ghost"
-            className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => { setViewOrderId(null); setDeleteAllFilteredMode(false); setSelected(new Set([viewOrderId!])); setConfirmDeleteOpen(true); }}
-          >
-            <Trash2 className="h-4 w-4" /> Excluir
-          </Button>
+          {selectedViewOrder && (
+            <Button
+              variant="ghost"
+              className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => {
+                const alvo = viewOrderId!;
+                fecharPainel();
+                setDeleteAllFilteredMode(false);
+                setSelected(new Set([alvo]));
+                setConfirmDeleteOpen(true);
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> Excluir
+            </Button>
+          )}
         </RodapeDoPainel>
       </ConteudoDoPainel>
     </Sheet>
