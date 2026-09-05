@@ -63,6 +63,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { usePedidosPorCliente } from "@/hooks/use-pedidos";
 import { clienteDoContato } from "@/lib/vinculo-contato-cliente";
+import { BotaoVerConversa } from "@/components/whatsapp/BotaoVerConversa";
 import {
   Table,
   TableBody,
@@ -83,7 +84,6 @@ import {
   useObrasDoContato,
   useSalvarObrasDoContato,
 } from "@/hooks/use-obra-contatos";
-import { useConversaDoContato } from "@/hooks/use-conversa-do-contato";
 import { Checkbox } from "@/components/ui/checkbox";
 
 /**
@@ -155,14 +155,6 @@ const ContatoDetalhe = () => {
   // coluna órfã em 27/08/2026) — ver `use-obra-contatos.ts`.
   const { data: obrasDoContato } = useObrasDoContato(contato?.id);
   const salvarObrasDoContato = useSalvarObrasDoContato();
-  // A conversa de WhatsApp desta pessoa, para o link "Ver conversa no WhatsApp" abrir direto.
-  // Casa pelo telefone (ver use-conversa-do-contato.ts); sem conversa, o link abre a caixa
-  // de entrada sem nada selecionado.
-  const { conversaId: conversaDoContatoId } = useConversaDoContato(
-    contato?.telefone,
-    contato?.id,
-    !!contato,
-  );
   const [vincularOpen, setVincularOpen] = useState(false);
   const [selectedEmpresaId, setSelectedEmpresaId] = useState("");
 
@@ -529,21 +521,15 @@ const ContatoDetalhe = () => {
                     </p>
                     {contato.telefone && (
                       <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 gap-1.5 text-xs"
-                          onClick={() =>
-                            navigate(
-                              conversaDoContatoId
-                                ? `/whatsapp?conversaId=${encodeURIComponent(conversaDoContatoId)}`
-                                : "/whatsapp",
-                            )
-                          }
-                        >
-                          <MessageSquare className="h-3.5 w-3.5" /> Ver conversa
-                          no WhatsApp
-                        </Button>
+                        {/* O atalho mora em `BotaoVerConversa` desde 04/09/2026: o mesmo gesto
+                            estava copiado em três arquivos, cada um montando o endereço por
+                            conta própria. Aqui ele também passou a dizer quando NÃO há conversa,
+                            em vez de levar para uma caixa de entrada vazia sem explicação. */}
+                        <BotaoVerConversa
+                          telefone={contato.telefone}
+                          contatoId={contato.id}
+                          nome={contato.nome_contato}
+                        />
                         <Button
                           variant="ghost"
                           size="sm"

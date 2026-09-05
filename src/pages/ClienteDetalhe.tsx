@@ -23,6 +23,7 @@ import { CampoCnpj } from '@/components/shared/CampoCnpj';
 import { validarCnpjDaObra } from '@/lib/obra-cnpj';
 import type { CnpjData } from '@/lib/cnpj';
 import { contatosDoCliente, contatosForaDoCliente } from '@/lib/vinculo-contato-cliente';
+import { BotaoVerConversa } from '@/components/whatsapp/BotaoVerConversa';
 import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -1495,22 +1496,33 @@ const ClienteDetalhe = () => {
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm" onClick={e => e.stopPropagation()}>{c.email || '-'}</TableCell>
                           <TableCell className="text-muted-foreground text-sm" onClick={e => e.stopPropagation()}>{c.telefone || '-'}</TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                              onClick={async () => {
-                                try {
-                                  await deleteContato.mutateAsync(c.id);
-                                  toast.success('Contato removido!');
-                                } catch (err: any) {
-                                  toast.error(err.message);
-                                }
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+                          {/* `stopPropagation` porque a linha inteira navega para a ficha do
+                              contato — sem isto, clicar no atalho do WhatsApp trocaria de tela
+                              antes de abrir a conversa. */}
+                          <TableCell onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-1">
+                              <BotaoVerConversa
+                                telefone={c.telefone}
+                                contatoId={c.id}
+                                nome={c.nome_contato}
+                                compacto
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={async () => {
+                                  try {
+                                    await deleteContato.mutateAsync(c.id);
+                                    toast.success('Contato removido!');
+                                  } catch (err: any) {
+                                    toast.error(err.message);
+                                  }
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

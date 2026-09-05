@@ -4248,12 +4248,31 @@ export default function WhatsAppInbox() {
   // é removido da URL logo em seguida para não reabrir a mesma conversa numa
   // atualização de página ou navegação manual dentro do inbox.
   const [searchParams, setSearchParams] = useSearchParams();
+  const jaAvisouDaConversa = useRef<string | null>(null);
   useEffect(() => {
     const conversaIdParam = searchParams.get("conversaId");
     if (!conversaIdParam || conversas.length === 0) return;
-    if (conversas.some((c) => c.id === conversaIdParam)) {
-      setConversaAtivaId(conversaIdParam);
+
+    // 🔴 SÓ APAGA O PARÂMETRO QUANDO A CONVERSA FOI ENCONTRADA.
+    //
+    // Antes o `setSearchParams` rodava FORA deste `if`: conversa que não estava na lista visível
+    // — e desde 03/09 a visibilidade é por número vinculado, então isso acontece de verdade —
+    // tinha o parâmetro apagado do endereço e a pessoa caía na caixa de entrada sem nada
+    // selecionado, sem nenhuma explicação. Pior: como o endereço já tinha sido limpo, recarregar
+    // não adiantava. Agora o parâmetro fica, o aviso aparece, e o endereço continua compartilhável.
+    if (!conversas.some((c) => c.id === conversaIdParam)) {
+      // Uma vez por conversa, não uma por atualização da lista: como o parâmetro fica no
+      // endereço de propósito, sem esta trava o aviso reapareceria a cada mensagem que chegasse.
+      if (jaAvisouDaConversa.current !== conversaIdParam) {
+        jaAvisouDaConversa.current = conversaIdParam;
+        toast.error(
+          'Esta conversa não está entre as suas. Ela pertence a outro número conectado — peça a quem cuida dele.',
+        );
+      }
+      return;
     }
+
+    setConversaAtivaId(conversaIdParam);
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);

@@ -18,6 +18,7 @@ import { useMarcadores } from '@/hooks/use-marcadores';
 import { MarcadoresDialog } from '@/components/pedidos/MarcadoresDialog';
 import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
 import { ComentariosNegocio } from '@/components/pedidos/ComentariosNegocio';
+import { ContatosDoNegocio } from '@/components/pedidos/ContatosDoNegocio';
 import { useFunis } from '@/hooks/use-funis';
 import { useConfiguracoesCampos, isCampoObrigatorioNaEtapa, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
 import { usePedidos, usePedidosStats, useSearchMatches, useHistoricoContatos, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, buscarNegociosDoRecorte, PEDIDOS_EXPORTACAO_AVISO, PEDIDOS_LOTE_EXPORTACAO, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField, type PedidosSort, type PedidosSortColumn } from '@/hooks/use-pedidos';
@@ -2509,6 +2510,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                 </div>
               </div>
             )}
+
+            {/* As pessoas da construtora, com o atalho para a conversa de cada uma. Até
+                04/09/2026 o negócio não tinha lista de contatos em lugar nenhum — a coluna
+                "Contato" da lista é texto solto vindo da importação, sem id nem telefone. */}
+            <ContatosDoNegocio
+              clienteId={selectedViewOrder.cliente_id}
+              empresaNome={selectedViewOrder.cliente?.empresa}
+            />
 
             {/* Tarefas / Observações do negócio — some quando a empresa não contratou a
                 seção. Os irmãos acima e abaixo são blocos independentes no mesmo
