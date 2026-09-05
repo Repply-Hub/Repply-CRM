@@ -22,7 +22,7 @@ import { ContatosDoNegocio } from '@/components/pedidos/ContatosDoNegocio';
 import { HistoricoDoNegocio } from '@/components/pedidos/HistoricoDoNegocio';
 import { useFunis } from '@/hooks/use-funis';
 import { useConfiguracoesCampos, isCampoObrigatorioNaEtapa, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
-import { usePedidos, usePedidosStats, useSearchMatches, usePedidoHistoricoStatus, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, buscarNegociosDoRecorte, PEDIDOS_EXPORTACAO_AVISO, PEDIDOS_LOTE_EXPORTACAO, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField, type PedidosSort, type PedidosSortColumn } from '@/hooks/use-pedidos';
+import { usePedidos, usePedidosStats, useSearchMatches, usePedidoHistoricoStatus, usePedidoPorId, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, buscarNegociosDoRecorte, PEDIDOS_EXPORTACAO_AVISO, PEDIDOS_LOTE_EXPORTACAO, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField, type PedidosSort, type PedidosSortColumn } from '@/hooks/use-pedidos';
 import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
 import { useSecaoLigada } from '@/hooks/use-secoes';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
@@ -2269,11 +2269,23 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       </div>
     </FilterButton>
   ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, selectedStages, setSelectedStages, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, marcadores, selectedMarcadores, dateFrom, handleDateFromSelect, dateTo, handleDateToSelect, dateField, showOnlyAttention, setShowOnlyAttention, hideImportados, setHideImportados]);
-  const selectedViewOrder = useMemo(
+  // O que está em memória tem prioridade: depois de arrastar um card no Kanban, a linha local já
+  // reflete a etapa nova, enquanto a busca por id ainda devolveria a anterior.
+  const negocioLocal = useMemo(
     () => (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === viewOrderId)
       ?? bulkPickerData?.data?.find(p => p.id === viewOrderId),
     [showKanban, kanbanPedidosFlat, pedidos, viewOrderId, bulkPickerData]
   );
+
+  // 🔴 A busca por id é o que faz o botão "Abrir negócio" da tela "Hoje" funcionar. Ela só sai
+  // quando a varredura local falha — no caso comum (clicar num card da própria tela) não há
+  // requisição nenhuma. Ver o comentário de `usePedidoPorId`.
+  const { data: negocioBuscado, isLoading: buscandoNegocio } = usePedidoPorId(
+    viewOrderId,
+    !negocioLocal,
+  );
+
+  const selectedViewOrder = negocioLocal ?? negocioBuscado ?? undefined;
 
   const viewOrderSheet = (
     <Sheet
@@ -2594,9 +2606,21 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
               <ComentariosNegocio pedidoId={viewOrderId} />
             </div>
           </div>
-        ) : (
+        ) : buscandoNegocio ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          /* Terceiro estado, que não existia: negócio apagado, de outra empresa, ou identificador
+             que não existe mais. Sem ele o painel gira para sempre e nada chega ao registro de
+             erros — o painel não lança exceção nenhuma. */
+          <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+            <p className="text-sm font-medium text-card-foreground">
+              Este negócio não está mais disponível.
+            </p>
+            <p className="max-w-xs text-xs text-muted-foreground">
+              Ele pode ter sido excluído, ou o link que você abriu é de outra empresa.
+            </p>
           </div>
         )}
         </CorpoDoPainel>

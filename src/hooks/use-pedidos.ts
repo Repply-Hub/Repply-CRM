@@ -324,6 +324,9 @@ const hasNoSearchMatches = (matches: SearchMatches) =>
 export function invalidarPaineisDeNegocios(qc: QueryClient) {
   const chaves = [
     'pedidos',
+    // Sem isto, editar um negócio e voltar ao painel mostra o estado velho: a busca por id tem
+    // chave própria e `invalidateQueries` casa elemento a elemento, não por prefixo.
+    'pedido_por_id',
     'pedidos_por_cliente',
     'pedidos_stats',
     'vw_faturamento_mensal',
@@ -788,6 +791,40 @@ export function usePedidoOptionPorId(pedidoId?: string | null) {
         .maybeSingle();
       if (error) throw error;
       return (data ?? null) as unknown as PedidoOption | null;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+/**
+ * Um negócio completo, buscado pelo identificador.
+ *
+ * 🔴 EXISTE POR CAUSA DE UM CAMINHO ESPECÍFICO: o botão "Abrir negócio" da tela "Hoje".
+ *
+ * O painel de negócio da tela de Negócios só procurava o negócio entre as linhas JÁ carregadas.
+ * O que está carregado é estreito por quatro motivos independentes — período padrão de mês
+ * corrente, funil guardado no armazenamento local, teto de 50 por coluna no Kanban e o termo de
+ * busca guardado. E a pauta do dia escolhe justamente o OPOSTO: o mais parado primeiro, que
+ * quase nunca é do mês. O painel abria e ficava girando para sempre.
+ *
+ * Usa o MESMO select da lista (`montarSelectDeNegocios`), e não o de `usePedidoCompleto`
+ * (use-edit-pedido.ts): aquele não traz `marcador`, e a falta é silenciosa.
+ *
+ * Molde de FORMA: `usePedidoOptionPorId`, logo acima, que existe para o mesmo tipo de problema
+ * no seletor de negócio das tarefas.
+ */
+export function usePedidoPorId(pedidoId?: string | null, habilitado = true) {
+  return useQuery({
+    queryKey: ['pedido_por_id', pedidoId ?? null],
+    enabled: !!pedidoId && habilitado,
+    queryFn: async (): Promise<PedidoWithRelations | null> => {
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select(montarSelectDeNegocios())
+        .eq('id', pedidoId!)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as unknown as PedidoWithRelations | null;
     },
     staleTime: 1000 * 60 * 5,
   });
