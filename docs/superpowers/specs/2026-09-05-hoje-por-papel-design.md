@@ -139,8 +139,15 @@ Por isso o bug parece intermitente: negócio criado neste mês, no funil salvo, 
   fechou, e o link copiado da barra manda outra pessoa para lá. Conserto: uma função
   `fecharPainel()` que zera o estado **e** limpa o parâmetro, usada nos três pontos de saída.
 - **"Excluir" fica clicável enquanto o painel está vazio.** Dá para apagar, direto da pauta, um
-  negócio cujo painel nunca mostrou uma linha. Conserto: esconder Editar e Excluir enquanto não
-  houver dado, e pôr o nome do negócio no título da confirmação.
+  negócio cujo painel nunca mostrou uma linha. Conserto: deixar Editar e Excluir **desabilitados**
+  enquanto não houver dado, e pôr o nome do negócio no título da confirmação.
+
+  > **Corrigido em 05/09/2026, depois de implementado.** Esta linha dizia "esconder Editar e
+  > Excluir". Esconder foi tentado e trocado por desabilitar na revisão final: montar o botão
+  > condicionalmente faz ele **nascer no meio do gesto** — enquanto a busca corre só existe
+  > "Fechar" à esquerda, e quando o dado chega o "Editar" entra na frente e empurra o "Fechar"
+  > para a direita. Quem estava mirando em Fechar cai em Editar e vai parar no formulário de
+  > edição. Desabilitado, a posição não muda e o botão continua inerte.
 
 ### 4.4 Testes
 
