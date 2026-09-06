@@ -30,6 +30,7 @@ import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { mapPedidoToOrder } from '@/lib/pedido-to-order';
 import { getNomeNegocio } from '@/lib/nome-negocio';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
 import { fabricanteEstaAtivo } from '@/lib/ordem-de-fabricantes';
 import { Button } from '@/components/ui/button';
@@ -1409,6 +1410,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const selectedCount = deleteAllFilteredMode ? Math.max(0, totalCount - excludedIds.size) : selected.size;
   const someSelected = selectedCount > 0;
 
+  // Achado C da revisão de 06/09/2026 (spec 4.3): a confirmação de exclusão precisa trazer o
+  // nome do negócio quando é UM só. O painel lateral já foi fechado nesse ponto — o clique de
+  // "Excluir" no rodapé do painel chama `fecharPainel()` ANTES de abrir este diálogo —, então
+  // `selectedViewOrder` não serve mais; o nome vem direto da linha selecionada. Se a linha não
+  // estiver entre as carregadas (caso raro), cai no texto genérico de sempre.
+  const nomeExclusaoUnica = (!deleteAllFilteredMode && selected.size === 1)
+    ? (() => {
+        const [id] = selected;
+        const linha = (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === id)
+          ?? bulkPickerData?.data?.find(p => p.id === id);
+        return linha ? getNomeNegocio(linha) : undefined;
+      })()
+    : undefined;
+
   const toggleOne = (id: string) => {
     if (deleteAllFilteredMode) {
       // Continua no modo "todos os filtrados": só acumula/desfaz a exclusão desse item
@@ -2280,7 +2295,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // 🔴 A busca por id é o que faz o botão "Abrir negócio" da tela "Hoje" funcionar. Ela só sai
   // quando a varredura local falha — no caso comum (clicar num card da própria tela) não há
   // requisição nenhuma. Ver o comentário de `usePedidoPorId`.
-  const { data: negocioBuscado, isLoading: buscandoNegocio } = usePedidoPorId(
+  const { data: negocioBuscado, isLoading: buscandoNegocio, error: erroBuscaNegocio } = usePedidoPorId(
     viewOrderId,
     !negocioLocal,
   );
@@ -2616,10 +2631,25 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : erroBuscaNegocio ? (
+          /* Quarto estado, achado da revisão de 06/09/2026: FALHA AO CARREGAR não é a mesma
+             coisa que "não existe mais". Queda de rede, tempo limite de 8s do Postgres (ver
+             CLAUDE.md §7.15) ou identificador malformado no endereço caem aqui — depois de
+             3 tentativas do TanStack Query — e o negócio pode estar intacto. Confundir os dois
+             manda a pessoa procurar um negócio que nunca sumiu. `mensagemDeErro` porque erro do
+             Supabase não é um `Error`: `e instanceof Error` daria falso aqui. */
+          <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+            <p className="text-sm font-medium text-card-foreground">
+              Não foi possível carregar este negócio.
+            </p>
+            <p className="max-w-xs text-xs text-muted-foreground">
+              {mensagemDeErro(erroBuscaNegocio, 'Falha ao buscar. Tente novamente em instantes.')}
+            </p>
+          </div>
         ) : (
-          /* Terceiro estado, que não existia: negócio apagado, de outra empresa, ou identificador
-             que não existe mais. Sem ele o painel gira para sempre e nada chega ao registro de
-             erros — o painel não lança exceção nenhuma. */
+          /* Terceiro estado: negócio apagado, de outra empresa, ou identificador que não existe
+             mais — sem erro nenhum na busca. Sem ele o painel gira para sempre e nada chega ao
+             registro de erros — o painel não lança exceção nenhuma. */
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
             <p className="text-sm font-medium text-card-foreground">
               Este negócio não está mais disponível.
@@ -2640,32 +2670,33 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <RodapeDoPainel
           esquerda={
             <>
-              {selectedViewOrder && (
-                <Button onClick={() => navigate(`/pedidos/${viewOrderId}/editar`)}>
-                  <Pencil className="mr-2 h-4 w-4" /> Editar
-                </Button>
-              )}
+              {/* Achado da revisão de 06/09/2026: os dois botões ficam SEMPRE montados, com
+                  `disabled` no lugar de sumir/aparecer. Montar "Editar" só quando o dado chega
+                  empurrava "Fechar" para a direita no meio do gesto — quem mirava em Fechar
+                  enquanto a busca corria caía em Editar. */}
+              <Button disabled={!selectedViewOrder} onClick={() => navigate(`/pedidos/${viewOrderId}/editar`)}>
+                <Pencil className="mr-2 h-4 w-4" /> Editar
+              </Button>
               <Button variant="outline" onClick={fecharPainel}>
                 Fechar
               </Button>
             </>
           }
         >
-          {selectedViewOrder && (
-            <Button
-              variant="ghost"
-              className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => {
-                const alvo = viewOrderId!;
-                fecharPainel();
-                setDeleteAllFilteredMode(false);
-                setSelected(new Set([alvo]));
-                setConfirmDeleteOpen(true);
-              }}
-            >
-              <Trash2 className="h-4 w-4" /> Excluir
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            disabled={!selectedViewOrder}
+            onClick={() => {
+              const alvo = viewOrderId!;
+              fecharPainel();
+              setDeleteAllFilteredMode(false);
+              setSelected(new Set([alvo]));
+              setConfirmDeleteOpen(true);
+            }}
+          >
+            <Trash2 className="h-4 w-4" /> Excluir
+          </Button>
         </RodapeDoPainel>
       </ConteudoDoPainel>
     </Sheet>
@@ -2981,7 +3012,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Excluir {selectedCount} negócio(s)?
+              {nomeExclusaoUnica ? `Excluir "${nomeExclusaoUnica}"?` : `Excluir ${selectedCount} negócio(s)?`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               Esta ação não pode ser desfeita. Todos os itens e histórico de contatos vinculados também serão removidos.
