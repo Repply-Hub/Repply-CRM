@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/DashboardChartTooltip';
 import { formatarMoedaBRL } from '@/lib/moeda';
 import { useDashboardNegociosRisco } from '@/hooks/use-dashboard';
+import { BarraDeFiltros } from '@/components/pauta/BarraDeFiltros';
+import type { FiltrosDoPainel } from '@/lib/filtros-do-painel';
 
 /**
  * Radar de Risco — negócios ABERTOS parados ou sem próxima ação agendada.
@@ -78,9 +80,15 @@ const formatCurrency = formatarMoedaBRL;
 
 interface Props {
   empresaId?: string;
+  // 🔴 A barra já entrega os filtros e o callback de troca, mas o painel ainda NÃO os aplica
+  // na consulta — ligar `filtros` a `useDashboardNegociosRisco` é outra etapa deste plano.
+  // Por ora eles só chegam até `<BarraDeFiltros>`, que escreve no endereço da página.
+  filtros: FiltrosDoPainel;
+  onChangeFiltros: (filtros: FiltrosDoPainel) => void;
+  podeFiltrarPorResponsavel: boolean;
 }
 
-export function RadarDeRisco({ empresaId }: Props) {
+export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarPorResponsavel }: Props) {
   const { data: bruto } = useDashboardNegociosRisco(empresaId);
 
   const risco = useMemo(() => ({
@@ -110,6 +118,14 @@ export function RadarDeRisco({ empresaId }: Props) {
           A carteira da empresa inteira. É a foto de agora — não depende de período.
         </p>
       </header>
+
+      <BarraDeFiltros
+        empresaId={empresaId}
+        filtros={filtros}
+        onChange={onChangeFiltros}
+        podeFiltrarPorResponsavel={podeFiltrarPorResponsavel}
+      />
+
     {/* Radar de Risco — negócios ABERTOS (nem ganhos nem perdidos) parados ou sem
         próxima ação agendada. Ver useDashboardNegociosRisco e a migration
         20260824220000_dashboard_negocios_risco.sql para a definição exata de cada

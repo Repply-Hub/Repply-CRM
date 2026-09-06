@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Check, Clock, Sun } from 'lucide-react';
@@ -12,6 +12,11 @@ import { useAuth } from '@/hooks/use-auth';
 import { usePauta, type ItemDaPauta } from '@/hooks/use-pauta';
 import { DialogoRetorno } from '@/components/pauta/DialogoRetorno';
 import { RadarDeRisco } from '@/components/pauta/RadarDeRisco';
+import {
+  lerFiltrosDoEndereco,
+  escreverFiltrosNoEndereco,
+  type FiltrosDoPainel,
+} from '@/lib/filtros-do-painel';
 
 /**
  * A tela "Hoje" — a pauta do dia.
@@ -117,6 +122,16 @@ const Hoje = () => {
   const { data: pauta, isLoading } = usePauta();
   const [alvo, setAlvo] = useState<ItemDaPauta | null>(null);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filtros = useMemo(() => lerFiltrosDoEndereco(searchParams), [searchParams]);
+  const ehGestor = profile?.role === 'admin' || profile?.role === 'gestor' || profile?.role === 'empresa';
+
+  function trocarFiltros(novos: FiltrosDoPainel) {
+    setSearchParams((prev) => escreverFiltrosNoEndereco(new URLSearchParams(prev), novos), {
+      replace: true,
+    });
+  }
+
   const { total, valorEmJogo } = useMemo(() => {
     const itens = pauta ?? [];
     return {
@@ -193,7 +208,12 @@ const Hoje = () => {
         {/* Depois da pauta, de propósito: primeiro o que dá para resolver hoje, depois o
             tamanho do problema. Veio do Dashboard em 25/08/2026, inteiro e sem alteração
             de fórmula — lá ele não existe mais. */}
-        <RadarDeRisco empresaId={empresaId} />
+        <RadarDeRisco
+          empresaId={empresaId}
+          filtros={filtros}
+          onChangeFiltros={trocarFiltros}
+          podeFiltrarPorResponsavel={ehGestor}
+        />
       </div>
 
       <DialogoRetorno
