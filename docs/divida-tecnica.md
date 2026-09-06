@@ -81,6 +81,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 64 | [Regra de banco alterada à mão diverge do código](#64-regra-de-banco-alterada-à-mão-volta-a-divergir-do-código-e-ninguém-percebe) | Média | Não — mas `create or replace` a partir do arquivo desfaz a correção em silêncio |
 | 65 | [As duas telas mais delicadas do calendário não têm teste](#65-as-duas-telas-mais-delicadas-do-calendário-não-têm-teste-nenhum) | Baixa | Não |
 | 66 | [A grade de figurinhas usa endereço público cru](#66-a-grade-de-figurinhas-usa-endereço-público-cru-e-para-quando-o-balde-fechar) | Média | Não hoje — **sim** no dia em que `whatsapp-media` fechar |
+| 67 | [Falta a contagem distinta de negócios em risco](#67-falta-a-contagem-distinta-de-negócios-em-risco) | Baixa | Não — só limita o cartão "Valor em Risco" a mostrar valor sem quantidade |
 
 > ⚠️ Os itens **61 e 62** existem no corpo deste documento mas não têm linha aqui — quem os
 > escreveu esqueceu a tabela. Vale acrescentar ao passar por perto.
@@ -2620,6 +2621,31 @@ a mesma função que o `whatsapp-send` já usa para entregar mídia à operadora
 
 **Fazer junto com o Passo 7, não depois.** Depois significa descobrir pelo relato de quem
 abriu a grade e não viu nada.
+
+---
+
+## 67. Falta a contagem distinta de negócios em risco
+
+**Gravidade: baixa. O cartão "Valor em Risco" do Radar de Risco (tela "Hoje") mostra o
+valor certo, mas não mostra quantos negócios são.**
+
+`dashboard_negocios_risco` devolve `qtd_parados` e `qtd_sem_proxima_acao` separados, e
+`valor_risco_total` já é o valor ÚNICO da união das duas condições — sem contar duas vezes
+o negócio que é as duas coisas ao mesmo tempo (ver o comentário de `valor_risco_total` em
+`DashboardNegociosRisco`, `src/hooks/use-dashboard.ts`). Não existe o equivalente em
+contagem: somar `qtd_parados + qtd_sem_proxima_acao` no navegador contaria esse mesmo
+negócio duas vezes, e o tamanho de `top_parados` não serve — é a lista dos 10 maiores, não
+a lista inteira.
+
+Por isso o cartão "Valor em Risco" (`src/components/pauta/RadarDeRisco.tsx`) mostra só o
+valor, com a legenda "Parado ou sem próxima ação, sem contar duas vezes", e nenhum número
+de quantidade ao lado — diferente dos outros dois cartões do mesmo painel, que têm os dois.
+
+**O conserto é de banco:** acrescentar uma coluna `qtd_risco_total` (ou nome equivalente) à
+função `dashboard_negocios_risco`, contando `DISTINCT` sobre a união das duas condições —
+o mesmo cálculo que já produz `valor_risco_total`, trocando `sum(valor)` por `count(*)`.
+Não é urgente: o valor em reais já está certo, e "parado" e "sem próxima ação" continuam
+visíveis (com contagem) nos dois cartões ao lado.
 
 ---
 

@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, CalendarX, Factory, ShieldAlert } from 'lucide-react';
 import {
-  Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/DashboardChartTooltip';
@@ -27,35 +28,6 @@ import type { FiltrosDoPainel } from '@/lib/filtros-do-painel';
  * `useDashboardNegociosRisco`.
  */
 
-const RADIAN = Math.PI / 180;
-
-/**
- * O rótulo de fora da pizza. Tipado à mão porque o Recharts não exporta o tipo destas
- * props — no Dashboard isto era `any`, e copiar o `any` junto com o resto seria trazer o
- * defeito de brinde.
- */
-interface RotuloDaPizza {
-  cx: number;
-  cy: number;
-  midAngle: number;
-  innerRadius: number;
-  outerRadius: number;
-  percent: number;
-  name: string;
-}
-
-const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }: RotuloDaPizza) => {
-  const radius = innerRadius + (outerRadius - innerRadius) * 1.35;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  if (percent < 0.05) return null;
-  return (
-    <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11} fontWeight={600}>
-      {name} ({(percent * 100).toFixed(0)}%)
-    </text>
-  );
-};
-
 // Recharts quebra o texto do tick em várias linhas quando ele não cabe na largura reservada
 // pro eixo — tick em SVG puro (sem a prop `width`, que é o que dispara o word-wrap) e a
 // largura do eixo calculada a partir do nome mais longo.
@@ -80,16 +52,18 @@ const formatCurrency = formatarMoedaBRL;
 
 interface Props {
   empresaId?: string;
-  // 🔴 A barra já entrega os filtros e o callback de troca, mas o painel ainda NÃO os aplica
-  // na consulta — ligar `filtros` a `useDashboardNegociosRisco` é outra etapa deste plano.
-  // Por ora eles só chegam até `<BarraDeFiltros>`, que escreve no endereço da página.
   filtros: FiltrosDoPainel;
   onChangeFiltros: (filtros: FiltrosDoPainel) => void;
   podeFiltrarPorResponsavel: boolean;
 }
 
 export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarPorResponsavel }: Props) {
-  const { data: bruto } = useDashboardNegociosRisco(empresaId);
+  const navigate = useNavigate();
+  const { data: bruto } = useDashboardNegociosRisco(empresaId, {
+    etapas: filtros.etapas,
+    fabricanteIds: filtros.fabricantes,
+    usuarioIds: filtros.responsaveis,
+  });
 
   const risco = useMemo(() => ({
     qtdParados: bruto?.qtd_parados ?? 0,
@@ -100,6 +74,7 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
     // A RPC já devolve [] pra quem não é gestor — nada a filtrar aqui.
     riscoPorVendedor: bruto?.risco_por_vendedor ?? [],
     riscoPorFabricante: bruto?.risco_por_fabricante ?? [],
+    topParados: bruto?.top_parados ?? [],
   }), [bruto]);
 
   const riscoVendedorAxisWidth = useMemo(() => {
@@ -158,6 +133,10 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
                 <span className="text-xs font-semibold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.1)]">
                   {formatCurrency(risco.valorSemProximaAcao)}
                 </span>
+                {/* Este cartão mudou de definição no banco: agora conta também retorno
+                    marcado, não só ausência de tarefa. Sem esta legenda, o número caindo
+                    de 146 para 90 parece defeito. */}
+                <span className="block text-xs text-muted-foreground">Sem tarefa aberta e sem retorno marcado</span>
               </div>
               <div className="h-11 w-11 rounded-xl bg-[hsl(var(--warning)/0.1)] flex items-center justify-center">
                 <CalendarX className="h-5 w-5 text-[hsl(var(--warning))]" />
@@ -171,7 +150,11 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
               <div className="space-y-1.5">
                 <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Valor em Risco</p>
                 <p className="text-2xl font-extrabold text-card-foreground tracking-tight">{formatCurrency(risco.valorRiscoTotal)}</p>
-                <span className="text-xs text-muted-foreground">Parado ou sem próxima ação</span>
+                {/* Valor ÚNICO — negócio que é parado E sem próxima ação entra uma vez só.
+                    Sem contagem aqui de propósito: qtdParados + qtdSemProximaAcao contaria
+                    esse negócio em dobro, e a contagem certa não é uma coluna que a RPC
+                    devolve hoje. Ver docs/divida-tecnica.md #67. */}
+                <span className="text-xs text-muted-foreground">Parado ou sem próxima ação, sem contar duas vezes</span>
               </div>
               <div className="h-11 w-11 rounded-xl bg-destructive/10 flex items-center justify-center">
                 <ShieldAlert className="h-5 w-5 text-destructive" />
@@ -219,45 +202,80 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
           </Card>
         )}
 
+        {/* Era gráfico de pizza — virou tabela: é o que o pessoal da MD de fato lê, e
+            mostra quantidade e valor juntos, coisa que a pizza não fazia. O gráfico de
+            barras por responsável ao lado não mudou nesta etapa. */}
         <Card className={`shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300 ${risco.riscoPorVendedor.length > 0 ? '' : 'lg:col-span-2'}`}>
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Factory className="h-4 w-4 text-[hsl(var(--warning))]" /> Risco por Fábrica
+              <Factory className="h-4 w-4 text-[hsl(var(--warning))]" /> Resumo por fabricante
             </CardTitle>
-            <CardDescription className="text-xs">Valor em risco entre os negócios de cada fabricante</CardDescription>
+            <CardDescription className="text-xs">Negócios em risco por marca representada</CardDescription>
           </CardHeader>
           <CardContent className="pt-2">
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie
-                  data={risco.riscoPorFabricante}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={65}
-                  outerRadius={100}
-                  dataKey="valor"
-                  nameKey="fabrica"
-                  label={renderCustomLabel}
-                  paddingAngle={3}
-                  cornerRadius={4}
-                  animationDuration={1000}
-                  animationEasing="ease-out"
-                >
-                  {risco.riscoPorFabricante.map((_, idx) => (
-                    <Cell
-                      key={`cell-risco-${idx}`}
-                      fill={[chartColors.warning, 'hsl(24, 100%, 47%)', chartColors.muted, 'hsl(280, 65%, 60%)', chartColors.primary][idx % 5]}
-                      stroke="hsl(var(--card))"
-                      strokeWidth={2}
-                    />
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <th className="py-2 text-left font-semibold">Fabricante</th>
+                    <th className="py-2 text-right font-semibold">Negócios</th>
+                    <th className="py-2 text-right font-semibold">Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {risco.riscoPorFabricante.map((f) => (
+                    <tr key={f.fabrica} className="border-b border-border/50 last:border-0">
+                      <td className="py-2">{f.fabrica}</td>
+                      <td className="py-2 text-right font-mono tabular-nums">{f.qtd}</td>
+                      <td className="py-2 text-right font-mono tabular-nums">{formatCurrency(f.valor)}</td>
+                    </tr>
                   ))}
-                </Pie>
-                <Tooltip content={<ChartTooltip formatValue={formatCurrency} />} />
-              </PieChart>
-            </ResponsiveContainer>
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Os 10 maiores parados — única parte deste painel que gera ação direta: cada
+          linha leva à ficha do negócio, pelo mesmo caminho que a pauta de cima usa
+          (/app?negocio=<id>, consertado na Etapa 1 deste plano). */}
+      <Card className="shadow-card border-border/60 mt-5">
+        <CardHeader className="pb-1">
+          <CardTitle className="text-sm font-bold">Os 10 maiores parados</CardTitle>
+          <CardDescription className="text-xs">Clique para abrir o negócio</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-2">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="py-2 text-left font-semibold">Negócio</th>
+                  <th className="py-2 text-left font-semibold">Fabricante</th>
+                  <th className="py-2 text-left font-semibold">Responsável</th>
+                  <th className="py-2 text-right font-semibold">Parado há</th>
+                  <th className="py-2 text-right font-semibold">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {risco.topParados.map((n) => (
+                  <tr
+                    key={n.id}
+                    className="cursor-pointer border-b border-border/50 last:border-0 hover:bg-muted/50"
+                    onClick={() => navigate(`/app?negocio=${n.id}`)}
+                  >
+                    <td className="py-2">{n.nome}</td>
+                    <td className="py-2 text-muted-foreground">{n.fabrica ?? '—'}</td>
+                    <td className="py-2 text-muted-foreground">{n.responsavel ?? '—'}</td>
+                    <td className="py-2 text-right font-mono tabular-nums">{n.dias_parado} dias</td>
+                    <td className="py-2 text-right font-mono tabular-nums">{formatCurrency(n.valor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
     </section>
   );

@@ -144,6 +144,19 @@ export function useDashboardStats(
   });
 }
 
+// Um dos "10 maiores parados" que dashboard_negocios_risco devolve em top_parados
+// (migration 20260905120000). fabrica e responsavel podem vir nulos; nome nunca
+// vem vazio — a função já resolve a cadeia de alternativas antes de devolver.
+export interface TopParado {
+  id: string;
+  nome: string;
+  fabrica: string | null;
+  etapa: string;
+  responsavel: string | null;
+  valor: number;
+  dias_parado: number;
+}
+
 export interface DashboardNegociosRisco {
   qtd_parados: number;
   valor_parados: number;
@@ -156,8 +169,11 @@ export interface DashboardNegociosRisco {
   // Vem vazio ([]) para quem não é gestor — a RPC já filtra por is_gestor(),
   // não é uma omissão do front. Não use este array pra decidir se o usuário É
   // gestor (ele também fica vazio quando não há nenhum negócio em risco).
-  risco_por_vendedor: { vendedor: string; valor: number }[];
-  risco_por_fabricante: { fabrica: string; valor: number }[];
+  risco_por_vendedor: { vendedor: string; qtd: number; valor: number }[];
+  risco_por_fabricante: { fabrica: string; qtd: number; valor: number }[];
+  // Os 10 negócios abertos com maior valor entre os parados/sem próxima ação,
+  // já ordenados pela RPC. Ver TopParado acima.
+  top_parados: TopParado[];
 }
 
 // "Radar de Risco": negócios ABERTOS (nem ganhos nem perdidos) parados há
@@ -169,29 +185,28 @@ export interface DashboardNegociosRisco {
 // continua sendo risco hoje mesmo que o filtro "Período" do topo do Dashboard
 // não alcance a data em que ele nasceu — filtrar por data de criação/fechamento
 // escondia justamente os negócios mais antigos parados, que são os que mais
-// importa achar aqui. Só Fabricante/Responsável (e o corte de dias parado, via
-// diasParado) afetam este painel.
+// importa achar aqui. Só Etapa/Fabricante/Responsável (e o corte de dias parado,
+// via diasParado) afetam este painel.
 export function useDashboardNegociosRisco(
   empresaId?: string,
-  filters?: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number },
+  filters?: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number; etapas?: string[] },
 ) {
-  const { usuarioIds, fabricanteIds, funilId, diasParado = 7 } = filters ?? {};
+  const { usuarioIds, fabricanteIds, funilId, diasParado = 7, etapas } = filters ?? {};
 
   return useQuery({
-    queryKey: ['dashboard_negocios_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado],
+    queryKey: ['dashboard_negocios_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado, etapas],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('dashboard_negocios_risco', {
         p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
         p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
         p_funil_id: funilId ?? null,
         p_dias_parado: diasParado,
+        // Array vazio em filtro de RPC filtra tudo fora (CLAUDE.md §7.8): `= ANY('{}')`
+        // não casa com nada, e o painel voltaria zerado em vez de "sem filtro". Mesma
+        // conversão que os três filtros acima já fazem.
+        p_etapas: etapas && etapas.length > 0 ? etapas : null,
       });
       if (error) throw error;
-      // A RPC agora devolve mais colunas do que esta interface descreve (top_parados,
-      // adicionado na migration 20260905120000). Este hook/interface ainda não os
-      // consome — isso é de outra etapa do plano "Hoje" — mas o formato ampliado do
-      // retorno gerado em types.ts não tem mais sobreposição suficiente com
-      // DashboardNegociosRisco para o TypeScript aceitar o cast direto.
       const row = (data as unknown as DashboardNegociosRisco[] | null)?.[0];
       return (row ?? {
         qtd_parados: 0,
@@ -201,6 +216,7 @@ export function useDashboardNegociosRisco(
         valor_risco_total: 0,
         risco_por_vendedor: [],
         risco_por_fabricante: [],
+        top_parados: [],
       }) as DashboardNegociosRisco;
     },
     enabled: !!empresaId,
