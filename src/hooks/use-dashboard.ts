@@ -187,7 +187,12 @@ export function useDashboardNegociosRisco(
         p_dias_parado: diasParado,
       });
       if (error) throw error;
-      const row = (data as DashboardNegociosRisco[] | null)?.[0];
+      // A RPC agora devolve mais colunas do que esta interface descreve (top_parados,
+      // adicionado na migration 20260905120000). Este hook/interface ainda não os
+      // consome — isso é de outra etapa do plano "Hoje" — mas o formato ampliado do
+      // retorno gerado em types.ts não tem mais sobreposição suficiente com
+      // DashboardNegociosRisco para o TypeScript aceitar o cast direto.
+      const row = (data as unknown as DashboardNegociosRisco[] | null)?.[0];
       return (row ?? {
         qtd_parados: 0,
         valor_parados: 0,

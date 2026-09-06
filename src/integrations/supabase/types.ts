@@ -4625,6 +4625,7 @@ export type Database = {
       dashboard_negocios_risco: {
         Args: {
           p_dias_parado?: number
+          p_etapas?: string[]
           p_fabricante_ids?: string[]
           p_funil_id?: string
           p_usuario_ids?: string[]
@@ -4634,6 +4635,7 @@ export type Database = {
           qtd_sem_proxima_acao: number
           risco_por_fabricante: Json
           risco_por_vendedor: Json
+          top_parados: Json
           valor_parados: number
           valor_risco_total: number
           valor_sem_proxima_acao: number
