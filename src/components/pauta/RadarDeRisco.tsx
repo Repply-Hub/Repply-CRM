@@ -213,67 +213,82 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
             <CardDescription className="text-xs">Negócios em risco por marca representada</CardDescription>
           </CardHeader>
           <CardContent className="pt-2">
+            {risco.riscoPorFabricante.length === 0 ? (
+              <p className="py-4 text-sm text-muted-foreground">Nenhum negócio em risco no momento.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-[11px] uppercase tracking-wider text-muted-foreground">
+                      <th className="py-2 text-left font-semibold">Fabricante</th>
+                      <th className="py-2 text-right font-semibold">Negócios</th>
+                      <th className="py-2 text-right font-semibold">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {risco.riscoPorFabricante.map((f) => (
+                      <tr key={f.fabrica} className="border-b border-border/50 last:border-0">
+                        <td className="py-2">{f.fabrica}</td>
+                        <td className="py-2 text-right font-mono tabular-nums">{f.qtd}</td>
+                        <td className="py-2 text-right font-mono tabular-nums">{formatCurrency(f.valor)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Título e cabeçalho de coluna: "em risco"/"Sem mexer há", não "parados". O SQL
+          seleciona `WHERE parado OR sem_proxima_acao` (migration 20260905120000) — na MD,
+          hoje, os 146 negócios da lista são todos "sem próxima ação", não "parado" (o
+          corte de parado é 7 dias). Um título que só diz "parados" mentia sobre o que a
+          tabela de fato lista.
+          Única parte deste painel que gera ação direta: cada linha leva à ficha do
+          negócio, pelo mesmo caminho que a pauta de cima usa (/app?negocio=<id>,
+          consertado na Etapa 1 deste plano). */}
+      <Card className="shadow-card border-border/60 mt-5">
+        <CardHeader className="pb-1">
+          <CardTitle className="text-sm font-bold">Os 10 maiores em risco</CardTitle>
+          <CardDescription className="text-xs">Clique para abrir o negócio</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-2">
+          {risco.topParados.length === 0 ? (
+            <p className="py-4 text-sm text-muted-foreground">Nenhum negócio em risco no momento.</p>
+          ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <th className="py-2 text-left font-semibold">Negócio</th>
                     <th className="py-2 text-left font-semibold">Fabricante</th>
-                    <th className="py-2 text-right font-semibold">Negócios</th>
+                    <th className="py-2 text-left font-semibold">Responsável</th>
+                    <th className="py-2 text-right font-semibold">Sem mexer há</th>
                     <th className="py-2 text-right font-semibold">Valor</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {risco.riscoPorFabricante.map((f) => (
-                    <tr key={f.fabrica} className="border-b border-border/50 last:border-0">
-                      <td className="py-2">{f.fabrica}</td>
-                      <td className="py-2 text-right font-mono tabular-nums">{f.qtd}</td>
-                      <td className="py-2 text-right font-mono tabular-nums">{formatCurrency(f.valor)}</td>
+                  {risco.topParados.map((n) => (
+                    <tr
+                      key={n.id}
+                      className="cursor-pointer border-b border-border/50 last:border-0 hover:bg-muted/50"
+                      onClick={() => navigate(`/app?negocio=${n.id}`)}
+                    >
+                      <td className="py-2">{n.nome}</td>
+                      <td className="py-2 text-muted-foreground">{n.fabrica ?? '—'}</td>
+                      <td className="py-2 text-muted-foreground">{n.responsavel ?? '—'}</td>
+                      <td className="py-2 text-right font-mono tabular-nums">
+                        {n.dias_parado} {n.dias_parado === 1 ? 'dia' : 'dias'}
+                      </td>
+                      <td className="py-2 text-right font-mono tabular-nums">{formatCurrency(n.valor)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Os 10 maiores parados — única parte deste painel que gera ação direta: cada
-          linha leva à ficha do negócio, pelo mesmo caminho que a pauta de cima usa
-          (/app?negocio=<id>, consertado na Etapa 1 deste plano). */}
-      <Card className="shadow-card border-border/60 mt-5">
-        <CardHeader className="pb-1">
-          <CardTitle className="text-sm font-bold">Os 10 maiores parados</CardTitle>
-          <CardDescription className="text-xs">Clique para abrir o negócio</CardDescription>
-        </CardHeader>
-        <CardContent className="pt-2">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="py-2 text-left font-semibold">Negócio</th>
-                  <th className="py-2 text-left font-semibold">Fabricante</th>
-                  <th className="py-2 text-left font-semibold">Responsável</th>
-                  <th className="py-2 text-right font-semibold">Parado há</th>
-                  <th className="py-2 text-right font-semibold">Valor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {risco.topParados.map((n) => (
-                  <tr
-                    key={n.id}
-                    className="cursor-pointer border-b border-border/50 last:border-0 hover:bg-muted/50"
-                    onClick={() => navigate(`/app?negocio=${n.id}`)}
-                  >
-                    <td className="py-2">{n.nome}</td>
-                    <td className="py-2 text-muted-foreground">{n.fabrica ?? '—'}</td>
-                    <td className="py-2 text-muted-foreground">{n.responsavel ?? '—'}</td>
-                    <td className="py-2 text-right font-mono tabular-nums">{n.dias_parado} dias</td>
-                    <td className="py-2 text-right font-mono tabular-nums">{formatCurrency(n.valor)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

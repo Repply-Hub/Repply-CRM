@@ -81,6 +81,12 @@ export function useRegistrarRetorno() {
       // diálogo, abre o negócio e não vê o que acabou de escrever.
       qc.invalidateQueries({ queryKey: ['historico-contatos'] });
       qc.invalidateQueries({ queryKey: ['contatos-calendario'] });
+      // O cartão "Sem Próxima Ação" do painel "No geral" (tela Hoje) agora CONTA retorno
+      // marcado — não só ausência de tarefa (migration 20260905120000). Sem esta
+      // invalidação, o negócio some da fila de cima e o cartão logo abaixo, na mesma tela,
+      // não se mexe: ele tem 5 minutos de vida (staleTime) e não refaz sozinho ao voltar o
+      // foco. Isso apagaria exatamente o retorno que "Retomar depois" promete mostrar.
+      qc.invalidateQueries({ queryKey: ['dashboard_negocios_risco'] });
     },
   });
 }
