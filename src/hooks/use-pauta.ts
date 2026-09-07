@@ -24,6 +24,8 @@ export interface ItemDaPauta {
   quando: string | null;
   dias_parado: number | null;
   ordem: number;
+  /** Nome do dono, só quando o negócio NÃO é de quem está olhando. */
+  responsavel: string | null;
 }
 
 export function usePauta() {

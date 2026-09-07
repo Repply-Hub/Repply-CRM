@@ -4717,6 +4717,7 @@ export type Database = {
           quando: string | null
           dias_parado: number | null
           ordem: number
+          responsavel: string | null
         }[]
       }
       parse_endereco_livre: {
