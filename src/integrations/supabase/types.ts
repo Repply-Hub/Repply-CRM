@@ -4821,6 +4821,10 @@ export type Database = {
           total_valor: number
         }[]
       }
+      registrar_retorno: {
+        Args: { p_motivo: string; p_pedido_id: string; p_retorno_em: string }
+        Returns: undefined
+      }
       restaurar_usuario_por_email: {
         Args: {
           p_email: string
@@ -4846,6 +4850,7 @@ export type Database = {
         Returns: undefined
       }
       pode_acessar_obra: { Args: { _obra_id: string }; Returns: boolean }
+      posso_agir_no_negocio: { Args: { p_pedido_id: string }; Returns: boolean }
       usuario_in_my_empresa: { Args: { _usuario_id: string }; Returns: boolean }
       validar_codigo_empresa: { Args: { p_codigo: string }; Returns: Json }
       vendedor_in_my_empresa: {

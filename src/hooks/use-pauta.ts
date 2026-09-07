@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/use-auth';
 
 /**
  * A pauta do dia — a tela "Hoje".
@@ -58,23 +57,31 @@ export function usePauta() {
  * 🔴 NÃO altera o negócio. Empurrar `prazo_resposta` seria mais barato e faria a coluna
  * mudar de significado — de "data de fechamento" para "quando eu vou cobrar" — e todo
  * relatório que a lê passaria a mentir (CLAUDE.md §4.4).
+ *
+ * 🔴 DESDE 07/09/2026 QUEM GRAVA É O SERVIDOR, não esta tela. Quem tem a chave
+ * `pauta_de_todos` vê o negócio de um colega na pauta e pode adiá-lo — e aí duas regras do
+ * banco impediam o gesto de sair daqui: a de `historico_contatos` só aceitava o dono ou um
+ * gestor, e a de `notificacoes` exige papel de gestor para inserir, então o aviso ao dono
+ * nunca poderia partir do navegador de um vendedor. A função `registrar_retorno` confere a
+ * permissão, grava o retorno e cria o aviso num gesto só.
  */
 export function useRegistrarRetorno() {
   const qc = useQueryClient();
-  const { profile } = useAuth();
 
   return useMutation({
     mutationFn: async (args: { pedidoId: string; motivo: string; retornoEm: string }) => {
-      const { error } = await supabase.from('historico_contatos').insert({
-        pedido_id: args.pedidoId,
-        usuario_id: profile?.id,
-        tipo: 'retorno',
-        descricao: args.motivo,
-        // Data de HOJE em texto, montada sem `new Date().toISOString()`: aquele caminho lê
-        // UTC e, das 21h em diante no Brasil, gravaria amanhã (CLAUDE.md §7.12).
-        data_contato: hojeEmTexto(),
-        proximo_contato_em: args.retornoEm,
+      // O "hoje" do registro passou a ser o do calendário brasileiro decidido no servidor —
+      // antes vinha do relógio deste navegador. Some assim a chance de um computador com o
+      // fuso trocado gravar o dia errado (CLAUDE.md §7.12).
+      const { error } = await supabase.rpc('registrar_retorno', {
+        p_pedido_id: args.pedidoId,
+        p_motivo: args.motivo,
+        p_retorno_em: args.retornoEm,
       });
+      // Sobe o erro do Supabase CRU, de propósito: `DialogoRetorno` já o traduz com
+      // `mensagemDeErro`, que sabe ler `code`/`details`/`hint` — e é o `code` 42501 que
+      // separa "empresa bloqueada" de "você não tem permissão neste negócio". Embrulhar em
+      // `new Error(...)` aqui jogaria fora justamente esses campos (CLAUDE.md §4.6).
       if (error) throw error;
     },
     onSuccess: () => {
@@ -89,14 +96,11 @@ export function useRegistrarRetorno() {
       // não se mexe: ele tem 5 minutos de vida (staleTime) e não refaz sozinho ao voltar o
       // foco. Isso apagaria exatamente o retorno que "Retomar depois" promete mostrar.
       qc.invalidateQueries({ queryKey: ['dashboard_negocios_risco'] });
+      // Adiar o negócio de um colega cria um aviso para o DONO — e a regra de leitura de
+      // `notificacoes` deixa um gestor ver os avisos da própria equipe. Ou seja: o sininho de
+      // quem acabou de adiar também muda. Sem isto, ele só mudaria quando o aviso em tempo
+      // real chegasse, e não chega quando essa conexão cai.
+      qc.invalidateQueries({ queryKey: ['notificacoes'] });
     },
   });
-}
-
-/** `AAAA-MM-DD` do dia de hoje no fuso de quem está usando, sem passar por UTC. */
-export function hojeEmTexto(): string {
-  const d = new Date();
-  const mes = String(d.getMonth() + 1).padStart(2, '0');
-  const dia = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mes}-${dia}`;
 }
