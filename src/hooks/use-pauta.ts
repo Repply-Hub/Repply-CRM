@@ -88,7 +88,9 @@ export function useRegistrarRetorno() {
       qc.invalidateQueries({ queryKey: ['pauta-do-dia'] });
       // O painel do negócio e o Calendário leem a mesma tabela — sem isto, a pessoa fecha o
       // diálogo, abre o negócio e não vê o que acabou de escrever.
-      qc.invalidateQueries({ queryKey: ['historico-contatos'] });
+      // 🔴 Com SUBLINHADO: o nome tem que bater com `['historico_contatos', pedidoId]` de
+      // `use-pedidos.ts` (`useHistoricoContatos`). Com hífen não casa nada, em silêncio.
+      qc.invalidateQueries({ queryKey: ['historico_contatos'] });
       qc.invalidateQueries({ queryKey: ['contatos-calendario'] });
       // O cartão "Sem Próxima Ação" do painel "No geral" (tela Hoje) agora CONTA retorno
       // marcado — não só ausência de tarefa (migration 20260905120000). Sem esta
