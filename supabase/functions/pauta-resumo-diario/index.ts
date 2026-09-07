@@ -34,6 +34,11 @@ interface ItemDaPauta {
   detalhe: string;
   valor: number | null;
   quando: string | null;
+  // Nome do dono do negócio. `pauta_do_dia_de` só preenche este campo quando o item NÃO é
+  // de quem vai receber o e-mail (gestor com a chave `pauta_de_todos` vendo a pauta de toda
+  // a equipe) — para o próprio dono ele vem nulo de propósito, senão o e-mail ficaria
+  // repetindo o nome da própria pessoa em todo item.
+  responsavel?: string | null;
 }
 
 /** O nome que este projeto usa por convenção — igual aos outros 8 segredos. */
@@ -110,7 +115,13 @@ function montarItens(itens: ItemDaPauta[]): string {
         .replaceAll("ITEM_SELO", esc(i.selo))
         .replaceAll("ITEM_VALOR", esc(direita))
         .replaceAll("ITEM_TITULO", esc(i.titulo))
-        .replaceAll("ITEM_DETALHE", esc(i.detalhe));
+        // `responsavel` só vem quando o negócio NÃO é de quem recebe o e-mail — a função de
+        // banco já resolve isso. Sem esta linha, o gestor recebe negócio de colega sem saber
+        // de quem é, e cobra a pessoa errada.
+        .replaceAll(
+          "ITEM_DETALHE",
+          esc(i.responsavel ? `${i.detalhe} · ${i.responsavel}` : i.detalhe),
+        );
     })
     .join("\n");
 }
