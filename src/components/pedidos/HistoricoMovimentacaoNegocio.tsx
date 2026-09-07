@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { PedidoHistoricoStatus } from '@/hooks/use-pedidos';
+import { linhasVisiveisDoHistorico } from '@/lib/historico-do-negocio';
 
 const LIMITE_INICIAL = 3;
 
@@ -76,12 +77,16 @@ function HistoricoTimeline({ entries, stageLabel }: { entries: PedidoHistoricoSt
 export function HistoricoMovimentacaoNegocio({ historico, stageLabel }: Props) {
   const [modalAberto, setModalAberto] = useState(false);
 
-  if (!historico || historico.length === 0) {
+  // 🔴 O mutirão de obras de 04/09 sai da tela aqui, e só aqui. Ver `historico-do-negocio.ts`
+  // para a régua, os números medidos e por que nada é apagado do banco.
+  const paraMostrar = useMemo(() => linhasVisiveisDoHistorico(historico), [historico]);
+
+  if (paraMostrar.length === 0) {
     return <p className="text-sm text-muted-foreground">Nenhuma movimentação registrada ainda.</p>;
   }
 
-  const visiveis = historico.slice(0, LIMITE_INICIAL);
-  const restantes = historico.length - visiveis.length;
+  const visiveis = paraMostrar.slice(0, LIMITE_INICIAL);
+  const restantes = paraMostrar.length - visiveis.length;
 
   return (
     <>
@@ -104,7 +109,7 @@ export function HistoricoMovimentacaoNegocio({ historico, stageLabel }: Props) {
             <DialogTitle>Histórico de Movimentação</DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] pr-3">
-            <HistoricoTimeline entries={historico} stageLabel={stageLabel} />
+            <HistoricoTimeline entries={paraMostrar} stageLabel={stageLabel} />
           </ScrollArea>
         </DialogContent>
       </Dialog>
