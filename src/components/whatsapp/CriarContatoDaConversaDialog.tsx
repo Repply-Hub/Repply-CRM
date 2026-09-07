@@ -15,6 +15,8 @@ import { CargoSelect } from '@/components/shared/CargoSelect';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { useClientes } from '@/hooks/use-clientes';
+import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
+import { useAuth } from '@/hooks/use-auth';
 import { useCriarContatoDaConversa } from '@/hooks/use-criar-contato-da-conversa';
 import { sugestaoDeContato, type ConversaParaContato } from '@/lib/contato-da-conversa';
 
@@ -48,6 +50,26 @@ export function CriarContatoDaConversaDialog({
   const sugestao = useMemo(() => sugestaoDeContato(conversa), [conversa]);
   const criar = useCriarContatoDaConversa();
   const { data: clientes } = useClientes();
+
+  // 🔴 A MESMA REGRA DA FICHA DE CONTATO, e não uma regra própria desta tela.
+  //
+  // Relatado pelo dono do produto em 06/09/2026: em Clientes o e-mail era exigido para criar um
+  // contato, e aqui não. Duas telas que criam a MESMA coisa cobrando coisas diferentes ensinam
+  // que a exigência é decoração — e a pessoa aprende a contornar a que atrapalha. Agora as duas
+  // leem `configuracoes_campos`, que é o interruptor que o gestor já tem em
+  // Configurações → Campos.
+  const { profile } = useAuth();
+  const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
+  const { data: camposDeContato, isLoading: carregandoCampos } = useConfiguracoesCampos(
+    'contatos',
+    empresaId,
+  );
+  // Enquanto a configuração não chegou, NÃO exige nada. O padrão `?? true` (o mesmo da ficha
+  // do cliente) vale para empresa sem linha configurada; usá-lo durante o carregamento
+  // travaria o botão sem explicação nenhuma nos primeiros instantes do diálogo.
+  const emailObrigatorio = carregandoCampos
+    ? false
+    : (camposDeContato?.find((c) => c.campo_key === 'email')?.obrigatorio ?? true);
 
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
@@ -110,7 +132,11 @@ export function CriarContatoDaConversaDialog({
     }
   };
 
-  const podeSalvar = !sugestao.impedimento && nome.trim().length > 0 && telefone.trim().length > 0;
+  const podeSalvar =
+    !sugestao.impedimento &&
+    nome.trim().length > 0 &&
+    telefone.trim().length > 0 &&
+    (!emailObrigatorio || email.trim().length > 0);
 
   return (
     <Dialog open={aberto} onOpenChange={(o) => !o && !criar.isPending && onFechar()}>
@@ -165,14 +191,20 @@ export function CriarContatoDaConversaDialog({
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="contato-email">E-mail</Label>
+                <Label htmlFor="contato-email">E-mail{emailObrigatorio ? ' *' : ''}</Label>
                 <Input
                   id="contato-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="opcional"
+                  placeholder={emailObrigatorio ? 'obrigatório nesta empresa' : 'opcional'}
                 />
+                {emailObrigatorio && (
+                  <p className="text-[11px] text-muted-foreground">
+                    O e-mail está marcado como obrigatório em Configurações → Campos. Um gestor
+                    pode torná-lo opcional por lá.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
