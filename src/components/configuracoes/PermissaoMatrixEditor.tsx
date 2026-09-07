@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { MODULOS, type Funcionalidade } from '@/hooks/use-permissoes';
-import { SECOES } from '@/lib/secoes';
+import { secaoQueMandaNoModulo } from '@/lib/secoes';
 import { useSecoesDaEmpresa } from '@/hooks/use-secoes';
 import {
   Plus, Eye, PenLine, Trash, ChevronDown, Search, Building2, Import, FileDown,
@@ -101,7 +101,7 @@ export function PermissaoMatrixEditor({
   const filteredModulos = MODULOS.filter(m => {
     if (searchModulo && !m.label.toLowerCase().includes(searchModulo.toLowerCase())) return false;
     if (!secoesDaEmpresa) return true;
-    const secao = SECOES.find(s => s.modulosPermissao.includes(m.key));
+    const secao = secaoQueMandaNoModulo(m.key);
     if (!secao?.desligavel) return true;
     return secoesDaEmpresa.get(secao.id) !== false;
   });

@@ -102,3 +102,19 @@ export function secaoDaRota(pathname: string): Secao | null {
   }
   return null;
 }
+
+/**
+ * Qual seção decide se este módulo aparece na matriz de permissões.
+ *
+ * 🔴 Existe porque `SECOES.find(...)` devolvia a PRIMEIRA da lista, e `pedidos` é citado por
+ * duas: `hoje` (desligável) vem antes de `pipeline` (não desligável). Como `hoje` nasce
+ * desligada no preset padrão, o módulo **Negócios** — o central do produto — sumia da tela de
+ * permissões das 7 empresas que não têm a pauta, sem ninguém perceber.
+ *
+ * A regra é: quando mais de uma seção cita o módulo, manda a que NÃO pode ser desligada. Ela é
+ * a que representa o acesso de verdade; a desligável é um recorte a mais em cima do mesmo dado.
+ */
+export function secaoQueMandaNoModulo(moduloKey: string): Secao | undefined {
+  const candidatas = SECOES.filter((s) => s.modulosPermissao.includes(moduloKey));
+  return candidatas.find((s) => !s.desligavel) ?? candidatas[0];
+}

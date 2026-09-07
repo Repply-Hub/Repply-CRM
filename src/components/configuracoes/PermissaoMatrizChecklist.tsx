@@ -1,7 +1,7 @@
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MODULOS } from '@/hooks/use-permissoes';
-import { SECOES } from '@/lib/secoes';
+import { secaoQueMandaNoModulo } from '@/lib/secoes';
 import { useSecoesDaEmpresa } from '@/hooks/use-secoes';
 import { cn } from '@/lib/utils';
 import type { MatrixModuloValue } from './PermissaoMatrixEditor';
@@ -68,7 +68,7 @@ export function PermissaoMatrizChecklist({
   // vazia a cada carregamento.
   const linhas = LINHAS.filter(linha => {
     if (!secoesDaEmpresa) return true;
-    const secao = SECOES.find(s => s.modulosPermissao.includes(linha.key));
+    const secao = secaoQueMandaNoModulo(linha.key);
     if (!secao?.desligavel) return true;
     return secoesDaEmpresa.get(secao.id) !== false;
   });

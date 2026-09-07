@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SECOES, SECOES_DESLIGAVEIS, secaoDaRota, type SecaoId } from './secoes';
+import { SECOES, SECOES_DESLIGAVEIS, secaoDaRota, secaoQueMandaNoModulo, type SecaoId } from './secoes';
 
 /**
  * POR QUE ESTE ARQUIVO EXISTE: o projeto tinha DUAS listas de módulos que não batiam —
@@ -70,5 +70,25 @@ describe('SECOES', () => {
   it('toda seção aponta para pelo menos um módulo da matriz de permissões', () => {
     // Se uma seção for desligada, a linha dela precisa sumir da matriz por usuário.
     for (const s of SECOES) expect(s.modulosPermissao.length).toBeGreaterThan(0);
+  });
+});
+
+describe('secaoQueMandaNoModulo', () => {
+  /**
+   * 🔴 `pedidos` é citado por DUAS seções: `hoje` (desligável, e desligada em 7 das 8 empresas)
+   * e `pipeline` (não desligável). Quem decide se a linha aparece na matriz de permissões tem
+   * que ser a NÃO desligável — senão o módulo Negócios some da tela de quem não tem a pauta.
+   */
+  it('devolve a seção não desligável quando duas citam o mesmo módulo', () => {
+    expect(secaoQueMandaNoModulo('pedidos')?.id).toBe('pipeline');
+  });
+
+  it('devolve a única seção quando só uma cita o módulo', () => {
+    expect(secaoQueMandaNoModulo('obras')?.id).toBe('obras');
+    expect(secaoQueMandaNoModulo('portal')?.id).toBe('portal');
+  });
+
+  it('devolve indefinido para módulo que nenhuma seção cita', () => {
+    expect(secaoQueMandaNoModulo('modulo_que_nao_existe')).toBeUndefined();
   });
 });
