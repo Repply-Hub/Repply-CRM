@@ -1,4 +1,5 @@
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MODULOS } from '@/hooks/use-permissoes';
 import { secaoQueMandaNoModulo } from '@/lib/secoes';
@@ -39,6 +40,12 @@ const ACOES = [
   { campo: 'pode_editar' as const, label: 'Editar' },
   { campo: 'pode_excluir' as const, label: 'Excluir' },
 ];
+
+// Funcionalidades que o gestor precisa alcançar pessoa a pessoa. As demais continuam só no
+// editor de presets — esta tela é uma matriz de leitura rápida, não um formulário completo.
+const FUNCIONALIDADES_NA_MATRIZ: Record<string, string[]> = {
+  pedidos: ['pauta_de_todos'],
+};
 
 // Ação que o módulo não tem como cumprir — o texto de `MODULOS` já marca isso
 // com "Não aplicável". A caixa aparece igual (o mockup mostra caixa vazia, não
@@ -131,6 +138,27 @@ export function PermissaoMatrizChecklist({
                         naoAplicavel && 'opacity-40',
                       )}
                     />
+                  </div>
+                );
+              })}
+
+              {(FUNCIONALIDADES_NA_MATRIZ[linha.key] ?? []).map(chaveFunc => {
+                const modulo = MODULOS.find(m => m.key === linha.key);
+                const func = modulo?.funcionalidades.find(f => f.key === chaveFunc);
+                if (!func) return null;
+                const ligada = perm?.funcionalidades?.[chaveFunc] === true;
+                return (
+                  <div key={chaveFunc} className="col-span-5 flex items-center gap-2 pl-6 pt-1">
+                    <Switch
+                      checked={ligada}
+                      aria-label={func.label}
+                      onCheckedChange={v =>
+                        onChange(linha.key, {
+                          funcionalidades: { ...(perm?.funcionalidades ?? {}), [chaveFunc]: v },
+                        })
+                      }
+                    />
+                    <span className="text-xs text-muted-foreground">{func.label}</span>
                   </div>
                 );
               })}

@@ -116,6 +116,12 @@ const MODULOS: ModuloDescricao[] = [
       { key: 'whatsapp', label: 'WhatsApp', descricao: 'Enviar cobrança ou acompanhamento via WhatsApp', icon: 'whatsapp' },
       { key: 'mover_cards', label: 'Mover Cards', descricao: 'Arrastar cards entre as etapas do Kanban', icon: 'move' },
       { key: 'filtrar_avancado', label: 'Filtro Avançado', descricao: 'Usar filtros por vendedor, fabricante e período no Kanban', icon: 'filter' },
+      {
+        key: 'pauta_de_todos',
+        label: 'Ver a pauta de toda a equipe',
+        descricao: 'Na tela "Hoje", ver e agir sobre os negócios dos colegas, não só os próprios',
+        icon: 'users',
+      },
     ],
   },
   {
