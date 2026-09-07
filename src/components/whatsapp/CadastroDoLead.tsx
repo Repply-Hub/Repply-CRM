@@ -1,4 +1,5 @@
-import { Loader2, Link2, User, UserPlus, TriangleAlert } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, Link2, User, UserPlus, TriangleAlert, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
@@ -8,6 +9,7 @@ import {
   useVincularContatoExistente,
 } from '@/hooks/use-contato-por-telefone';
 import { telefoneParaCadastro } from '@/lib/contato-da-conversa';
+import { VincularContatoExistente } from './VincularContatoExistente';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 
 interface CadastroDoLeadProps {
@@ -48,6 +50,9 @@ export function CadastroDoLead({ conversa, onCadastrar }: CadastroDoLeadProps) {
   // empresa. Reaproveita a mesma busca já em cache — não custa consulta a mais.
   const { parecidos } = useContatosParecidos(conversa.nome_contato, !conversa.is_group);
   const vincular = useVincularContatoExistente();
+  // A terceira camada: procurar à mão. Ver `VincularContatoExistente.tsx` para o caso que a
+  // obrigou a existir (o Djair, com três fichas no CRM e nenhuma alcançável pelas duas réguas).
+  const [procurando, setProcurando] = useState(false);
 
   const amarrar = async (contatoId: string, clienteId: string | null, nome: string | null) => {
     try {
@@ -131,15 +136,33 @@ export function CadastroDoLead({ conversa, onCadastrar }: CadastroDoLeadProps) {
           {/* 🔴 A saída para quando NENHUM deles é a pessoa certa. Sem ela, quem fala com o
               engenheiro pelo telefone do escritório fica sem caminho — e o reconhecimento
               viraria uma parede em vez de um atalho. */}
-          <button
-            type="button"
-            onClick={onCadastrar}
-            className="mt-2.5 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-          >
-            Não é nenhum desses — cadastrar como contato novo
-          </button>
+          {/* As duas saídas para quando nenhum deles é a pessoa certa. Procurar vem antes de
+              cadastrar de propósito: o cadastro repetido é o estrago que esta tela evita, e
+              quem chega até aqui já sabe que o telefone não bate com quem ele procura. */}
+          <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1.5">
+            <button
+              type="button"
+              onClick={() => setProcurando(true)}
+              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              Procurar outro contato no cadastro
+            </button>
+            <button
+              type="button"
+              onClick={onCadastrar}
+              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              Não é nenhum desses — cadastrar como contato novo
+            </button>
+          </div>
         </div>
         <Separator />
+
+        <VincularContatoExistente
+          aberto={procurando}
+          onFechar={() => setProcurando(false)}
+          conversa={conversa}
+        />
       </div>
     );
   }
@@ -156,10 +179,29 @@ export function CadastroDoLead({ conversa, onCadastrar }: CadastroDoLeadProps) {
             ? 'Cadastre para ela aparecer na busca de contatos, nos negócios e nas obras.'
             : 'Este número não tem o formato de um telefone brasileiro, então não deu para procurar no cadastro.'}
         </p>
-        <Button size="sm" className="mt-2.5 gap-1.5" onClick={onCadastrar}>
-          <UserPlus className="h-3.5 w-3.5" />
-          Cadastrar como contato
-        </Button>
+        {/* 🔴 DUAS SAÍDAS, e não uma. Até 06/09/2026 só havia "Cadastrar", e o painel dizia
+            "esta pessoa não está no CRM" com a confiança de quem sabe — quando na verdade ele
+            só não a RECONHECEU. No caso do Djair havia três fichas dele no cadastro, e o único
+            botão oferecido criava a quarta. */}
+        <div className="mt-2.5 flex flex-wrap gap-2">
+          <Button size="sm" className="gap-1.5" onClick={onCadastrar}>
+            <UserPlus className="h-3.5 w-3.5" />
+            Cadastrar como contato
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => setProcurando(true)}
+          >
+            <Search className="h-3.5 w-3.5" />
+            Vincular a um contato existente
+          </Button>
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Não achamos pelo número nem pelo nome — mas a pessoa pode estar cadastrada com outro
+          telefone, ou sem telefone nenhum. Vale procurar antes de cadastrar de novo.
+        </p>
       </div>
 
       {/* 🔴 SEGUNDA CAMADA: o palpite pelo NOME, e ele tem cara diferente do reconhecimento por
@@ -230,6 +272,12 @@ export function CadastroDoLead({ conversa, onCadastrar }: CadastroDoLeadProps) {
         </div>
       )}
       <Separator />
+
+      <VincularContatoExistente
+        aberto={procurando}
+        onFechar={() => setProcurando(false)}
+        conversa={conversa}
+      />
     </div>
   );
 }

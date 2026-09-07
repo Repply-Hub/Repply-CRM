@@ -313,3 +313,69 @@ export function contatosComNomeParecido<T extends ContatoCadastrado>(
     .slice(0, limite)
     .map((x) => x.c);
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * PROCURAR UM CONTATO À MÃO
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** Sem acento e em minúsculas — para "Djair" achar "djair" e "Construções" achar "construcoes". */
+function semAcento(texto: string | null | undefined): string {
+  return (texto ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+/**
+ * Procurar um contato pelo que a pessoa digita — a saída para quando NEM o telefone NEM o nome
+ * reconheceram ninguém.
+ *
+ * 🔴 O CASO QUE OBRIGOU ISTO A EXISTIR, relatado pelo dono do produto em 06/09/2026. O Djair da
+ * Licenge tem três fichas no CRM e o chat dele oferecia só "Cadastrar como contato" — criar a
+ * quarta. As duas camadas automáticas falharam por motivos diferentes, e nenhuma delas é
+ * conserto de régua:
+ *
+ *   - por TELEFONE: a ficha guarda `6143498404030`, um dos 383 números corrompidos na
+ *     importação de 24/07. É o celular dele embaralhado (a fórmula devolve `5584999202015`,
+ *     exatamente o número de onde ele fala) — mas, do jeito que está gravado, nenhuma
+ *     comparação honesta o encontra;
+ *   - por NOME: a ficha que casaria ("Djair - Licenge") **está sem telefone**, e a consulta de
+ *     reconhecimento pedia `telefone não vazio`. Medido: **196 contatos** ficavam de fora por
+ *     isso, 104 deles com empresa vinculada. Esse filtro caiu junto com esta função.
+ *
+ * Mesmo com os dois consertos, sobra o caso em que o cadastro simplesmente não se parece com o
+ * que o WhatsApp mostra. Aí só a pessoa sabe — e ela precisa de um jeito de dizer.
+ *
+ * A BUSCA OLHA NOME, EMPRESA E TELEFONE. A empresa entra porque é ela que salva quem não tem
+ * telefone no cadastro: digitar "licenge" acha o Djair que nenhuma régua automática acharia.
+ *
+ * TODAS as palavras precisam bater, em qualquer ordem e em qualquer um dos três campos. Com
+ * 2.013 contatos, exigir só uma devolveria uma lista onde se clica no errado — a mesma razão
+ * pela qual `contatosComNomeParecido` pede duas palavras.
+ */
+export function contatosQueCasamComTexto<T extends ContatoCadastrado>(
+  termo: string | null | undefined,
+  contatos: readonly T[] | null | undefined,
+): T[] {
+  const lista = contatos ?? [];
+  if (!lista.length) return [];
+
+  const porNome = [...lista].sort((a, b) =>
+    semAcento(a.nome_contato).localeCompare(semAcento(b.nome_contato), 'pt-BR'),
+  );
+
+  const palavras = semAcento(termo).split(/\s+/).filter(Boolean);
+  if (palavras.length === 0) return porNome;
+
+  return porNome.filter((c) => {
+    // O telefone entra duas vezes: como está escrito e só com os dígitos, para "84999202015"
+    // achar quem está gravado como "(84) 99920-2015".
+    const alvo = [
+      semAcento(c.nome_contato),
+      semAcento(c.empresa),
+      semAcento(c.telefone),
+      (c.telefone ?? '').replace(/\D/g, ''),
+    ].join(' ');
+    return palavras.every((p) => alvo.includes(p));
+  });
+}

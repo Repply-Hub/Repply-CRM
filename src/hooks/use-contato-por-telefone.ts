@@ -54,6 +54,18 @@ export interface ContatoReconhecido {
  * 🔴 O RECORTE POR EMPRESA É DO BANCO. A política de `contatos` só devolve os da empresa de
  * quem está logado. Medido: sem esse recorte, 2 conversas casariam com contato de OUTRA
  * empresa assinante.
+ *
+ * 🔴 TRAZ TAMBÉM QUEM ESTÁ SEM TELEFONE, e isto foi um defeito real até 06/09/2026. A consulta
+ * pedia `telefone não vazio` — o que parece óbvio para casar por número e, sem ninguém notar,
+ * apagou as outras duas formas de encontrar alguém: pelo NOME e pela BUSCA À MÃO.
+ *
+ * O caso que expôs isso: o Djair da Licenge tem a ficha "Djair - Licenge" **sem telefone**, e o
+ * chat dele oferecia só "Cadastrar como contato" — criar a quarta ficha da mesma pessoa. Medido
+ * em produção: **196 contatos** ficavam invisíveis por este filtro, 104 deles com empresa
+ * vinculada.
+ *
+ * Trazê-los não afrouxa o casamento por telefone: `chavesDeTelefone(null)` devolve lista vazia,
+ * e lista vazia não casa com chave nenhuma.
  */
 async function buscarContatosParaReconhecimento(): Promise<ContatoReconhecido[]> {
   const TAMANHO_DA_PAGINA = 1000;
@@ -64,7 +76,6 @@ async function buscarContatosParaReconhecimento(): Promise<ContatoReconhecido[]>
     const { data, error } = await supabase
       .from('contatos')
       .select('id, nome_contato, telefone, cargo, cliente_id, empresa, cliente:clientes!cliente_id(empresa)')
-      .not('telefone', 'is', null)
       .range(de, de + TAMANHO_DA_PAGINA - 1);
     if (error) throw error;
 
@@ -159,6 +170,30 @@ export function useContatosParecidos(
   );
 
   return { parecidos, carregando: consulta.isLoading };
+}
+
+/**
+ * A carteira inteira de contatos, para a pessoa procurar à mão quem o sistema não reconheceu.
+ *
+ * 🔴 A TERCEIRA CAMADA, e a única que nunca erra — porque quem decide é gente. As duas
+ * automáticas falharam juntas no caso do Djair (telefone corrompido na importação, e a ficha
+ * que casaria pelo nome estava sem telefone), e o chat não oferecia saída nenhuma além de
+ * criar a quarta ficha da mesma pessoa.
+ *
+ * Reaproveita a MESMA busca das outras duas camadas (mesma `queryKey`): abrir o diálogo não
+ * custa consulta nenhuma quando o painel do lead já carregou a lista.
+ */
+export function useContatosParaVincular(habilitado: boolean) {
+  const consulta = useQuery({
+    queryKey: ['contatos_para_reconhecimento'],
+    queryFn: buscarContatosParaReconhecimento,
+    enabled: habilitado,
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
+    refetchOnWindowFocus: false,
+  });
+
+  return { contatos: consulta.data ?? [], carregando: consulta.isLoading };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, cleanup, act } from '@testing-library/react';
+import { renderHook, cleanup, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 /**
@@ -21,6 +21,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 let respostaDoUpdate: { data: unknown; error: unknown } = { data: [{ id: 'conv-1' }], error: null };
 const atualizou = vi.fn();
+/** Registra qualquer `.not(...)` na consulta de reconhecimento — ver o teste do Djair. */
+const filtrouContatos = vi.fn();
+const contatosDoBanco = [
+  { id: 'c-1', nome_contato: 'Djair - Licenge', telefone: null, cargo: null, cliente_id: 'cli-1', empresa: null, cliente: { empresa: 'Construtora Licenge Ltda' } },
+  { id: 'c-2', nome_contato: 'Nara - Licenge', telefone: '(84) 3388-0040', cargo: null, cliente_id: 'cli-1', empresa: null, cliente: { empresa: 'Construtora Licenge Ltda' } },
+];
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -33,11 +39,18 @@ vi.mock('@/integrations/supabase/client', () => ({
           }),
         };
       },
-      // `useContatosComEsteTelefone` pagina contatos; não é o alvo destes testes, mas o mock
-      // precisa existir para o módulo carregar sem estourar.
-      select: () => ({
-        not: () => ({ range: async () => ({ data: [], error: null }) }),
-      }),
+      // A consulta de reconhecimento. O mock aceita `.not(...)` mas ANOTA a chamada: é assim
+      // que o teste do Djair percebe se alguém devolver o filtro de telefone.
+      select: () => {
+        const cadeia = {
+          not: (...args: unknown[]) => {
+            filtrouContatos(...args);
+            return cadeia;
+          },
+          range: async () => ({ data: contatosDoBanco, error: null }),
+        };
+        return cadeia;
+      },
     }),
   },
 }));
@@ -45,6 +58,7 @@ vi.mock('@/integrations/supabase/client', () => ({
 import {
   useDesvincularConversa,
   useVincularContatoExistente,
+  useContatosParaVincular,
 } from './use-contato-por-telefone';
 
 function envolver() {
@@ -147,5 +161,48 @@ describe('useVincularContatoExistente', () => {
         await result.current.mutateAsync({ conversaId: 'conv-1', contatoId: 'ct-9' });
       }),
     ).rejects.toThrow(/regra de segurança/i);
+  });
+});
+
+describe('a busca de contatos para reconhecer NÃO exclui quem está sem telefone', () => {
+  it('🔴 traz o contato sem telefone — é a ficha "Djair - Licenge" do caso real de 06/09/2026', async () => {
+    const { wrapper } = envolver();
+    const { result } = renderHook(() => useContatosParaVincular(true), { wrapper });
+
+    await waitFor(() => expect(result.current.carregando).toBe(false));
+
+    const semTelefone = result.current.contatos.find((c) => c.telefone === null);
+    expect(
+      semTelefone,
+      'A consulta voltou a esconder quem está sem telefone. Foi assim que o chat do Djair ' +
+        'ofereceu só "Cadastrar como contato", embora ele tivesse três fichas no CRM — e são ' +
+        '196 contatos nessa situação nesta base.',
+    ).toBeDefined();
+    expect(semTelefone?.nome_contato).toBe('Djair - Licenge');
+  });
+
+  it('🔴 nenhum `.not()` é aplicado à consulta — o filtro de telefone não pode voltar', async () => {
+    const { wrapper } = envolver();
+    const { result } = renderHook(() => useContatosParaVincular(true), { wrapper });
+
+    await waitFor(() => expect(result.current.carregando).toBe(false));
+
+    expect(
+      filtrouContatos.mock.calls,
+      'Alguém adicionou um filtro na consulta de reconhecimento. Se for `telefone is null`, ' +
+        'ele apaga o casamento por NOME e a busca à mão de quem não tem telefone gravado.',
+    ).toEqual([]);
+  });
+
+  it('o nome da empresa vem do vínculo quando o contato não tem o texto solto', async () => {
+    const { wrapper } = envolver();
+    const { result } = renderHook(() => useContatosParaVincular(true), { wrapper });
+
+    await waitFor(() => expect(result.current.carregando).toBe(false));
+
+    expect(result.current.contatos.map((c) => c.empresa)).toEqual([
+      'Construtora Licenge Ltda',
+      'Construtora Licenge Ltda',
+    ]);
   });
 });

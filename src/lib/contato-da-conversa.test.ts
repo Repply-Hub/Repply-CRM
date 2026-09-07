@@ -8,6 +8,7 @@ import {
   contatosComMesmoTelefone,
   contatosComNomeParecido,
   palavrasDoNome,
+  contatosQueCasamComTexto,
 } from './contato-da-conversa';
 
 describe('telefoneParaCadastro', () => {
@@ -343,5 +344,57 @@ describe('contatosComNomeParecido', () => {
     expect(contatosComNomeParecido('Ana', contatos)).toEqual([]);
     expect(contatosComNomeParecido('Anae - Qualita', [])).toEqual([]);
     expect(contatosComNomeParecido(null, contatos)).toEqual([]);
+  });
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * PROCURAR UM CONTATO À MÃO, para amarrar a conversa a ele
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe('contatosQueCasamComTexto', () => {
+  const base = [
+    { id: '1', nome_contato: 'Djair - Licenge', telefone: null, empresa: 'Construtora Licenge Ltda' },
+    { id: '2', nome_contato: 'Djair - Hospital do Rim', telefone: '(84) 99920-2015', empresa: null },
+    { id: '3', nome_contato: 'Nara - Licenge', telefone: '(84) 3388-0040', empresa: 'Construtora Licenge Ltda' },
+    { id: '4', nome_contato: 'Fredy', telefone: '(84) 98324-3428', empresa: 'Outra' },
+  ];
+
+  it('sem termo, devolve todo mundo em ordem de nome', () => {
+    expect(contatosQueCasamComTexto('', base).map((c) => c.id)).toEqual(['2', '1', '4', '3']);
+  });
+
+  it('acha pelo nome, ignorando maiúsculas e acento', () => {
+    expect(contatosQueCasamComTexto('DJAIR', base).map((c) => c.id)).toEqual(['2', '1']);
+  });
+
+  it('🔴 acha pela EMPRESA — é assim que se encontra quem não tem telefone no cadastro', () => {
+    expect(contatosQueCasamComTexto('licenge', base).map((c) => c.id)).toEqual(['1', '3']);
+  });
+
+  it('acha pelo telefone mesmo escrito sem máscara', () => {
+    expect(contatosQueCasamComTexto('84999202015', base).map((c) => c.id)).toEqual(['2']);
+  });
+
+  it('🔴 todas as palavras precisam bater — é o que faz "djair licenge" apontar UM só', () => {
+    expect(contatosQueCasamComTexto('djair licenge', base).map((c) => c.id)).toEqual(['1']);
+  });
+
+  it('acha quem tem acento no nome digitando sem acento, e vice-versa', () => {
+    const acentuados = [
+      { id: 'v', nome_contato: 'Ver' + String.fromCharCode(244) + 'nica Concei' + String.fromCharCode(231) + String.fromCharCode(227) + 'o', telefone: null, empresa: null },
+    ];
+    expect(contatosQueCasamComTexto('veronica', acentuados).map((c) => c.id)).toEqual(['v']);
+    expect(contatosQueCasamComTexto('concei' + String.fromCharCode(231) + String.fromCharCode(227) + 'o', acentuados).map((c) => c.id)).toEqual(['v']);
+  });
+
+  it('contato sem nome não quebra a busca', () => {
+    const comNulo = [{ id: 'x', nome_contato: null, telefone: null, empresa: null }];
+    expect(contatosQueCasamComTexto('qualquer', comNulo)).toEqual([]);
+    expect(contatosQueCasamComTexto('', comNulo).map((c) => c.id)).toEqual(['x']);
+  });
+
+  it('lista vazia ou indefinida devolve vazio', () => {
+    expect(contatosQueCasamComTexto('djair', [])).toEqual([]);
+    expect(contatosQueCasamComTexto('djair', undefined)).toEqual([]);
   });
 });
