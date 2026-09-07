@@ -62,6 +62,7 @@ import { formatarTelefone } from "@/lib/telefone";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { usePedidosPorCliente } from "@/hooks/use-pedidos";
+import { PainelDeNegocios } from "@/components/pedidos/PainelDeNegocios";
 import { clienteDoContato } from "@/lib/vinculo-contato-cliente";
 import { BotaoVerConversa } from "@/components/whatsapp/BotaoVerConversa";
 import {
@@ -148,7 +149,7 @@ const ContatoDetalhe = () => {
   // `enabled: !!empresaId && enabled` e o primeiro argumento ia vazio. O teto de 500 nunca foi o
   // limitador; a lista era sempre vazia. `usePedidosPorCliente` já existe, já é usado na ficha da
   // empresa, e traz todos os negócios do cliente (sem teto, de propósito — ver use-pedidos.ts).
-  const { data: pedidosRelacionados = [] } = usePedidosPorCliente(
+  const { data: pedidosRelacionados = [], isLoading: carregandoNegocios } = usePedidosPorCliente(
     contato?.cliente_id,
   );
   // As obras vêm da tabela de vínculo, não mais de `contatos.obra_id` (que virou
@@ -547,101 +548,29 @@ const ContatoDetalhe = () => {
           </Card>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          {/* Card: Resumo de Negócios */}
-          <Card className="md:col-span-3">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                <History className="h-4 w-4" /> Histórico de Negócios (Via
-                Empresa)
-              </CardTitle>
-              <Badge variant="outline">
-                {pedidosRelacionados.length} Registros
-              </Badge>
-            </CardHeader>
-            <CardContent>
-              {pedidosRelacionados.length === 0 ? (
-                <div className="py-10 text-center border-2 border-dashed rounded-xl">
-                  <p className="text-sm text-muted-foreground">
-                    Nenhum negócio vinculado a esta empresa.
-                  </p>
-                </div>
-              ) : (
-                <div className="rounded-xl border overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="text-xs">Fabricante</TableHead>
-                        <TableHead className="text-xs">Valor</TableHead>
-                        <TableHead className="text-xs">Etapa</TableHead>
-                        <TableHead className="text-xs">Data</TableHead>
-                        <TableHead className="text-right text-xs">
-                          Ações
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pedidosRelacionados.slice(0, 5).map((p) => (
-                        <TableRow
-                          key={p.id}
-                          className="hover:bg-muted/20 transition-colors"
-                        >
-                          <TableCell className="font-medium text-sm">
-                            {(p as any).fabricante?.nome || "—"}
-                          </TableCell>
-                          <TableCell className="text-sm font-semibold text-primary">
-                            {(p.valor_total ?? 0).toLocaleString("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            })}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px] capitalize"
-                            >
-                              {p.status.replace("_", " ")}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {format(new Date(p.data_pedido), "dd/MM/yyyy", {
-                              locale: ptBR,
-                            })}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => navigate(`/app`)}
-                              className="h-8 text-xs"
-                            >
-                              Ver Negócio
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  {pedidosRelacionados.length > 5 && (
-                    <div className="p-3 bg-muted/10 text-center border-t">
-                      <Button
-                        variant="link"
-                        className="text-xs h-auto p-0"
-                        onClick={() =>
-                          clienteVinculado &&
-                          navigate(`/clientes/${clienteVinculado.id}`)
-                        }
-                      >
-                        Ver todos os {pedidosRelacionados.length} negócios na
-                        página da empresa
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        {/* 🔴 O MESMO PAINEL DA FICHA DA EMPRESA, e não uma tabela parecida.
+            Até 06/09/2026 esta ficha tinha uma tabela própria: cinco linhas fixas, quatro
+            colunas, sem filtro, sem ordenação, e um botão "Ver Negócio" que chamava
+            `navigate('/app')` — ou seja, não levava a negócio nenhum. Agora as duas fichas
+            desenham `PainelDeNegocios`, entao elas nao tem como divergir de novo.
+
+            Os negócios são os da EMPRESA do contato: negócio pertence à construtora, e é assim
+            que a ficha da pessoa mostra em que ela está envolvida. O título diz isso, para
+            ninguém achar que são negócios da pessoa. */}
+        <PainelDeNegocios
+          pedidos={pedidosRelacionados}
+          carregando={carregandoNegocios}
+          titulo={
+            clienteVinculado
+              ? `Negócios de ${clienteVinculado.empresa}`
+              : "Negócios da empresa"
+          }
+          mensagemVazio={
+            contato?.cliente_id
+              ? "Nenhum negócio nesta empresa ainda."
+              : "Este contato não está vinculado a nenhuma empresa, então não há negócios para mostrar."
+          }
+        />
 
         {/* A grade inteira sai quando a empresa não contratou Tarefas: ela só contém este
             card, então não sobra div vazia nem espaçamento fantasma. O TarefaFormDialog
