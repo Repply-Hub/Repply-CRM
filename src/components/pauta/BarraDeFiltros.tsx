@@ -48,7 +48,14 @@ export function BarraDeFiltros({ empresaId, filtros, onChange, podeFiltrarPorRes
     vistos.add(c.slug);
     return true;
   });
-  const quantos = filtros.etapas.length + filtros.fabricantes.length + filtros.responsaveis.length;
+  // O responsável só entra na conta quando o controle dele existe na barra. Sem a chave, o
+  // `?responsaveis=` que tenha sobrado no endereço não é mandado para o servidor
+  // (`RadarDeRisco.tsx`), então contá-lo aqui deixaria um crachá "1 filtro" e um botão "Limpar"
+  // apontando para um recorte que não está mais acontecendo — e sem dizer qual filtro é.
+  const quantos =
+    filtros.etapas.length +
+    filtros.fabricantes.length +
+    (podeFiltrarPorResponsavel ? filtros.responsaveis.length : 0);
 
   return (
     <div className="mt-5 flex flex-wrap items-center gap-2">

@@ -105,10 +105,33 @@ describe('vePautaDeTodos — o que o `jsonb` pode devolver de estranho', () => {
     expect(vePautaDeTodos('vendedor', [linhaDeNegocios({ pauta_de_todos: null })])).toBe(false);
   });
 
-  it('valor irreconhecível cai no papel em vez de derrubar a tela', () => {
-    // Divergência deliberada e documentada: no banco o `::boolean` estouraria `22P02`.
-    // Nenhuma tela grava isso; se acontecer, a tela erra para o lado do papel, não para o erro.
-    expect(vePautaDeTodos('gestor', [linhaDeNegocios({ pauta_de_todos: 'talvez' })])).toBe(true);
-    expect(vePautaDeTodos('vendedor', [linhaDeNegocios({ pauta_de_todos: 1 })])).toBe(false);
+  it('1 e 0 valem como booleano — é o que o `::boolean` do banco responde', () => {
+    // Medido no Postgres: ('{"k":1}'::jsonb ->> 'k')::boolean -> true, e 0 -> false.
+    // O JSON pode trazer número ou texto; `->>` entrega os dois como o mesmo texto.
+    expect(vePautaDeTodos('vendedor', [linhaDeNegocios({ pauta_de_todos: 1 })])).toBe(true);
+    expect(vePautaDeTodos('gestor', [linhaDeNegocios({ pauta_de_todos: 0 })])).toBe(false);
+    expect(vePautaDeTodos('vendedor', [linhaDeNegocios({ pauta_de_todos: '1' })])).toBe(true);
+    expect(vePautaDeTodos('gestor', [linhaDeNegocios({ pauta_de_todos: '0' })])).toBe(false);
+  });
+
+  it('as palavras que o Postgres aceita, sem diferenciar maiúscula nem espaço nas pontas', () => {
+    // Inclui os prefixos não ambíguos ('tr', 'fals'…), que o cast do banco também aceita.
+    for (const sim of ['t', 'tr', 'tru', 'true', 'TRUE', 'True', 'y', 'ye', 'yes', 'YES', 'on', 'ON', ' true ']) {
+      expect(vePautaDeTodos('vendedor', [linhaDeNegocios({ pauta_de_todos: sim })])).toBe(true);
+    }
+    for (const nao of ['f', 'fa', 'fal', 'fals', 'false', 'FALSE', 'n', 'no', 'NO', 'off', 'OFF', ' false ']) {
+      expect(vePautaDeTodos('gestor', [linhaDeNegocios({ pauta_de_todos: nao })])).toBe(false);
+    }
+  });
+
+  it('o que o Postgres RECUSARIA cai no papel em vez de derrubar a tela', () => {
+    // Divergência deliberada e documentada: no banco o `::boolean` estoura `22P02` — e o erro
+    // não fica nesta resposta, ele derruba a `pauta_do_dia_de` inteira. Nenhuma tela grava
+    // isso; se acontecer, a tela erra para o lado do papel, não para o erro.
+    // 'o' está aqui porque é ambíguo entre 'on' e 'off', e o banco o recusa.
+    for (const recusado of ['talvez', '', 'o', 2, -1, '01', 'sim', {}, []]) {
+      expect(vePautaDeTodos('gestor', [linhaDeNegocios({ pauta_de_todos: recusado })])).toBe(true);
+      expect(vePautaDeTodos('vendedor', [linhaDeNegocios({ pauta_de_todos: recusado })])).toBe(false);
+    }
   });
 });

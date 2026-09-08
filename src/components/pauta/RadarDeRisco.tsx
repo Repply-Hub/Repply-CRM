@@ -62,7 +62,15 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
   const { data: bruto } = useDashboardNegociosRisco(empresaId, {
     etapas: filtros.etapas,
     fabricanteIds: filtros.fabricantes,
-    usuarioIds: filtros.responsaveis,
+    // 🔴 Sem a chave `pauta_de_todos`, o filtro de responsável NÃO vai para o servidor — nem
+    // que ele esteja no endereço. Os filtros moram na URL (ver `filtros-do-painel.ts`), e
+    // revogar a chave de alguém não limpa o `?responsaveis=` que essa pessoa já tinha salvo ou
+    // favoritado: o controle sumia da barra e o recorte continuava valendo, com os três cartões
+    // mostrando números que não correspondiam a nenhum controle visível.
+    // `undefined` (e não `[]`) é o que significa "sem filtro": array vazio vira `= ANY('{}')`,
+    // que não casa com nada e zeraria o painel (CLAUDE.md §7.8). Quem faz essa conversão é o
+    // `useDashboardNegociosRisco`, do mesmo jeito para os quatro filtros.
+    usuarioIds: podeFiltrarPorResponsavel ? filtros.responsaveis : undefined,
   });
 
   const risco = useMemo(() => ({

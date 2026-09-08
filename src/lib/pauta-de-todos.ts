@@ -45,19 +45,57 @@ const MODULO = 'pedidos';
 const CHAVE = 'pauta_de_todos';
 
 /**
+ * As duas listas que a entrada de `boolean` do Postgres aceita, na íntegra.
+ *
+ * Além de `true`/`false`/`yes`/`no`/`on`/`off`/`1`/`0`, o Postgres aceita qualquer **prefixo não
+ * ambíguo** das palavras — por isso `t`, `tr`, `tru`, `y`, `ye`, `f`, `fa`, `fal`, `fals` e `n`
+ * estão aqui. `o` sozinho fica de fora de propósito: é ambíguo entre `on` e `off`, e o banco o
+ * recusa. Maiúscula não diferencia e espaço nas pontas é ignorado — por isso a normalização
+ * abaixo faz `trim().toLowerCase()` antes de consultar.
+ */
+const TEXTOS_VERDADEIROS = new Set(['t', 'tr', 'tru', 'true', 'y', 'ye', 'yes', 'on', '1']);
+const TEXTOS_FALSOS = new Set(['f', 'fa', 'fal', 'fals', 'false', 'n', 'no', 'off', '0']);
+
+/**
  * Traduz o valor cru da chave em "sim", "não" ou "não está configurada".
  *
  * `funcionalidades` é `jsonb`, então o que chega no navegador pode não ser booleano mesmo que a
- * tela de permissões só grave booleano. O `::boolean` do banco aceita `'true'`/`'false'` como
- * texto e **estoura `22P02`** em qualquer outra coisa. A tela não pode estourar: valor
- * irreconhecível é tratado como "não configurada" e cai no papel — é a divergência deliberada,
- * e ela só existe num estado que nenhuma tela produz.
+ * tela de permissões só grave booleano — e o `::boolean` do banco é MUITO mais permissivo do que
+ * "só `true` e `false`". Medido no próprio Postgres em 07/09/2026:
+ *
+ *   ('{"k":1}'::jsonb      ->> 'k')::boolean  ->  true
+ *   ('{"k":0}'::jsonb      ->> 'k')::boolean  ->  false
+ *   ('{"k":"yes"}'::jsonb  ->> 'k')::boolean  ->  true
+ *   ('{"k":"t"}'::jsonb    ->> 'k')::boolean  ->  true
+ *   ('{"k":"on"}'::jsonb   ->> 'k')::boolean  ->  true
+ *   ('{"k":"TRUE"}'::jsonb ->> 'k')::boolean  ->  true
+ *
+ * Este arquivo existe para reproduzir a função do banco cláusula por cláusula, então ele aceita
+ * exatamente o mesmo conjunto — ver `TEXTOS_VERDADEIROS` e `TEXTOS_FALSOS`. O número `1` do JSON
+ * entra por aqui também: `->>` o entrega como o texto `'1'`, que o cast aceita.
+ *
+ * 🔴 **O QUE O POSTGRES RECUSARIA (`'talvez'`, `2`, `''`, `'o'`, objeto, lista) CAI NO PAPEL**,
+ * como se a chave não estivesse gravada. É escolha explícita, por dois motivos:
+ *
+ *   1. **A tela não pode estourar.** Lá o cast levanta `22P02` e derruba a chamada inteira —
+ *      `ve_pauta_de_todos` é consultada de dentro de `pauta_do_dia_de`, então o erro apaga a
+ *      pauta do dia, não só esta resposta. Não há aqui uma "resposta do banco" para copiar:
+ *      o banco não responde, ele falha.
+ *   2. **Cair no papel é a resposta menos surpreendente**, porque é a mesma que a pessoa já
+ *      recebe hoje — medido em 07/09/2026, **zero** linhas de `permissoes_usuario` têm a chave
+ *      gravada, e nenhum escritor produz não-booleano (o `Switch` da matriz manda `boolean`; o
+ *      backfill do preset usa `to_jsonb(...)` sobre uma comparação).
  */
 function chaveGravada(valor: unknown): boolean | null {
-  if (valor === true || valor === 'true') return true;
-  if (valor === false || valor === 'false') return false;
-  // `null` dentro do JSON conta como ausente no banco também: `funcionalidades ? 'chave'` é
-  // verdadeiro, mas `->> 'chave'` devolve NULL e o `coalesce` cai no papel do mesmo jeito.
+  // `null` e `undefined` (e qualquer objeto ou lista) contam como ausente. No banco vale o
+  // mesmo para o `null` do JSON: `funcionalidades ? 'chave'` é verdadeiro, mas `->> 'chave'`
+  // devolve NULL e o `coalesce` cai no papel do mesmo jeito.
+  if (typeof valor !== 'boolean' && typeof valor !== 'number' && typeof valor !== 'string') {
+    return null;
+  }
+  const texto = String(valor).trim().toLowerCase();
+  if (TEXTOS_VERDADEIROS.has(texto)) return true;
+  if (TEXTOS_FALSOS.has(texto)) return false;
   return null;
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { addDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -38,6 +38,23 @@ function sugestaoDeRetorno(): Date {
   const d = new Date();
   d.setDate(d.getDate() + 7);
   return d;
+}
+
+/**
+ * A data mais cedo que se pode escolher: AMANHÃ, nunca hoje.
+ *
+ * 🔴 HOJE NÃO É UMA ESCOLHA VÁLIDA, e o motivo é que a tela mentiria. A pauta pergunta
+ * `r.ate <= v_hoje` (migration `20260907150000`): retorno marcado para hoje já venceu no
+ * mesmo instante em que foi gravado, o negócio CONTINUA na pauta — enquanto o dono recebe o
+ * aviso dizendo que ele "saiu da pauta até <a data de hoje>". Quem adiou vê o item reaparecer
+ * e conclui que o botão não funcionou.
+ *
+ * `addDays` do date-fns lê o fuso LOCAL, igual ao calendário e ao `format` da gravação — a
+ * mesma família, sem conversão no meio (CLAUDE.md §7.12). O `before` do react-day-picker
+ * compara por DIA de calendário, então a hora aqui não influencia.
+ */
+function primeiroDiaPermitido(): Date {
+  return addDays(new Date(), 1);
 }
 
 /**
@@ -158,7 +175,8 @@ export function DialogoRetorno({
                   defaultMonth={retorno}
                   onSelect={(d) => d && setRetorno(d)}
                   locale={ptBR}
-                  disabled={{ before: new Date() }}
+                  // Piso em AMANHÃ, não em hoje: ver `primeiroDiaPermitido`.
+                  disabled={{ before: primeiroDiaPermitido() }}
                   initialFocus
                   // Sem `captionLayout` a primitiva do projeto esconde o rótulo do mês e
                   // anula as setas: o calendário fica preso no mês atual, sem saída.
