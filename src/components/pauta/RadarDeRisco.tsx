@@ -71,7 +71,10 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
     qtdSemProximaAcao: bruto?.qtd_sem_proxima_acao ?? 0,
     valorSemProximaAcao: bruto?.valor_sem_proxima_acao ?? 0,
     valorRiscoTotal: bruto?.valor_risco_total ?? 0,
-    // A RPC já devolve [] pra quem não é gestor — nada a filtrar aqui.
+    // A RPC já devolve [] pra quem não enxerga a pauta de toda a equipe — nada a filtrar aqui.
+    // 🔴 O corte é da chave `pauta_de_todos`, não do papel: desde 07/09/2026 o `CASE` de
+    // `dashboard_negocios_risco` pergunta `eu_vejo_pauta_de_todos()`. Gestor com o interruptor
+    // desligado à mão recebe [] aqui, e vendedor com a chave ligada recebe a lista.
     riscoPorVendedor: bruto?.risco_por_vendedor ?? [],
     riscoPorFabricante: bruto?.risco_por_fabricante ?? [],
     topParados: bruto?.top_parados ?? [],
@@ -165,8 +168,8 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Risco por Vendedor — só aparece pra gestor/admin: a RPC já devolve o array
-            vazio pra quem não é (ver comentário de risco.riscoPorVendedor). */}
+        {/* Risco por Vendedor — só aparece pra quem enxerga a pauta de toda a equipe: a RPC já
+            devolve o array vazio pra quem não enxerga (ver comentário de risco.riscoPorVendedor). */}
         {risco.riscoPorVendedor.length > 0 && (
           <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
             <CardHeader className="pb-1">

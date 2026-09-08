@@ -13,7 +13,8 @@ import type { FiltrosDoPainel } from '@/lib/filtros-do-painel';
  *
  * O filtro de RESPONSÁVEL só aparece para quem pode ver a carteira dos colegas. Esconder o
  * controle não protege nada — quem decide é a regra do banco, e `dashboard_negocios_risco` já
- * devolve a lista nominal só para gestor. Aqui é só para não oferecer o que vai voltar vazio.
+ * devolve a lista nominal só para quem tem a chave `pauta_de_todos` (ou, sem a chave gravada,
+ * para quem é gestor/admin/empresa). Aqui é só para não oferecer o que vai voltar vazio.
  *
  * Nenhum filtro de PERÍODO, e isso é deliberado: um negócio aberto criado há meses continua
  * sendo risco hoje. Recortar por data esconderia justamente os mais antigos parados, que são os

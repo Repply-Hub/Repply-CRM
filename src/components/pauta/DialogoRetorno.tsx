@@ -26,6 +26,11 @@ interface Props {
   aoFechar: () => void;
   pedidoId: string | null;
   tituloDoNegocio: string;
+  /**
+   * Nome do dono, **só quando o negócio não é de quem está olhando** — é o `responsavel` que
+   * `pauta_do_dia_de` devolve. Nulo significa "é meu", não "não sei de quem é".
+   */
+  responsavel?: string | null;
 }
 
 /** Sugestão inicial: daqui a uma semana. É o intervalo mais comum de "me retorna depois". */
@@ -47,8 +52,24 @@ function sugestaoDeRetorno(): Date {
  * 193 negócios candidatos, adiar de graça viraria esteira infinita e a tela morreria como
  * morreram as notificações. Ter de escrever uma frase e escolher uma data é o que separa
  * "decidi adiar isto" de "tirei da frente sem pensar".
+ *
+ * 🔴 O TEXTO MUDA QUANDO O NEGÓCIO É DE UM COLEGA. Até 07/09/2026 ele dizia sempre "a SUA
+ * pauta" e "o SEU calendário". Desde a Tarefa 4 quem tem a chave `pauta_de_todos` vê e adia o
+ * negócio dos colegas — e aí as duas frases ficam erradas ao mesmo tempo:
+ *
+ *   · a pauta que muda é a do DONO (e a de quem adiou junto: sai das duas, é "uma verdade só");
+ *   · o dono RECEBE UM AVISO com o motivo escrito aqui, o que a pessoa precisa saber ANTES de
+ *     apertar o botão, não depois;
+ *   · e o calendário nunca foi "seu": `use-eventos.ts` mostra os contatos da empresa inteira,
+ *     então a data aparece para todo mundo. Isso já era verdade antes desta etapa.
  */
-export function DialogoRetorno({ aberto, aoFechar, pedidoId, tituloDoNegocio }: Props) {
+export function DialogoRetorno({
+  aberto,
+  aoFechar,
+  pedidoId,
+  tituloDoNegocio,
+  responsavel,
+}: Props) {
   const [motivo, setMotivo] = useState('');
   const [retorno, setRetorno] = useState<Date>(sugestaoDeRetorno);
   const registrar = useRegistrarRetorno();
@@ -104,6 +125,12 @@ export function DialogoRetorno({ aberto, aoFechar, pedidoId, tituloDoNegocio }: 
               placeholder="Ex.: o cliente vai decidir depois que a obra começar"
               rows={3}
               autoFocus
+              // Teto de tamanho: o motivo vira o texto do aviso que cai no sininho do dono, e o
+              // sininho baixa até 50 avisos inteiros de uma vez. Sem teto, um motivo enorme
+              // (medido: 1 MB concatena sem erro no banco) entope o sininho de outra pessoa.
+              // 🔴 Isto fecha só o lado do NAVEGADOR — a função `registrar_retorno` continua
+              // aceitando qualquer tamanho por chamada direta à API. Ver o relatório da Tarefa 6.
+              maxLength={2000}
             />
             <p className="text-xs text-muted-foreground">
               Isso fica registrado no histórico do negócio, visível para a equipe.
@@ -143,7 +170,10 @@ export function DialogoRetorno({ aberto, aoFechar, pedidoId, tituloDoNegocio }: 
               </PopoverContent>
             </Popover>
             <p className="text-xs text-muted-foreground">
-              O negócio volta para a sua pauta nesse dia, e a data entra no seu calendário.
+              {responsavel
+                ? `Este negócio é de ${responsavel}. Ao marcar o retorno, ele sai da pauta de vocês dois até essa data, e ${responsavel} recebe um aviso com o motivo que você escreveu.`
+                : 'O negócio volta para a sua pauta nesse dia.'}{' '}
+              A data também aparece no calendário da equipe.
             </p>
           </div>
         </CorpoDialogo>

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { usePermissoes } from '@/hooks/use-permissoes';
+import { vePautaDeTodos } from '@/lib/pauta-de-todos';
 
 export type AcaoPermissao = 'ver' | 'criar' | 'editar' | 'excluir';
 
@@ -68,4 +69,42 @@ export function useMinhaPermissao(modulo: string, acao: AcaoPermissao): {
 
     return { permitido: valor === true, carregando: false };
   }, [ehGestor, loading, carregandoPermissoes, permissoes, modulo, acao]);
+}
+
+/**
+ * "EU vejo a pauta e os números de toda a equipe?" — o espelho de
+ * `public.ve_pauta_de_todos(uuid)` no banco.
+ *
+ * 🔴 ISTO NÃO PROTEGE NADA. Quem decide é `pauta_do_dia()` (quais itens entram na fila) e
+ * `dashboard_negocios_risco` (se a lista nominal por responsável vem preenchida), as duas no
+ * servidor. Aqui serve para não oferecer um filtro de "Responsável" que voltaria vazio.
+ *
+ * 🔴 POR QUE ELE NÃO USA `usePodeFazer('pedidos', 'ver', 'pauta_de_todos')`, que já existe:
+ * aquele hook começa com `if (ehGestor) return true` — **sem olhar a linha de permissão**. É o
+ * mesmo atalho de `has_funcionalidade()` no banco, e ele torna IMPOSSÍVEL o caso que mais
+ * importa: um gestor com o interruptor "Ver a pauta de toda a equipe" DESLIGADO à mão tem de
+ * voltar a ver só os próprios negócios, porque é assim que a pauta e o adiamento já se
+ * comportam no servidor desde a Tarefa 4. Com o atalho, a tela diria "vê tudo" e o servidor
+ * devolveria só os próprios — o tipo de desencontro que leva meses até alguém notar.
+ *
+ * A decisão em si mora em `src/lib/pauta-de-todos.ts`, como função pura, com teste que fixa os
+ * quatro casos (chave ligada/desligada × vendedor/gestor).
+ *
+ * ⚠️ DIFERENÇA DELIBERADA EM RELAÇÃO A `useMinhaPermissao`: aqui a linha de permissão é buscada
+ * TAMBÉM para gestor. Lá o gestor é atalho e a consulta nem sai; aqui ela é o ponto — sem ela a
+ * chave desligada nunca seria lida. É uma consulta a mais na tela "Hoje", em cache compartilhado
+ * com a matriz de permissões (`['permissoes_usuario', id]`).
+ */
+export function usePossoVerPautaDeTodos(): boolean {
+  const { profile, loading } = useAuth();
+  const { data: permissoes, isLoading: carregandoPermissoes } = usePermissoes(profile?.id);
+
+  return useMemo(() => {
+    // Enquanto não se sabe, a resposta é "não vejo" — mesmo raciocínio de `useMinhaPermissao`.
+    // O preço é o filtro de Responsável aparecer uma fração de segundo depois para o gestor; o
+    // preço do contrário seria ele PISCAR ligado e sumir justamente para quem teve a chave
+    // desligada à mão, que é o caso que este hook existe para acertar.
+    if (loading || carregandoPermissoes || !permissoes) return false;
+    return vePautaDeTodos(profile?.role, permissoes);
+  }, [loading, carregandoPermissoes, permissoes, profile?.role]);
 }

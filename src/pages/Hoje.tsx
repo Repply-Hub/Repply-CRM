@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatarMoedaBRL } from '@/lib/moeda';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
+import { usePossoVerPautaDeTodos } from '@/hooks/use-minha-permissao';
 import { usePauta, type ItemDaPauta } from '@/hooks/use-pauta';
 import { DialogoRetorno } from '@/components/pauta/DialogoRetorno';
 import { RadarDeRisco } from '@/components/pauta/RadarDeRisco';
@@ -78,6 +79,14 @@ function ItemPauta({
               {format(new Date(item.quando), 'HH:mm')}
             </span>
           )}
+          {/* De quem é o negócio. `pauta_do_dia_de` só preenche este campo quando o item NÃO é
+              de quem está olhando — escrever o próprio nome em todo item viraria ruído, e sem
+              ele um gestor decide sobre o negócio de um colega sem saber que é de alguém. */}
+          {item.responsavel && (
+            <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              {item.responsavel}
+            </span>
+          )}
         </div>
 
         <h3 className="mb-1 text-base font-semibold leading-snug text-card-foreground sm:text-[17px]">
@@ -124,7 +133,11 @@ const Hoje = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const filtros = useMemo(() => lerFiltrosDoEndereco(searchParams), [searchParams]);
-  const ehGestor = profile?.role === 'admin' || profile?.role === 'gestor' || profile?.role === 'empresa';
+  // 🔴 A CHAVE, NÃO O PAPEL. Era `profile.role in (admin, gestor, empresa)`, e isso passou a
+  // discordar do servidor: desde a Tarefa 4 a pauta lê a chave `pauta_de_todos` e ela MANDA
+  // sobre o papel — um gestor com o interruptor desligado à mão volta a ver só os próprios.
+  // O painel de baixo agora usa a mesma leitura (ver `usePossoVerPautaDeTodos`).
+  const podeVerDeTodos = usePossoVerPautaDeTodos();
 
   function trocarFiltros(novos: FiltrosDoPainel) {
     setSearchParams((prev) => escreverFiltrosNoEndereco(new URLSearchParams(prev), novos), {
@@ -212,7 +225,7 @@ const Hoje = () => {
           empresaId={empresaId}
           filtros={filtros}
           onChangeFiltros={trocarFiltros}
-          podeFiltrarPorResponsavel={ehGestor}
+          podeFiltrarPorResponsavel={podeVerDeTodos}
         />
       </div>
 
@@ -221,6 +234,9 @@ const Hoje = () => {
         aoFechar={() => setAlvo(null)}
         pedidoId={alvo?.referencia_id ?? null}
         tituloDoNegocio={alvo?.titulo ?? ''}
+        // Vem preenchido só quando o negócio é de outra pessoa — é o que faz o diálogo parar
+        // de dizer "SUA pauta" para quem está adiando o negócio de um colega.
+        responsavel={alvo?.responsavel ?? null}
       />
     </AppLayout>
   );
