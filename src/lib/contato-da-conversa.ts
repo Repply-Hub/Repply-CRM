@@ -379,3 +379,78 @@ export function contatosQueCasamComTexto<T extends ContatoCadastrado>(
     return palavras.every((p) => alvo.includes(p));
   });
 }
+
+/**
+ * O campo de telefone da ficha depois de trazer o número de quem está falando no chat.
+ *
+ * 🔴 GUARDA OS DOIS, não substitui. Decisão do dono do produto em 07/09/2026, para o caso que
+ * ele descreveu: o cadastro tem o fixo da construtora e a pessoa fala do celular pessoal. O fixo
+ * continua valendo — é por ele que se fala com a empresa quando aquela pessoa sai — e o celular
+ * passa a ser reconhecido pelo WhatsApp. O campo já aceita dois números separados por vírgula:
+ * 79 contatos desta base são assim.
+ *
+ * 🔴 NÃO REPETE O QUE JÁ ESTÁ LÁ, e a comparação é pela CHAVE (DDD + 8 finais), não pelo texto.
+ * Sem isso, uma ficha com `(84) 9920-2015` (cadastro antigo, sem o nono dígito) ganharia
+ * `(84) 99920-2015` do lado e ficaria com o mesmo telefone escrito duas vezes — parecendo dois
+ * contatos possíveis onde só existe um.
+ *
+ * Número de chat que não dá para comparar (estrangeiro, curto) não é grudado numa ficha que já
+ * tem telefone: ali o certo é a pessoa digitar, não a máquina adivinhar. Ficha VAZIA recebe
+ * assim mesmo — melhor ter o número estranho do que não ter nenhum.
+ */
+export function telefoneComONumeroDoChat(
+  atual: string | null | undefined,
+  doChat: string | null | undefined,
+): string {
+  const jaTem = (atual ?? '').trim();
+  const novo = telefoneParaCadastro(doChat);
+  if (!novo) return jaTem;
+  if (!jaTem) return novo;
+
+  const chaveNova = chaveDeTelefone(doChat);
+  if (!chaveNova) return jaTem;
+  if (chavesDeTelefone(jaTem).includes(chaveNova)) return jaTem;
+
+  return `${jaTem}, ${novo}`;
+}
+
+export interface ConversaParaCasar {
+  id: string;
+  telefone: string | null;
+  contato_id: string | null;
+}
+
+/**
+ * A conversa de WhatsApp desta pessoa: primeiro pelo vínculo explícito, depois pelo telefone.
+ *
+ * 🔴 O CONTATO PODE TER MAIS DE UM NÚMERO, e é por isso que esta função existe separada do
+ * gancho. A busca usava `chaveDeTelefone` no singular, que devolve `null` para qualquer campo
+ * com dois números (o portão dos 11 dígitos, que existe para barrar identificador de grupo).
+ * Resultado medido em produção em 07/09/2026: **30 contatos** têm dois números E conversa de
+ * WhatsApp, e para todos eles o botão "Ver conversa" aparecia apagado — na ficha da pessoa, na
+ * lista da empresa, nos contatos do negócio e no histórico.
+ *
+ * A conversa continua sendo lida no singular: o telefone que o WhatsApp reporta é sempre um
+ * número só, e `chavesDeTelefone` só quebraria em vírgula, ponto-e-vírgula e barra — nunca em
+ * hífen, que é o que separa o identificador antigo de grupo (CLAUDE.md §7.2).
+ */
+export function conversaDoContato<T extends ConversaParaCasar>(
+  conversas: readonly T[] | null | undefined,
+  telefone: string | null | undefined,
+  contatoId: string | null | undefined,
+): T | null {
+  if (!conversas?.length) return null;
+
+  if (contatoId) {
+    const ligada = conversas.find((c) => c.contato_id === contatoId);
+    if (ligada) return ligada;
+  }
+
+  const chaves = chavesDeTelefone(telefone);
+  if (!chaves.length) return null;
+
+  return conversas.find((c) => {
+    const chave = chaveDeTelefone(c.telefone);
+    return chave !== null && chaves.includes(chave);
+  }) ?? null;
+}

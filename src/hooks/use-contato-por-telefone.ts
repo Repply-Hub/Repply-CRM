@@ -36,6 +36,8 @@ export interface ContatoReconhecido {
   cliente_id: string | null;
   /** Nome da empresa, para a pessoa conferir que é mesmo quem ela pensa antes de amarrar. */
   empresa: string | null;
+  /** Só para o painel de "vincular e atualizar" poder editar sem uma segunda consulta. */
+  email: string | null;
 }
 
 /**
@@ -75,7 +77,7 @@ async function buscarContatosParaReconhecimento(): Promise<ContatoReconhecido[]>
   for (;;) {
     const { data, error } = await supabase
       .from('contatos')
-      .select('id, nome_contato, telefone, cargo, cliente_id, empresa, cliente:clientes!cliente_id(empresa)')
+      .select('id, nome_contato, telefone, cargo, email, cliente_id, empresa, cliente:clientes!cliente_id(empresa)')
       .range(de, de + TAMANHO_DA_PAGINA - 1);
     if (error) throw error;
 
@@ -86,6 +88,7 @@ async function buscarContatosParaReconhecimento(): Promise<ContatoReconhecido[]>
         nome_contato: (c.nome_contato as string) ?? null,
         telefone: (c.telefone as string) ?? null,
         cargo: (c.cargo as string) ?? null,
+        email: (c.email as string) ?? null,
         cliente_id: (c.cliente_id as string) ?? null,
         // 🔴 O nome da empresa tem DUAS moradas — mesma armadilha do seletor de contatos da
         // obra: quem tem cliente amarrado traz pelo vínculo, o cadastro antigo tem só o texto

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { chaveDeTelefone } from '@/lib/contato-da-conversa';
+import { chavesDeTelefone, conversaDoContato } from '@/lib/contato-da-conversa';
 
 /**
  * A conversa de WhatsApp desta pessoa, para o link "Ver conversa no WhatsApp" da ficha do
@@ -61,7 +61,13 @@ export function useConversaDoContato(
   // Sem chave de telefone válida (número curto, estrangeiro, identificador de grupo) só
   // sobra o vínculo explícito por `contato_id` — que quase nunca existe, mas custa nada
   // conferir.
-  const temChave = chaveDeTelefone(telefone) !== null;
+  //
+  // 🔴 NO PLURAL. A ficha pode guardar dois números no mesmo campo, e a versão singular
+  // devolve `null` para o campo inteiro nesse caso — o portão dos 11 dígitos, que existe para
+  // barrar identificador de grupo, conta os dígitos dos dois números juntos. Medido em
+  // produção em 07/09/2026: 30 contatos com dois números TÊM conversa, e o botão "Ver
+  // conversa" aparecia apagado para todos eles.
+  const temChave = chavesDeTelefone(telefone).length > 0;
 
   const consulta = useQuery({
     queryKey: ['conversa-do-contato', 'todas'],
@@ -74,19 +80,12 @@ export function useConversaDoContato(
     refetchOnWindowFocus: false,
   });
 
-  const conversa = useMemo(() => {
-    const conversas = consulta.data;
-    if (!conversas?.length) return null;
-
-    if (contatoId) {
-      const ligada = conversas.find((c) => c.contato_id === contatoId);
-      if (ligada) return ligada;
-    }
-
-    const chave = chaveDeTelefone(telefone);
-    if (!chave) return null;
-    return conversas.find((c) => chaveDeTelefone(c.telefone) === chave) ?? null;
-  }, [consulta.data, telefone, contatoId]);
+  // A regra do casamento mora em `contato-da-conversa.ts` porque ela precisa de teste próprio:
+  // é ela que decide o atalho de quatro telas diferentes.
+  const conversa = useMemo(
+    () => conversaDoContato(consulta.data, telefone, contatoId),
+    [consulta.data, telefone, contatoId],
+  );
 
   // `conversaId` continua no retorno porque é o que os atalhos usam; `conversa` é para quem
   // precisa também da data da última mensagem (a linha-resumo no histórico do negócio).

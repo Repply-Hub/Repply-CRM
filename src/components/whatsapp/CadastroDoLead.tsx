@@ -7,9 +7,11 @@ import {
   useContatosComEsteTelefone,
   useContatosParecidos,
   useVincularContatoExistente,
+  type ContatoReconhecido,
 } from '@/hooks/use-contato-por-telefone';
 import { telefoneParaCadastro } from '@/lib/contato-da-conversa';
 import { VincularContatoExistente } from './VincularContatoExistente';
+import { VincularEAtualizarContato } from './VincularEAtualizarContato';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 
 interface CadastroDoLeadProps {
@@ -53,6 +55,39 @@ export function CadastroDoLead({ conversa, onCadastrar }: CadastroDoLeadProps) {
   // A terceira camada: procurar à mão. Ver `VincularContatoExistente.tsx` para o caso que a
   // obrigou a existir (o Djair, com três fichas no CRM e nenhuma alcançável pelas duas réguas).
   const [procurando, setProcurando] = useState(false);
+
+  // 🔴 QUEM ESTÁ ESPERANDO CONFERÊNCIA. Nos dois caminhos em que o telefone da ficha É OUTRO
+  // (o palpite por nome e a busca à mão), vincular passa pela ficha da pessoa antes: o número
+  // do chat vai entrar no cadastro dela, e isso é edição, não só um vínculo. Pedido do dono do
+  // produto em 07/09/2026 — ver `VincularEAtualizarContato.tsx`.
+  //
+  // O caminho do TELEFONE QUE JÁ BATE continua de um clique só: ali não há nada de novo para
+  // trazer do chat, e a conferência seria cerimônia vazia no caso mais comum e mais certo.
+  const [paraConferir, setParaConferir] = useState<
+    { contato: ContatoReconhecido; origem: 'nome' | 'busca' } | null
+  >(null);
+
+  const painelDeConferencia = (
+    <VincularEAtualizarContato
+      aberto={!!paraConferir}
+      onFechar={() => setParaConferir(null)}
+      conversa={conversa}
+      contato={paraConferir?.contato ?? null}
+      origem={paraConferir?.origem ?? 'busca'}
+    />
+  );
+
+  const buscaDeContato = (
+    <VincularContatoExistente
+      aberto={procurando}
+      onFechar={() => setProcurando(false)}
+      conversa={conversa}
+      onEscolher={(c) => {
+        setProcurando(false);
+        setParaConferir({ contato: c, origem: 'busca' });
+      }}
+    />
+  );
 
   const amarrar = async (contatoId: string, clienteId: string | null, nome: string | null) => {
     try {
@@ -158,11 +193,8 @@ export function CadastroDoLead({ conversa, onCadastrar }: CadastroDoLeadProps) {
         </div>
         <Separator />
 
-        <VincularContatoExistente
-          aberto={procurando}
-          onFechar={() => setProcurando(false)}
-          conversa={conversa}
-        />
+        {buscaDeContato}
+        {painelDeConferencia}
       </div>
     );
   }
@@ -256,15 +288,10 @@ export function CadastroDoLead({ conversa, onCadastrar }: CadastroDoLeadProps) {
                   size="sm"
                   variant="outline"
                   className="mt-2 h-7 gap-1.5"
-                  onClick={() => amarrar(c.id, c.cliente_id, c.nome_contato)}
-                  disabled={vincular.isPending}
+                  onClick={() => setParaConferir({ contato: c, origem: 'nome' })}
                 >
-                  {vincular.isPending ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Link2 className="h-3 w-3" />
-                  )}
-                  Sim, é ele — vincular
+                  <Link2 className="h-3 w-3" />
+                  Sim, é ele — conferir a ficha
                 </Button>
               </div>
             ))}
@@ -273,11 +300,8 @@ export function CadastroDoLead({ conversa, onCadastrar }: CadastroDoLeadProps) {
       )}
       <Separator />
 
-      <VincularContatoExistente
-        aberto={procurando}
-        onFechar={() => setProcurando(false)}
-        conversa={conversa}
-      />
+      {buscaDeContato}
+      {painelDeConferencia}
     </div>
   );
 }

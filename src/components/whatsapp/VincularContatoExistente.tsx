@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { Link2, Loader2, Search, User, TriangleAlert } from 'lucide-react';
-import { toast } from 'sonner';
 import { Dialog, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   ConteudoDialogo,
@@ -9,9 +8,11 @@ import {
 } from '@/components/shared/DialogoResponsivo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useContatosParaVincular, useVincularContatoExistente } from '@/hooks/use-contato-por-telefone';
+import {
+  useContatosParaVincular,
+  type ContatoReconhecido,
+} from '@/hooks/use-contato-por-telefone';
 import { contatosQueCasamComTexto, telefoneParaCadastro } from '@/lib/contato-da-conversa';
-import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 
 /**
  * Procurar, à mão, o contato do CRM a que esta conversa pertence.
@@ -41,16 +42,22 @@ interface VincularContatoExistenteProps {
   aberto: boolean;
   onFechar: () => void;
   conversa: { id: string; telefone: string; nome_contato?: string | null };
+  /**
+   * Chamado com o contato escolhido. 🔴 Esta tela NÃO grava mais o vínculo: escolher aqui abre
+   * a ficha da pessoa para conferência, porque o número do chat vai entrar no cadastro dela.
+   * Pedido do dono do produto em 07/09/2026 — ver `VincularEAtualizarContato.tsx`.
+   */
+  onEscolher: (contato: ContatoReconhecido) => void;
 }
 
 export function VincularContatoExistente({
   aberto,
   onFechar,
   conversa,
+  onEscolher,
 }: VincularContatoExistenteProps) {
   const [busca, setBusca] = useState('');
   const { contatos, carregando } = useContatosParaVincular(aberto);
-  const vincular = useVincularContatoExistente();
 
   const encontrados = useMemo(
     () => contatosQueCasamComTexto(busca, contatos),
@@ -58,18 +65,8 @@ export function VincularContatoExistente({
   );
   const visiveis = encontrados.slice(0, MOSTRAR_NO_MAXIMO);
 
-  const amarrar = async (contatoId: string, clienteId: string | null, nome: string | null) => {
-    try {
-      await vincular.mutateAsync({ conversaId: conversa.id, contatoId, clienteId });
-      toast.success(`Conversa ligada a ${nome || 'este contato'}.`);
-      onFechar();
-    } catch (err) {
-      toast.error(mensagemDeErro(err, 'Não foi possível ligar a conversa a este contato.'));
-    }
-  };
-
   return (
-    <Dialog open={aberto} onOpenChange={(o) => !o && !vincular.isPending && onFechar()}>
+    <Dialog open={aberto} onOpenChange={(o) => !o && onFechar()}>
       <ConteudoDialogo className="sm:max-w-lg">
         <CabecalhoDialogo>
           <DialogTitle className="flex items-center gap-2">
@@ -142,14 +139,9 @@ export function VincularContatoExistente({
                     size="sm"
                     variant="outline"
                     className="h-7 shrink-0 gap-1.5"
-                    onClick={() => void amarrar(c.id, c.cliente_id ?? null, c.nome_contato)}
-                    disabled={vincular.isPending}
+                    onClick={() => onEscolher(c)}
                   >
-                    {vincular.isPending ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Link2 className="h-3 w-3" />
-                    )}
+                    <Link2 className="h-3 w-3" />
                     Vincular
                   </Button>
                 </div>

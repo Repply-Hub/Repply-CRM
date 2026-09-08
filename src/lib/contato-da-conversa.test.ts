@@ -9,6 +9,8 @@ import {
   contatosComNomeParecido,
   palavrasDoNome,
   contatosQueCasamComTexto,
+  telefoneComONumeroDoChat,
+  conversaDoContato,
 } from './contato-da-conversa';
 
 describe('telefoneParaCadastro', () => {
@@ -396,5 +398,68 @@ describe('contatosQueCasamComTexto', () => {
   it('lista vazia ou indefinida devolve vazio', () => {
     expect(contatosQueCasamComTexto('djair', [])).toEqual([]);
     expect(contatosQueCasamComTexto('djair', undefined)).toEqual([]);
+  });
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * TRAZER O NÚMERO DO CHAT PARA A FICHA
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe('telefoneComONumeroDoChat', () => {
+  it('ficha sem telefone recebe o número do chat, já formatado', () => {
+    expect(telefoneComONumeroDoChat(null, '5584999202015')).toBe('(84) 99920-2015');
+    expect(telefoneComONumeroDoChat('   ', '5584999202015')).toBe('(84) 99920-2015');
+  });
+
+  it('🔴 GUARDA OS DOIS: o fixo do escritório fica, o celular entra', () => {
+    expect(telefoneComONumeroDoChat('(84) 3207-8807', '5584999202015')).toBe(
+      '(84) 3207-8807, (84) 99920-2015',
+    );
+  });
+
+  it('🔴 não repete o número que já está lá, mesmo escrito de outro jeito', () => {
+    expect(telefoneComONumeroDoChat('(84) 99920-2015', '5584999202015')).toBe('(84) 99920-2015');
+    expect(telefoneComONumeroDoChat('84 9 9920 2015', '5584999202015')).toBe('84 9 9920 2015');
+  });
+
+  it('🔴 nem quando a ficha guarda o número SEM o nono dígito — é a mesma pessoa', () => {
+    expect(telefoneComONumeroDoChat('(84) 9920-2015', '5584999202015')).toBe('(84) 9920-2015');
+  });
+
+  it('não repete um número que já está na lista de dois', () => {
+    expect(telefoneComONumeroDoChat('(84) 3207-8807, (84) 99920-2015', '5584999202015')).toBe(
+      '(84) 3207-8807, (84) 99920-2015',
+    );
+  });
+
+  it('número de chat que não dá para comparar não é grudado numa ficha que já tem telefone', () => {
+    expect(telefoneComONumeroDoChat('(84) 3207-8807', '+1 415 555 0123')).toBe('(84) 3207-8807');
+    expect(telefoneComONumeroDoChat('(84) 3207-8807', '')).toBe('(84) 3207-8807');
+  });
+});
+
+describe('conversaDoContato', () => {
+  const conversas = [
+    { id: 'a', telefone: '5584999202015', contato_id: null },
+    { id: 'b', telefone: '5584320788007', contato_id: null },
+    { id: 'c', telefone: '5511988887777', contato_id: 'contato-x' },
+  ];
+
+  it('acha pelo telefone, ignorando o nono dígito', () => {
+    expect(conversaDoContato(conversas, '(84) 9920-2015', null)?.id).toBe('a');
+  });
+
+  it('🔴 acha quando a ficha guarda DOIS números e só o segundo tem conversa', () => {
+    expect(conversaDoContato(conversas, '(84) 3207-8807, (84) 99920-2015', null)?.id).toBe('a');
+  });
+
+  it('o vínculo explícito ganha do telefone', () => {
+    expect(conversaDoContato(conversas, '(84) 99920-2015', 'contato-x')?.id).toBe('c');
+  });
+
+  it('sem nada que case, devolve nulo', () => {
+    expect(conversaDoContato(conversas, '(11) 3333-4444', null)).toBeNull();
+    expect(conversaDoContato(conversas, null, null)).toBeNull();
+    expect(conversaDoContato([], '(84) 99920-2015', null)).toBeNull();
   });
 });
