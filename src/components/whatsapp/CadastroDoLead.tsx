@@ -170,25 +170,37 @@ export function CadastroDoLead({ conversa, onCadastrar }: CadastroDoLeadProps) {
 
           {/* 🔴 A saída para quando NENHUM deles é a pessoa certa. Sem ela, quem fala com o
               engenheiro pelo telefone do escritório fica sem caminho — e o reconhecimento
-              viraria uma parede em vez de um atalho. */}
-          {/* As duas saídas para quando nenhum deles é a pessoa certa. Procurar vem antes de
-              cadastrar de propósito: o cadastro repetido é o estrago que esta tela evita, e
-              quem chega até aqui já sabe que o telefone não bate com quem ele procura. */}
-          <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1.5">
-            <button
-              type="button"
+              viraria uma parede em vez de um atalho.
+
+              🔴 MESMO PESO VISUAL DO OUTRO ESTADO, e isto foi um acerto de rota. Em 06/09/2026
+              eu acrescentei "Procurar outro contato" aqui como um segundo texto sublinhado ao
+              lado do que já existia — e dois sublinhados em sequência viraram uma linha de
+              rodapé, enquanto o estado "não achei ninguém" ganhava dois botões sólidos. O dono
+              do produto reparou na diferença em 08/09/2026 e preferiu o mais sólido. São as
+              MESMAS duas saídas nos dois estados; não havia razão para uma parecer menos.
+
+              Procurar vem antes de cadastrar de propósito: o cadastro repetido é o estrago que
+              esta tela evita, e quem chega até aqui já sabe que o telefone não bate com quem
+              ele procura. */}
+          <p className="mt-3 text-xs text-muted-foreground">
+            {/* "essa pessoa" e não "ele/ela": o cadastro não guarda o gênero de
+                ninguém, e adivinhar pelo nome erra com quem tem nome ambíguo. */}
+            {encontrados.length === 1 ? 'Não é essa pessoa?' : 'Não é nenhum desses?'}
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
               onClick={() => setProcurando(true)}
-              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
             >
-              Procurar outro contato no cadastro
-            </button>
-            <button
-              type="button"
-              onClick={onCadastrar}
-              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-            >
-              Não é nenhum desses — cadastrar como contato novo
-            </button>
+              <Search className="h-3.5 w-3.5" />
+              Procurar outro contato
+            </Button>
+            <Button size="sm" variant="ghost" className="gap-1.5" onClick={onCadastrar}>
+              <UserPlus className="h-3.5 w-3.5" />
+              Cadastrar como novo
+            </Button>
           </div>
         </div>
         <Separator />
