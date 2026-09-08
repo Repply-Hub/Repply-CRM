@@ -12,6 +12,14 @@
 --       abaixo, o gráfico com o nome e o valor em risco de cada colega. Passa a decidir pela
 --       mesma leitura.
 --
+--       E a MESMA leitura passa a valer para `top_parados`, a lista "Os 10 maiores em risco"
+--       logo abaixo do gráfico, que saía SEM portão nenhum. Medido em 07/09/2026 rodando a
+--       função como a Érika Marques (vendedora, sem a chave): `risco_por_vendedor` veio `[]`,
+--       correto, e `top_parados` veio com 10 linhas de 4 donos diferentes — nome do colega,
+--       nome do negócio (que carrega o nome do cliente) e valor. Quem tem a chave continua
+--       vendo os 10 da empresa com o nome do dono; quem não tem passa a ver os 10 maiores
+--       DELE. Isto NÃO é regressão desta leva: já está publicado e já vaza hoje.
+--
 --   (b) `pauta_do_dia_de` — o bloco que lê a chave estava copiado dentro dela. Passa a chamar
 --       `public.ve_pauta_de_todos(uuid)`, criada na migration `20260907140000`. Uma leitura só.
 --
@@ -48,8 +56,22 @@
 --     herda tudo da irmã. (O brief desta tarefa dizia que eram "duas cópias idênticas"; não são.)
 --
 --   · `is_gestor()` aparece UMA vez em `dashboard_negocios_risco`, no `CASE` de
---     `risco_por_vendedor`. O campo `responsavel` da lista dos 10 maiores continua sem portão,
---     como já estava — o comentário original explica por quê, e ele segue valendo.
+--     `risco_por_vendedor`. A lista dos 10 maiores não tinha portão NENHUM — nem papel, nem
+--     chave. Passa a ter, e é a quarta troca intencional deste arquivo (ver o item (a) e o
+--     comentário no corpo).
+--
+--   · 🔴 DESMENTIDO POR MEDIÇÃO, e vale ficar escrito porque a intuição diz o contrário: os
+--     AGREGADOS desta função (`qtd_parados`, `qtd_sem_proxima_acao`, `valor_risco_total`,
+--     `risco_por_fabricante`) NÃO se restringem a quem está olhando. A política de leitura de
+--     `pedidos` é `usuario_id IN (usuarios_da_minha_empresa())` — a EMPRESA inteira. Chamadas
+--     como `authenticated` em 07/09/2026, a Érika (vendedora) e a Fabiola (gestora) recebem os
+--     MESMOS números: `qtd_sem_proxima_acao` = 145 e R$ 7.402.422,24 para as duas. E
+--     `qtd_parados` = 0 para as duas — não porque a Érika esteja recortada, mas porque hoje
+--     ninguém na MD está parado há 7 dias.
+--     Ou seja: o único campo com portão era `risco_por_vendedor`. Este arquivo fecha o
+--     segundo, `top_parados`, porque ali a exposição é NOMINAL. Os três cartões de cima
+--     continuam mostrando o total da empresa para todo mundo — mexer neles muda o número que
+--     a tela mostra e é decisão do dono do produto, não conserto de vazamento.
 --
 --   · 🔴 `dashboard_negocios_risco` **NÃO é `SECURITY DEFINER`** (`pg_proc.prosecdef = false`).
 --     Ela roda como quem chama, então cada função de dentro dela é conferida contra o
@@ -81,9 +103,12 @@
 --
 -- ----------------------------------------------------------------------------
 -- 🔴 PARA VOLTAR ATRÁS: reemitir as duas funções com o texto anterior (trocando
--- `public.ve_pauta_de_todos(p_usuario_id)` pelo bloco `coalesce(...)` de novo, `<=` por `<`, e
--- `public.eu_vejo_pauta_de_todos()` por `is_gestor()`), e `DROP FUNCTION IF EXISTS
+-- `public.ve_pauta_de_todos(p_usuario_id)` pelo bloco `coalesce(...)` de novo, `<=` por `<`,
+-- `public.eu_vejo_pauta_de_todos()` por `is_gestor()`, e tirando do `top_parados` o portão novo
+-- junto com a coluna `p.usuario_id` da CTE `abertos`), e `DROP FUNCTION IF EXISTS
 -- public.eu_vejo_pauta_de_todos();`. Sempre com `CREATE OR REPLACE` — ver o aviso lá em cima.
+-- O script pronto é `.superpowers/sdd/hoje-3/desfazer-hoje-3.sql`: ele reemite o texto que está
+-- no ar hoje, então desfaz esta troca junto com as outras três, sem precisar de ajuste.
 -- ============================================================================
 
 BEGIN;
@@ -259,7 +284,9 @@ $function$;
 -- ────────────────────────────────────────────────────────────────────────────
 -- (a) — O PAINEL "NO GERAL"
 --
--- Texto colhido de `pg_get_functiondef` em 07/09/2026. Uma linha muda, marcada com 🔴.
+-- Texto colhido de `pg_get_functiondef` em 07/09/2026. DUAS coisas mudam, as duas marcadas com
+-- 🔴 no corpo: o portão de `risco_por_vendedor` (item (a)) e o portão novo de `top_parados`,
+-- que traz junto a coluna `p.usuario_id` na CTE `abertos`. Fora isso o texto é o mesmo.
 -- A função continua SEM `SECURITY DEFINER`: quem recorta os negócios é a regra de segurança de
 -- `pedidos`, avaliada com o privilégio de quem chama. Não mexer nisso é o que mantém o painel
 -- incapaz de mostrar negócio de outra empresa.
@@ -273,6 +300,11 @@ AS $function$
   abertos AS (
     SELECT
       p.id,
+      -- 🔴 MUDOU: coluna nova, e ela existe SÓ para o portão de `top_parados` lá embaixo.
+      -- `marcado` faz `SELECT a.*`, então ela chega lá sozinha, e o `jsonb_build_object` nomeia
+      -- campo a campo — nenhuma outra parte da função enxerga a coluna a mais. Comparar por
+      -- `vendedor_nome` em vez do identificador juntaria dois homônimos numa pessoa só.
+      p.usuario_id,
       p.nome,
       p.cliente_id,
       p.campos_extras,
@@ -351,9 +383,28 @@ AS $function$
       ) rf
     ),
     -- 🔴 `clientes` só entra AQUI, depois do `LIMIT 10`, nunca na CTE `abertos`.
-    -- E `responsavel` sai sem o portão de propósito: a regra de segurança de
-    -- `pedidos` já é da empresa inteira, e a tela de Negócios já mostra o responsável de
-    -- cada negócio. O portão do outro campo existe porque ALI é um RANKING nominal.
+    --
+    -- 🔴 MUDOU — é a QUARTA troca intencional deste arquivo, acrescentada depois da revisão
+    -- final que provou por md5 as outras três. Esta lista saía sem portão nenhum, e o
+    -- comentário antigo justificava assim: "a regra de segurança de `pedidos` já é da empresa
+    -- inteira, e a tela de Negócios já mostra o responsável de cada negócio". A primeira metade
+    -- é verdadeira e é exatamente o problema — a política deixa passar a empresa toda, então
+    -- ela não recorta nada aqui. Medido como a Érika Marques (vendedora, sem a chave):
+    --
+    --     risco_por_vendedor -> []                  (o portão duas linhas acima, correto)
+    --     top_parados        -> 10 linhas, 4 donos  (Érika, Lucas Ferreira, Margley Pontes,
+    --                                                Pricila Azevedo)
+    --
+    -- Nome do colega, nome do negócio (que carrega o nome do cliente) e valor, para quem a
+    -- própria função acabou de dizer que não pode ver lista nominal. Agora as duas leem a mesma
+    -- chave: quem tem vê os 10 da empresa com o nome do dono — é o que o dono do produto pediu
+    -- —, quem não tem vê os 10 maiores DELE. Simulado antes de aplicar, como as duas pessoas:
+    -- Érika passa de 4 donos para 1 (só ela); Fabiola (gestora) fica com os mesmos 10 ids.
+    --
+    -- 🔴 O portão é avaliado UMA VEZ, não por linha. `(SELECT ...)` sem correlação com a
+    -- consulta de fora vira `InitPlan`, que roda uma vez e guarda o resultado — o mesmo motivo
+    -- do §7.16 do CLAUDE.md, onde a RLS de `pedidos` cobrando função por linha matou uma função
+    -- desta base. Nada entra no `FROM`: o que sobra por linha é uma comparação de `uuid`.
     (
       SELECT coalesce(jsonb_agg(jsonb_build_object(
                'id', tp.id,
@@ -368,7 +419,12 @@ AS $function$
                'dias_parado', (SELECT d FROM hoje) - tp.parado_desde
              ) ORDER BY tp.valor_total DESC), '[]'::jsonb)
       FROM (
-        SELECT * FROM marcado WHERE parado OR sem_proxima_acao
+        SELECT * FROM marcado
+        WHERE (parado OR sem_proxima_acao)
+          AND (
+            (SELECT public.eu_vejo_pauta_de_todos())
+            OR usuario_id = (SELECT public.get_my_usuario_id())
+          )
         ORDER BY valor_total DESC NULLS LAST LIMIT 10
       ) tp
       LEFT JOIN public.clientes cl ON cl.id = tp.cliente_id

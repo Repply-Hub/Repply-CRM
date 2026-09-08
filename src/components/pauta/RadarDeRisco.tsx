@@ -85,6 +85,10 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
     // desligado à mão recebe [] aqui, e vendedor com a chave ligada recebe a lista.
     riscoPorVendedor: bruto?.risco_por_vendedor ?? [],
     riscoPorFabricante: bruto?.risco_por_fabricante ?? [],
+    // 🔴 Desde 07/09/2026 esta lista TAMBÉM segue a chave, no servidor: quem não enxerga a
+    // pauta de toda a equipe recebe aqui só os próprios negócios. Antes ela vinha com a
+    // empresa inteira — nome do colega, nome do negócio e valor — para qualquer vendedor,
+    // duas linhas abaixo do gráfico que a mesma função já recusava a essa pessoa.
     topParados: bruto?.top_parados ?? [],
   }), [bruto]);
 
@@ -275,7 +279,12 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
                   <tr className="border-b text-[11px] uppercase tracking-wider text-muted-foreground">
                     <th className="py-2 text-left font-semibold">Negócio</th>
                     <th className="py-2 text-left font-semibold">Fabricante</th>
-                    <th className="py-2 text-left font-semibold">Responsável</th>
+                    {/* Sem a chave, o servidor só manda negócio da própria pessoa — a coluna
+                        repetiria o mesmo nome em todas as linhas. Esconder aqui é cosmético,
+                        não é proteção: o corte de verdade é o da função de banco. */}
+                    {podeFiltrarPorResponsavel && (
+                      <th className="py-2 text-left font-semibold">Responsável</th>
+                    )}
                     <th className="py-2 text-right font-semibold">Sem mexer há</th>
                     <th className="py-2 text-right font-semibold">Valor</th>
                   </tr>
@@ -289,7 +298,9 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
                     >
                       <td className="py-2">{n.nome}</td>
                       <td className="py-2 text-muted-foreground">{n.fabrica ?? '—'}</td>
-                      <td className="py-2 text-muted-foreground">{n.responsavel ?? '—'}</td>
+                      {podeFiltrarPorResponsavel && (
+                        <td className="py-2 text-muted-foreground">{n.responsavel ?? '—'}</td>
+                      )}
                       <td className="py-2 text-right font-mono tabular-nums">
                         {n.dias_parado} {n.dias_parado === 1 ? 'dia' : 'dias'}
                       </td>
