@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { marcaDaEmpresa } from '@/lib/marca-da-empresa';
 import { useMinhaPermissao } from '@/hooks/use-minha-permissao';
-import { PainelDeResponsaveis } from '@/components/pedidos/PainelDeResponsaveis';
+import { PainelDoNegocio } from '@/components/pedidos/PainelDoNegocio';
 import { useParticipantesDosNegocios } from '@/hooks/use-participantes-dos-negocios';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useDelayedLoading } from '@/hooks/use-delayed-loading';
@@ -16,21 +16,12 @@ import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { KanbanColunasDialog } from '@/components/pedidos/kanban/KanbanColunasDialog';
 import { useMarcadores } from '@/hooks/use-marcadores';
 import { MarcadoresDialog } from '@/components/pedidos/MarcadoresDialog';
-import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
-import { ComentariosNegocio } from '@/components/pedidos/ComentariosNegocio';
-import { ContatosDoNegocio } from '@/components/pedidos/ContatosDoNegocio';
-import { HistoricoDoNegocio } from '@/components/pedidos/HistoricoDoNegocio';
 import { useFunis } from '@/hooks/use-funis';
 import { useConfiguracoesCampos, isCampoObrigatorioNaEtapa, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
-import { usePedidos, usePedidosStats, useSearchMatches, usePedidoHistoricoStatus, usePedidoPorId, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, buscarNegociosDoRecorte, PEDIDOS_EXPORTACAO_AVISO, PEDIDOS_LOTE_EXPORTACAO, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField, type PedidosSort, type PedidosSortColumn } from '@/hooks/use-pedidos';
-import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
+import { usePedidos, usePedidosStats, useSearchMatches, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, buscarNegociosDoRecorte, PEDIDOS_EXPORTACAO_AVISO, PEDIDOS_LOTE_EXPORTACAO, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField, type PedidosSort, type PedidosSortColumn } from '@/hooks/use-pedidos';
 import { useSecaoLigada } from '@/hooks/use-secoes';
-import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
-import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
-import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { mapPedidoToOrder } from '@/lib/pedido-to-order';
 import { getNomeNegocio } from '@/lib/nome-negocio';
-import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
 import { fabricanteEstaAtivo } from '@/lib/ordem-de-fabricantes';
 import { Button } from '@/components/ui/button';
@@ -40,14 +31,12 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 import {
-  Plus, Search, Upload, MessageSquare, Phone, Mail, Eye, EyeOff, Loader2, Pencil, FileDown,
+  Plus, Search, Upload, Phone, Mail, Eye, EyeOff, Loader2, FileDown,
   Settings2, Columns3, Trash2, Filter, X, ChevronDown, AlertTriangle, CalendarIcon,
-  LayoutGrid, List as ListIcon, Building2, Factory, DollarSign, Clock, User, FileText,
-  ChevronRight, FileSpreadsheet, FolderKanban, Rows3, History, Tag, ArrowRightLeft,
+  LayoutGrid, List as ListIcon, Factory, User,
+  ChevronRight, FileSpreadsheet, FolderKanban, Rows3, Tag, ArrowRightLeft,
   ListChecks, ArrowRight
 } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
-import { ConteudoDoPainel, CabecalhoDoPainel, CorpoDoPainel, RodapeDoPainel } from '@/components/shared/PainelDeDetalhes';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -73,12 +62,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { acaoDaCaixaDoCabecalho } from '@/lib/selecao-em-massa';
-import { repairCorruptedBitrixUrl } from '@/lib/repair-bitrix-url';
-import { filenameFromUrl } from '@/lib/download-file';
-import { FilePreviewDialog, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
 import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 import { LinkAnexoPrivado } from '@/components/shared/LinkAnexoPrivado';
-import { enderecoDoArquivo } from '@/lib/arquivo-privado';
 
 const ImportPedidosDialog = lazy(() =>
   import('@/components/pedidos/ImportPedidosDialog').then(m => ({ default: m.ImportPedidosDialog }))
@@ -688,8 +673,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // manda a pessoa para um negócio: ela quer VER o negócio, não editá-lo — mandar para
   // /pedidos/:id/editar abre um formulário para quem só queria olhar.
   const [viewOrderId, setViewOrderId] = useState<string | null>(() => searchParams.get('negocio'));
-  const { data: tarefasNegocio } = useTarefasPorPedido(viewOrderId);
-  const { ligada: temTarefas } = useSecaoLigada('tarefas');
   // `=== true` em todo uso abaixo, nunca `!== false`: enquanto a resposta não chega, a cascata
   // esconde. Bloco que aparece e some meio segundo depois é pior de usar que bloco que demora.
   const { ligada: temObras } = useSecaoLigada('obras');
@@ -701,15 +684,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const placeholderBuscaNegocios = temObras === true
     ? 'Buscar por cliente, obra ou fabricante...'
     : 'Buscar por cliente ou fabricante...';
-  const { data: historicoStatusNegocio } = usePedidoHistoricoStatus(viewOrderId);
-  const { data: tarefasKanbanColunas = [] } = useTarefasKanbanColunas(empresaId);
-  const tarefaKanbanStages = useMemo(
-    () => tarefasKanbanColunas.map(c => ({ key: c.slug, label: c.nome })),
-    [tarefasKanbanColunas]
-  );
-  const [addTarefaOpen, setAddTarefaOpen] = useState(false);
-  const [editingTarefaNegocio, setEditingTarefaNegocio] = useState<Tarefa | null>(null);
-  const [pdfPreview, setPdfPreview] = useState<FilePreviewTarget | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exportTargetId, setExportTargetId] = useState<string | undefined>(undefined);
   // Exportação em andamento: trava um segundo clique enquanto a varredura do funil roda.
@@ -792,7 +766,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // Não protege nada — quem recusa é o Postgres. Serve para não oferecer um caminho que
   // termina em nada: sem isto, quem não pode apagar digita APAGAR e a tela fica igual.
   const { permitido: podeExcluir } = useMinhaPermissao('pedidos', 'excluir');
-  const { permitido: podeEditar } = useMinhaPermissao('pedidos', 'editar');
   // Os participantes de todos os negócios visíveis, num mapa. Uma consulta só para a tela
   // inteira — o porquê (e os números medidos) está em use-participantes-dos-negocios.ts.
   const { data: participantesPorNegocio } = useParticipantesDosNegocios();
@@ -2286,21 +2259,28 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   ), [activeFilterCount, clearPipelineFilters, hasPipelineFilters, selectedStages, setSelectedStages, vendedores, selectedVendedores, toggleFilter, fabricantes, selectedFabricantes, marcadores, selectedMarcadores, dateFrom, handleDateFromSelect, dateTo, handleDateToSelect, dateField, showOnlyAttention, setShowOnlyAttention, hideImportados, setHideImportados]);
   // O que está em memória tem prioridade: depois de arrastar um card no Kanban, a linha local já
   // reflete a etapa nova, enquanto a busca por id ainda devolveria a anterior.
+  //
+  // 🔴 Isto vai para o painel como `negocioJaCarregado`, e é o que mantém a tela mais usada do
+  // sistema SEM requisição no caso comum (clicar num card da própria lista). Sem ele o painel
+  // buscaria o negócio por id em toda abertura — que é o certo em quem NÃO carregou a lista
+  // (a tela "Hoje"), e desperdício aqui. Ver `usePedidoPorId` e `PainelDoNegocioProps`.
   const negocioLocal = useMemo(
     () => (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === viewOrderId)
       ?? bulkPickerData?.data?.find(p => p.id === viewOrderId),
     [showKanban, kanbanPedidosFlat, pedidos, viewOrderId, bulkPickerData]
   );
 
-  // 🔴 A busca por id é o que faz o botão "Abrir negócio" da tela "Hoje" funcionar. Ela só sai
-  // quando a varredura local falha — no caso comum (clicar num card da própria tela) não há
-  // requisição nenhuma. Ver o comentário de `usePedidoPorId`.
-  const { data: negocioBuscado, isLoading: buscandoNegocio, error: erroBuscaNegocio } = usePedidoPorId(
-    viewOrderId,
-    !negocioLocal,
+  // Os campos extras que o painel mostra são os desta lista: as colunas criadas na importação
+  // que estão visíveis aqui, sem as padrão, sem "acoes" e sem `pdf_url` (que o painel já desenha
+  // como "Anexo", com o reparo de link corrompido). Sai daqui e não de dentro do painel porque
+  // `useTableSettings` lê e regrava `configuracoes_tabelas` — ver `camposExtras` lá.
+  const camposExtrasDoPainel = useMemo(
+    () => columns
+      .filter(col => tableVisibleColumns.includes(col.id))
+      .filter(col => !PEDIDOS_COLUMNS.some(c => c.id === col.id) && col.id !== 'acoes' && col.id !== 'pdf_url')
+      .map(col => ({ id: col.id, rotulo: getLabel(col.id) })),
+    [columns, tableVisibleColumns, getLabel]
   );
-
-  const selectedViewOrder = negocioLocal ?? negocioBuscado ?? undefined;
 
   // Os três caminhos de saída do painel passam por aqui. O `onOpenChange` do Radix só dispara
   // em fechamento iniciado pelo usuário — o botão "Fechar" do rodapé mexe no estado direto e
@@ -2316,411 +2296,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       }, { replace: true });
     }
   }, [searchParams, setSearchParams]);
-
-  const viewOrderSheet = (
-    <Sheet
-      open={!!viewOrderId}
-      onOpenChange={(open) => {
-        if (open) return;
-        fecharPainel();
-      }}
-    >
-      <ConteudoDoPainel className="sm:max-w-xl">
-        <CabecalhoDoPainel className="border-b pb-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="space-y-1">
-              <SheetTitle className="text-foreground font-bold text-lg">
-                {selectedViewOrder ? getNomeNegocio(selectedViewOrder) : 'Detalhes do Negócio'}
-              </SheetTitle>
-              {/* O <SheetDescription> continua montado mesmo sem a seção, e só o texto some:
-                  é ele que o painel usa como descrição acessível (aria-describedby), e tirar o
-                  elemento deixaria o leitor de tela sem referência. Sem Obras, a frase "Sem obra
-                  vinculada" seria pior que o silêncio — fala de algo que a empresa não tem. */}
-              <SheetDescription>
-                {temObras === true && (selectedViewOrder?.obra?.nome_obra ?? 'Sem obra vinculada')}
-              </SheetDescription>
-            </div>
-            {selectedViewOrder && (
-              <Badge className={getStageBadgeClass(KANBAN_STAGES.find(s => s.key === selectedViewOrder.status)?.color ?? 'muted-foreground')}>
-                {stageLabel(selectedViewOrder.status)}
-              </Badge>
-            )}
-          </div>
-        </CabecalhoDoPainel>
-
-        <CorpoDoPainel className="pt-6">
-        {selectedViewOrder ? (
-          <div className="space-y-8">
-            {/* Grid de Dados */}
-            <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Building2 className="h-3 w-3" /> Cliente
-                </p>
-                {selectedViewOrder.cliente ? (
-                  <button 
-                    onClick={() => navigate(`/clientes/${selectedViewOrder.cliente?.id}`)}
-                    className="text-sm font-medium hover:text-primary transition-colors text-left flex items-center gap-1 group"
-                  >
-                    {selectedViewOrder.cliente.empresa}
-                    <div className="h-1.5 w-1.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </button>
-                ) : (
-                  <p className="text-sm font-medium">-</p>
-                )}
-              </div>
-              {/* Sem a seção, o quadro de Obra some inteiro — rótulo e valor. O botão levaria
-                  para /obras, que a guarda de rota já barra: mostrar um caminho fechado é pior
-                  que não mostrar caminho nenhum. A grade é de duas colunas fixas, então os
-                  outros quadros só se reacomodam. */}
-              {temObras === true && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <Building2 className="h-3 w-3" /> Obra
-                  </p>
-                  {selectedViewOrder.obra ? (
-                    <button
-                      // `/obras/{id}` NÃO existe como rota (App.tsx só tem `/obras`), então
-                      // este clique caía no curinga e abria "página não encontrada". O
-                      // caminho certo já existia em ClienteDetalhe.tsx:720: navega para
-                      // `/obras` levando o id no estado, e a tela de Obras o lê e abre a
-                      // obra (Obras.tsx:138).
-                      onClick={() =>
-                        navigate('/obras', {
-                          state: { selectedObraId: selectedViewOrder.obra?.id },
-                        })
-                      }
-                      className="text-sm font-medium hover:text-primary transition-colors text-left flex items-center gap-1 group"
-                    >
-                      {selectedViewOrder.obra.nome_obra}
-                      <div className="h-1.5 w-1.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </button>
-                  ) : (
-                    <p className="text-sm font-medium">{selectedViewOrder.obra?.nome_obra ?? '-'}</p>
-                  )}
-                </div>
-              )}
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Factory className="h-3 w-3" /> Fabricante
-                </p>
-                <p className="text-sm font-medium">{selectedViewOrder.fabricante?.nome ?? '-'}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Tag className="h-3 w-3" /> Marcador
-                </p>
-                {selectedViewOrder.marcador ? (
-                  <Badge className={getStageBadgeClass(selectedViewOrder.marcador.cor)}>
-                    {selectedViewOrder.marcador.nome}
-                  </Badge>
-                ) : (
-                  <p className="text-sm font-medium">-</p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <DollarSign className="h-3 w-3" /> Valor Total
-                </p>
-                <p className="text-sm font-bold text-primary">
-                  {(selectedViewOrder.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <User className="h-3 w-3" /> Responsáveis
-                </p>
-                {/*
-                  Aqui a estrela grava NA HORA: este painel não tem botão de salvar, e um clique
-                  que não valesse na hora faria a pessoa fechar o painel achando que mudou algo.
-                  Toda troca de estrela entra no histórico de atividades do negócio.
-
-                  🔴 O nome deixou de ser um atalho para a ficha da pessoa. Com vários
-                  responsáveis, um link só teria de escolher um deles — e o painel passaria a
-                  responder "quem é o titular" em vez de "quem toca este negócio", que é a
-                  pergunta que o campo único existe para responder. A ficha da pessoa continua
-                  a um clique em Usuários.
-                */}
-                <PainelDeResponsaveis pedidoId={selectedViewOrder.id} somenteLeitura={!podeEditar} />
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Clock className="h-3 w-3" /> Data de Criação
-                </p>
-                <p className="text-sm font-medium">
-                  {selectedViewOrder.data_pedido ? (() => {
-                    const dateParts = selectedViewOrder.data_pedido.split('-');
-                    return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
-                  })() : '-'}
-                </p>
-              </div>
-              {selectedViewOrder.prazo_resposta && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <CalendarIcon className="h-3 w-3" /> Data de Fechamento
-                  </p>
-                  <p className="text-sm font-medium">
-                    {(() => {
-                      const dateParts = selectedViewOrder.prazo_resposta.split('-');
-                      return `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
-                    })()}
-                  </p>
-                </div>
-              )}
-              {selectedViewOrder.pdf_url && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <FileText className="h-3 w-3" /> Anexo
-                  </p>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const original = repairCorruptedBitrixUrl(selectedViewOrder.pdf_url);
-                      const nome = filenameFromUrl(original, 'anexo.pdf');
-                      // Assina no clique, não ao desenhar a lista: só paga pelo anexo que alguém
-                      // de fato abre. O nome sai do endereço ORIGINAL, onde o caminho está limpo.
-                      setPdfPreview({ url: (await enderecoDoArquivo(original)) ?? original, nome });
-                    }}
-                    className="inline-flex items-center gap-2 p-2.5 rounded-lg border bg-muted/30 text-sm font-medium text-primary hover:underline w-fit"
-                  >
-                    <FileText className="h-4 w-4" /> Ver PDF anexado
-                  </button>
-                </div>
-              )}
-              {/* Renderização de Campos Extras dinâmicos */}
-              {columns.filter(col => tableVisibleColumns.includes(col.id)).map(col => {
-                const colId = col.id;
-                const isDefault = PEDIDOS_COLUMNS.some(c => c.id === colId);
-                if (isDefault || colId === 'acoes') return null;
-                
-                if (colId === 'pdf_url') return null; // já exibido acima em "Anexo", com correção de link corrompido
-                const value = selectedViewOrder.campos_extras?.[colId] ?? selectedViewOrder.campos_extras?.[getLabel(colId)];
-                if (!value) return null;
-
-                // Evita duplicar a exibição quando o mesmo link já aparece na seção "Anexo"
-                // estruturada abaixo (importações antigas guardavam o PDF só como campo extra).
-                // Compara após reparo, pois o valor bruto em campos_extras pode ter a corrupção
-                // de locale (pontos trocados por vírgulas) que o pdf_url estruturado já corrige.
-                if (
-                  selectedViewOrder.pdf_url &&
-                  typeof value === 'string' &&
-                  repairCorruptedBitrixUrl(value.trim()) === repairCorruptedBitrixUrl(selectedViewOrder.pdf_url.trim())
-                ) return null;
-
-                const isUrl = typeof value === 'string' && /^https?:\/\//i.test(value.trim());
-
-                return (
-                  <div key={colId} className="space-y-1">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <FileText className="h-3 w-3" /> {getLabel(colId)}
-                    </p>
-                    {isUrl ? (
-                      <a
-                        href={value.trim()}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 p-2.5 rounded-lg border bg-muted/30 text-sm font-medium text-primary hover:underline w-fit"
-                      >
-                        <FileText className="h-4 w-4" /> Abrir {getLabel(colId)}
-                      </a>
-                    ) : (
-                      <p className="text-sm font-medium">{value}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Endereço */}
-            {selectedViewOrder.endereco_entrega && (
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Endereço de Entrega</p>
-                <div className="p-3 rounded-lg border bg-muted/30 flex items-start gap-3">
-                  <Building2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                  <p className="text-sm text-muted-foreground leading-relaxed">{selectedViewOrder.endereco_entrega}</p>
-                </div>
-              </div>
-            )}
-
-            {/* As pessoas da construtora, com o atalho para a conversa de cada uma. Até
-                04/09/2026 o negócio não tinha lista de contatos em lugar nenhum — a coluna
-                "Contato" da lista é texto solto vindo da importação, sem id nem telefone. */}
-            <ContatosDoNegocio
-              clienteId={selectedViewOrder.cliente_id}
-              empresaNome={selectedViewOrder.cliente?.empresa}
-            />
-
-            {/* O que aconteceu com este negócio: o que alguém anotou à mão, e um resumo por
-                conversa de WhatsApp. O card antigo dependia de um `selectedOrder` que ninguém
-                preenchia, e a consulta dele quebraria se rodasse. */}
-            <HistoricoDoNegocio
-              pedidoId={viewOrderId}
-              clienteId={selectedViewOrder.cliente_id}
-              empresaNome={selectedViewOrder.cliente?.empresa}
-            />
-
-            {/* Tarefas / Observações do negócio — some quando a empresa não contratou a
-                seção. Os irmãos acima e abaixo são blocos independentes no mesmo
-                empilhamento, então o espaçamento se fecha sozinho. */}
-            {temTarefas === true && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tarefas</p>
-                <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={() => setAddTarefaOpen(true)}>
-                  <Plus className="h-3.5 w-3.5" /> Nova Tarefa
-                </Button>
-              </div>
-              <div className="rounded-lg border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Tarefa</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Responsável</TableHead>
-                      <TableHead>Prazo Final</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {!tarefasNegocio?.length ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground text-sm">
-                          Nenhuma tarefa vinculada a este negócio
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      tarefasNegocio.map(tarefa => (
-                        <TableRow key={tarefa.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setEditingTarefaNegocio(tarefa)}>
-                          <TableCell className="font-medium text-sm">{tarefa.titulo}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="capitalize text-[10px]">{tarefa.status.replace(/_/g, ' ')}</Badge>
-                          </TableCell>
-                          <TableCell className="text-sm" onClick={(e) => tarefa.responsavel && e.stopPropagation()}>
-                            {tarefa.responsavel ? <UserProfilePopover name={tarefa.responsavel} /> : <span className="text-muted-foreground">-</span>}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {tarefa.prazo_final
-                              ? format(new Date(tarefa.prazo_final), 'dd/MM/yyyy', { locale: ptBR })
-                              : '-'}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-            )}
-
-            {/* Histórico de Movimentação no Kanban */}
-            <div className="space-y-4">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <History className="h-3 w-3" /> Histórico de Movimentação
-              </p>
-              <HistoricoMovimentacaoNegocio historico={historicoStatusNegocio} stageLabel={stageLabel} />
-            </div>
-
-            {/* Comentários manuais — separado do log automático acima */}
-            <div className="space-y-4">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <MessageSquare className="h-3 w-3" /> Comentários
-              </p>
-              <ComentariosNegocio pedidoId={viewOrderId} />
-            </div>
-          </div>
-        ) : buscandoNegocio ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : erroBuscaNegocio ? (
-          /* Quarto estado, achado da revisão de 06/09/2026: FALHA AO CARREGAR não é a mesma
-             coisa que "não existe mais". Queda de rede, tempo limite de 8s do Postgres (ver
-             CLAUDE.md §7.15) ou identificador malformado no endereço caem aqui — depois de
-             3 tentativas do TanStack Query — e o negócio pode estar intacto. Confundir os dois
-             manda a pessoa procurar um negócio que nunca sumiu. `mensagemDeErro` porque erro do
-             Supabase não é um `Error`: `e instanceof Error` daria falso aqui. */
-          <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
-            <p className="text-sm font-medium text-card-foreground">
-              Não foi possível carregar este negócio.
-            </p>
-            <p className="max-w-xs text-xs text-muted-foreground">
-              {mensagemDeErro(erroBuscaNegocio, 'Falha ao buscar. Tente novamente em instantes.')}
-            </p>
-          </div>
-        ) : (
-          /* Terceiro estado: negócio apagado, de outra empresa, ou identificador que não existe
-             mais — sem erro nenhum na busca. Sem ele o painel gira para sempre e nada chega ao
-             registro de erros — o painel não lança exceção nenhuma. */
-          <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
-            <p className="text-sm font-medium text-card-foreground">
-              Este negócio não está mais disponível.
-            </p>
-            <p className="max-w-xs text-xs text-muted-foreground">
-              Ele pode ter sido excluído, ou o link que você abriu é de outra empresa.
-            </p>
-          </div>
-        )}
-        </CorpoDoPainel>
-
-        {/* Rodapé CONGELADO e no MESMO padrão do painel de Obras, a pedido do Lucas: à esquerda
-            o que se usa todo dia (Editar, Fechar), à direita a exclusão, sozinha.
-
-            O botão "Exportar" saiu. Ele abria a exportação de UM negócio, coisa que a tela de
-            Negócios já faz pela seleção da lista — e ficava colado nas duas ações que a pessoa
-            de fato usa aqui. */}
-        <RodapeDoPainel
-          esquerda={
-            <>
-              {/* Achado da revisão de 06/09/2026: os dois botões ficam SEMPRE montados, com
-                  `disabled` no lugar de sumir/aparecer. Montar "Editar" só quando o dado chega
-                  empurrava "Fechar" para a direita no meio do gesto — quem mirava em Fechar
-                  enquanto a busca corria caía em Editar. */}
-              <Button disabled={!selectedViewOrder} onClick={() => navigate(`/pedidos/${viewOrderId}/editar`)}>
-                <Pencil className="mr-2 h-4 w-4" /> Editar
-              </Button>
-              <Button variant="outline" onClick={fecharPainel}>
-                Fechar
-              </Button>
-            </>
-          }
-        >
-          <Button
-            variant="ghost"
-            className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            disabled={!selectedViewOrder}
-            onClick={() => {
-              const alvo = viewOrderId!;
-              fecharPainel();
-              setDeleteAllFilteredMode(false);
-              setSelected(new Set([alvo]));
-              setConfirmDeleteOpen(true);
-            }}
-          >
-            <Trash2 className="h-4 w-4" /> Excluir
-          </Button>
-        </RodapeDoPainel>
-      </ConteudoDoPainel>
-    </Sheet>
-  );
-
-  const addTarefaDialog = (
-    <TarefaFormDialog
-      open={addTarefaOpen}
-      onOpenChange={setAddTarefaOpen}
-      editingTarefa={null}
-      kanbanStages={tarefaKanbanStages}
-      extraFields={{ pedido_id: viewOrderId!, cliente_id: selectedViewOrder?.cliente_id }}
-    />
-  );
-
-  const editTarefaDialog = (
-    <TarefaFormDialog
-      open={!!editingTarefaNegocio}
-      onOpenChange={(open) => { if (!open) setEditingTarefaNegocio(null); }}
-      editingTarefa={editingTarefaNegocio}
-      kanbanStages={tarefaKanbanStages}
-      extraFields={{ pedido_id: viewOrderId!, cliente_id: selectedViewOrder?.cliente_id }}
-    />
-  );
 
   const isFiltered = hasPipelineFilters || deferredSearch.trim() !== '';
 
@@ -3718,13 +3293,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {viewOrderSheet}
-      {/* Cinto e suspensório: os dois únicos gatilhos que abrem estes diálogos já estão
-          dentro do bloco escondido acima, então eles nasceriam com `open={false}` de
-          qualquer jeito. Vale mesmo assim — impede que um gatilho novo, colado ali no
-          futuro, ressuscite a tela de tarefas numa empresa que não contratou. */}
-      {temTarefas === true && (<>{addTarefaDialog}{editTarefaDialog}</>)}
-      <FilePreviewDialog file={pdfPreview} onClose={() => setPdfPreview(null)} />
+      <PainelDoNegocio
+        pedidoId={viewOrderId}
+        onClose={fecharPainel}
+        negocioJaCarregado={negocioLocal}
+        camposExtras={camposExtrasDoPainel}
+        onExcluir={(alvo) => {
+          // A exclusão daqui reaproveita a máquina de seleção em massa desta tela. Por isso ela
+          // é `prop` e não vive dentro do painel: as outras telas não têm essa máquina.
+          fecharPainel();
+          setDeleteAllFilteredMode(false);
+          setSelected(new Set([alvo]));
+          setConfirmDeleteOpen(true);
+        }}
+      />
     </AppLayout>
   );
 };
