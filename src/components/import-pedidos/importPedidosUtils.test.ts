@@ -52,6 +52,7 @@ describe('importPedidosUtils', () => {
       data_pedido: '',
       prazo_resposta: '',
       pdf_url: '',
+      codigo: '',
     };
 
     expect(getImportedPedidosRows(rows, mapping)).toEqual([

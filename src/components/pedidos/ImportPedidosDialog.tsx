@@ -283,6 +283,10 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         prazo_resposta: rest.prazo_resposta || undefined,
         observacoes: rest.observacoes || '',
         pdf_url: rest.pdf_url || '',
+        // Só carrega. Quem decide o que fazer com o código é a Tarefa 4 — aqui ele apenas deixa
+        // de ser descartado no caminho. `use-bulk-import` monta o payload do insert campo a
+        // campo, então enquanto a atualização não existir este valor é ignorado sem estragar nada.
+        codigo: rest.codigo || '',
         campos_extras: campos_extras || {}
       };
     });

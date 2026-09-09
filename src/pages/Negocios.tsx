@@ -1862,11 +1862,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         // hoje qualquer pessoa com a planilha na mão baixa o orçamento sem estar logada.
         // A ida e volta exportar → editar → reimportar continua funcionando.
         pdf_url: p => p.pdf_url ?? '',
+        // O identificador permanente do negócio. É o que permite exportar, anotar no Excel e
+        // devolver ao CRM sem duplicar: sem esta coluna, a importação não tem como saber que a
+        // linha é a mesma, e desde 03/09/2026 (23b3d6c9) não há mais deduplicação por conteúdo
+        // para segurar a queda.
+        //
+        // Vai cru, sem formatação: é o mesmo texto que a importação vai comparar do outro lado,
+        // e qualquer enfeite aqui quebraria o reencontro.
+        codigo: p => p.id,
       };
 
       const larguraPorCampo: Record<string, number> = {
         negocio: 38, cliente: 28, contato: 24, obra: 30, fabricante: 22, valor: 16, vendedor: 22,
         status: 18, marcador: 16, data_pedido: 12, prazo_resposta: 12, observacoes: 40, pdf_url: 40,
+        codigo: 40,
       };
 
       const cabecalhos = FIELDS.map(f => f.label);

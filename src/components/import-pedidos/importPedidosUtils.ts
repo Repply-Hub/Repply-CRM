@@ -1,7 +1,7 @@
 import { getExtraDisplayName, getExtraHeaders, type ExtraMappingValue } from '@/components/import/MappingStep';
 import * as XLSX from 'xlsx';
 
-export type FieldKey = 'negocio' | 'cliente' | 'contato' | 'obra' | 'fabricante' | 'valor' | 'vendedor' | 'observacoes' | 'status' | 'marcador' | 'data_pedido' | 'prazo_resposta' | 'pdf_url';
+export type FieldKey = 'negocio' | 'cliente' | 'contato' | 'obra' | 'fabricante' | 'valor' | 'vendedor' | 'observacoes' | 'status' | 'marcador' | 'data_pedido' | 'prazo_resposta' | 'pdf_url' | 'codigo';
 
 export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'negocio', label: 'Negócio', required: false },
@@ -17,6 +17,12 @@ export const FIELDS: { key: FieldKey; label: string; required: boolean }[] = [
   { key: 'prazo_resposta', label: 'Fechamento', required: false },
   { key: 'observacoes', label: 'Observações', required: false },
   { key: 'pdf_url', label: 'Anexo', required: false },
+  // 🔴 ÚLTIMA DA LISTA, E ISSO É A DECISÃO. A exportação monta o cabeçalho da planilha com
+  // `FIELDS.map(f => f.label)`, na ordem daqui — mover esta linha move a coluna do arquivo.
+  // O dono do produto pediu no fim, depois de "Anexo", para não mexer na planilha que a
+  // equipe já conhece. O rótulo tem as duas palavras de propósito: "ID" é o que o mercado
+  // usa, "Código" é o que se fala em português.
+  { key: 'codigo', label: 'Código/ID', required: false },
 ];
 
 const EMPTY_MAPPING: Record<FieldKey, string> = {
@@ -33,6 +39,7 @@ const EMPTY_MAPPING: Record<FieldKey, string> = {
   data_pedido: '',
   prazo_resposta: '',
   pdf_url: '',
+  codigo: '',
 };
 
 const FIELD_KEYS = Object.keys(EMPTY_MAPPING) as FieldKey[];
@@ -160,6 +167,20 @@ const HEADER_RULES: Record<FieldKey, Array<{ pattern: RegExp; score: number }>> 
     { pattern: /arquivo/, score: 74 },
     { pattern: /documento/, score: 70 },
   ],
+  codigo: [
+    // normalizeText troca "/" por espaço antes de comparar (linha 254), então
+    // "Código/ID" chega aqui como "codigo id" — não "codigo/id".
+    { pattern: /^codigo id$/, score: 100 },
+    { pattern: /^codigo$/, score: 100 },
+    { pattern: /^id$/, score: 100 },
+    { pattern: /^id codigo$/, score: 100 },
+    { pattern: /^identificador$/, score: 95 },
+    { pattern: /^codigo do negocio$/, score: 95 },
+    { pattern: /^id do negocio$/, score: 95 },
+    // Solto no meio de outro texto vale menos: "Código do Cliente" não é este campo.
+    { pattern: /\bcodigo\b.*\bnegocio\b/, score: 85 },
+    { pattern: /\bid\b.*\bnegocio\b/, score: 85 },
+  ],
 };
 
 const MIN_SCORE: Record<FieldKey, number> = {
@@ -176,6 +197,10 @@ const MIN_SCORE: Record<FieldKey, number> = {
   data_pedido: 70,
   prazo_resposta: 70,
   pdf_url: 70,
+  // Alto de propósito: um cabeçalho que apenas contenha "id" ou "código" não basta.
+  // "Código do Cliente" e "ID Bitrix" são outros campos, e casar errado aqui manda a
+  // importação atualizar o negócio errado — o pior estrago que este trabalho pode causar.
+  codigo: 95,
 };
 
 const STATUS_RULES: Array<{ status: string; patterns: RegExp[] }> = [
