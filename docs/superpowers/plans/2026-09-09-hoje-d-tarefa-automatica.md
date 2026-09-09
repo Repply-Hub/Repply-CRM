@@ -12,6 +12,20 @@ linha só** no dia do retorno, em vez de duas.
 terceiro. A fila deixa de listar o negócio quando existe tarefa aberta ligada a ele — o mesmo
 critério que o cartão "Sem Próxima Ação" já usa.
 
+**Este plano começa consertando o módulo de Tarefas, e não é arrumação.** As Tarefas 1 e 2 são
+dois defeitos **anteriores a este trabalho**, achados de passagem durante o Plano A e aprovados
+pelo dono do produto em 09/09/2026 para serem feitos aqui:
+
+- **Tarefa 1 é pré-requisito técnico.** A cláusula que esconde o negócio da fila casa por
+  `t.pedido_id = p.id`, e o comentário promete que **qualquer** tarefa aberta esconde. Hoje,
+  tarefa criada pelo botão "Nova Tarefa" nasce **sem negócio** — a promessa seria falsa, e o
+  sistema teria duas regras conforme o caminho pelo qual a tarefa nasceu.
+- **Tarefa 2 é honestidade.** Este plano faz o sistema **criar** tarefas sozinho; entregar isso
+  enquanto "Excluir" mente sobre ter apagado é aumentar o que a pessoa não consegue desfazer.
+
+A pegada medida das duas é pequena — a MD tem **4 tarefas no total** —, o que é justamente por
+que elas cabem aqui, antes de este plano começar a criar tarefas de verdade.
+
 **Pilha:** Postgres (`SECURITY DEFINER`) · React 18 + TypeScript · TanStack Query v5 · Vitest.
 
 ## Restrições globais
@@ -69,13 +83,152 @@ Outros fatos: `status` tem `'pendente'` (padrão), `'em andamento'` e `'concluid
 
 | Arquivo | Responsabilidade |
 |---|---|
+| `src/components/pedidos/PainelDoNegocio.tsx` | O formulário de tarefa para de fechar o painel (Tarefa 1) |
+| `src/hooks/use-tarefas.ts` | Excluir passa a dizer a verdade quando o banco recusa (Tarefa 2) |
 | `supabase/migrations/<data>_retomar_cria_tarefa.sql` **(novo)** | `registrar_retorno` ganha a tarefa; `pauta_do_dia_de` esconde o negócio que já tem tarefa aberta |
 | `src/components/pauta/DialogoRetorno.tsx` | A caixinha "Criar tarefa para o responsável" |
 | `src/hooks/use-pauta.ts` | Passa o novo argumento e invalida as tarefas |
 
 ---
 
-## Tarefa 1: o banco cria a tarefa
+## Tarefa 1: "Nova Tarefa" no painel volta a vincular a tarefa ao negócio
+
+🔴 **Isto é pré-requisito técnico da Tarefa 3, não arrumação.** O Passo 3 daquela tarefa esconde
+da fila o negócio que tem tarefa aberta, pela cláusula `t.pedido_id = p.id`, e o comentário
+promete que **qualquer** tarefa aberta esconde — "venha de onde vier". Enquanto este defeito
+existir, tarefa criada pelo botão "Nova Tarefa" nasce **sem negócio**, a cláusula não casa, e a
+promessa do comentário é falsa. Consertar depois deixaria o sistema com duas regras conforme o
+caminho pelo qual a tarefa nasceu.
+
+**O defeito, conferido três vezes na tela em 09/09/2026:** o primeiro clique dentro do formulário
+de tarefa **fecha o painel do negócio**. `TarefaFormDialog` é um diálogo `modal={false}` num
+portal fora da árvore do `Sheet`, e o `Sheet` não desliga clique-fora — então o clique conta como
+"clicou fora do painel". Com o painel fechado, `pedidoId` vira nulo e o `extraFields` grava a
+tarefa solta. A ficha da tarefa mostra "NEGÓCIO: —".
+
+**Não é regressão do Plano A:** em `Negocios.tsx`, antes da extração, os diálogos já eram irmãos
+do `Sheet` e já usavam `viewOrderId!` — mesma estrutura, mesmo defeito.
+
+**Arquivos:**
+- Modificar: `src/components/pedidos/PainelDoNegocio.tsx`
+
+- [ ] **Passo 1: reproduzir antes de consertar**
+
+Com o navegador logado (usuário de teste da empresa **Repply**, a de demonstração), abra um
+negócio, clique em "Nova Tarefa", clique **uma vez** dentro do formulário e observe o painel
+fechar. Salve a tarefa e confirme no banco que ela nasceu com `pedido_id` nulo:
+
+```sql
+select titulo, pedido_id from public.tarefas order by created_at desc limit 3;
+```
+
+**Não conserte sem ter visto o defeito.** Se ele não reproduzir, pare e avise — o diagnóstico
+está errado e o conserto seria chute.
+
+- [ ] **Passo 2: escolher o conserto pela causa, não pelo sintoma**
+
+Há mais de um caminho, e eles não são equivalentes. **Meça e escolha:**
+
+| caminho | o que resolve | o que arrisca |
+|---|---|---|
+| `onInteractOutside` do `Sheet` ignorar cliques originados dentro do diálogo de tarefa | ataca a causa: o painel para de achar que foi clique fora | precisa identificar o portal do diálogo com segurança |
+| Guardar o `pedidoId` num `ref` no instante em que "Nova Tarefa" é clicado, e usar o `ref` no `extraFields` | a tarefa nasce ligada mesmo se o painel fechar | o painel continua fechando — o sintoma visível permanece |
+| Tornar o `TarefaFormDialog` `modal` | o clique deixa de vazar | muda o comportamento do diálogo em **todas** as telas que o usam — procure quantas são antes |
+
+Prefira o primeiro, que conserta o que a pessoa vê. Se ele se mostrar frágil, o segundo é rede
+de segurança e os dois podem conviver. **Justifique a escolha no relatório com o que mediu.**
+
+- [ ] **Passo 3: provar na tela e no banco**
+
+Repita o Passo 1 depois do conserto: o painel **não** fecha, e a tarefa nasce com `pedido_id`
+preenchido. Traga o antes e o depois da mesma consulta.
+
+⚠️ Você vai criar tarefas de teste na empresa **Repply**. Anote os títulos e **liste-os no
+relatório** — quem tem permissão apaga depois. (Excluir pela tela hoje falha em silêncio; é a
+Tarefa 2.)
+
+- [ ] **Passo 4: prender com teste**
+
+O caminho do clique é difícil de testar sem navegador, mas o **contrato** não é: escreva um teste
+que falhe se `extraFields` voltar a depender de um valor que pode ser nulo no momento do envio.
+Se a sua escolha foi o `ref`, o teste é direto. Se foi o `onInteractOutside`, prenda ao menos que
+a propriedade existe e aponta para o portal certo — e diga no relatório o que o teste **não**
+cobre.
+
+- [ ] **Passo 5: commitar**
+
+```bash
+git status --short
+git commit -m "fix(negocios): o formulario de tarefa para de fechar o painel, e a tarefa nasce ligada ao negocio
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>" --only -- src/components/pedidos/PainelDoNegocio.tsx
+```
+
+---
+
+## Tarefa 2: "Excluir tarefa" para de dizer que excluiu quando não excluiu
+
+**O defeito, descoberto em 09/09/2026 tentando apagar tarefas de teste com um `vendedor`:** a
+política `tarefas_delete` exige ser gestor ou ter a funcionalidade `tarefas.excluir`. Sem isso o
+`DELETE` do PostgREST volta **sem erro e com zero linhas**, e as duas telas comemoram — "Tarefa
+excluída" na exclusão avulsa e "N tarefa(s) removida(s)!" na exclusão em massa. A tarefa continua
+lá depois de recarregar.
+
+🔴 **É a armadilha do `CLAUDE.md` §4.6 numa forma que o arquivo ainda não descreve.** Lá está
+escrito "erro do Supabase não é `Error`"; aqui **não há erro nenhum** — o que existe é
+**"zero linhas não é sucesso"**. Uma tela que mente sobre o que gravou custa mais que o recurso
+que ela não entregou.
+
+**Arquivos:**
+- Modificar: `src/hooks/use-tarefas.ts`
+- Modificar: `CLAUDE.md` (a variante nova da armadilha, em §4.6)
+
+- [ ] **Passo 1: medir o defeito, e procurar os irmãos dele**
+
+Confirme o comportamento rodando o `DELETE` como um usuário sem a permissão e mostrando o
+retorno. Depois **varra o projeto**: quantos outros `.delete()` — e `.update()` — não conferem
+as linhas afetadas?
+
+```bash
+grep -rn "\.delete()" src/hooks/ | head -30
+```
+
+Para cada achado, diga se ele tem política que pode recusar em silêncio. **Este é o trabalho
+principal desta tarefa** — consertar só o das tarefas deixaria os irmãos vivos, que é como o
+projeto já se machucou (`CLAUDE.md` §7.14: o conserto certo no arquivo que ninguém chamava).
+
+- [ ] **Passo 2: fazer a tela dizer a verdade**
+
+Peça as linhas afetadas ao PostgREST e trate zero como recusa. Confira na documentação do cliente
+Supabase instalado como se pede a contagem — **não invente a chamada**; se não achar, use
+`.select()` no fim do `delete` e conte o que voltou.
+
+A frase tem que dizer **o que aconteceu e o que fazer**, não "erro ao excluir". Use
+`mensagemDeErro` de `src/lib/mensagem-de-erro.ts` (§4.6) — nunca
+`e instanceof Error ? e.message : '...'`.
+
+- [ ] **Passo 3: registrar a armadilha no CLAUDE.md**
+
+Acrescente ao §4.6 a variante **"zero linhas não é sucesso"**, com o caso medido: a política que
+recusa, o retorno sem erro, e as duas telas que comemoravam. Escreva do jeito que o resto do
+arquivo é escrito — a consequência prática antes do mecanismo.
+
+- [ ] **Passo 4: prender com teste**
+
+Um teste que falhe se alguém voltar a tratar `count === 0` como sucesso no caminho de exclusão.
+
+- [ ] **Passo 5: commitar**
+
+```bash
+git status --short
+git commit -m "fix(tarefas): excluir para de dizer que excluiu quando o banco recusou
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>" --only -- src/hooks/use-tarefas.ts CLAUDE.md
+```
+
+---
+
+## Tarefa 3: o banco cria a tarefa
 
 **Arquivos:**
 - Criar: `supabase/migrations/<AAAAMMDDHHMMSS>_retomar_cria_tarefa.sql`
@@ -217,14 +370,14 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>" --only -- supabase/migrat
 
 ---
 
-## Tarefa 2: a caixinha no diálogo
+## Tarefa 4: a caixinha no diálogo
 
 **Arquivos:**
 - Modificar: `src/components/pauta/DialogoRetorno.tsx`
 - Modificar: `src/hooks/use-pauta.ts` (`useRegistrarRetorno`)
 
 **Interfaces:**
-- Consome: `registrar_retorno(p_pedido_id, p_motivo, p_retorno_em, p_criar_tarefa)` (Tarefa 1).
+- Consome: `registrar_retorno(p_pedido_id, p_motivo, p_retorno_em, p_criar_tarefa)` (Tarefa 3).
 - Produz: `useRegistrarRetorno()` passa a aceitar `{ pedidoId, motivo, retornoEm, criarTarefa }`.
 
 - [ ] **Passo 1: o hook passa o argumento**
@@ -321,6 +474,9 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>" --only -- src/lib/aviso-d
 
 | | Prova |
 |---|---|
+| O painel não fecha mais | Clicar dentro do formulário de tarefa deixa o painel aberto, e a tarefa nasce com `pedido_id` preenchido — a mesma consulta, antes e depois |
+| Excluir diz a verdade | Um usuário sem a permissão clica em excluir e **lê que não tinha permissão**; a tarefa continua lá e a tela não mente |
+| Os irmãos foram procurados | A varredura por `.delete()` sem conferência de linhas está no relatório, com o veredito de cada achado |
 | A tarefa vai para o dono | `usuario_id` = dono, `responsavel` = nome do dono, `criado_por` = nome de quem clicou |
 | A caixinha desliga | Com `p_criar_tarefa := false`, nenhuma linha em `tarefas` |
 | Sem dono não estoura | Negócio com `usuario_id` nulo: retorno gravado, tarefa não criada, sem erro |
