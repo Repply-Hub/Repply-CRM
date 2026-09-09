@@ -372,45 +372,38 @@ export default function Portal() {
     }
   };
 
-  // ─── Natal: lista edições via list-dom-editions ──────────────────────────────
-  // Download + parse de PDF roda no GitHub Actions (scripts/dom_natal_scraper.py).
-  // Este botão apenas consulta quais edições existem no período selecionado.
+  // ─── Natal: dispara o scraper server-side (Edge Function scrape-dom-natal-licencas) ──
+  // A função lista as edições do mês corrente + anterior pela API JSON do DOM, baixa o PDF
+  // real de cada uma, extrai o texto, filtra LP/LI/LO e grava em `licencas_natal` (dedupe
+  // por hash do bloco). Mesmo padrão dos botões do IDEMA e do Extremoz. A janela de datas é
+  // decidida pela própria função — o seletor de período da tela não a afeta.
   const scrapeNatal = async () => {
     setScraping((prev) => ({ ...prev, natal: true }));
-    const toastId = toast.loading('Consultando edições disponíveis do DOM Natal...');
+    const toastId = toast.loading('Buscando edições do Diário Oficial de Natal...');
     try {
-      const from = dateRange.from;
-      const to   = dateRange.to;
+      const { data, error } = await supabase.functions.invoke('scrape-dom-natal-licencas');
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
 
-      // Monta lista de meses sem repetição — ignora o dia selecionado
-      const meses: { mes: number; ano: number }[] = [];
-      const cursor = new Date(from.getFullYear(), from.getMonth(), 1);
-      const fim    = new Date(to.getFullYear(),   to.getMonth(),   1);
-      while (cursor <= fim) {
-        meses.push({ mes: cursor.getMonth() + 1, ano: cursor.getFullYear() });
-        cursor.setMonth(cursor.getMonth() + 1);
-      }
+      const inseridos: number = data?.inseridos ?? 0;
+      const novas: number = data?.novas ?? 0;
+      const restantes: number = data?.restantes ?? 0;
 
-      // Uma chamada por mês em paralelo — a API do DOM só aceita mes+ano por request
-      const respostas = await Promise.all(
-        meses.map(({ mes, ano }) =>
-          supabase.functions.invoke('list-dom-editions', { body: { mes, ano } })
-        )
-      );
+      const base =
+        novas === 0
+          ? 'Banco de dados já está atualizado.'
+          : inseridos > 0
+            ? `${inseridos} publicação${inseridos === 1 ? '' : 'ões'} de licença importada${inseridos === 1 ? '' : 's'} de ${novas} edição${novas === 1 ? '' : 'ões'}.`
+            : `${novas} edição${novas === 1 ? '' : 'ões'} lida${novas === 1 ? '' : 's'} — sem LP/LI/LO.`;
+      const cauda = restantes > 0 ? ' Pode haver mais — clique de novo para continuar.' : '';
+      toast.success(base + cauda, { id: toastId });
 
-      let totalEdicoes = 0;
-      for (const { data, error } of respostas) {
-        if (!error && data?.success) totalEdicoes += data.edicoes?.length ?? 0;
-      }
-
-      toast.success(
-        `${totalEdicoes} edição(ões) disponível(is) no período. Importação via GitHub Actions.`,
-        { id: toastId },
-      );
       await fetchNatalFromDb();
     } catch (err) {
-      console.error('Erro ao listar edições Natal:', err);
-      toast.error('Erro ao consultar edições do DOM Natal', { id: toastId });
+      console.error('Scraping Natal error:', err);
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      setResults((prev) => ({ ...prev, natal: { success: false, error: message } }));
+      toast.error('Erro ao acessar o Diário Oficial de Natal.', { id: toastId });
     } finally {
       setScraping((prev) => ({ ...prev, natal: false }));
     }
