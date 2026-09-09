@@ -28,7 +28,7 @@ Valem para **todas** as tarefas deste plano.
 - **Verificação antes de dizer "feito"** (CLAUDE.md §9), com estes números como linha de base:
   - `npx tsc --noEmit -p tsconfig.app.json 2>&1 | grep -cE "error TS"` → **31**. O `-p` é
     obrigatório; sem ele o comando não confere nada e devolve sucesso.
-  - `npm run test` → **1140** testes verdes em 81 arquivos. O seu número tem que ser ≥ isso.
+  - `npm run test` → **1140** testes verdes em 82 arquivos. O seu número tem que ser ≥ isso.
   - `npm run build` → tem que compilar.
   - `npx eslint <arquivos tocados>` → o total do projeto (433) não pode subir.
 - **Git:** `git status --short` num comando **separado** antes de commitar. Outra sessão do Claude
@@ -104,7 +104,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Building, Calendar as CalendarIcon, Clock, DollarSign, Factory, FileText, History, Loader2, MessageSquare, Pencil, Plus, Tag, Trash2, User } from 'lucide-react';
-import { ConteudoDoPainel, CabecalhoDoPainel, CorpoDoPainel, RodapeDoPainel } from '@/components/shared/DialogoResponsivo';
+import { ConteudoDoPainel, CabecalhoDoPainel, CorpoDoPainel, RodapeDoPainel } from '@/components/shared/PainelDeDetalhes';
 import { PainelDeResponsaveis } from '@/components/pedidos/PainelDeResponsaveis';
 import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
 import { ComentariosNegocio } from '@/components/pedidos/ComentariosNegocio';
@@ -120,10 +120,19 @@ import { useSecaoLigada } from '@/hooks/use-secoes';
 import { useAuth } from '@/hooks/use-auth';
 ```
 
-⚠️ **Confira cada caminho de import contra `Negocios.tsx` antes de escrever.** Alguns nomes deste
-projeto enganam: `ConteudoDoPainel` vem de `DialogoResponsivo`, não de `ui/sheet`; e
-`PainelDeResponsaveis` (o do negócio) não é `PainelDeNegocios` (o das fichas). Se algum símbolo
-não existir no caminho que você escreveu, o `tsc` acusa — rode-o antes de seguir.
+⚠️ **Esta lista é um ponto de partida, não a lista final. Confira cada caminho contra
+`Negocios.tsx` antes de escrever, e acrescente o que faltar** — o JSX que você vai mover usa mais
+símbolos do que este cabeçalho traz.
+
+Três nomes deste projeto enganam:
+
+| Parece | É |
+|---|---|
+| `ConteudoDoPainel` vir de `DialogoResponsivo` | Vem de `@/components/shared/**PainelDeDetalhes**` — `DialogoResponsivo` é outro arquivo (conferido em 09/09/2026) |
+| `PainelDeResponsaveis` ser o painel das fichas | É o dos **responsáveis do negócio**; o das fichas é `PainelDeNegocios` |
+| O ícone chamar-se `Building` | É `Building2` |
+
+Se algum símbolo não existir no caminho que você escreveu, o `tsc` acusa — rode-o antes de seguir.
 
 O corpo do componente recria o estado que hoje mora em `Negocios.tsx`:
 
