@@ -59,6 +59,13 @@ import { useVendedores, useClientes } from "@/hooks/use-clientes";
 import { usePedidosOptions } from "@/hooks/use-pedidos";
 import { getNomeNegocio } from "@/lib/nome-negocio";
 import { definirConversaEmFoco, tocarEnvio } from "@/lib/som";
+import {
+  lerRascunhos,
+  gravarRascunho,
+  limparRascunho,
+  podarRascunhos,
+  comRascunhoNoTopo,
+} from "@/lib/rascunhos-do-whatsapp";
 import { somLigado } from "@/hooks/use-som-ligado";
 import { useCreateTarefa, useTarefasPorConversa } from "@/hooks/use-tarefas";
 import { useSecaoLigada } from "@/hooks/use-secoes";
@@ -4785,7 +4792,51 @@ export default function WhatsAppInbox() {
     "conversas",
   );
 
-  const [texto, setTexto] = useState("");
+  /**
+   * 🔴 O QUE ESTÁ NA CAIXA DE TEXTO É SEMPRE DAQUELA CONVERSA.
+   *
+   * Era um `useState("")` só para a tela inteira: começar a escrever numa
+   * conversa e trocar de chat levava o texto junto, e a pessoa mandava para
+   * quem não devia.
+   *
+   * São dois estados de propósito, e não um. O rascunho é PERSISTIDO por
+   * conversa (ver rascunhos-do-whatsapp); o texto de uma EDIÇÃO de mensagem já
+   * enviada é passageiro e não pode virar rascunho — se virasse, sair no meio da
+   * edição e voltar depois restauraria o texto sem o modo de edição, e a pessoa
+   * mandaria a mensagem antiga de novo como se fosse nova.
+   */
+  const [rascunhos, setRascunhos] = useState<Record<string, string>>({});
+  const [textoDeEdicao, setTextoDeEdicao] = useState("");
+
+  const texto = msgEmEdicao
+    ? textoDeEdicao
+    : conversaAtivaId
+      ? (rascunhos[conversaAtivaId] ?? "")
+      : "";
+
+  const setTexto = useCallback(
+    (valor: string) => {
+      if (msgEmEdicao) {
+        setTextoDeEdicao(valor);
+        return;
+      }
+      if (!conversaAtivaId || !profile?.id) return;
+      setRascunhos(gravarRascunho(profile.id, conversaAtivaId, valor));
+    },
+    [msgEmEdicao, conversaAtivaId, profile?.id],
+  );
+
+  // Carrega uma vez por pessoa; depois disso o estado é a fonte.
+  useEffect(() => {
+    if (profile?.id) setRascunhos(lerRascunhos(profile.id));
+  }, [profile?.id]);
+
+  // Rascunho de conversa que não existe mais não pode ficar segurando um selo
+  // na lista para sempre.
+  useEffect(() => {
+    if (!profile?.id || conversas.length === 0) return;
+    setRascunhos(podarRascunhos(profile.id, conversas.map((c) => c.id)));
+  }, [profile?.id, conversas.length]);
   const [respondendoA, setRespondendoA] = useState<WaMensagem | null>(null);
   // Ao clicar numa citação (reply), rola até a mensagem original e a destaca
   // brevemente com o anel de cor primária do sistema.
@@ -5483,6 +5534,7 @@ export default function WhatsAppInbox() {
     inputRef.current?.focus();
     setRespondendoA(null);
     setMsgEmEdicao(null);
+    setTextoDeEdicao("");
     prependAnchorRef.current = null;
   }, [conversaAtiva?.id]);
 
@@ -5501,13 +5553,15 @@ export default function WhatsAppInbox() {
     setMsgEmEdicao(msg);
     // Numa mensagem encaminhada, o campo mostra SÓ o conteúdo — a linha
     // "Encaminhada" fica de fora da edição e é recolocada ao salvar.
-    setTexto(semMarcadorEncaminhada(msg.conteudo));
+    // Direto no estado passageiro: `setMsgEmEdicao` acima ainda nao valeu
+    // neste render, entao `setTexto` cairia no rascunho da conversa.
+    setTextoDeEdicao(semMarcadorEncaminhada(msg.conteudo));
     setTimeout(() => inputRef.current?.focus(), 0);
   }
 
   function handleCancelarEdicao() {
     setMsgEmEdicao(null);
-    setTexto("");
+    setTextoDeEdicao("");
   }
 
   // Clicar no mesmo emoji que já reagiu remove a reação (toggle, como no WhatsApp).
@@ -5775,6 +5829,20 @@ export default function WhatsAppInbox() {
     if (filtroStatus === "fechado" && !c.arquivada) return false;
     return true;
   });
+  /**
+   * A MESMA lista, só que com quem tem rascunho no topo — e fica lá até a
+   * mensagem sair ou ser apagada, porque é a pendência mais concreta que a
+   * pessoa tem na tela.
+   *
+   * Existe separada de `conversasFiltradas` de propósito: aquela é o CONJUNTO
+   * (contadores, "selecionar todas", filtros), esta é a ORDEM de desenho. Trocar
+   * a de cima faria a contagem depender da ordenação sem motivo.
+   */
+  const conversasOrdenadas = useMemo(
+    () => comRascunhoNoTopo(conversasFiltradas, rascunhos),
+    [conversasFiltradas, rascunhos],
+  );
+
   // Base do texto/checkbox de "Selecionar todas": só considera a aba (Em
   // aberto/Fechado) visível agora — `selecionadas.size` sozinho não serve
   // porque pode incluir marcações da outra aba (ver `toggleTodas`).
@@ -6265,7 +6333,7 @@ export default function WhatsAppInbox() {
       }
       isSendingRef.current = true;
       setMsgEmEdicao(null);
-      setTexto("");
+      setTextoDeEdicao("");
       try {
         await editarMensagem.mutateAsync({
           conversaId: conversaAtiva.id,
@@ -6309,7 +6377,11 @@ export default function WhatsAppInbox() {
       if (telefone === "all") continue;
       msg = msg.split(`@${nome}`).join(`@${telefone}`);
     }
-    setTexto("");
+    // Apaga o rascunho explicitamente, em vez de depender de "texto vazio
+    // limpa": o envio e o unico ponto onde a intencao e mesmo descartar.
+    if (conversaAtivaId && profile?.id) {
+      setRascunhos(limparRascunho(profile.id, conversaAtivaId));
+    }
     tocarEnvio(somLigado());
     setMentionedParticipantes(new Map());
     fecharMencao();
@@ -6520,7 +6592,16 @@ export default function WhatsAppInbox() {
               {conv.nome_contato ?? formatPhone(conv.telefone)}
             </p>
             <p className="text-xs text-muted-foreground truncate mt-0.5">
-              <UltimaMensagemPreview mensagem={conv.ultima_mensagem} />
+              {rascunhos[conv.id] ? (
+                <span className="inline-flex min-w-0 items-center gap-1">
+                  <span className="shrink-0 font-medium text-destructive">
+                    rascunho:
+                  </span>
+                  <span className="truncate">{rascunhos[conv.id]}</span>
+                </span>
+              ) : (
+                <UltimaMensagemPreview mensagem={conv.ultima_mensagem} />
+              )}
             </p>
           </div>
           {!modoSelecao &&
@@ -6655,7 +6736,7 @@ export default function WhatsAppInbox() {
         </>
       );
     }
-    return conversasFiltradas.map((conv) =>
+    return conversasOrdenadas.map((conv) =>
       renderConvButton(conv, () => onSelect(conv)),
     );
   }
@@ -6827,7 +6908,7 @@ export default function WhatsAppInbox() {
               </div>
               <ScrollArea className="flex-1 w-full pt-2">
                 <div className="flex flex-col items-center gap-2 px-1">
-                  {conversasFiltradas.map((conv) => (
+                  {conversasOrdenadas.map((conv) => (
                     <div key={conv.id} className="relative">
                       <button
                         onClick={() => setConversaAtivaId(conv.id)}

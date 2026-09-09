@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  lerRascunhos, gravarRascunho, limparRascunho, podarRascunhos,
+  lerRascunhos, gravarRascunho, limparRascunho, podarRascunhos, comRascunhoNoTopo,
 } from './rascunhos-do-whatsapp';
 
 beforeEach(() => localStorage.clear());
@@ -49,5 +49,40 @@ describe('rascunhos do whatsapp', () => {
   it('aguenta lixo gravado no armazenamento', () => {
     localStorage.setItem('repply_wa_rascunhos_u1', 'isto não é json');
     expect(lerRascunhos('u1')).toEqual({});
+  });
+});
+
+describe('comRascunhoNoTopo', () => {
+  // A ordem que chega já vem do banco: mais recente primeiro.
+  const lista = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
+
+  it('sem rascunho nenhum, devolve o MESMO array', () => {
+    expect(comRascunhoNoTopo(lista, {})).toBe(lista);
+  });
+
+  it('quem tem rascunho sobe', () => {
+    expect(comRascunhoNoTopo(lista, { c: 'oi' }).map((x) => x.id))
+      .toEqual(['c', 'a', 'b', 'd']);
+  });
+
+  it('preserva a ordem original entre os que têm rascunho', () => {
+    expect(comRascunhoNoTopo(lista, { d: 'x', b: 'y' }).map((x) => x.id))
+      .toEqual(['b', 'd', 'a', 'c']);
+  });
+
+  it('preserva a ordem original entre os que não têm', () => {
+    expect(comRascunhoNoTopo(lista, { a: 'x' }).map((x) => x.id))
+      .toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('todo mundo com rascunho não embaralha nada', () => {
+    expect(comRascunhoNoTopo(lista, { a: '1', b: '2', c: '3', d: '4' }).map((x) => x.id))
+      .toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('não altera a lista que recebeu', () => {
+    const copia = [...lista];
+    comRascunhoNoTopo(lista, { d: 'x' });
+    expect(lista).toEqual(copia);
   });
 });

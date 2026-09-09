@@ -62,6 +62,27 @@ export function limparRascunho(usuarioId: string, conversaId: string): Rascunhos
  * sempre. Lista vazia NÃO poda: significa "a lista ainda não chegou", e podar
  * ali apagaria tudo enquanto a tela carrega.
  */
+/**
+ * A mesma lista, com quem tem rascunho no topo.
+ *
+ * Fica aqui, e não solto dentro da tela, porque é regra e merece teste: a
+ * ordenação precisa ser ESTÁVEL — o empate tem de preservar a ordem que veio
+ * do banco (mais recente primeiro), senão a lista embaralha sozinha a cada
+ * tecla digitada.
+ *
+ * Devolve o MESMO array quando não há rascunho nenhum, para não criar
+ * referência nova a cada render.
+ */
+export function comRascunhoNoTopo<T extends { id: string }>(
+  conversas: T[],
+  rascunhos: Rascunhos,
+): T[] {
+  if (Object.keys(rascunhos).length === 0) return conversas;
+  return [...conversas].sort(
+    (a, b) => (rascunhos[b.id] ? 1 : 0) - (rascunhos[a.id] ? 1 : 0),
+  );
+}
+
 export function podarRascunhos(usuarioId: string, idsVivos: string[]): Rascunhos {
   const atual = lerRascunhos(usuarioId);
   if (idsVivos.length === 0) return atual;
