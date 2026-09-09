@@ -192,7 +192,7 @@ além do retorno e do aviso, grava uma tarefa:
 
 | campo | valor |
 |---|---|
-| título | `Retomar <nome do negócio>` |
+| título | `Retomar contato <nome do negócio>` — escolha do dono do produto em 09/09/2026 |
 | descrição | o motivo digitado |
 | responsável | **o dono do negócio** (`pedidos.usuario_id`), não quem clicou |
 | prazo | a data do retorno |
