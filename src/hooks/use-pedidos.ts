@@ -16,6 +16,10 @@ export interface PedidoWithRelations {
   fabricante_id: string;
   usuario_id: string;
   obra_id: string | null;
+  /** O funil a que este negócio pertence. Usado pelo painel para resolver o crachá da etapa
+   *  pelo funil DO NEGÓCIO, nunca pelo funil que a tela está mostrando (achado 🟠 A1 da
+   *  revisão da Tarefa 1) — ver `PainelDoNegocio.tsx`. */
+  funil_id: string;
   endereco_entrega: string | null;
   prazo_resposta: string | null;
   pdf_url: string | null;
@@ -642,7 +646,7 @@ export function usePedidosPorCliente(clienteId?: string | null) {
         .from('pedidos')
         .select(`
           id, status, nome, valor_total, data_pedido, created_at, observacoes,
-          cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
+          cliente_id, fabricante_id, usuario_id, obra_id, funil_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
           cliente:clientes(id, empresa),
           fabricante:fabricantes(id, nome),
           vendedor:usuarios!pedidos_vendedor_id_fkey(id, nome, empresa_id),

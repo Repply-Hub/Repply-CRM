@@ -23,7 +23,6 @@ import { usePedidoPorId, usePedidoHistoricoStatus, type PedidoWithRelations } fr
 import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
-import { useFunis } from '@/hooks/use-funis';
 import { useSecaoLigada } from '@/hooks/use-secoes';
 import { useMinhaPermissao } from '@/hooks/use-minha-permissao';
 import { useAuth } from '@/hooks/use-auth';
@@ -127,23 +126,35 @@ export function PainelDoNegocio({
   // Espelho da política de UPDATE do banco. Não protege nada — quem recusa é o Postgres.
   const { permitido: podeEditar } = useMinhaPermissao('pedidos', 'editar');
 
-  // As etapas saem do funil que o quadro de Negócios está mostrando, resolvido do mesmo jeito
-  // que `Negocios.tsx` resolve (o guardado no navegador; se ele não existir mais, o funil padrão
-  // da empresa). É leitura, nunca escrita — quem troca de funil continua sendo a tela.
+  // As etapas saem do funil DO PRÓPRIO NEGÓCIO (`pedidos.funil_id`), nunca do funil que a tela
+  // que montou o painel está mostrando. Achado 🟠 A1 da revisão da Tarefa 1: a versão anterior
+  // resolvia pelo funil do QUADRO (guardado no navegador, com fallback pro padrão da empresa) —
+  // igual a `Negocios.tsx`. Isso é fiel só enquanto todo negócio aberto pertence ao funil
+  // corrente, o que é verdade na tela de Negócios (a lista já é filtrada por `funilId`) mas não
+  // na pauta "Hoje" nem na tabela de risco, que podem abrir um negócio de OUTRO funil — e aí o
+  // crachá mostrava o slug cru ("negociacao") em vez do nome e da cor da etapa.
   //
-  // 🔴 A chave da consulta é IDÊNTICA à da tela de Negócios, então montar o painel lá não gera
-  // requisição nova: os dois leem a mesma entrada do cache. `useKanbanColunas` não busca nada
-  // sem um funil (`enabled: !!funilId`), e por isso a resolução abaixo não pode ser pulada.
-  const { data: funis } = useFunis(empresaId);
-  const funilGuardado = localStorage.getItem('negocios_funil_id') || undefined;
-  const funilDoQuadro = funis?.some(f => f.id === funilGuardado)
-    ? funilGuardado
-    : (funis?.find(f => f.is_padrao) ?? funis?.[0])?.id;
-  const { data: kanbanColunas } = useKanbanColunas(empresaId, funilDoQuadro);
+  // 🔴 O casamento da etapa precisa das TRÊS colunas — slug, empresa_id e funil_id — nunca só o
+  // slug: uma empresa com dois funis pode repetir o mesmo slug em etapas diferentes (já causou
+  // bug duas vezes neste projeto: migrations 20260905140000 e a da Etapa 3). `useKanbanColunas`
+  // já filtra por `empresa_id` e `funil_id` na consulta; o `.find` do `stageLabel` casa o slug
+  // só DENTRO desse recorte — nunca solto.
+  //
+  // Por que continua sendo `useKanbanColunas` (e não `useKanbanColunasEmpresa`, o padrão de
+  // `BarraDeFiltros.tsx`): na tela de Negócios todo negócio listado já tem
+  // `funil_id === funilId` (a lista é filtrada por `.eq('funil_id', funilId)`), então esta chave
+  // de consulta é IDÊNTICA à que a própria tela usa (`['kanban_colunas', empresaId, funilId]`) —
+  // montar o painel lá não gera requisição nova, os dois leem a mesma entrada do cache.
+  // `useKanbanColunasEmpresa` tem chave própria (`['kanban_colunas_empresa', empresaId]`) e hoje
+  // só divide cache com a barra de filtros da pauta — trocar para ela criaria uma requisição
+  // nova bem na tela mais usada do sistema. Medido, não suposto.
+  const { data: kanbanColunas } = useKanbanColunas(empresaId, negocio?.funil_id);
   const etapas = useMemo(
     () => (kanbanColunas ?? []).map(c => ({ key: c.slug, label: c.nome, color: c.cor })),
     [kanbanColunas]
   );
+  // Sem `funil_id` no negócio, ou com a etapa não encontrada no funil dele, cai no texto cru do
+  // status — o comportamento de sempre, não um vazio novo.
   const stageLabel = (key: string) => etapas.find(s => s.key === key)?.label || (key || '');
 
   // `=== true` em todo uso, nunca `!== false`: enquanto a resposta não chega, a cascata esconde.

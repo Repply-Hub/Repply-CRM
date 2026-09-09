@@ -28,11 +28,18 @@ const RAIZ = join(process.cwd(), 'src');
  * As duas marcas juntas, e por que elas denunciam uma cópia.
  *
  * `CabecalhoDoPainel` só aparece em quem desenha a casca de um painel lateral, e
- * `usePedidoPorId` só em quem busca UM negócio pelo identificador. Separadas, as duas são
- * legítimas em vários lugares — o painel de Obras usa a primeira, a tela de Negócios já usou a
- * segunda. Juntas no mesmo arquivo, significam painel de detalhe de negócio desenhado à mão.
+ * `PedidoWithRelations` só em quem lida com um negócio completo (com as relações embutidas).
+ * Separadas, as duas são legítimas em vários lugares — o painel de Obras usa a primeira, a tela
+ * de Negócios e `use-pedidos.ts` usam a segunda. Juntas no mesmo arquivo, significam painel de
+ * detalhe de negócio desenhado à mão.
+ *
+ * 🔴 Achado 🟠 A2 da revisão da Tarefa 1: a marca original era `usePedidoPorId`, e ela só pega
+ * quem COPIA o arquivo (busca o negócio por conta própria). Uma segunda cópia que receba o
+ * negócio PRONTO por `prop` — o caminho que `negocioJaCarregado` tornou natural — não chamaria
+ * `usePedidoPorId` e passaria batido. `PedidoWithRelations` pega os dois caminhos: quem busca E
+ * quem recebe pronto precisam do formato completo do negócio.
  */
-const MARCAS = ['CabecalhoDoPainel', 'usePedidoPorId'];
+const MARCAS = ['CabecalhoDoPainel', 'PedidoWithRelations'];
 
 /** Quem pode ter as duas marcas, e por quê. Hoje, só o próprio painel. */
 const PODEM_TER_AS_DUAS_MARCAS = ['components/pedidos/PainelDoNegocio.tsx'];

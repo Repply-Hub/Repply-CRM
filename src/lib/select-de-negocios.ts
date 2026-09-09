@@ -17,7 +17,7 @@ export function montarSelectDeNegocios(relacoesInternas: RelacaoInterna[] = []):
   const j = (rel: RelacaoInterna) => (relacoesInternas.includes(rel) ? '!inner' : '');
   return `
   id, status, nome, valor_total, data_pedido, created_at, observacoes,
-  cliente_id, fabricante_id, usuario_id, obra_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
+  cliente_id, fabricante_id, usuario_id, obra_id, funil_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
   cliente:clientes${j('cliente')}(id, empresa),
   fabricante:fabricantes${j('fabricante')}(id, nome),
   vendedor:usuarios!pedidos_vendedor_id_fkey${j('vendedor')}(id, nome, empresa_id),

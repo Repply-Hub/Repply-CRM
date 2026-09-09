@@ -11,7 +11,7 @@ import { montarSelectDeNegocios } from './select-de-negocios';
 describe('montarSelectDeNegocios', () => {
   const CAMPOS_QUE_O_PAINEL_LE = [
     'id', 'status', 'nome', 'valor_total', 'data_pedido', 'observacoes',
-    'cliente_id', 'fabricante_id', 'usuario_id', 'obra_id',
+    'cliente_id', 'fabricante_id', 'usuario_id', 'obra_id', 'funil_id',
     'endereco_entrega', 'campos_extras', 'prazo_resposta', 'pdf_url', 'marcador_id',
   ];
 
