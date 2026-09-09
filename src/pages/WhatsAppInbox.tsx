@@ -66,6 +66,11 @@ import {
   podarRascunhos,
   comRascunhoNoTopo,
 } from "@/lib/rascunhos-do-whatsapp";
+import {
+  ehIndecifravel,
+  FRASE_INDECIFRAVEL,
+  PREVIA_INDECIFRAVEL,
+} from "@/lib/mensagem-indecifravel";
 import { somLigado } from "@/hooks/use-som-ligado";
 import { useCreateTarefa, useTarefasPorConversa } from "@/hooks/use-tarefas";
 import { useSecaoLigada } from "@/hooks/use-secoes";
@@ -192,6 +197,7 @@ import {
   Paperclip,
   X,
   FileText,
+  LockKeyhole,
   Music,
   Video,
   Image as ImageIcon,
@@ -1530,6 +1536,10 @@ function UltimaMensagemPreview({
 }: {
   mensagem: string | null | undefined;
 }) {
+  // Antes de tudo: o marcador do provedor nao pode virar previa da conversa.
+  if (ehIndecifravel(mensagem)) {
+    return <span className="italic">{PREVIA_INDECIFRAVEL}</span>;
+  }
   const info = infoPreviewMensagem(mensagem);
   if (!info) return <>{mensagem ?? "Nenhuma mensagem"}</>;
   const Icon = info.icon;
@@ -2064,6 +2074,25 @@ function MessageContent({
   onSalvarContatoRecebido?: (dados: { nome: string; telefone: string }) => void;
 }) {
   const textCls = isSaida ? "text-white" : "text-foreground";
+
+  // O provedor não conseguiu decifrar esta mensagem e mandou o aviso dele em
+  // inglês, colado ao texto ("[Undecryptable] [text] …"). Não há o que recuperar
+  // do nosso lado — ver `mensagem-indecifravel`. Sai antes de qualquer
+  // tratamento de mídia porque o marcador vem no `conteudo` inclusive quando o
+  // `tipo` diz imagem, e aí a tela tentaria baixar um arquivo que não existe.
+  if (ehIndecifravel(msg.conteudo)) {
+    return (
+      <span
+        className={cn(
+          "flex items-center gap-1.5 text-sm italic",
+          isSaida ? "text-white/80" : "text-muted-foreground",
+        )}
+      >
+        <LockKeyhole className="h-3.5 w-3.5 shrink-0" />
+        {FRASE_INDECIFRAVEL}
+      </span>
+    );
+  }
 
   // O endereço da mídia — Passo 2 do plano dos baldes privados, módulo 3.
   //
@@ -4833,10 +4862,19 @@ export default function WhatsAppInbox() {
 
   // Rascunho de conversa que não existe mais não pode ficar segurando um selo
   // na lista para sempre.
+  //
+  // A dependência é a lista de ids em texto, e não o array: `conversas` é
+  // recriado a cada refetch e faria a poda rodar sem nada ter mudado; só o
+  // tamanho não bastaria, porque uma conversa pode sumir e outra entrar no
+  // mesmo ciclo.
+  const idsDasConversas = useMemo(
+    () => conversas.map((c) => c.id).join(","),
+    [conversas],
+  );
   useEffect(() => {
-    if (!profile?.id || conversas.length === 0) return;
-    setRascunhos(podarRascunhos(profile.id, conversas.map((c) => c.id)));
-  }, [profile?.id, conversas.length]);
+    if (!profile?.id || !idsDasConversas) return;
+    setRascunhos(podarRascunhos(profile.id, idsDasConversas.split(",")));
+  }, [profile?.id, idsDasConversas]);
   const [respondendoA, setRespondendoA] = useState<WaMensagem | null>(null);
   // Ao clicar numa citação (reply), rola até a mensagem original e a destaca
   // brevemente com o anel de cor primária do sistema.
