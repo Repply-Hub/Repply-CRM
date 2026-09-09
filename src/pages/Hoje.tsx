@@ -13,6 +13,8 @@ import { usePossoVerPautaDeTodos } from '@/hooks/use-minha-permissao';
 import { usePauta, type ItemDaPauta } from '@/hooks/use-pauta';
 import { DialogoRetorno } from '@/components/pauta/DialogoRetorno';
 import { RadarDeRisco } from '@/components/pauta/RadarDeRisco';
+import { PainelDoNegocio } from '@/components/pedidos/PainelDoNegocio';
+import { useNegocioNoEndereco } from '@/hooks/use-negocio-no-endereco';
 import {
   lerFiltrosDoEndereco,
   escreverFiltrosNoEndereco,
@@ -133,6 +135,14 @@ const Hoje = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const filtros = useMemo(() => lerFiltrosDoEndereco(searchParams), [searchParams]);
+  // 🔴 O negócio aberto vive no ENDEREÇO (`?negocio=<id>`), do mesmo jeito que na tela de
+  // Negócios — é o MESMO hook e o MESMO parâmetro. Isso é o que faz recarregar a página manter o
+  // painel aberto e o botão voltar do navegador fechá-lo.
+  //
+  // Convive com os filtros do painel de baixo sem briga: `escreverFiltrosNoEndereco` copia o que
+  // recebeu e só mexe nas três chaves dele, então mexer num filtro com o painel aberto preserva
+  // `negocio=` — e `comNegocio` faz o simétrico, preservando os filtros ao abrir e ao fechar.
+  const { negocioAberto, abrirNegocio, fecharNegocio } = useNegocioNoEndereco();
   // 🔴 A CHAVE, NÃO O PAPEL. Era `profile.role in (admin, gestor, empresa)`, e isso passou a
   // discordar do servidor: desde a Tarefa 4 a pauta lê a chave `pauta_de_todos` e ela MANDA
   // sobre o papel — um gestor com o interruptor desligado à mão volta a ver só os próprios.
@@ -203,13 +213,19 @@ const Hoje = () => {
                   item={item}
                   larguraInteira={total % 2 === 1 && i === total - 1}
                   aoAgir={() =>
-                    navigate(
-                      item.tipo === 'compromisso'
-                        ? '/calendario'
-                        // Painel de visualização, não o formulário de edição: quem clica
-                        // aqui quer ENTENDER o negócio antes de decidir o que fazer.
-                        : `/app?negocio=${item.referencia_id}`,
-                    )
+                    // 🔴 O negócio abre AQUI, por cima da pauta — não leva mais para a tela de
+                    // Negócios. Quem clica em "Abrir negócio" está no meio de uma fila de
+                    // trabalho: trocar de tela custava o lugar na fila, o filtro escolhido e a
+                    // rolagem, e voltar significava recomeçar. O painel é o mesmo componente que
+                    // a tela de Negócios monta (`PainelDoNegocio`), montado no fim desta página.
+                    //
+                    // Compromisso continua NAVEGANDO: a agenda é outra tela de verdade, com o
+                    // dia inteiro em volta, e não cabe num painel lateral.
+                    item.tipo === 'compromisso'
+                      ? navigate('/calendario')
+                      // Painel de visualização, não o formulário de edição: quem clica
+                      // aqui quer ENTENDER o negócio antes de decidir o que fazer.
+                      : abrirNegocio(item.referencia_id)
                   }
                   aoAdiar={() => setAlvo(item)}
                 />
@@ -226,6 +242,10 @@ const Hoje = () => {
           filtros={filtros}
           onChangeFiltros={trocarFiltros}
           podeFiltrarPorResponsavel={podeVerDeTodos}
+          // A tabela "Os 10 maiores em risco" abre o MESMO painel que a pauta de cima, e pela
+          // MESMA instância do hook — ver `onAbrirNegocio` em RadarDeRisco.tsx para o que uma
+          // segunda instância quebrava no botão voltar do navegador.
+          onAbrirNegocio={abrirNegocio}
         />
       </div>
 
@@ -238,6 +258,27 @@ const Hoje = () => {
         // de dizer "SUA pauta" para quem está adiando o negócio de um colega.
         responsavel={alvo?.responsavel ?? null}
       />
+
+      {/* UM painel para a tela inteira — a pauta de cima e a tabela "Os 10 maiores em risco" de
+          baixo abrem os dois o MESMO, pela mesma `abrirNegocio` daqui. Montar um segundo painel
+          dentro do `RadarDeRisco` abriria duas cópias sobrepostas do mesmo negócio.
+
+          Três propriedades opcionais NÃO são passadas, de propósito:
+
+          • `onExcluir` — sem ela o botão Excluir nem é desenhado. Excluir negócio pela pauta não
+            foi pedido, e a exclusão da tela de Negócios depende da máquina de seleção em massa
+            de lá, que não existe aqui.
+          • `negocioJaCarregado` — a pauta não tem as linhas dos negócios em mãos (`pauta_do_dia`
+            devolve título, valor e id, não o negócio inteiro com as relações). Sem ela o painel
+            busca por id sozinho, que é exatamente o caso para o qual `usePedidoPorId` existe.
+          • `camposExtras` — o bloco de campos extras não aparece na pauta. Decisão registrada em
+            `.superpowers/sdd/hoje-a/tarefa-3-report.md`: a lista sai de
+            `useTableSettings({ key: 'pedidos' })`, que é a preferência de COLUNAS DA TABELA de
+            Negócios; montar esse hook aqui traria uma leitura de `configuracoes_tabelas` a cada
+            visita e uma REGRAVAÇÃO da mesma linha logo depois (o efeito de salvar dispara quando
+            a carga do servidor troca `columns`) — a corrida que a propriedade existe para evitar.
+            E a pauta é uma fila de ação: campo extra vazio ocupa espaço sem informar. */}
+      <PainelDoNegocio pedidoId={negocioAberto} onClose={fecharNegocio} />
     </AppLayout>
   );
 };

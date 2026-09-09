@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, CalendarX, Factory, ShieldAlert } from 'lucide-react';
 import {
   Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -55,10 +54,27 @@ interface Props {
   filtros: FiltrosDoPainel;
   onChangeFiltros: (filtros: FiltrosDoPainel) => void;
   podeFiltrarPorResponsavel: boolean;
+  /**
+   * Abre o painel do negócio SOBRE a tela — quem monta o painel é a página "Hoje", uma vez só.
+   *
+   * 🔴 Vem por propriedade, e NÃO de um `useNegocioNoEndereco()` daqui de dentro. Os dois
+   * escrevem o mesmo `?negocio=` e nesse ponto são equivalentes; o que não é equivalente é o
+   * FECHAMENTO. O hook lembra, num `useRef` por instância, se foi ELE quem empurrou a entrada
+   * atual do histórico — e só então "Fechar" desfaz a entrada (`navigate(-1)`) em vez de apagar o
+   * parâmetro por cima (`replace`). Com uma instância aqui e outra na página, quem empurra é esta
+   * e quem fecha é a de lá, que nunca vê a marca.
+   *
+   * Medido no navegador em 09/09/2026, antes deste conserto: abrir um negócio por esta tabela e
+   * fechar deixava uma entrada morta na pilha (`push` de `/hoje?negocio=…` seguido de `replace`
+   * para `/hoje`, com a entrada de trás já sendo `/hoje`) — e o primeiro clique no botão VOLTAR do
+   * navegador não fazia nada visível. É o mesmo sintoma que a revisão da Tarefa 2 mediu e
+   * consertou na tela de Negócios. Pela pauta de cima, que usa a instância da página, o par certo
+   * já acontecia: `push` ao abrir, `POP` ao fechar.
+   */
+  onAbrirNegocio: (pedidoId: string) => void;
 }
 
-export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarPorResponsavel }: Props) {
-  const navigate = useNavigate();
+export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarPorResponsavel, onAbrirNegocio }: Props) {
   const { data: bruto } = useDashboardNegociosRisco(empresaId, {
     etapas: filtros.etapas,
     fabricanteIds: filtros.fabricantes,
@@ -261,9 +277,11 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
           hoje, os 146 negócios da lista são todos "sem próxima ação", não "parado" (o
           corte de parado é 7 dias). Um título que só diz "parados" mentia sobre o que a
           tabela de fato lista.
-          Única parte deste painel que gera ação direta: cada linha leva à ficha do
-          negócio, pelo mesmo caminho que a pauta de cima usa (/app?negocio=<id>,
-          consertado na Etapa 1 deste plano). */}
+          Única parte deste painel que gera ação direta: cada linha abre o painel do negócio
+          SOBRE esta mesma tela, pelo mesmo caminho que a pauta de cima usa — escreve
+          `?negocio=<id>` no endereço, e o `PainelDoNegocio` que a página "Hoje" monta lê dali.
+          Antes daqui a linha navegava para a tela de Negócios (/app?negocio=<id>) e tirava a
+          pessoa da pauta, perdendo o filtro e o lugar na lista. */}
       <Card className="shadow-card border-border/60 mt-5">
         <CardHeader className="pb-1">
           <CardTitle className="text-sm font-bold">Os 10 maiores em risco</CardTitle>
@@ -294,7 +312,7 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
                     <tr
                       key={n.id}
                       className="cursor-pointer border-b border-border/50 last:border-0 hover:bg-muted/50"
-                      onClick={() => navigate(`/app?negocio=${n.id}`)}
+                      onClick={() => onAbrirNegocio(n.id)}
                     >
                       <td className="py-2">{n.nome}</td>
                       <td className="py-2 text-muted-foreground">{n.fabrica ?? '—'}</td>
