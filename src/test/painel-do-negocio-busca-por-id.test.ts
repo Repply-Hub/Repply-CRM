@@ -46,6 +46,10 @@ describe('o painel do negócio busca por identificador', () => {
     join(process.cwd(), 'src', 'pages', 'Hoje.tsx'),
     'utf8',
   );
+  const painelDeNegocios = readFileSync(
+    join(process.cwd(), 'src', 'components', 'pedidos', 'PainelDeNegocios.tsx'),
+    'utf8',
+  );
 
   it('usa usePedidoPorId', () => {
     expect(painel).toContain('usePedidoPorId');
@@ -101,6 +105,46 @@ describe('o painel do negócio busca por identificador', () => {
     // Navegar para a tela de Negócios, em qualquer das duas formas que existiam antes.
     expect(hoje).not.toContain("navigate('/app");
     expect(hoje).not.toContain('/app?negocio=');
+  });
+
+  it('a lista de negócios da ficha ABRE o painel, e não desenha um detalhe próprio', () => {
+    // 🔴 O defeito que isto impede (Tarefa 4, 09/09/2026, e o achado A4 da revisão dela). Até
+    // aqui a lista de negócios das fichas de empresa e de contato tinha um diálogo PRÓPRIO de
+    // detalhe: nome, obra, fabricante, valor, data, etapa e observações, e mais nada. Era a
+    // TERCEIRA versão do detalhe do negócio e a mais pobre das três — sem responsáveis, sem
+    // contatos, sem anexo, sem campos extras, sem tarefas, sem histórico e sem comentários.
+    //
+    // O sintoma da volta do bug NÃO é uma tela quebrada: é uma tela que funciona mostrando menos.
+    // Nada falha se alguém trocar `abrirNegocio(p.id)` por um diálogo à mão ou por um
+    // `navigate('/pedidos/<id>/editar')` amanhã — o clique continua abrindo alguma coisa, e a
+    // divergência só aparece quando alguém compara duas telas lado a lado, meses depois.
+    //
+    // O guarda ESTRUTURAL vizinho (`painel-do-negocio-e-uma-peca-so.test.ts`) pega a cópia pela
+    // forma dela; estas asserções prendem o GESTO desta lista em particular.
+    expect(painelDeNegocios).toContain('useNegocioNoEndereco');
+    expect(painelDeNegocios).toMatch(/<PainelDoNegocio\b/);
+    // O clique da linha abre o painel pelo endereço — não guarda id em estado próprio, que é
+    // como o diálogo antigo funcionava (`setViewOrderId`).
+    expect(painelDeNegocios).toMatch(/onClick=\{\(\)\s*=>\s*p\.id\s*&&\s*abrirNegocio\(p\.id\)\}/);
+    expect(painelDeNegocios).not.toContain('setViewOrderId');
+  });
+
+  it('a lista de negócios da ficha não volta a ter sobreposição de detalhe própria', () => {
+    // `Dialog` e `ConteudoDialogo` são as duas formas de abrir um modal neste projeto (CLAUDE.md
+    // §7.11). Nenhuma delas tem o que fazer aqui: quem mostra o detalhe é `PainelDoNegocio`, e
+    // este componente não abre mais nada por conta própria. Um `<Dialog` novo neste arquivo é a
+    // assinatura exata da terceira cópia voltando.
+    expect(painelDeNegocios).not.toMatch(/<Dialog\b/);
+    expect(painelDeNegocios).not.toContain('ConteudoDialogo');
+  });
+
+  it('a lista de negócios da ficha não manda ninguém para o formulário de edição', () => {
+    // 🔴 O gesto que o Plano A inteiro veio tirar do sistema: mandar para a tela de EDIÇÃO quem
+    // só queria OLHAR. Quem clica numa linha da ficha está lendo o histórico do cliente — cair no
+    // formulário custa o lugar na lista, a rolagem e os filtros, e volta significa recomeçar.
+    // Editar continua a um clique: é o botão do rodapé do próprio painel.
+    expect(painelDeNegocios).not.toContain('/editar');
+    expect(painelDeNegocios).not.toContain('useNavigate');
   });
 
   it('a tela de Negócios não tem a sua própria lógica do `?negocio=`', () => {

@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Loader2, TrendingUp, Clock, Factory, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PainelDoNegocio } from '@/components/pedidos/PainelDoNegocio';
+import { useNegocioNoEndereco } from '@/hooks/use-negocio-no-endereco';
 import { formatarMoedaBRL } from '@/lib/moeda';
 import {
   useObraVendas, useObraFabricantes, useObraNegocios, NEGOCIOS_POR_PAGINA,
@@ -22,9 +23,31 @@ import {
  * os dois caminhos que abrem uma obra passam o id pelo `state` da navegação
  * (`Negocios.tsx:2095`, `ClienteDetalhe.tsx:1124`). Criar a rota sem ajustar os dois deixaria
  * duas formas de navegar convivendo.
+ *
+ * 🔴 CLICAR NUM NEGÓCIO ABRE `PainelDoNegocio`, O MESMO DE TODAS AS TELAS — desde 09/09/2026
+ * (achado 🟡 A3 da revisão do Plano A). Até aqui o clique fazia
+ * `navigate('/pedidos/<id>/editar')`: fechava o painel da obra e jogava a pessoa no FORMULÁRIO
+ * DE EDIÇÃO — o gesto que o Plano A tirou das outras três listas de negócios do sistema. Esta
+ * era a quarta, e ficou de fora porque cada tarefa do plano mandava tocar um arquivo só.
+ *
+ * O cartão nunca prometeu "editar": ele mostra nome, valor, etapa, fabricante e responsável, sem
+ * texto, `title` ou `aria-label` que fale em edição (conferido na tela em 09/09/2026). Quem
+ * clica está lendo o histórico da obra — cair no formulário custa o painel aberto, a página da
+ * lista e a rolagem, e voltar significa recomeçar. Editar continua a um clique: é o botão do
+ * rodapé do próprio painel do negócio.
+ *
+ * O painel do negócio abre SOBRE o painel da obra — duas sobreposições empilhadas, o único lugar
+ * do sistema onde isso acontece. Foi visto na tela antes de decidir: o de cima recebe o foco, o
+ * de baixo continua montado por trás, e fechar o de cima devolve a obra exatamente como estava.
  */
 export function VendasDaObra({ obraId }: { obraId: string }) {
-  const navigate = useNavigate();
+  // O negócio aberto vive no ENDEREÇO (`?negocio=<id>`), igual às outras três telas. Aqui isso
+  // tem um limite conhecido e aceito: a OBRA selecionada mora em estado de `Obras.tsx`, não no
+  // endereço, então recarregar a página com `?negocio=` reabre o negócio sem o painel da obra
+  // por trás. Não é regressão (antes recarregar caía no formulário de edição), e o conserto de
+  // verdade seria pôr a obra no endereço também — outra tarefa, com as duas telas que hoje
+  // mandam o id pelo `state` da navegação.
+  const { negocioAberto, abrirNegocio, fecharNegocio } = useNegocioNoEndereco();
   const [pagina, setPagina] = useState(1);
 
   const { data: vendas, isLoading: carregandoVendas } = useObraVendas(obraId);
@@ -60,6 +83,7 @@ export function VendasDaObra({ obraId }: { obraId: string }) {
   const totalPaginas = Math.max(1, Math.ceil((negocios?.total ?? 0) / NEGOCIOS_POR_PAGINA));
 
   return (
+    <>
     <div className="space-y-5">
       {/* ---------------------------------------------------------------- os dois números */}
       <div className="grid grid-cols-2 gap-3">
@@ -132,7 +156,10 @@ export function VendasDaObra({ obraId }: { obraId: string }) {
           {(negocios?.linhas ?? []).map((n) => (
             <button
               key={n.id}
-              onClick={() => navigate(`/pedidos/${n.id}/editar`)}
+              // `n.id &&` pelo mesmo motivo da lista das fichas: `abrirNegocio` só sabe abrir um
+              // id de verdade, e escrever `?negocio=` vazio deixaria o painel preso no estado
+              // "este negócio não está mais disponível".
+              onClick={() => n.id && abrirNegocio(n.id)}
               className="w-full rounded-md border bg-card px-3 py-2 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
             >
               <div className="flex items-center justify-between gap-2">
@@ -188,5 +215,20 @@ export function VendasDaObra({ obraId }: { obraId: string }) {
         )}
       </div>
     </div>
+
+    {/* O MESMO painel que a tela de Negócios, a pauta "Hoje" e as fichas de empresa e de contato
+        abrem. Quem manda o id é o clique no cartão, via `?negocio=` no endereço.
+
+        Nenhuma das três propriedades opcionais é passada, e por motivos que valem aqui:
+
+        • `onExcluir` — excluir negócio pela ficha da obra não existe hoje e não foi pedido.
+        • `negocioJaCarregado` — esta lista NÃO tem o negócio completo em mãos. Ela vem da RPC
+          `obra_negocios`, que devolve um resumo (`ObraNegocio`: nome, cliente, fabricante e
+          responsável já achatados em texto) e não um `PedidoWithRelations`. Sem a propriedade o
+          painel busca por id sozinho — exatamente o caso para o qual `usePedidoPorId` existe.
+        • `camposExtras` — a lista sai de `useTableSettings({ key: 'pedidos' })`, a preferência de
+          colunas da TELA de Negócios; ver `camposExtras` em PainelDoNegocioProps. */}
+    <PainelDoNegocio pedidoId={negocioAberto} onClose={fecharNegocio} />
+    </>
   );
 }

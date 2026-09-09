@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  Building2, CalendarIcon, Clock, DollarSign, Factory, FileText, History, Loader2,
-  MessageSquare, Pencil, Plus, Tag, Trash2, User,
+  Building2, CalendarIcon, ClipboardList, Clock, DollarSign, Factory, FileText, History,
+  Loader2, MessageSquare, Pencil, Plus, Tag, Trash2, User,
 } from 'lucide-react';
 import { Sheet, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -386,6 +386,40 @@ export function PainelDoNegocio({
                   <div className="p-3 rounded-lg border bg-muted/30 flex items-start gap-3">
                     <Building2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                     <p className="text-sm text-muted-foreground leading-relaxed">{negocio.endereco_entrega}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Observações — o texto livre do negócio.
+                  🔴 POR QUE ELE PRECISA ESTAR AQUI (achado 🟠 A1 da revisão do Plano A,
+                  09/09/2026). Até 09/09/2026 o único detalhe do sistema que mostrava
+                  `pedidos.observacoes` era o diálogo próprio da ficha do cliente — e ele saiu
+                  quando as fichas passaram a abrir este painel. A lista de Negócios tem a coluna
+                  "Observações", mas ela NÃO vem ligada por padrão (`NEGOCIOS_DEFAULT_VISIBLE`),
+                  então o campo ficou sem lugar nenhum na tela.
+                  Medido em produção: 442 dos 12.473 negócios têm o campo preenchido — mas o
+                  número geral engana. Na JHS Representações são 277 de 277 (100%), e o texto de
+                  lá é `"Pedido 100867/26 | Produtos: …"`. Como `itens_pedido` está VAZIA no
+                  sistema inteiro, este campo é o único lugar onde os produtos do pedido existem
+                  para aquela empresa. E entre os negócios criados dentro do CRM (não importados)
+                  são 165 de 211 (78%).
+
+                  `whitespace-pre-wrap` porque o texto da JHS traz quebras de linha que separam
+                  os itens — colapsá-las embaralharia a lista de produtos numa parede de texto.
+                  `break-words` porque o painel tem largura fixa (`sm:max-w-xl`) e código de
+                  produto ou endereço longo sem espaço transbordaria a lateral.
+
+                  O `trim()` é o `nullif(trim(...))` do lado do JS: a importação gravou campo só
+                  com espaço em algumas linhas, e um bloco vazio com rótulo ocupa espaço sem
+                  informar nada. */}
+              {negocio.observacoes?.trim() && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Observações</p>
+                  <div className="p-3 rounded-lg border bg-muted/30 flex items-start gap-3">
+                    <ClipboardList className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
+                      {negocio.observacoes.trim()}
+                    </p>
                   </div>
                 </div>
               )}
