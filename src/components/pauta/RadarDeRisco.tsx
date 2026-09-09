@@ -57,19 +57,18 @@ interface Props {
   /**
    * Abre o painel do negócio SOBRE a tela — quem monta o painel é a página "Hoje", uma vez só.
    *
-   * 🔴 Vem por propriedade, e NÃO de um `useNegocioNoEndereco()` daqui de dentro. Os dois
-   * escrevem o mesmo `?negocio=` e nesse ponto são equivalentes; o que não é equivalente é o
-   * FECHAMENTO. O hook lembra, num `useRef` por instância, se foi ELE quem empurrou a entrada
-   * atual do histórico — e só então "Fechar" desfaz a entrada (`navigate(-1)`) em vez de apagar o
-   * parâmetro por cima (`replace`). Com uma instância aqui e outra na página, quem empurra é esta
-   * e quem fecha é a de lá, que nunca vê a marca.
+   * Vem por propriedade, e não de um `useNegocioNoEndereco()` daqui de dentro, por
+   * REAPROVEITAMENTO: esta é uma tabela de gráfico, e tabela de gráfico não tem por que conhecer
+   * rota, endereço nem histórico do navegador. Quem monta o componente decide o que "abrir"
+   * significa na tela dela — e, como a propriedade é obrigatória, o TypeScript cobra essa decisão
+   * de quem montar o `RadarDeRisco` numa tela nova, em vez de deixar um padrão silencioso.
    *
-   * Medido no navegador em 09/09/2026, antes deste conserto: abrir um negócio por esta tabela e
-   * fechar deixava uma entrada morta na pilha (`push` de `/hoje?negocio=…` seguido de `replace`
-   * para `/hoje`, com a entrada de trás já sendo `/hoje`) — e o primeiro clique no botão VOLTAR do
-   * navegador não fazia nada visível. É o mesmo sintoma que a revisão da Tarefa 2 mediu e
-   * consertou na tela de Negócios. Pela pauta de cima, que usa a instância da página, o par certo
-   * já acontecia: `push` ao abrir, `POP` ao fechar.
+   * ⚠️ O motivo ANTIGO desta propriedade não existe mais, e não vale citá-lo: até 09/09/2026 a
+   * marca de "fui eu que empurrei esta entrada do histórico" morava num `useRef` do hook — um por
+   * instância —, então uma segunda instância aqui dentro quebrava o fechamento em silêncio. A
+   * revisão da Tarefa 3 (achados A1/A2) mandou a marca para o `state` da própria entrada do
+   * histórico, onde ela vale entre instâncias. Montar o hook aqui hoje seria correto; a
+   * propriedade fica porque deixa o componente melhor, não porque o hook seja frágil.
    */
   onAbrirNegocio: (pedidoId: string) => void;
 }

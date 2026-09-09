@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Check, Clock, Sun } from 'lucide-react';
@@ -134,6 +134,8 @@ const Hoje = () => {
   const [alvo, setAlvo] = useState<ItemDaPauta | null>(null);
 
   const [searchParams, setSearchParams] = useSearchParams();
+  // Só para `trocarFiltros` repassar o `state` da entrada do histórico — ver o comentário lá.
+  const location = useLocation();
   const filtros = useMemo(() => lerFiltrosDoEndereco(searchParams), [searchParams]);
   // 🔴 O negócio aberto vive no ENDEREÇO (`?negocio=<id>`), do mesmo jeito que na tela de
   // Negócios — é o MESMO hook e o MESMO parâmetro. Isso é o que faz recarregar a página manter o
@@ -152,6 +154,11 @@ const Hoje = () => {
   function trocarFiltros(novos: FiltrosDoPainel) {
     setSearchParams((prev) => escreverFiltrosNoEndereco(new URLSearchParams(prev), novos), {
       replace: true,
+      // 🔴 Repassa o `state` da entrada em vez de deixá-lo cair. `replace` sem `state` nas opções
+      // não preserva nada: grava `undefined`. Mexer num filtro com o painel do negócio ABERTO
+      // apagaria a marca que `useNegocioNoEndereco` deixou ao abrir, e o "Fechar" seguinte
+      // deixaria entrada morta no histórico em vez de desfazer a que ele empurrou.
+      state: location.state,
     });
   }
 
@@ -242,9 +249,9 @@ const Hoje = () => {
           filtros={filtros}
           onChangeFiltros={trocarFiltros}
           podeFiltrarPorResponsavel={podeVerDeTodos}
-          // A tabela "Os 10 maiores em risco" abre o MESMO painel que a pauta de cima, e pela
-          // MESMA instância do hook — ver `onAbrirNegocio` em RadarDeRisco.tsx para o que uma
-          // segunda instância quebrava no botão voltar do navegador.
+          // A tabela "Os 10 maiores em risco" abre o MESMO painel que a pauta de cima, pela
+          // `abrirNegocio` desta página — ver `onAbrirNegocio` em RadarDeRisco.tsx para por que a
+          // tabela recebe isso por propriedade em vez de conhecer o endereço sozinha.
           onAbrirNegocio={abrirNegocio}
         />
       </div>
@@ -272,7 +279,7 @@ const Hoje = () => {
             devolve título, valor e id, não o negócio inteiro com as relações). Sem ela o painel
             busca por id sozinho, que é exatamente o caso para o qual `usePedidoPorId` existe.
           • `camposExtras` — o bloco de campos extras não aparece na pauta. Decisão registrada em
-            `.superpowers/sdd/hoje-a/tarefa-3-report.md`: a lista sai de
+            `docs/superpowers/specs/2026-09-09-hoje-tabela-do-time-e-voz-design.md`: a lista sai de
             `useTableSettings({ key: 'pedidos' })`, que é a preferência de COLUNAS DA TABELA de
             Negócios; montar esse hook aqui traria uma leitura de `configuracoes_tabelas` a cada
             visita e uma REGRAVAÇÃO da mesma linha logo depois (o efeito de salvar dispara quando

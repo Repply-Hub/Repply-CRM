@@ -477,7 +477,7 @@ Em `src/pages/Hoje.tsx`, o botão hoje faz:
 
 ```tsx
 navigate(
-  ehCompromisso ? '/agenda' : `/app?negocio=${item.referencia_id}`,
+  ehCompromisso ? '/calendario' : `/app?negocio=${item.referencia_id}`,
 )
 ```
 
@@ -487,8 +487,13 @@ indo para a agenda, que é outra tela de verdade:
 ```tsx
 const { negocioAberto, abrirNegocio, fecharNegocio } = useNegocioNoEndereco();
 // …
-onClick={() => (ehCompromisso ? navigate('/agenda') : abrirNegocio(item.referencia_id))}
+onClick={() => (ehCompromisso ? navigate('/calendario') : abrirNegocio(item.referencia_id))}
 ```
+
+> ⚠️ **Corrigido em 09/09/2026:** as duas linhas acima diziam `/agenda`, e essa rota **não
+> existe** — a tela da agenda é `path="/calendario"` (`src/App.tsx:597`). Seguir o texto ao pé da
+> letra teria mandado o compromisso para a página de "não encontrado". O implementador da Tarefa 3
+> percebeu e usou a rota certa; o erro era do plano.
 
 E monte o painel uma vez, no fim do JSX da página:
 

@@ -42,6 +42,10 @@ describe('o painel do negócio busca por identificador', () => {
     join(process.cwd(), 'src', 'pages', 'Negocios.tsx'),
     'utf8',
   );
+  const hoje = readFileSync(
+    join(process.cwd(), 'src', 'pages', 'Hoje.tsx'),
+    'utf8',
+  );
 
   it('usa usePedidoPorId', () => {
     expect(painel).toContain('usePedidoPorId');
@@ -82,6 +86,23 @@ describe('o painel do negócio busca por identificador', () => {
     expect(negocios).not.toContain('setViewOrderId');
   });
 
+  it('a tela "Hoje" ABRE o painel, e não navega para a tela de Negócios', () => {
+    // 🔴 O defeito que isto impede (Tarefa 3, 09/09/2026, e o achado A3 da revisão dela). Até
+    // aqui, clicar em "Abrir negócio" na pauta ou numa linha de "Os 10 maiores em risco" LEVAVA a
+    // pessoa para `/app?negocio=<id>` — outra tela. Quem clica está no meio de uma fila de
+    // trabalho: trocar de tela custava o lugar na fila, o filtro escolhido e a rolagem, e voltar
+    // significava recomeçar.
+    //
+    // O sintoma da volta do bug é a pessoa SAIR da tela. Nenhum teste quebra com isso: a tela
+    // continua funcionando, o negócio continua abrindo, só que no lugar errado. Estas três
+    // asserções são a única coisa que prende a entrega.
+    expect(hoje).toContain('useNegocioNoEndereco');
+    expect(hoje).toMatch(/<PainelDoNegocio\b/);
+    // Navegar para a tela de Negócios, em qualquer das duas formas que existiam antes.
+    expect(hoje).not.toContain("navigate('/app");
+    expect(hoje).not.toContain('/app?negocio=');
+  });
+
   it('a tela de Negócios não tem a sua própria lógica do `?negocio=`', () => {
     // 🔴 Este é o guarda contra a volta do defeito de CLAUDE.md §7.14 — duas implementações da
     // mesma regra, e o conserto de uma não alcançando a outra. Até 09/09/2026 `Negocios.tsx`
@@ -89,5 +110,21 @@ describe('o painel do negócio busca por identificador', () => {
     // Dois donos do mesmo parâmetro fazem o painel piscar, ou não abrir.
     expect(negocios).not.toMatch(/delete\(\s*['"]negocio['"]\s*\)/);
     expect(negocios).not.toMatch(/set\(\s*['"]negocio['"]\s*,/);
+  });
+
+  it('quem espelha filtros no endereço com `replace` repassa o `state` da entrada', () => {
+    // 🔴 Guarda do conserto de 09/09/2026 (achados A1/A2 da revisão da Tarefa 3). A marca de "fui
+    // eu que empurrei esta entrada do histórico" mora no `state` da entrada, e um `replace` sem
+    // `state` nas opções não a preserva: grava `undefined` por cima. As duas telas espelham
+    // filtros na URL com `replace` — `Negocios.tsx` num efeito que dispara SOZINHO logo depois de
+    // abrir o painel —, então tirar esse repasse apaga a marca e o "Fechar" volta a deixar
+    // entrada morta no histórico, sem nada na tela além de "o primeiro clique no voltar não fez
+    // nada".
+    //
+    // O comportamento em si está preso em `src/hooks/use-negocio-no-endereco-na-tela.test.tsx`
+    // (o teste do espelho de filtros); o que falta e mora aqui é o guarda de que as telas de
+    // VERDADE fazem o repasse.
+    expect(negocios).toMatch(/replace:\s*true,\s*state:\s*location\.state/);
+    expect(hoje).toMatch(/replace:\s*true,[\s\S]{0,600}?state:\s*location\.state/);
   });
 });

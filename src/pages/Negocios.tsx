@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useDeferredValue, useRef, memo, lazy, Suspense } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { parse, isValid, startOfMonth, endOfMonth } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
@@ -472,6 +472,9 @@ PedidoRow.displayName = 'PedidoRow';
 const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  // Só para o espelho de filtros lá embaixo repassar o `state` da entrada do histórico no
+  // `replace` — ver o comentário do efeito.
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { profile, loading: isUserLoading } = useAuth();
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
@@ -1303,6 +1306,15 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // a URL restaurada já traz esses parâmetros, e os useState acima são inicializados a partir
   // deles. Não realimenta pedidosFilters/activeStages (que dependem só do state), então não gera
   // refetch extra — é puramente o espelho pra URL.
+  //
+  // 🔴 O `state: location.state` do fim NÃO é decoração. Este efeito dispara SOZINHO logo depois
+  // de abrir o painel de um negócio: `setSearchParams` está nas dependências e o React Router o
+  // memoiza sobre a busca atual, então mudar o `?negocio=` já troca a identidade dele. E um
+  // `replace` sem `state` nas opções não deixa o state como estava — ele grava `undefined`.
+  // Sem o repasse, isto apagaria a marca que `useNegocioNoEndereco` deixa na entrada do
+  // histórico ao abrir, e "Fechar" voltaria a deixar entrada morta (achado A1 da revisão da
+  // Tarefa 2). Medido em 09/09/2026: com o repasse a marca sobrevive ao efeito; sem ele, some no
+  // disparo seguinte. Vale para QUALQUER `state`, não só o nosso.
   useEffect(() => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev);
@@ -1325,8 +1337,8 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       next.set('data_ate', dateTo ? format(dateTo, 'yyyy-MM-dd') : '');
       setOrDelete('data_campo', dateField !== 'data_pedido' ? dateField : undefined);
       return next;
-    }, { replace: true });
-  }, [selectedStages, selectedVendedores, selectedFabricantes, selectedMarcadores, showOnlyAttention, hideImportados, dateFrom, dateTo, dateField, setSearchParams]);
+    }, { replace: true, state: location.state });
+  }, [selectedStages, selectedVendedores, selectedFabricantes, selectedMarcadores, showOnlyAttention, hideImportados, dateFrom, dateTo, dateField, setSearchParams, location.state]);
 
   const handleDragEnd = useCallback(async (result: DropResult) => {
     if (!result.destination) return;
