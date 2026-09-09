@@ -25,6 +25,11 @@ import { join } from 'node:path';
  *     existe;
  *   - `PainelDoNegocio.tsx` é quem BUSCA por id, e só quando nada chegou pronto.
  *
+ * ⚠️ E MUDOU DE DONO EM 09/09/2026 (Tarefa 2): quem lê e escreve o `?negocio=` do endereço é
+ * `useNegocioNoEndereco`, um hook só, que qualquer tela usa. `Negocios.tsx` não guarda mais o
+ * negócio aberto em estado próprio — quem manda é a URL, e por isso recarregar a página mantém o
+ * painel aberto.
+ *
  * SE ESTE TESTE FALHOU: não o apague. O caminho certo é manter `usePedidoPorId` encadeado como
  * último recurso do painel, com o que a tela já tem em mãos tendo prioridade.
  */
@@ -64,11 +69,25 @@ describe('o painel do negócio busca por identificador', () => {
   });
 
   it('sai do painel por um caminho só, que limpa o endereço', () => {
-    expect(negocios).toContain('const fecharPainel');
-    // O botão "Fechar" do rodapé não pode voltar a mexer no estado direto: ele não passa pelo
-    // onOpenChange do Radix, e o `?negocio=` ficaria no endereço. Hoje ele chama `onClose`, que
-    // é `fecharPainel` — o único caminho de saída.
+    // A saída única mudou de nome em 09/09/2026 (Tarefa 2): era `fecharPainel`, escrito à mão
+    // dentro de `Negocios.tsx`, e passou a ser o `fecharNegocio` de `useNegocioNoEndereco` — o
+    // mesmo que as outras telas usam. O que ela garante continua igual: apagar o `?negocio=` é o
+    // que fecha o painel, e é um lugar só.
+    expect(negocios).toContain('useNegocioNoEndereco');
+    expect(negocios).toMatch(/onClose=\{fecharNegocio\}/);
+    // O botão "Fechar" do rodapé não pode voltar a mexer em estado direto: ele não passa pelo
+    // onOpenChange do Radix, e o `?negocio=` ficaria no endereço — recarregar reabriria o que a
+    // pessoa acabou de fechar.
     expect(painel).not.toContain('setViewOrderId(null)');
-    expect(negocios).not.toContain('onClick={() => setViewOrderId(null)}');
+    expect(negocios).not.toContain('setViewOrderId');
+  });
+
+  it('a tela de Negócios não tem a sua própria lógica do `?negocio=`', () => {
+    // 🔴 Este é o guarda contra a volta do defeito de CLAUDE.md §7.14 — duas implementações da
+    // mesma regra, e o conserto de uma não alcançando a outra. Até 09/09/2026 `Negocios.tsx`
+    // mexia no parâmetro por conta própria; hoje o único dono dele é `useNegocioNoEndereco`.
+    // Dois donos do mesmo parâmetro fazem o painel piscar, ou não abrir.
+    expect(negocios).not.toMatch(/delete\(\s*['"]negocio['"]\s*\)/);
+    expect(negocios).not.toMatch(/set\(\s*['"]negocio['"]\s*,/);
   });
 });

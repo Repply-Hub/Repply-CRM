@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { marcaDaEmpresa } from '@/lib/marca-da-empresa';
 import { useMinhaPermissao } from '@/hooks/use-minha-permissao';
 import { PainelDoNegocio } from '@/components/pedidos/PainelDoNegocio';
+import { useNegocioNoEndereco } from '@/hooks/use-negocio-no-endereco';
 import { useParticipantesDosNegocios } from '@/hooks/use-participantes-dos-negocios';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useDelayedLoading } from '@/hooks/use-delayed-loading';
@@ -672,7 +673,22 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // `?negocio=<id>` abre o painel de visualização já na chegada. É como a tela "Hoje"
   // manda a pessoa para um negócio: ela quer VER o negócio, não editá-lo — mandar para
   // /pedidos/:id/editar abre um formulário para quem só queria olhar.
-  const [viewOrderId, setViewOrderId] = useState<string | null>(() => searchParams.get('negocio'));
+  //
+  // 🔴 Quem manda é o ENDEREÇO, não estado desta tela. Até 09/09/2026 isto era um `useState`
+  // inicializado do parâmetro, e o parâmetro só era escrito no fechamento: clicar num card abria
+  // o painel sem mexer na URL, e recarregar a página perdia o que estava aberto. Agora abrir
+  // também escreve — recarregar mantém, e o link serve para mandar a alguém.
+  //
+  // A lógica é uma só, em `useNegocioNoEndereco`, porque as outras telas (a pauta "Hoje", as
+  // fichas de cliente) montam o MESMO painel pelo mesmo parâmetro. Duas cópias da mesma regra é
+  // como o conserto certo acaba num arquivo que nenhuma tela chama (CLAUDE.md §7.14).
+  //
+  // `fecharNegocio` é a SAÍDA ÚNICA do painel, e é ela que apaga `?negocio=` do endereço. Os três
+  // caminhos de saída passam por aqui: o `onOpenChange` do Radix (Esc e clique fora) e o botão
+  // "Fechar" do rodapé — que mexeria no estado direto e não passa pelo Radix. Sem uma saída só,
+  // um dos caminhos deixaria `?negocio=` no endereço e recarregar reabriria o que a pessoa
+  // acabou de fechar.
+  const { negocioAberto, abrirNegocio, fecharNegocio } = useNegocioNoEndereco();
   // `=== true` em todo uso abaixo, nunca `!== false`: enquanto a resposta não chega, a cascata
   // esconde. Bloco que aparece e some meio segundo depois é pior de usar que bloco que demora.
   const { ligada: temObras } = useSecaoLigada('obras');
@@ -1385,7 +1401,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
 
   // Achado C da revisão de 06/09/2026 (spec 4.3): a confirmação de exclusão precisa trazer o
   // nome do negócio quando é UM só. O painel lateral já foi fechado nesse ponto — o clique de
-  // "Excluir" no rodapé do painel chama `fecharPainel()` ANTES de abrir este diálogo —, então
+  // "Excluir" no rodapé do painel chama `fecharNegocio()` ANTES de abrir este diálogo —, então
   // `selectedViewOrder` não serve mais; o nome vem direto da linha selecionada. Se a linha não
   // estiver entre as carregadas (caso raro), cai no texto genérico de sempre.
   const nomeExclusaoUnica = (!deleteAllFilteredMode && selected.size === 1)
@@ -2265,9 +2281,9 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // buscaria o negócio por id em toda abertura — que é o certo em quem NÃO carregou a lista
   // (a tela "Hoje"), e desperdício aqui. Ver `usePedidoPorId` e `PainelDoNegocioProps`.
   const negocioLocal = useMemo(
-    () => (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === viewOrderId)
-      ?? bulkPickerData?.data?.find(p => p.id === viewOrderId),
-    [showKanban, kanbanPedidosFlat, pedidos, viewOrderId, bulkPickerData]
+    () => (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === negocioAberto)
+      ?? bulkPickerData?.data?.find(p => p.id === negocioAberto),
+    [showKanban, kanbanPedidosFlat, pedidos, negocioAberto, bulkPickerData]
   );
 
   // Os campos extras que o painel mostra são os desta lista: as colunas criadas na importação
@@ -2281,21 +2297,6 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       .map(col => ({ id: col.id, rotulo: getLabel(col.id) })),
     [columns, tableVisibleColumns, getLabel]
   );
-
-  // Os três caminhos de saída do painel passam por aqui. O `onOpenChange` do Radix só dispara
-  // em fechamento iniciado pelo usuário — o botão "Fechar" do rodapé mexe no estado direto e
-  // não passa por ele. Sem uma saída só, um dos caminhos deixa `?negocio=` no endereço e
-  // recarregar reabre o que a pessoa acabou de fechar.
-  const fecharPainel = useCallback(() => {
-    setViewOrderId(null);
-    if (searchParams.get('negocio')) {
-      setSearchParams(prev => {
-        const p = new URLSearchParams(prev);
-        p.delete('negocio');
-        return p;
-      }, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
 
   const isFiltered = hasPipelineFilters || deferredSearch.trim() !== '';
 
@@ -2412,7 +2413,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                   stageKey={stage.key as any}
                   label={stage.label}
                   colorClass={stage.color}
-                  onCardClick={setViewOrderId}
+                  onCardClick={abrirNegocio}
                   visibleColumns={visibleColumns}
                   columns={columns}
                   pageSize={kanbanPageSize}
@@ -2551,7 +2552,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                           pedido={p}
                           selected={deleteAllFilteredMode ? !excludedIds.has(p.id) : selected.has(p.id)}
                           onToggle={() => toggleOne(p.id)}
-                          onClick={() => setViewOrderId(p.id)}
+                          onClick={() => abrirNegocio(p.id)}
                           visibleColumns={tableVisibleColumns}
                           columns={columns}
                           KANBAN_STAGES={KANBAN_STAGES}
@@ -3007,7 +3008,7 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
                                   });
                                 }
                               }}
-                              onClick={() => setViewOrderId(p.id)}
+                              onClick={() => abrirNegocio(p.id)}
                               visibleColumns={tableVisibleColumns}
                               columns={columns}
                               KANBAN_STAGES={KANBAN_STAGES}
@@ -3294,14 +3295,14 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
       </AlertDialog>
 
       <PainelDoNegocio
-        pedidoId={viewOrderId}
-        onClose={fecharPainel}
+        pedidoId={negocioAberto}
+        onClose={fecharNegocio}
         negocioJaCarregado={negocioLocal}
         camposExtras={camposExtrasDoPainel}
         onExcluir={(alvo) => {
           // A exclusão daqui reaproveita a máquina de seleção em massa desta tela. Por isso ela
           // é `prop` e não vive dentro do painel: as outras telas não têm essa máquina.
-          fecharPainel();
+          fecharNegocio();
           setDeleteAllFilteredMode(false);
           setSelected(new Set([alvo]));
           setConfirmDeleteOpen(true);
