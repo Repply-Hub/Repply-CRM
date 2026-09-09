@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { normalizeWhatsappPhone, varianteDoNumero } from "../_shared/whatsapp.ts";
+import { normalizeWhatsappPhone, varianteDoNumero, nomeParaNegrito } from "../_shared/whatsapp.ts";
 import { enderecoParaQuemBaixaDeFora } from "../_shared/arquivo-privado.ts";
 import { registrarFigurinha } from "../_shared/figurinhas.ts";
 
@@ -22,8 +22,12 @@ const PLACEHOLDER: Record<string, string> = {
 // qual usuário do CRM está falando. O conteúdo salvo em whatsapp_mensagens
 // permanece sem o prefixo (ver `conteudo` mais abaixo).
 function withRemetente(nome: string | null, mensagem: string): string {
-  if (!nome) return mensagem;
-  const header = `*${nome}*`;
+  // O nome vem do cadastro e pode ter espaço sobrando ou marca de formatação —
+  // ver `nomeParaNegrito`. Um nome que não sobrevive à limpeza sai sem prefixo,
+  // em vez de mandar `**` para o cliente.
+  const limpo = nomeParaNegrito(nome);
+  if (!limpo) return mensagem;
+  const header = `*${limpo}*`;
   return mensagem ? `${header}\n${mensagem}` : header;
 }
 

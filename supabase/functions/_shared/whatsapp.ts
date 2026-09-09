@@ -56,3 +56,27 @@ export function varianteDoNumero(numero: string): string | null {
   }
   return null;
 }
+
+/**
+ * Prepara um nome para ir dentro de `*negrito*` no WhatsApp.
+ *
+ * 🔴 O defeito: o WhatsApp só aplica negrito quando o asterisco encosta em
+ * caractere visível. Um nome cadastrado como "Silvia " (com espaço sobrando)
+ * virava `*Silvia *`, e o cliente recebia os asteriscos crus no lugar do
+ * negrito. Erro de cadastro do cliente não pode vazar para quem recebe.
+ *
+ * Também tira `*`, `_`, `~` e crase: são a própria linguagem de formatação do
+ * WhatsApp, e um nome como "Ana *Paula*" fecharia o negrito no meio.
+ *
+ * Devolve string vazia quando não sobra nada — aí quem chama manda a mensagem
+ * sem prefixo, em vez de mandar `**`.
+ */
+export function nomeParaNegrito(nome: string | null | undefined): string {
+  return (nome ?? "")
+    // Marcas de formatação do WhatsApp saem antes de qualquer coisa.
+    .replace(/[*_~`]/g, "")
+    // Qualquer espaço em branco (inclusive quebra de linha e tabulação) vira um
+    // espaço só.
+    .replace(/\s+/g, " ")
+    .trim();
+}
