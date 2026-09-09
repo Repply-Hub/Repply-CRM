@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
@@ -58,16 +58,42 @@ function arquivosDeCodigo(dir: string, achados: string[] = []): string[] {
 }
 
 describe('o painel do negócio é uma peça só', () => {
-  it('🔴 só PainelDoNegocio.tsx monta o painel de detalhe do negócio', () => {
-    const permitidos = new Set(PODEM_TER_AS_DUAS_MARCAS);
+  // 🟡 Achado A7 da revisão da Tarefa 2 (09/09/2026): este teste falhou por tempo limite (5s,
+  // o padrão do Vitest) rodando junto com a suíte inteira, e passou em 226ms sozinho.
+  // Diagnóstico medido, não suposto: a varredura em si (`readdirSync`/`readFileSync` síncronos
+  // sobre uns 400 arquivos de `src/`) é o que fica lento sob concorrência, não o tempo limite
+  // sendo curto demais em termos absolutos — 5s é generoso para um teste unitário comum. Medido
+  // nesta máquina: ~130ms em Node puro isolado, ~226-320ms via Vitest isolado, e 651ms rodando
+  // junto com os outros 84 arquivos de teste (Windows, disco síncrono disputado com os outros
+  // processos). O CÓDIGO tinha uma causa extra e evitável: os dois `it()` abaixo repetiam a
+  // MESMA varredura, cada um lendo os ~400 arquivos de novo — dobrando à toa o tempo gasto em
+  // disco. `beforeAll` faz a varredura rodar 1 vez por arquivo de teste, não 2, cortando pela
+  // metade a exposição ao tempo limite sem tirar cobertura nenhuma (nenhuma pasta ficou de fora:
+  // os dois testes continuam vendo TODO `src/`).
+  //
+  // Mesmo depois do corte, a varredura ainda é synchronous I/O sobre centenas de arquivos — uma
+  // categoria diferente de teste unitário comum, e sensível a quanto os OUTROS arquivos de teste
+  // estão disputando disco/CPU no momento. Por isso o tempo limite deste bloco é maior que o
+  // padrão: não é "afrouxar" o teste (a asserção continua a mesma), é dar à varredura a folga que
+  // a natureza dela pede. `beforeAll` tem timeout próprio no Vitest (`hookTimeout`, também 5s por
+  // padrão) — por isso o terceiro argumento vai nele, não nos `it()` (que não tocam mais em disco
+  // e continuam rápidos).
+  const TEMPO_LIMITE_DA_VARREDURA_MS = 20_000;
 
-    const culpados = arquivosDeCodigo(RAIZ)
+  let comAsDuasMarcas: string[];
+
+  beforeAll(() => {
+    comAsDuasMarcas = arquivosDeCodigo(RAIZ)
       .filter((caminho) => {
         const texto = readFileSync(caminho, 'utf8');
         return MARCAS.every((marca) => texto.includes(marca));
       })
-      .map((caminho) => relative(RAIZ, caminho).split('\\').join('/'))
-      .filter((relativo) => !permitidos.has(relativo));
+      .map((caminho) => relative(RAIZ, caminho).split('\\').join('/'));
+  }, TEMPO_LIMITE_DA_VARREDURA_MS);
+
+  it('🔴 só PainelDoNegocio.tsx monta o painel de detalhe do negócio', () => {
+    const permitidos = new Set(PODEM_TER_AS_DUAS_MARCAS);
+    const culpados = comAsDuasMarcas.filter((relativo) => !permitidos.has(relativo));
 
     expect(culpados).toEqual([]);
   });
@@ -75,13 +101,6 @@ describe('o painel do negócio é uma peça só', () => {
   it('o painel que a lista de permitidos aponta existe de verdade', () => {
     // Sem isto, renomear ou mover `PainelDoNegocio.tsx` deixaria o teste acima passando por
     // vazio — nenhum arquivo teria as duas marcas, e a segunda cópia entraria sem ninguém ver.
-    const comAsDuasMarcas = arquivosDeCodigo(RAIZ)
-      .filter((caminho) => {
-        const texto = readFileSync(caminho, 'utf8');
-        return MARCAS.every((marca) => texto.includes(marca));
-      })
-      .map((caminho) => relative(RAIZ, caminho).split('\\').join('/'));
-
     expect(comAsDuasMarcas).toEqual(PODEM_TER_AS_DUAS_MARCAS);
   });
 });
