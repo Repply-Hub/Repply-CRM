@@ -81,14 +81,9 @@ function ItemPauta({
               {format(new Date(item.quando), 'HH:mm')}
             </span>
           )}
-          {/* De quem é o negócio. `pauta_do_dia_de` só preenche este campo quando o item NÃO é
-              de quem está olhando — escrever o próprio nome em todo item viraria ruído, e sem
-              ele um gestor decide sobre o negócio de um colega sem saber que é de alguém. */}
-          {item.responsavel && (
-            <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-              {item.responsavel}
-            </span>
-          )}
+          {/* A fila é sempre pessoal desde 09/09/2026, então `item.responsavel` vem sempre nulo e
+              a etiqueta de dono saiu daqui. O campo fica no banco: é o que a tabela do time e o
+              e-mail leem. */}
         </div>
 
         <h3 className="mb-1 text-base font-semibold leading-snug text-card-foreground sm:text-[17px]">
