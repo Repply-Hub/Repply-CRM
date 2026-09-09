@@ -83,18 +83,13 @@ const normalizeNatalLicenseType = (value?: string | null) => {
 };
 
 const isNatalRelevantRecord = (row: Record<string, unknown>) => {
-  const tipo = normalizeNatalLicenseType(String(row.tipo_licenca || ''));
-  const hasCoreData = Boolean(
-    String(row.fase_obra || '').trim() ||
-    String(row.nome_contato || '').trim() ||
-    String(row.email || '').trim() ||
-    String(row.construtora || '').trim() ||
-    String(row.razao_social || '').trim() ||
-    String(row.obra_descricao || '').trim() ||
-    String(row.endereco_obra || '').trim()
-  );
-
-  return Boolean(tipo && hasCoreData);
+  // Basta o tipo de licença estar preenchido. As linhas-placeholder
+  // ("Nenhuma LP/LI/LO identificada nesta edição") são gravadas SEM tipo_licenca, então
+  // este critério já as exclui. Os campos legados (construtora, razao_social, nome_contato,
+  // fase_obra, endereco_obra, obra_descricao) eram preenchidos pelo scraper Python antigo
+  // — o scrape-dom-natal-licencas atual não os grava, e exigi-los escondia da tela quase
+  // toda linha coletada corretamente.
+  return String(row.tipo_licenca ?? '').trim() !== '';
 };
 
 const isNatalPlaceholderRecord = (row: Record<string, unknown>) =>
@@ -340,12 +335,16 @@ export default function Portal() {
       const tableData = relevantData.map(row => ({
         'Data da Edição': formatDataEdicao(row.data_edicao || ''),
         'Nº DOM': row.numero_dom || '',
-        'Tipo de Licença': normalizeNatalLicenseType(row.tipo_licenca) || '',
-        'Fase da Obra': (row as any).fase_obra || '',
-        'Construtora': (row as any).construtora || '',
-        'Contato': (row as any).nome_contato || '',
-        'Email': (row as any).email || '',
-        'Endereço da Obra': (row as any).endereco_obra || '',
+        'Tipo de Licença': normalizeNatalLicenseType(row.tipo_licenca) || String(row.tipo_licenca ?? ''),
+        // Campos abaixo: preenchidos só pelo scraper Python antigo (removido). O
+        // scrape-dom-natal-licencas atual não os grava — ficam vazios na maioria das
+        // linhas, e a célula mostra "—" nesse caso (ver render da tabela). Mantidos como
+        // coluna para não mexer no layout, e ainda leem linhas antigas que os tenham.
+        'Fase da Obra': row.fase_obra || '',
+        'Construtora': row.construtora || '',
+        'Contato': row.nome_contato || '',
+        'Email': row.email || '',
+        'Endereço da Obra': row.endereco_obra || '',
         'Obra / Descrição': row.obra_descricao || '',
         'PDF': row.pdf_nome || '',
         'Link PDF': row.pdf_link || '',
@@ -993,7 +992,8 @@ export default function Portal() {
                                               )}
                                               title={rawVal}
                                             >
-                                              {rawVal}
+                                              {/* DOM Natal: campos legados vêm vazios no scraper atual — mostra "—" sem tirar a coluna */}
+                                              {site.id === 'natal' && !rawVal ? '—' : rawVal}
                                             </td>
                                           );
                                         })}
