@@ -687,7 +687,18 @@ async function handleIncomingMessage(
   // empresa a cada resposta enviada fora do CRM. payload.chat sempre descreve o contato
   // da conversa, então é a fonte certa quando quem enviou não é o contato.
   const pushName: string = isGroup
-    ? groupName || msg.senderName || ""
+    // 🔴 NUNCA `|| msg.senderName` aqui. Em grupo, `senderName` é o PARTICIPANTE
+    // que enviou, e quando a uazapi manda o pacote degradado — acontece: nas 19
+    // mensagens indecifráveis do histórico, `sender_pn` veio nulo em TODAS —
+    // `groupName` chega vazio e o grupo era renomeado com o nome do cliente.
+    // Um grupo da MD (`120363397034366398`) ficou chamado "Crispim Santana"
+    // por causa disto, e só voltou ao normal quando chegou uma mensagem com o
+    // nome certo.
+    //
+    // Vazio aqui significa "mantenha o nome que já está" (ver
+    // `nomeContatoResolvido`, mais abaixo). Quem enviou já é gravado separado em
+    // `remetente_nome`, que é onde ele serve.
+    ? groupName
     : sentByOtherChannel
       ? (contactSavedName || payload.chat?.name || payload.chat?.wa_name || "")
       : (contactSavedName || payload.chat?.name || msg.senderName || payload.chat?.wa_name || "");
