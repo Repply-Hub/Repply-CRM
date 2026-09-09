@@ -44,11 +44,13 @@ type EstadoDaEntrada = { negocioAbertoPorNos?: boolean } | null;
  *
  * 🔴 O QUE ISSO COBRA DE QUEM MONTA A TELA: quem mexer no endereço com `replace` tem que
  * REPASSAR `state: location.state`. Um `replace` sem `state` nas opções não "deixa o state como
- * estava" — ele grava `undefined`. As duas telas que usam este hook espelham filtros na URL com
- * `replace` (`Negocios.tsx` num efeito que dispara sozinho a cada mudança de busca, `Hoje.tsx` a
- * cada filtro mexido), então esquecer o repasse apaga a marca em silêncio e devolve o defeito do
- * achado A1 da revisão da Tarefa 2. Não é regra deste hook, é do React Router: qualquer `state`
- * de qualquer funcionalidade morre do mesmo jeito. O teste
+ * estava" — ele grava `undefined`. Hoje o hook é montado em QUATRO arquivos (`Negocios.tsx`,
+ * `Hoje.tsx`, `PainelDeNegocios.tsx` e `VendasDaObra.tsx`); dois deles espelham filtros na URL
+ * com `replace` (`Negocios.tsx` num efeito que dispara sozinho a cada mudança de busca, `Hoje.tsx`
+ * a cada filtro mexido) e são os que precisam do repasse — os outros dois não escrevem no
+ * endereço. Esquecer o repasse apaga a marca em silêncio e devolve o defeito do achado A1 da
+ * revisão da Tarefa 2. Não é regra deste hook, é do React Router: qualquer `state` de qualquer
+ * funcionalidade morre do mesmo jeito. O teste
  * `use-negocio-no-endereco-na-tela.test.tsx` reproduz o espelho de filtros e prende isto.
  */
 export function useNegocioNoEndereco() {

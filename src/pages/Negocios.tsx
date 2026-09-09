@@ -2288,10 +2288,12 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
   // O que está em memória tem prioridade: depois de arrastar um card no Kanban, a linha local já
   // reflete a etapa nova, enquanto a busca por id ainda devolveria a anterior.
   //
-  // 🔴 Isto vai para o painel como `negocioJaCarregado`, e é o que mantém a tela mais usada do
-  // sistema SEM requisição no caso comum (clicar num card da própria lista). Sem ele o painel
-  // buscaria o negócio por id em toda abertura — que é o certo em quem NÃO carregou a lista
-  // (a tela "Hoje"), e desperdício aqui. Ver `usePedidoPorId` e `PainelDoNegocioProps`.
+  // 🔴 Isto vai para o painel como `negocioJaCarregado`: poupa UMA requisição — a de `pedidos`
+  // por id — na tela mais usada do sistema. Não poupa a abertura inteira: medido em 09/09/2026,
+  // abrir o painel daqui dispara 8 requisições na primeira vez e 6 em regime, e as outras saem
+  // igual. Sem ele o painel buscaria o negócio por id em toda abertura — que é o certo em quem
+  // NÃO carregou a lista (a tela "Hoje"), e desperdício aqui. Ver `usePedidoPorId` e
+  // `PainelDoNegocioProps`.
   const negocioLocal = useMemo(
     () => (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === negocioAberto)
       ?? bulkPickerData?.data?.find(p => p.id === negocioAberto),

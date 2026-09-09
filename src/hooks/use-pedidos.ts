@@ -337,6 +337,16 @@ export function invalidarPaineisDeNegocios(qc: QueryClient) {
     'dashboard_indicadores_vendedor',
     'dashboard_stats',
     'dashboard_negocios_risco',
+    // A FILA da tela "Hoje" (`pauta_do_dia_de`, hook `use-pauta.ts`). Entrou nesta lista em
+    // 09/09/2026, quando o painel do negócio passou a abrir POR CIMA dela: até então só a tela
+    // de Negócios tinha esses botões, e ela não mostra fila nenhuma. A fila junta `pedidos` por
+    // `usuario_id` e desenha valor, etapa e data de criação — então passar o negócio a um colega
+    // o tira da SUA fila, e editar o negócio muda o que o cartão diz. Com `staleTime` de 30
+    // minutos e sem refetch ao voltar o foco (`App.tsx`), sem esta linha a tela onde a pessoa
+    // ACABOU de trabalhar é a última a saber, por meia hora — e a leitura natural de quem usa é
+    // "não salvou", então ela faz de novo.
+    // 🔴 Com HÍFEN: a chave é `['pauta-do-dia']`. Com sublinhado não casa nada, em silêncio.
+    'pauta-do-dia',
     'plano_vendas_progresso',
     // Chave própria de propósito: `invalidateQueries` casa elemento a elemento do array,
     // não por prefixo de texto — ['plano_vendas_progresso'] NÃO alcança

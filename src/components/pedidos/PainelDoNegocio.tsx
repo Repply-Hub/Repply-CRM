@@ -103,8 +103,13 @@ export function PainelDoNegocio({
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
 
   // 🔴 A busca por id é o que faz o botão "Abrir negócio" da tela "Hoje" funcionar. Ela só sai
-  // quando quem monta o painel NÃO mandou o negócio pronto — no caso comum da tela de Negócios
-  // (clicar num card da própria lista) não há requisição nenhuma. Ver `usePedidoPorId`.
+  // quando quem monta o painel NÃO mandou o negócio pronto.
+  //
+  // O que `negocioJaCarregado` poupa é UMA requisição — esta —, não todas. Medido na tela em
+  // 09/09/2026: abrir o painel na tela de Negócios dispara 8 requisições na primeira vez e 6 em
+  // regime; as outras (tarefas, histórico de status, responsáveis, histórico de contato,
+  // comentários) saem com ou sem a propriedade. O ganho é real e barato, mas quem ler "abre de
+  // graça" vai decidir sem medir. Ver `usePedidoPorId`.
   const {
     data: negocioBuscado,
     isLoading,
