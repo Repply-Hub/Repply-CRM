@@ -452,6 +452,95 @@ primeira.
 
 ---
 
+## Tarefa 4: o e-mail de quem não tem negócio próprio vira o pulso da equipe
+
+**Decisão do dono do produto em 09/09/2026**, tomada com a medição na mesa.
+
+**O problema, medido em produção.** Depois que a fila voltou a ser pessoal (Plano C, Tarefa 1),
+quem tem a chave `pauta_de_todos` **e nenhum negócio próprio** fica com a pauta vazia — e
+`pauta-resumo-diario` **pula** quem tem pauta vazia, registrando `status: ok`. O e-mail some em
+silêncio.
+
+Em `automation_logs`: a execução de 09/09/2026 mandou **10 e-mails com 3 pautas vazias**; a de
+07/09, antes de a pauta ampliada entrar, mandou **7 com 6 vazias**. Depois do Plano C a conta
+volta para 7/6 — e **três gestoras da MD param de receber**, uma delas a Fabiola, que é a
+principal usuária do cliente-âncora.
+
+**A decisão:** em vez de sumir, o e-mail **muda de assunto**. Quem tem a chave e está sem negócio
+próprio recebe o **pulso da equipe**:
+
+```
+ASSUNTO:  145 negócios da equipe pedem atenção
+
+  Bom dia, Fabiola
+
+  R$ 7.402.422 parados
+  em 145 negócios da equipe
+
+  • Cond Residl Dionisio | Deca Metais
+    Érika Marques · R$ 214.000 · parado há 40 dias
+  • Jampa Ocean Palace | Deca
+    Pricila Azevedo · R$ 198.000 · parado há 32 dias
+
+  [Ver a tabela do time]
+```
+
+**Arquivos:**
+- Modificar: `supabase/functions/pauta-resumo-diario/index.ts`
+
+**Interfaces:**
+- Consome: `negocios_em_risco(...)` (Plano C, Tarefa 2) e `ve_pauta_de_todos(uuid)`.
+
+- [ ] **Passo 1: decidir quem recebe qual e-mail, no servidor**
+
+A regra tem **duas** condições, e as duas importam: a pessoa tem a chave **e** a pauta dela veio
+vazia. Quem tem a chave e **tem** negócio próprio continua recebendo a fila pessoal — não troque
+o e-mail de quem já tinha um útil.
+
+Leia a chave com `ve_pauta_de_todos(p_usuario_id)`, que já existe no banco desde 08/09/2026 e é a
+**mesma** leitura que a tela usa. Não escreva uma terceira.
+
+- [ ] **Passo 2: montar o corpo do pulso**
+
+Os itens vêm de `negocios_em_risco`, limitados aos **5 maiores** — e-mail não é tabela. Cada linha
+traz nome do negócio, **nome do dono**, valor e dias parado.
+
+🔴 **`esc()` em tudo que vem do banco**, como o arquivo já faz: nome de negócio e de cliente podem
+ter `<` ou `&`.
+
+🔴 A função de borda roda em **Deno** e chama o banco com `service_role`, que **pula a RLS**. Então
+o recorte por empresa e por permissão tem que ser explícito na chamada — `negocios_em_risco` usa
+`eu_vejo_pauta_de_todos()`, que depende de `auth.uid()` e **não funciona** com `service_role`.
+**Confira isso antes de escrever** e, se for o caso, peça ao Plano C uma variante que receba o
+identificador da pessoa, como `pauta_do_dia_de` faz. **Não improvise um filtro por empresa no
+Deno** — é o tipo de corte que envelhece errado.
+
+- [ ] **Passo 3: o link**
+
+O botão leva à tela "Hoje", onde a tabela do time está. Use o mesmo endereço que o e-mail já usa.
+
+- [ ] **Passo 4: provar sem mandar e-mail para ninguém**
+
+Monte o corpo com dados de mentira e confira o texto. 🔴 **Não dispare o envio real** — há gente
+de verdade do outro lado.
+
+Confira também o caso de borda: quem tem a chave, pauta vazia **e** a equipe sem nada em risco.
+O e-mail não pode dizer "0 negócios da equipe pedem atenção" — nesse dia ele volta a ser o
+degrau 1 da escada ("Nada parado. Seu dia está seu."), ou não sai. **Decida e escreva o porquê.**
+
+- [ ] **Passo 5: commitar — e AVISAR que falta publicar**
+
+🔴 Commitar **não** publica a função (CLAUDE.md §16). O site sobe pelo `git push`; a função de
+borda é outro gesto, do controlador:
+
+```
+npx supabase functions deploy pauta-resumo-diario --project-ref hukeirrmsoiowvvrhivx
+```
+
+Escreva no relatório, em destaque, que a função está **commitada e NÃO publicada**.
+
+---
+
 ## Como se prova que o plano B funcionou
 
 | | Prova |
@@ -461,6 +550,7 @@ primeira.
 | O degrau 3 é relativo | Os três casos negativos passam: sem segundo colocado, abaixo do dobro, abaixo do ajuste da empresa |
 | A tela fala | Fila com negócios mostra o valor somado; fila vazia mostra o degrau 1 e mantém o sol |
 | O e-mail fala | Assunto e manchete saem da mesma função |
+| O gestor sem negócio próprio volta a receber | Com a chave e a pauta vazia, o corpo montado é o pulso da equipe, com os 5 maiores e o nome de cada dono — e quem tem a chave **e** negócio próprio continua recebendo a fila pessoal |
 | Nada quebrou | tsc **31**, testes verdes, build limpo |
 
 ## O que este plano NÃO faz
