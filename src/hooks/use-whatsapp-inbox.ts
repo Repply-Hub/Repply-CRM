@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
 import { erroLegivelDaFunction } from '@/lib/erro-edge-function';
 import { infoPreviewMensagem } from '@/lib/wa-mensagem-preview';
+import { tocarNotificacao } from '@/lib/som';
+import { somLigado } from '@/hooks/use-som-ligado';
 
 const MENSAGEM_TOAST_MAX_CHARS = 100;
 
@@ -1457,6 +1459,9 @@ export function useUnreadWaMessages() {
                   ? `${ultimaMensagem.slice(0, MENSAGEM_TOAST_MAX_CHARS)}...`
                   : ultimaMensagem
                 : 'Nova mensagem';
+            // O som decide sozinho se cala: ja sabe qual conversa esta aberta na
+            // frente da pessoa (ver definirConversaEmFoco em WhatsAppInbox).
+            tocarNotificacao({ ligado: somLigado(), conversaId: row.id });
             toast(() => createElement('span', null, createElement('b', null, nomeConversa), ' enviou uma mensagem'), {
               description: descricao,
               style: { background: '#f97316', color: '#fff', border: 'none' },

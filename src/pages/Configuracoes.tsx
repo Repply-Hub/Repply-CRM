@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks, CreditCard } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks, CreditCard, Volume2 } from 'lucide-react';
+import { useSomLigado } from '@/hooks/use-som-ligado';
 import { PagamentosTab } from '@/components/configuracoes/PagamentosTab';
 import { podeGerenciarAssinatura } from '@/lib/plano-gate';
 import { SidebarHistoricoDialog } from '@/components/configuracoes/SidebarHistoricoDialog';
@@ -126,6 +127,45 @@ function CustomizeTab() {
           {isGestor && (
             <SidebarHistoricoDialog open={historicoOpen} onOpenChange={setHistoricoOpen} empresaId={empresaId} />
           )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Liga e desliga o aviso sonoro.
+ *
+ * Fica no Perfil, e não em Empresa, porque é preferência de PESSOA: numa sala
+ * com cinco atendentes, quem senta ao lado do telefone quer o som e quem está em
+ * reunião não. Vive no navegador dela (ver use-som-ligado), como as outras
+ * preferências pessoais do sistema.
+ */
+function CardDeSom() {
+  const { ligado, definir } = useSomLigado();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Volume2 className="h-4 w-4 text-primary" /> Aviso sonoro
+        </CardTitle>
+        <CardDescription>Vale só para você, neste computador</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium">Tocar som nas notificações</p>
+            <p className="text-xs text-muted-foreground">
+              Avisa quando chega mensagem de WhatsApp, e-mail ou chat interno
+              enquanto você está em outra tela. Não toca na conversa que você já
+              está lendo.
+            </p>
+          </div>
+          <Switch
+            checked={ligado}
+            onCheckedChange={definir}
+            aria-label="Tocar som nas notificações"
+          />
         </div>
       </CardContent>
     </Card>
@@ -510,6 +550,8 @@ function ProfileTab() {
             </form>
           </CardContent>
         </Card>
+
+        <CardDeSom />
 
         <CustomizeTab />
         {/* GmailSettings sai daqui: a conexão de e-mail passou a ser da EMPRESA,

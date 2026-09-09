@@ -58,6 +58,8 @@ import {
 import { useVendedores, useClientes } from "@/hooks/use-clientes";
 import { usePedidosOptions } from "@/hooks/use-pedidos";
 import { getNomeNegocio } from "@/lib/nome-negocio";
+import { definirConversaEmFoco, tocarEnvio } from "@/lib/som";
+import { somLigado } from "@/hooks/use-som-ligado";
 import { useCreateTarefa, useTarefasPorConversa } from "@/hooks/use-tarefas";
 import { useSecaoLigada } from "@/hooks/use-secoes";
 import { useTarefasKanbanColunas } from "@/hooks/use-tarefas-kanban-colunas";
@@ -4240,6 +4242,13 @@ export default function WhatsAppInbox() {
   }
   const [conversaAtivaId, setConversaAtivaId] = useState<string | null>(null);
   const conversaAtiva = conversas.find((c) => c.id === conversaAtivaId) ?? null;
+
+  // O modulo de som precisa saber o que a pessoa esta vendo para nao avisar
+  // sobre a conversa que ja esta aberta na frente dela.
+  useEffect(() => {
+    definirConversaEmFoco(conversaAtivaId);
+    return () => definirConversaEmFoco(null);
+  }, [conversaAtivaId]);
   const [atribuicaoModalOpen, setAtribuicaoModalOpen] = useState(false);
 
   // Deep-link vindo do toast/ação de "nova mensagem" (ver useUnreadWaMessages em
@@ -6301,6 +6310,7 @@ export default function WhatsAppInbox() {
       msg = msg.split(`@${nome}`).join(`@${telefone}`);
     }
     setTexto("");
+    tocarEnvio(somLigado());
     setMentionedParticipantes(new Map());
     fecharMencao();
     clearAttachments();

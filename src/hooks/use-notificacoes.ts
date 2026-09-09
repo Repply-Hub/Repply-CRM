@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './use-auth';
 import { useSecaoLigada } from '@/hooks/use-secoes';
+import { tocarNotificacao } from '@/lib/som';
+import { somLigado } from '@/hooks/use-som-ligado';
 
 const MENSAGEM_TOAST_MAX_CHARS = 100;
 
@@ -167,6 +169,9 @@ export function useUnreadChatMessages() {
               ? `${conteudo.slice(0, MENSAGEM_TOAST_MAX_CHARS)}...`
               : conteudo
             : 'Enviou um arquivo';
+          // Chat interno nao tem conversa de WhatsApp em foco para comparar:
+          // toca sempre que a aba nao esta a vista.
+          tocarNotificacao({ ligado: somLigado() });
           toast(() => createElement('span', null, createElement('b', null, nomeConversa), ' enviou uma mensagem'), {
             description: descricao,
             style: { background: '#f97316', color: '#fff', border: 'none' },

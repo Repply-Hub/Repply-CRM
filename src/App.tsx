@@ -17,6 +17,7 @@ import { useSecaoLigada } from "@/hooks/use-secoes";
 // traduz "o arquivo desta página sumiu do servidor depois de um deploy" num
 // erro reconhecível, em vez de deixar virar o "Algo deu errado" genérico.
 import { lazyComRetry, ErroDeVersao } from "@/lib/lazy-com-retry";
+import { destravarSom } from "@/lib/som";
 
 const Negocios = lazyComRetry(() => import("./pages/Negocios"));
 const Clientes = lazyComRetry(() => import("./pages/Clientes"));
@@ -713,6 +714,18 @@ function UrlCleaner() {
   return null;
 }
 
+/**
+ * O navegador só libera áudio depois do primeiro gesto da pessoa na página, e a
+ * recusa é silenciosa. Registrar cedo garante que o primeiro aviso já saia com
+ * som, em vez de o primeiro ser engolido sem ninguém entender por quê.
+ */
+function DestravaDoSom() {
+  useEffect(() => {
+    destravarSom();
+  }, []);
+  return null;
+}
+
 const PageFallback = () => (
   <div className="min-h-screen flex items-center justify-center text-muted-foreground">
     Carregando...
@@ -729,6 +742,7 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <UrlCleaner />
+              <DestravaDoSom />
               {/* Boundary da RAIZ. O único ErrorBoundary do app ficava dentro do
                   ProtectedRoute, então as rotas públicas — `/`, `/login`,
                   `/cadastro`, `/redefinir-senha` e o 404 — não tinham nenhum. Lá
