@@ -1,21 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Loader2, Pencil, Plus, Search, X } from 'lucide-react';
+import { Loader2, Plus, Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
-import { ConteudoDialogo } from '@/components/shared/DialogoResponsivo';
 import { ColumnSettings, type ColumnDefinition } from '@/components/shared/ColumnSettings';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { LinkAnexoPrivado } from '@/components/shared/LinkAnexoPrivado';
 import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
+import { PainelDoNegocio } from '@/components/pedidos/PainelDoNegocio';
 import { useAuth } from '@/hooks/use-auth';
 import { useFabricantes } from '@/hooks/use-clientes';
 import { useKanbanColunasEmpresa } from '@/hooks/use-kanban-colunas';
+import { useNegocioNoEndereco } from '@/hooks/use-negocio-no-endereco';
 import { useSecaoLigada } from '@/hooks/use-secoes';
 import { useTableSettings } from '@/hooks/use-table-settings';
 import { getNomeNegocio } from '@/lib/nome-negocio';
@@ -46,6 +45,19 @@ import { compararFabricantes, fabricanteEstaAtivo } from '@/lib/ordem-de-fabrica
  *
  * Quem recorta os negócios é quem chama: a ficha da empresa manda os do cliente, a do contato
  * manda os da empresa do contato. Este componente não decide de quem é a lista.
+ *
+ * 🔴 CLICAR NUMA LINHA ABRE `PainelDoNegocio`, O MESMO DE TODAS AS TELAS — desde 09/09/2026.
+ * Até aqui esta lista tinha um diálogo próprio de detalhe: nome, obra, fabricante, valor, data,
+ * etapa e observações, e mais nada. Era uma TERCEIRA versão do detalhe do negócio, e a mais
+ * pobre das três — sem responsáveis, sem contatos, sem anexo, sem campos extras, sem tarefas,
+ * sem histórico de movimentação e sem comentários. O guarda que existe contra essa cópia
+ * (`src/test/painel-do-negocio-e-uma-peca-so.test.ts`) não a pegava porque ela era pobre demais
+ * para ter as marcas que ele procura — ela não buscava o negócio nem recebia o formato completo,
+ * desenhava o que já estava na linha da tabela. Segunda cópia não se descobre por teste de
+ * comportamento: cada uma passa nos seus próprios testes (CLAUDE.md §7.14).
+ *
+ * Este componente MONTA o painel, e é o único do plano que monta: as duas fichas que o desenham
+ * não montam painel de negócio nenhum. Ver o bloco no fim do JSX para o que não é passado a ele.
  */
 
 // Os ids são os MESMOS de PEDIDOS_COLUMNS (Negocios.tsx), para as três telas falarem a mesma
@@ -261,7 +273,6 @@ export function PainelDeNegocios({
   mensagemVazio = 'Nenhum negócio encontrado para este cliente.',
   aoCriarNegocio,
 }: PainelDeNegociosProps) {
-  const navigate = useNavigate();
   const { profile } = useAuth();
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const { ligada: temObras } = useSecaoLigada('obras');
@@ -285,7 +296,17 @@ export function PainelDeNegocios({
   const stageBadgeClass = (key: string) =>
     `bg-${KANBAN_STAGES.find(s => s.key === key)?.color || 'muted-foreground'} text-white`;
 
-  const [viewOrderId, setViewOrderId] = useState<string | null>(null);
+  // O negócio aberto vive no ENDEREÇO (`?negocio=<id>`), não em estado desta lista: assim
+  // recarregar a ficha mantém o painel aberto, o voltar do navegador o fecha, e o link serve para
+  // mandar a alguém — igual à tela de Negócios e à pauta "Hoje".
+  //
+  // Montar o hook AQUI é seguro mesmo que a tela em volta monte outra instância dele: desde o
+  // commit 87dc7125 a marca de "fui eu que empurrei esta entrada" mora no `state` da própria
+  // entrada do histórico, não num `useRef` por instância. Hoje nenhuma das duas fichas monta o
+  // hook — nem mexe no endereço com `setSearchParams`, que é o outro jeito de apagar a marca (é o
+  // que `Negocios.tsx` faz e por isso precisa repassar `state: location.state`).
+  const { negocioAberto, abrirNegocio, fecharNegocio } = useNegocioNoEndereco();
+
   const [pedidosPage, setPedidosPage] = useState(1);
   const [pedidosPageSize, setPedidosPageSize] = useState(5);
   const [pedidosBusca, setPedidosBusca] = useState('');
@@ -326,10 +347,6 @@ export function PainelDeNegocios({
   );
 
   const lista = useMemo(() => pedidos ?? [], [pedidos]);
-  const selectedViewOrder = useMemo(
-    () => lista.find(p => p.id === viewOrderId),
-    [lista, viewOrderId],
-  );
 
   // O status Ativa/Inativa não vem no negócio: o embed de `pedidos` traz do fabricante só
   // `id, nome`. Quem sabe o status é o cadastro — daí este índice. É a MESMA consulta que o
@@ -661,7 +678,10 @@ export function PainelDeNegocios({
                       </TableRow>
                     ) : (
                       paginatedPedidos.map(p => (
-                        <TableRow key={p.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setViewOrderId(p.id ?? null)}>
+                        // `p.id &&` porque `abrirNegocio` só sabe abrir um id de verdade: sem
+                        // negócio nenhum, escrever `?negocio=` vazio no endereço deixaria o painel
+                        // preso no estado "este negócio não está mais disponível".
+                        <TableRow key={p.id} className="cursor-pointer hover:bg-muted/30" onClick={() => p.id && abrirNegocio(p.id)}>
                           {negociosColunasVisiveis.map(col => renderNegocioCell(p, col.id))}
                         </TableRow>
                       ))
@@ -687,73 +707,25 @@ export function PainelDeNegocios({
         </CardContent>
       </Card>
 
-      <Dialog open={!!viewOrderId} onOpenChange={(open) => !open && setViewOrderId(null)}>
-        <ConteudoDialogo className="sm:max-w-xl">
-          <DialogHeader className="pb-6 border-b">
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-1">
-                <DialogTitle className="text-foreground font-bold text-lg">
-                  {selectedViewOrder ? getNomeNegocio(selectedViewOrder) : 'Detalhes do Negócio'}
-                </DialogTitle>
-                {/* Sem a seção Obras a frase de reserva ("Sem obra vinculada") ficaria falando
-                    de algo que a empresa não tem — some o subtítulo inteiro. */}
-                {temObras === true && (
-                  <p className="text-sm text-muted-foreground">
-                    {comEmbeds(selectedViewOrder).obra?.nome_obra ?? 'Sem obra vinculada'}
-                  </p>
-                )}
-              </div>
-            </div>
-          </DialogHeader>
+      {/* UM painel de detalhe para a ficha inteira, o MESMO que a tela de Negócios e a pauta
+          "Hoje" abrem. Quem manda o id é o clique na linha, via `?negocio=` no endereço.
 
-          {selectedViewOrder ? (
-            <div className="py-6 space-y-8">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Fabricante</p>
-                  <p className="text-sm font-medium">{comEmbeds(selectedViewOrder).fabricante?.nome ?? '-'}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Valor Total</p>
-                  <p className="text-sm font-bold text-primary">
-                    {(selectedViewOrder.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Data do Negócio</p>
-                  {/* formatDateBR, e não `new Date(...).toLocaleDateString`: a data vem do banco
-                      como "aaaa-mm-dd" e essa leitura a interpretava como UTC, mostrando o dia
-                      anterior para quem está no Brasil (CLAUDE.md §7.12). */}
-                  <p className="text-sm font-medium">{formatDateBR(selectedViewOrder.data_pedido) || '—'}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status</p>
-                  <Badge className={stageBadgeClass(selectedViewOrder.status ?? '')}>
-                    {stageLabel(selectedViewOrder.status ?? '')}
-                  </Badge>
-                </div>
-              </div>
+          Três propriedades opcionais NÃO são passadas, de propósito:
 
-              {selectedViewOrder.observacoes && (
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Observações</p>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap italic">"{selectedViewOrder.observacoes}"</p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          )}
-          <div className="flex justify-end gap-2 pt-6 border-t mt-4">
-            <Button variant="outline" onClick={() => navigate(`/pedidos/${viewOrderId}/editar`)}>
-              <Pencil className="h-4 w-4 mr-2" /> Editar Negócio
-            </Button>
-            <Button variant="secondary" onClick={() => setViewOrderId(null)}>Fechar</Button>
-          </div>
-        </ConteudoDialogo>
-      </Dialog>
+          • `onExcluir` — sem ela o botão Excluir nem é desenhado. Excluir negócio pela ficha do
+            cliente não existe hoje e não foi pedido; a exclusão da tela de Negócios depende da
+            máquina de seleção em massa de lá, que não existe aqui.
+          • `negocioJaCarregado` — a ficha TEM o negócio em mãos (`usePedidosPorCliente` devolve
+            `PedidoWithRelations`), mas mandá-lo daqui obrigaria o tipo local `NegocioDaFicha` a
+            crescer para o formato completo, e ele é curto de propósito: todo campo dele é um campo
+            que a ordenação de fato consulta. Sem a propriedade o painel busca por id sozinho —
+            exatamente o caso para o qual `usePedidoPorId` existe —, e essa busca traz o `funil_id`
+            de que o crachá da etapa precisa para não cair no slug cru.
+          • `camposExtras` — a lista sai de `useTableSettings({ key: 'pedidos' })`, a preferência de
+            colunas da TELA de Negócios, e este card já monta o mesmo hook com outra chave
+            (`clientes_negocios`). Duas instâncias da MESMA chave na mesma árvore disputariam a
+            mesma linha de `configuracoes_tabelas` — ver `camposExtras` em PainelDoNegocioProps. */}
+      <PainelDoNegocio pedidoId={negocioAberto} onClose={fecharNegocio} />
     </>
   );
 }
