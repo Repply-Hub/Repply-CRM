@@ -129,11 +129,17 @@ Pontos a tocar, todos por causa de `FIELDS` ser a fonte única:
 
 | Onde | O que muda |
 |---|---|
-| `importPedidosUtils.ts` — `FieldKey`, `FIELDS`, `EMPTY_MAPPING`, `HEADER_RULES` | a chave `codigo`, rótulo `Código/ID`, `required: false`, **última** da lista |
+| `importPedidosUtils.ts` — `FieldKey`, `FIELDS`, `EMPTY_MAPPING`, `HEADER_RULES`, `MIN_SCORE` | a chave `codigo`, rótulo `Código/ID`, `required: false`, **última** da lista |
 | `Negocios.tsx` — `valorDaColuna`, `larguraPorCampo` | `codigo: p => p.id` e uma largura (40) |
-| `MappingStep.tsx` — `sanitizeFieldValue` | o código passa como texto cru, sem conversão |
+| `ImportPedidosDialog.tsx` — `getMappedRows` | carregar `codigo` no objeto da linha |
 
-`computeRowHash` **não** muda: o hash só marca "veio de importação" e ninguém o confere.
+**`MappingStep.tsx` não muda** — conferido: `getFieldType('codigo')` cai em `'text'` por não casar
+com nenhuma das regras, e `sanitizeFieldValue` devolve o texto aparado. O código passa intacto.
+
+`computeRowHash` também **não** muda: o hash só marca "veio de importação" e ninguém o confere.
+
+`VISIBLE_FIELDS` (`ImportPedidosDialog.tsx:40`) deriva de `FIELDS`, então a coluna passa a ser
+reconhecida pelo assistente de importação no mesmo gesto — que é o ponto da entrega 5.B.
 
 ### 5.B — A importação reconhece o código e atualiza
 
@@ -179,6 +185,15 @@ volta inocente congelaria 12.324 nomes (§4).
 **As três regras de escrita**, juntas: vazio não mexe · igual ao automático não mexe (só no nome)
 · marcador desconhecido não é criado.
 
+### 🔴 Código com formato inválido não pode chegar na consulta
+
+O código é um `uuid`, e o Postgres **recusa a consulta inteira** quando um dos valores não tem
+esse formato — `invalid input syntax for type uuid`. Uma célula com `"abc"`, ou com o texto
+`Código/ID` repetido por engano, derrubaria a busca dos 12 mil códigos válidos junto.
+
+Por isso a classificação confere o formato **antes** de consultar: o que não tem cara de código
+vai direto para o balde "não encontrado", sem passar pelo banco. Só o que sobra é consultado.
+
 ### O caminho da escrita
 
 Lotes pelo navegador, o mesmo mecanismo que `use-bulk-import.ts` já usa para inserir 12 mil
@@ -186,6 +201,13 @@ linhas em produção. Sem migration, sem função nova no servidor. A alternativ
 banco recebendo o lote — seria mais rápida por alguns segundos e custaria uma mudança em produção
 que este trabalho não precisa. A atualização filtra por chave primária, que é barato mesmo com a
 regra de segurança cobrando por linha.
+
+**Uma gravação por negócio, e isso é inevitável:** cada negócio recebe valores diferentes, então
+não existe um `update` só que sirva para todos. A escrita segue o mesmo limite de 4 em paralelo
+que a inserção já usa, com aviso de progresso — o mesmo padrão da exportação, que também percorre
+a base em lotes. Para o uso que motivou este trabalho (anotar dezenas ou centenas de negócios)
+isso é instantâneo; para um arquivo com milhares de alterações, a tela precisa dizer que vai
+demorar em vez de parecer travada.
 
 ## 6. 🔴 A assimetria que o banco impõe, e que o aviso não pode ignorar
 
