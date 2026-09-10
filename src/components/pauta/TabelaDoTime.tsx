@@ -137,14 +137,18 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
           <p className="py-4 text-sm text-destructive">
             Não foi possível carregar a lista: {mensagemDeErro(error, 'tente recarregar a página')}
           </p>
-        ) : isPaused ? (
+        ) : isPending && isPaused ? (
           /* 🔴 SEM RESPOSTA NÃO É "NÃO HÁ NADA". Quando o navegador perde a rede, o TanStack Query
              PAUSA a consulta em vez de deixá-la falhar: ela fica sem dados e sem erro, e é um
              estado que dura enquanto a conexão não voltar. Se isso caísse no ramo de lista vazia
              abaixo, a tabela diria "nenhum negócio pedindo atenção" — a mesma tela mentindo por
              falta de resposta, que é justamente o que este trabalho veio consertar.
              Medido no navegador em 10/09/2026: consulta `pending` com `fetchStatus: paused`
-             deixa `isLoading` FALSO, então o esqueleto sozinho também não cobria este caso. */
+             deixa `isLoading` FALSO, então o esqueleto sozinho também não cobria este caso.
+
+             `isPending &&` porque isto vale só quando NÃO HÁ o que mostrar. Perder a rede durante
+             uma recarga de uma lista que já está na tela não é motivo para apagá-la: as linhas
+             continuam sendo a melhor informação disponível, e o que envelhece é a idade delas. */
           <p className="py-4 text-sm text-muted-foreground">
             Sem conexão para carregar a lista. Ela aparece assim que a internet voltar.
           </p>
