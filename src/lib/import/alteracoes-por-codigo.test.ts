@@ -9,6 +9,7 @@ function negocio(over: Partial<NegocioAtual> = {}): NegocioAtual {
     nome: null,
     observacoes: null,
     marcador_id: null,
+    marcadorNome: null,
     nomeAutomatico: 'Construtora Alfa | Portobello',
     rotulo: 'Construtora Alfa | Portobello',
     ...over,
@@ -54,6 +55,15 @@ describe('calcularAlteracoes — a regra do NOME', () => {
   it('a comparação com o automático ignora espaço sobrando', () => {
     const r = calcularAlteracoes(
       [{ codigo: ID, negocio: '  Construtora Alfa | Portobello  ' }],
+      atuais(negocio()),
+      semMarcadores,
+    );
+    expect(r.negocios).toHaveLength(0);
+  });
+
+  it('nome vindo da planilha em caixa diferente do rótulo automático não vira alteração', () => {
+    const r = calcularAlteracoes(
+      [{ codigo: ID, negocio: 'CONSTRUTORA ALFA | PORTOBELLO' }],
       atuais(negocio()),
       semMarcadores,
     );
@@ -123,6 +133,19 @@ describe('calcularAlteracoes — a regra do MARCADOR', () => {
     );
     expect(r.negocios).toHaveLength(0);
   });
+
+  it('🔴 o de-para mostra o NOME do marcador de hoje, não o identificador interno', () => {
+    // Sem este teste, `de` volta a receber `marcador_id` (algo como "mk-1") e a tela mostra
+    // "mk-1 → Urgente" — que não diz nada a quem lê o aviso.
+    const r = calcularAlteracoes(
+      [{ codigo: ID, marcador: 'Urgente' }],
+      atuais(negocio({ marcador_id: 'mk-0', marcadorNome: 'Antigo' })),
+      new Map([['urgente', 'mk-1']]),
+    );
+    expect(r.negocios[0].alteracoes).toEqual([
+      { campo: 'marcador_id', de: 'Antigo', para: 'Urgente' },
+    ]);
+  });
 });
 
 describe('calcularAlteracoes — o resumo', () => {
@@ -135,6 +158,21 @@ describe('calcularAlteracoes — o resumo', () => {
     expect(r.negocios).toHaveLength(1);
     expect(r.negocios[0].patch).toEqual({ observacoes: 'nova nota', marcador_id: 'mk-1' });
     expect(r.porCampo).toEqual({ nome: 0, observacoes: 1, marcador_id: 1 });
+  });
+
+  it('os três campos mudando juntos entram no mesmo patch e contam 1 cada um em porCampo', () => {
+    const r = calcularAlteracoes(
+      [{ codigo: ID, negocio: 'Obra do Porto — fachada', observacoes: 'nova nota', marcador: 'Urgente' }],
+      atuais(negocio({ observacoes: 'nota velha', marcador_id: 'mk-0', marcadorNome: 'Antigo' })),
+      new Map([['urgente', 'mk-1']]),
+    );
+    expect(r.negocios).toHaveLength(1);
+    expect(r.negocios[0].patch).toEqual({
+      nome: 'Obra do Porto — fachada',
+      observacoes: 'nova nota',
+      marcador_id: 'mk-1',
+    });
+    expect(r.porCampo).toEqual({ nome: 1, observacoes: 1, marcador_id: 1 });
   });
 
   it('linha cujo código não está no mapa é ignorada em silêncio', () => {

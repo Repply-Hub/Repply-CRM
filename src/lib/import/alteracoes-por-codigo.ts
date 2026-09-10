@@ -25,6 +25,12 @@ export interface NegocioAtual {
   observacoes: string | null;
   marcador_id: string | null;
   /**
+   * O nome legível do marcador que o negócio tem hoje (ex.: "Urgente"), só para o de-para
+   * da tela ficar pronto para leitura. Quem decide se o marcador mudou continua sendo
+   * `marcador_id` — este campo nunca entra em comparação nem no `patch`.
+   */
+  marcadorNome: string | null;
+  /**
    * O rótulo que a tela monta quando `nome` está vazio: `"cliente | fabricante"`.
    * É contra ele que a regra 2 compara — ver `getNomeNegocioAutomatico` em
    * `src/lib/nome-negocio.ts`, que é quem a exportação usa.
@@ -133,7 +139,7 @@ export function calcularAlteracoes(
           desconhecidos.set(marcadorNovo.toLowerCase(), marcadorNovo);
         }
       } else if (id !== atual.marcador_id) {
-        alteracoes.push({ campo: 'marcador_id', de: atual.marcador_id ?? '', para: marcadorNovo });
+        alteracoes.push({ campo: 'marcador_id', de: atual.marcadorNome ?? '', para: marcadorNovo });
         patch.marcador_id = id;
         porCampo.marcador_id += 1;
       }
@@ -170,7 +176,7 @@ export function textoDoResumoDeAlteracoes(resumo: ResumoDasAlteracoes): string[]
       ? ` e mais ${resumo.marcadoresDesconhecidos.length - 5}`
       : '';
     frases.push(
-      `Marcador que não existe aqui${resto ? '' : ''}: ${lista}${resto}. Esses negócios ficam com o marcador que já têm — a importação não cria marcador novo.`,
+      `Marcador que não existe aqui: ${lista}${resto}. Esses negócios ficam com o marcador que já têm — a importação não cria marcador novo.`,
     );
   }
 
