@@ -502,6 +502,12 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   }, [step, previewRows, empresaId]);
 
   const handleImport = async () => {
+    // Trava de profundidade: o `disabled` do botão é de tela, e o efeito da conferência é
+    // passivo — entre a pintura do passo e a primeira execução dele existe um instante em que
+    // `reencontro` ainda é nulo e o botão parece habilitado. Um clique ali mandaria a planilha
+    // INTEIRA para o cadastro, que é a duplicação que este trabalho existe para impedir.
+    // Na dúvida, não cadastra.
+    if (conferindoCodigos || falhaNaConferencia || !reencontro) return;
     if (importing) return;
     const allRows = getMappedRows();
     // Linhas com campo de data inválido (ex: "30/12/2022 18:01" → parse falhou)
@@ -1242,11 +1248,19 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
 
             {/* Reimportar a mesma exportação sem editar nada é o caminho normal de quem
                 exporta só para conferir — não um erro. Sem esta frase, a tela mostra "0 —
-                Importados com sucesso" sozinho, e quem não é técnico lê isso como falha. */}
+                Importados com sucesso" sozinho, e quem não é técnico lê isso como falha.
+                🔴 As três contas de baixo (Código/ID inexistente, repetido e linha sem
+                Cliente/Fabricante) entram na condição porque, sem elas, uma planilha com 5
+                linhas de Código/ID inexistente e nada mais mostrava "a planilha voltou igual"
+                bem em cima de "5 linha(s) com Código/ID inexistente" — as duas se
+                contradizendo na mesma tela. */}
             {importResult.totalInseridos === 0
               && importResult.totalFalharam === 0
               && importResult.atualizados === 0
-              && importResult.atualizacoesRecusadas === 0 && (
+              && importResult.atualizacoesRecusadas === 0
+              && importResult.totalIgnoradosValidacao === 0
+              && importResult.naoEncontrados === 0
+              && importResult.repetidos === 0 && (
               <p className="text-sm text-muted-foreground">
                 A planilha voltou igual à que saiu — por isso nada precisou mudar. É o caminho
                 normal de quem exporta só para conferir, não uma falha da importação.
@@ -1263,35 +1277,45 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                 quando alterou 20 — e só descobre semanas depois, se descobrir.
                 `recusados` é `pedidos - aceitos`: erro de rede ou do banco cai no MESMO balde
                 da recusa por permissão (a recusa por permissão não dá erro, só devolve zero
-                linhas — ver `contarResultadoDaAtualizacao` em `use-bulk-import.ts`). Por isso
-                a frase de permissão só aparece quando `motivosAtualizacaoRecusada` vem vazio;
-                havendo erro de verdade, ele é mostrado em vez de um motivo que pode nem ser
-                o certo. */}
-            {importResult.atualizacoesRecusadas > 0 && (
-              Object.keys(importResult.motivosAtualizacaoRecusada).length > 0 ? (
-                <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-4">
-                  <p className="text-sm text-destructive">
-                    <strong>{importResult.atualizacoesRecusadas}</strong> negócio(s) não
-                    puderam ser alterados por um erro — não é recusa de permissão. Motivo(s):
-                  </p>
-                  <div className="mt-2 space-y-1.5">
-                    {Object.entries(importResult.motivosAtualizacaoRecusada).map(([motivo, count]) => (
-                      <div key={motivo} className="flex items-center justify-between gap-2 text-xs">
-                        <span className="text-destructive/90 truncate">{motivo}</span>
-                        <Badge variant="outline" className="shrink-0">{count}×</Badge>
+                linhas — ver `contarResultadoDaAtualizacao` em `use-bulk-import.ts`). As duas
+                coisas são contadas separadamente em vez de escolher UMA frase pela existência
+                de `motivos`: a soma dos valores de `motivosAtualizacaoRecusada` é quantos
+                falharam por erro de verdade, e o resto de `atualizacoesRecusadas` é recusa por
+                permissão. Um erro de rede sozinho entre dez recusas por permissão não pode mais
+                esconder as outras nove. */}
+            {importResult.atualizacoesRecusadas > 0 && (() => {
+              const porErro = Object.values(importResult.motivosAtualizacaoRecusada)
+                .reduce((soma, count) => soma + count, 0);
+              const porPermissao = importResult.atualizacoesRecusadas - porErro;
+              return (
+                <>
+                  {porErro > 0 && (
+                    <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-4">
+                      <p className="text-sm text-destructive">
+                        <strong>{porErro}</strong> negócio(s) não puderam ser alterados por um
+                        erro (de rede ou do banco). Motivo(s):
+                      </p>
+                      <div className="mt-2 space-y-1.5">
+                        {Object.entries(importResult.motivosAtualizacaoRecusada).map(([motivo, count]) => (
+                          <div key={motivo} className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-destructive/90 truncate" title={motivo}>{motivo}</span>
+                            <Badge variant="outline" className="shrink-0">{count}×</Badge>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-amber-800">
-                  <strong>{importResult.atualizacoesRecusadas}</strong> negócio(s) não puderam
-                  ser alterados. O mais provável é que sejam de outra pessoa: só é possível
-                  editar os próprios negócios, a menos que você seja gestor ou tenha a
-                  permissão de editar Negócios.
-                </p>
-              )
-            )}
+                    </div>
+                  )}
+                  {porPermissao > 0 && (
+                    <p className="text-sm text-amber-800">
+                      <strong>{porPermissao}</strong> negócio(s) não puderam ser alterados. O
+                      mais provável é que sejam de outra pessoa: só é possível editar os
+                      próprios negócios, a menos que você seja gestor ou tenha a permissão de
+                      editar Negócios.
+                    </p>
+                  )}
+                </>
+              );
+            })()}
 
             {(importResult.naoEncontrados > 0 || importResult.repetidos > 0) && (
               <p className="text-sm text-muted-foreground">
@@ -1309,7 +1333,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                 <div className="space-y-1.5">
                   {Object.entries(importResult.motivosFalha).map(([motivo, count]) => (
                     <div key={motivo} className="flex items-center justify-between gap-2 text-xs">
-                      <span className="text-muted-foreground truncate">{motivo}</span>
+                      <span className="text-muted-foreground truncate" title={motivo}>{motivo}</span>
                       <Badge variant="outline" className="shrink-0">{count}×</Badge>
                     </div>
                   ))}
