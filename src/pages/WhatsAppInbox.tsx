@@ -9308,7 +9308,10 @@ export default function WhatsAppInbox() {
                       : "transform 0.15s ease-out",
                   }}
                 />
-                <div className="absolute bottom-3 right-3 flex items-center gap-0.5 rounded-full border border-border bg-background/90 px-1 py-1 shadow-sm backdrop-blur">
+              </div>
+              <DialogFooter className="px-4 py-3 border-t border-border gap-2 sm:justify-between sm:items-center">
+                {/* Controle de zoom no rodapé, à esquerda — antes ficava sobre a imagem e tampava o conteúdo */}
+                <div className="flex items-center gap-0.5 rounded-full border border-border bg-background px-1 py-1 shadow-sm">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -9344,33 +9347,31 @@ export default function WhatsAppInbox() {
                     </Button>
                   )}
                 </div>
-              </div>
-              <DialogFooter className="px-4 py-3 border-t border-border sm:justify-between">
-                {viewingImage.msgId ? (
+                <div className="flex items-center gap-2">
+                  {viewingImage.msgId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => {
+                        const msgId = viewingImage.msgId!;
+                        setViewingImage(null);
+                        setLeadSheetOpen(false);
+                        setTimeout(() => irParaMensagem(msgId), 300);
+                      }}
+                    >
+                      <MessageSquareText className="h-4 w-4" /> Ver na conversa
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
                     className="gap-1.5"
-                    onClick={() => {
-                      const msgId = viewingImage.msgId!;
-                      setViewingImage(null);
-                      setLeadSheetOpen(false);
-                      setTimeout(() => irParaMensagem(msgId), 300);
-                    }}
+                    onClick={() => downloadFile(viewingImage.url, "imagem.jpg")}
                   >
-                    <MessageSquareText className="h-4 w-4" /> Ver na conversa
+                    <Download className="h-4 w-4" /> Baixar
                   </Button>
-                ) : (
-                  <span />
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => downloadFile(viewingImage.url, "imagem.jpg")}
-                >
-                  <Download className="h-4 w-4" /> Baixar
-                </Button>
+                </div>
               </DialogFooter>
             </>
           )}

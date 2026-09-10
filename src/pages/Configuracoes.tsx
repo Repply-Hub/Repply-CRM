@@ -390,36 +390,42 @@ function ProfileTab() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-4 mb-5">
-              <div className="relative group">
-                <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden border border-border">
-                  {perfil.avatar_url ? (
-                    <img src={perfil.avatar_url} alt={perfil.nome} className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-2xl font-bold text-primary">{iniciais}</span>
-                  )}
+            {/* Três partes: foto · nome+e-mail · ações de foto. O container é
+                `flex-wrap`: enquanto couber, tudo numa linha (o bloco do meio
+                tem `flex-1` e empurra as ações para a direita); quando aperta —
+                card estreito no grid de 2 colunas, ou tela de celular — o bloco
+                de ações desce inteiro para a linha de baixo, e aí o nome/e-mail
+                recupera a largura toda. O `min-w-[15rem]` no bloco do meio é o
+                gatilho: força a quebra antes de o e-mail ser espremido letra a
+                letra. */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-3 mb-5">
+              <div className="flex items-center gap-4 min-w-[15rem] flex-1">
+                <div className="relative group shrink-0">
+                  <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden border border-border">
+                    {perfil.avatar_url ? (
+                      <img src={perfil.avatar_url} alt={perfil.nome} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-2xl font-bold text-primary">{iniciais}</span>
+                    )}
+                  </div>
+                  <label className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                    {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+                    <input type="file" accept="image/*" onChange={selectAvatarFile} disabled={isUploading} className="hidden" />
+                  </label>
                 </div>
-                <label className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
-                  {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
-                  <input type="file" accept="image/*" onChange={selectAvatarFile} disabled={isUploading} className="hidden" />
-                </label>
+                <div className="min-w-0 flex-1">
+                  {/* Badge de cargo junto do nome (é identidade, não ação) —
+                      separado das ações (trocar/editar/remover foto). */}
+                  <p className="font-semibold flex flex-wrap items-center gap-2 break-words">
+                    {perfil.nome}
+                    <Badge variant={perfil.role === 'admin' ? 'destructive' : perfil.role === 'gestor' || perfil.role === 'empresa' ? 'default' : 'secondary'} className="shrink-0 text-[10px]">
+                      {{ admin: 'Admin', empresa: 'Empresa', gestor: 'Gestor', vendedor: 'Vendedor' }[perfil.role] || perfil.role}
+                    </Badge>
+                  </p>
+                  <p className="text-sm text-muted-foreground break-words">{perfil.email}</p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                {/* Badge de cargo junto do nome (é identidade, não ação) —
-                    separado das ações (trocar/editar/remover foto), que agora
-                    ficam num bloco à parte, alinhado à direita do card. */}
-                <p className="font-semibold flex flex-nowrap items-center gap-2 whitespace-nowrap">
-                  {perfil.nome}
-                  <Badge variant={perfil.role === 'admin' ? 'destructive' : perfil.role === 'gestor' || perfil.role === 'empresa' ? 'default' : 'secondary'} className="shrink-0 text-[10px]">
-                    {{ admin: 'Admin', empresa: 'Empresa', gestor: 'Gestor', vendedor: 'Vendedor' }[perfil.role] || perfil.role}
-                  </Badge>
-                </p>
-                <p className="whitespace-nowrap text-sm text-muted-foreground">{perfil.email}</p>
-              </div>
-              {/* `ml-auto` empurra este bloco para o espaço à direita do card
-                  — o pai é `items-center`, então fica na mesma linha da foto
-                  e do nome/e-mail, em vez de embaixo deles. */}
-              <div className="ml-auto flex flex-nowrap items-center gap-1.5 shrink-0">
+              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                 <Button
                   type="button"
                   variant="outline"
@@ -463,7 +469,7 @@ function ProfileTab() {
               </div>
             </div>
             <form onSubmit={handleSalvarPerfil} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5"><Label>Nome</Label><Input name="nome" defaultValue={perfil.nome} placeholder="Seu nome completo" className="h-10" /></div>
                 <div className="space-y-1.5"><Label>Telefone</Label><Input name="telefone" defaultValue={perfil.telefone ?? ''} placeholder="(00) 00000-0000" className="h-10" /></div>
               </div>
