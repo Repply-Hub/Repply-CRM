@@ -84,10 +84,29 @@
 --
 -- Você vê as travas passarem (ou abortarem), a tabela de cópia se formar e as
 -- DUAS conferências do PASSO 4 com o resultado final — e o banco volta ao que
--- era, sem uma linha alterada. Isso também prova que o SQL está correto contra
--- o banco de verdade: este script nunca foi executado em lugar nenhum.
+-- era, sem uma linha alterada.
 --
 -- Se o ensaio mostrar o quadro esperado, rode de novo com `commit;` no lugar.
+--
+-- ─── O ENSAIO JÁ FOI FEITO UMA VEZ, EM 10/09/2026 ──────────────────────────
+--
+-- O miolo do PASSO 3 (o `delete` e o `insert`) foi rodado contra o banco de
+-- produção dentro de uma transação desfeita, e a medição foi feita ATRAVESSANDO
+-- A RLS como cada usuário de verdade (`set local role authenticated` com o
+-- `sub` de cada um). Resultado:
+--
+--                                    antes          depois do ensaio
+--   Usuario teste (vendedor) ......  0 conversas    8 conversas / 8 não lidas
+--                                                   (4 "Não atribuídos" + 4 "Atribuídos a mim")
+--   Repply Suporte (empresa) ......  12 / 9         12 / 9  (não muda, e não devia)
+--
+-- Depois do `rollback`, conferido: 12 linhas de responsável, 12 donos fantasmas,
+-- nenhuma tabela de cópia. O banco ficou como estava.
+--
+-- ⚠️ O que o ensaio NÃO exercitou: o PASSO 0 (travas), o PASSO 1 (tabela de
+--    cópia) e o PASSO 4 (conferências) — o ensaio pulou a criação de tabela.
+--    Por isso o ensaio com `rollback;` acima continua valendo a pena antes do
+--    `commit;`: é ele que exercita o arquivo INTEIRO.
 --
 -- ============================================================================
 -- COMO DESFAZER (rode isto se algo sair errado)
