@@ -27,6 +27,7 @@ import { useSecaoLigada } from '@/hooks/use-secoes';
 import { useMinhaPermissao } from '@/hooks/use-minha-permissao';
 import { useAuth } from '@/hooks/use-auth';
 import { getNomeNegocio } from '@/lib/nome-negocio';
+import { alvoDaTarefaDoNegocio, type AlvoDaTarefaDoNegocio } from '@/lib/alvo-da-tarefa-do-negocio';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { repairCorruptedBitrixUrl } from '@/lib/repair-bitrix-url';
 import { filenameFromUrl } from '@/lib/download-file';
@@ -171,6 +172,22 @@ export function PainelDoNegocio({
   const [editingTarefaNegocio, setEditingTarefaNegocio] = useState<Tarefa | null>(null);
   const [pdfPreview, setPdfPreview] = useState<FilePreviewTarget | null>(null);
 
+  // O negócio a que a tarefa deste formulário pertence, congelado no clique que o abriu.
+  // Ver `alvoDaTarefaDoNegocio`.
+  const [alvoDaTarefa, setAlvoDaTarefa] = useState<AlvoDaTarefaDoNegocio | null>(null);
+
+  const abrirNovaTarefa = () => {
+    setAlvoDaTarefa(alvoDaTarefaDoNegocio(negocio));
+    setAddTarefaOpen(true);
+  };
+  const abrirEdicaoDeTarefa = (tarefa: Tarefa) => {
+    setAlvoDaTarefa(alvoDaTarefaDoNegocio(negocio));
+    setEditingTarefaNegocio(tarefa);
+  };
+
+  // Enquanto o formulário de tarefa está por cima, NADA fecha o painel por clique fora.
+  const formularioDeTarefaAberto = addTarefaOpen || editingTarefaNegocio !== null;
+
   return (
     <>
       <Sheet
@@ -180,7 +197,37 @@ export function PainelDoNegocio({
           onClose();
         }}
       >
-        <ConteudoDoPainel className="sm:max-w-xl">
+        <ConteudoDoPainel
+          className="sm:max-w-xl"
+          /*
+            🔴 O DEFEITO QUE ISTO CONSERTA, conferido na tela em 09 e 10/09/2026: o PRIMEIRO
+            clique dentro do formulário de "Nova Tarefa" fechava o painel do negócio inteiro.
+
+            A causa é a soma de duas escolhas legítimas. O painel é um `Sheet` — que é o Dialog
+            do Radix — e, sendo modal, o `DismissableLayer` dele continua sendo o layer mais alto
+            "com ponteiros de fora desligados". O `TarefaFormDialog`, por outro lado, é
+            `modal={false}` DE PROPÓSITO (senão a trava de rolagem do Radix mata a roda do mouse
+            dentro dos seletores dele — está escrito lá, em TarefaFormDialog.tsx:170). Um diálogo
+            não-modal não assume esse posto, então o painel segue ouvindo cliques do lado de fora
+            da própria árvore — e o formulário vive noutro portal. Resultado: clicar no formulário
+            contava como "clicou fora do painel", `pedidoId` virava nulo e a tarefa nascia solta.
+
+            🔴 POR QUE A CONDIÇÃO É O ESTADO, e não "o alvo está dentro do diálogo de tarefa".
+            Medido no DOM em 10/09/2026: os seletores do formulário (Responsável, Empresa,
+            Negócio, Participantes, Marcadores, Status e o calendário do Prazo) são portais
+            pendurados DIRETO no `<body>` — `dialogoDaTarefa.contains(alvo)` deu `false` para o
+            popover de Responsável. Uma checagem por `closest()` no conteúdo do diálogo
+            consertaria o clique no campo de texto e deixaria sete buracos: escolher um
+            responsável na lista continuaria fechando o painel.
+
+            O que isto NÃO desliga: o botão Fechar, o "X", o Esc e o clique fora quando não há
+            formulário de tarefa aberto — tudo segue igual. E o Esc com o formulário aberto já
+            era do formulário, não do painel: o Radix só entrega a tecla ao layer mais alto.
+          */
+          onInteractOutside={(evento) => {
+            if (formularioDeTarefaAberto) evento.preventDefault();
+          }}
+        >
           <CabecalhoDoPainel className="border-b pb-4">
             <div className="flex items-center justify-between gap-4">
               <div className="space-y-1">
@@ -456,7 +503,7 @@ export function PainelDoNegocio({
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tarefas</p>
-                  <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={() => setAddTarefaOpen(true)}>
+                  <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={abrirNovaTarefa}>
                     <Plus className="h-3.5 w-3.5" /> Nova Tarefa
                   </Button>
                 </div>
@@ -479,7 +526,7 @@ export function PainelDoNegocio({
                         </TableRow>
                       ) : (
                         tarefasNegocio.map(tarefa => (
-                          <TableRow key={tarefa.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setEditingTarefaNegocio(tarefa)}>
+                          <TableRow key={tarefa.id} className="cursor-pointer hover:bg-muted/30" onClick={() => abrirEdicaoDeTarefa(tarefa)}>
                             <TableCell className="font-medium text-sm">{tarefa.titulo}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="capitalize text-[10px]">{tarefa.status.replace(/_/g, ' ')}</Badge>
@@ -595,19 +642,23 @@ export function PainelDoNegocio({
           futuro, ressuscite a tela de tarefas numa empresa que não contratou. */}
       {temTarefas === true && (
         <>
+          {/* 🔴 `extraFields` sai do alvo CONGELADO no clique, nunca de `pedidoId` — que é
+              `string | null` e cujo `!` escondia justamente o nulo que gravava a tarefa solta.
+              Ver `alvoDaTarefaDoNegocio`, e o teste
+              `src/test/tarefa-do-painel-nasce-ligada-ao-negocio.test.ts`. */}
           <TarefaFormDialog
             open={addTarefaOpen}
             onOpenChange={setAddTarefaOpen}
             editingTarefa={null}
             kanbanStages={tarefaKanbanStages}
-            extraFields={{ pedido_id: pedidoId!, cliente_id: negocio?.cliente_id }}
+            extraFields={alvoDaTarefa ?? undefined}
           />
           <TarefaFormDialog
             open={!!editingTarefaNegocio}
             onOpenChange={(open) => { if (!open) setEditingTarefaNegocio(null); }}
             editingTarefa={editingTarefaNegocio}
             kanbanStages={tarefaKanbanStages}
-            extraFields={{ pedido_id: pedidoId!, cliente_id: negocio?.cliente_id }}
+            extraFields={alvoDaTarefa ?? undefined}
           />
         </>
       )}
