@@ -1078,8 +1078,16 @@ from (values
 -- ---------------------------------------------------------------------------
 -- 7.2 WhatsApp — 12 conversas
 -- ---------------------------------------------------------------------------
--- `instancia_id` fica NULO: não há número conectado. A tela trata esse caso
--- (WhatsAppInbox.tsx:3812, `temInstanciaConhecida`).
+-- `instancia_id` fica NULO: não há número conectado. Isso NÃO esconde a conversa
+-- de ninguém — a regra de visibilidade por número (20260902170000) deixa passar
+-- de propósito a conversa sem número registrado, pelo princípio "nenhuma conversa
+-- some em silêncio" (20260827181625).
+--
+-- ⚠️ O que a tela FAZ com isso é escolher a redação do vazio: quem não está
+-- vinculado a nenhum número lê "Você ainda não atende nenhum número" no lugar de
+-- "Nenhuma conversa ainda". Como esta empresa não tem número nenhum, TODO MUNDO
+-- lê essa frase — e ela aponta para o lado errado quando a lista está vazia por
+-- outro motivo. Foi assim que o defeito abaixo levou dez dias para ser entendido.
 --
 -- ⚠️ `telefone` é o identificador literal da conversa. NUNCA aplicar
 -- `replace(/\D/g,'')` nele: em grupo, o formato antigo tem hífen, e limpar o
@@ -1114,13 +1122,72 @@ from (values
   (12,'5584991000112','Nelson Aguiar - Santa Luzia',    33, 0,'Segue a tabela atualizada.','saida')
 ) as v(n, telefone, nome, cli, nao_lidas, ultima, direcao);
 
--- Responsável por conversa — é o que faz o alarme "precisa atribuição" ficar quieto
-insert into whatsapp_conversa_responsaveis (id, conversa_id, usuario_id)
-select
-  gen_random_uuid(), c.id,
-  ('11111111-0000-4000-8000-' || lpad((1 + mod(abs(('x' || substr(md5('wr' || c.id::text), 1, 7))::bit(28)::int), 5))::text, 12, '0'))::uuid
-from whatsapp_conversas c
-where c.id::text like 'aaaaaaaa-0000-4000-8000-%';
+-- Responsável por conversa — e QUEM CONSEGUE ENTRAR NO SISTEMA, que é o ponto.
+--
+-- 🔴 NUNCA DEIXE AS 12 NAS MÃOS DOS CINCO FICTÍCIOS. Foi exatamente o defeito da
+--    base de 31/08/2026, descoberto só em 10/09. Aqui morava um sorteio
+--    (`md5(...) mod 5`) que dava toda conversa a um dos cinco — e os cinco têm
+--    `user_id` nulo de propósito (2.1): não conseguem entrar.
+--
+--    A cerca de responsável (20260722110000) diz que você alcança a conversa se
+--    for gestor/dono da empresa, OU for o responsável, OU a conversa não tiver
+--    responsável. Com as 12 atribuídas a fantasmas, um vendedor falha nas três e
+--    enxerga ZERO. A seção mais vendedora da demonstração ficou vazia por dez
+--    dias — e a frase na tela ("Você ainda não atende nenhum número") culpava o
+--    número que falta, que não tinha nada a ver.
+--
+-- A divisão é 4/4/4 de propósito, para a barra lateral mostrar os TRÊS grupos que
+-- a tela sabe montar — é o que vende a ideia de fila de atendimento:
+--
+--   4  "Atribuídos a mim"  → a conta real que apresenta
+--   4  "Não atribuídos"    → sem responsável: a fila, alcançável por QUALQUER perfil
+--   4  "Outros atendentes" → os fictícios: só dono/gestor da empresa alcança
+--
+-- As 4 da fila (n = 4, 5, 8, 10) somam 5 não lidas, e as 4 da conta que apresenta
+-- somam 3: as duas pilhas nascem com movimento, não zeradas.
+do $$
+declare
+  -- 🔴 A CONTA QUE VAI APRESENTAR. Precisa ter login.
+  --
+  -- Por padrão é a "Repply Suporte", a mesma que a guarda do LOTE 1 já exige e a
+  -- que ancora os compromissos. Ela é `role = 'empresa'`, então alcançaria as 12
+  -- de qualquer jeito — receber 4 é o que faz o grupo "Atribuídos a mim" existir
+  -- na tela dela.
+  --
+  -- ⚠️ SE A DEMONSTRAÇÃO FOR FEITA COM UMA CONTA DE VENDEDOR, troque o
+  --    identificador abaixo pelo `usuarios.id` dela. Sem isso, esse vendedor
+  --    enxerga só as 4 da fila.
+  v_apresenta uuid := '37b5a8eb-09d8-4cd6-b823-8b19022edbac';  -- Repply Suporte
+begin
+  if not exists (
+    select 1 from usuarios where id = v_apresenta and user_id is not null
+  ) then
+    raise exception 'ABORTADO: a conta % não existe ou não tem login. Conversa atribuída a quem não entra no sistema fica invisível — é o defeito que esta divisão existe para não repetir.', v_apresenta;
+  end if;
+
+  -- 4 para quem apresenta → "Atribuídos a mim"
+  insert into whatsapp_conversa_responsaveis (id, conversa_id, usuario_id)
+  select gen_random_uuid(),
+         ('aaaaaaaa-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
+         v_apresenta
+    from unnest(array[1, 3, 6, 12]) as n;
+
+  -- 4 para a equipe fictícia → "Outros atendentes" (um de cada, para parecer time)
+  insert into whatsapp_conversa_responsaveis (id, conversa_id, usuario_id)
+  select gen_random_uuid(),
+         ('aaaaaaaa-0000-4000-8000-' || lpad(d.n::text, 12, '0'))::uuid,
+         d.dono
+    from (values
+      ( 2, '11111111-0000-4000-8000-000000000002'::uuid),  -- Otávio Rangel
+      ( 7, '11111111-0000-4000-8000-000000000003'::uuid),  -- Beatriz Nunes
+      ( 9, '11111111-0000-4000-8000-000000000004'::uuid),  -- Murilo Sandes
+      (11, '11111111-0000-4000-8000-000000000005'::uuid)   -- Larissa Coelho
+    ) as d(n, dono);
+
+  -- n = 4, 5, 8 e 10 ficam DE FORA de propósito: são a fila. Conversa sem
+  -- responsável entra em "Não atribuídos" SEMPRE — a tela não depende mais da
+  -- marca `precisa_atribuicao` para isso (20260827181625).
+end $$;
 
 -- As mensagens: 15 por conversa, alternando entrada e saída.
 --
@@ -1268,6 +1335,48 @@ select
   (select count(*) from whatsapp_conversas where empresa_id = '9b17bfdf-f631-4af6-9471-a68411909a04') as conversas_wa,
   (select count(*) from whatsapp_mensagens where empresa_id = '9b17bfdf-f631-4af6-9471-a68411909a04') as msgs_wa,
   (select count(*) from email_mensagens   where empresa_id = '9b17bfdf-f631-4af6-9471-a68411909a04') as emails;
+
+-- 🔴 A TRAVA QUE FALTAVA EM 31/08/2026: prova que a caixa de WhatsApp não nasceu
+--    vazia. Contar conversas não bastava — as 12 existiam e ninguém as via.
+--    O número que importa é quantas um VENDEDOR COMUM alcança.
+do $$
+declare
+  v_total int; v_fila int; v_com_login int; v_fantasma int;
+begin
+  select
+    count(*),
+    -- sem responsável: a fila. Qualquer perfil alcança.
+    count(*) filter (
+      where not exists (
+        select 1 from whatsapp_conversa_responsaveis r where r.conversa_id = c.id
+      )
+    ),
+    -- dono que CONSEGUE ENTRAR: alcançável por essa conta.
+    count(*) filter (
+      where exists (
+        select 1 from whatsapp_conversa_responsaveis r
+          join usuarios u on u.id = r.usuario_id
+         where r.conversa_id = c.id and u.user_id is not null
+      )
+    )
+  into v_total, v_fila, v_com_login
+  from whatsapp_conversas c
+  where c.empresa_id = '9b17bfdf-f631-4af6-9471-a68411909a04';
+
+  -- O resto tem dono fantasma: existe de propósito, mas SÓ dono/gestor alcança.
+  v_fantasma := v_total - v_fila - v_com_login;
+
+  raise notice 'WhatsApp: % na fila + % com dono que entra = % para uma conta real; % só para dono/gestor.',
+    v_fila, v_com_login, v_fila + v_com_login, v_fantasma;
+
+  if v_fila = 0 then
+    raise exception 'ABORTADO: nenhuma conversa ficou na fila. Um vendedor sem atribuição enxergaria zero.';
+  end if;
+  if v_fila + v_com_login <> 8 then
+    raise exception 'ABORTADO: esperava 8 conversas alcançáveis por uma conta real (4 da fila + 4 atribuídas), achei %.',
+      v_fila + v_com_login;
+  end if;
+end $$;
 
 
 -- ============================================================================
