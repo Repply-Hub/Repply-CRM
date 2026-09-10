@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useBlocosDoNegocio } from '@/hooks/use-blocos-do-negocio';
+import type { LinhaDoHistorico } from '@/hooks/use-blocos-do-negocio';
 
 /**
  * Cada atendimento do negócio: um bloco de WhatsApp, ou um assunto de e-mail.
@@ -24,22 +24,20 @@ function periodo(inicio: string, fim: string): string {
   return a === b ? a : `${a} a ${b}`;
 }
 
-export function BlocosDeAtendimento(props: {
-  clienteId?: string | null;
-  empresaNome?: string | null;
-  /** 🔴 `data_pedido`, nunca `created_at` — ver janelaDoNegocio. */
-  dataPedido?: string | null;
-  /** A data de FECHAMENTO; o nome da coluna mente (CLAUDE.md §4.4). */
-  prazoResposta?: string | null;
-  status?: string | null;
-}) {
+/**
+ * 🔴 RECEBE as linhas prontas em vez de buscá-las.
+ *
+ * Antes ele chamava o gancho por dentro, e o pai não tinha como saber se
+ * alguma linha havia sido desenhada — resultado: o painel mostrava um
+ * atendimento E, logo abaixo, "Nenhuma conversa, e-mail, visita ou ligação
+ * neste negócio". Quem decide o vazio precisa enxergar os dois lados, e quem
+ * enxerga os dois é o pai.
+ */
+export function BlocosDeAtendimento({ linhas }: { linhas: LinhaDoHistorico[] }) {
   const navigate = useNavigate();
   const [verTodas, setVerTodas] = useState(false);
-  const { linhas, carregando } = useBlocosDoNegocio(props);
 
-  // Silêncio quando não houve nada: este bloco é sobre o que ACONTECEU, e
-  // "não conversamos" não é um acontecimento.
-  if (carregando || linhas.length === 0) return null;
+  if (linhas.length === 0) return null;
 
   const visiveis = verTodas ? linhas : linhas.slice(0, MOSTRAR_NO_MAXIMO);
   const restantes = linhas.length - visiveis.length;

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, Phone, MessageSquare, Eye, CalendarClock, History } from 'lucide-react';
 import { useHistoricoContatos } from '@/hooks/use-pedidos';
 import { BlocosDeAtendimento } from '@/components/pedidos/BlocosDeAtendimento';
+import { useBlocosDoNegocio } from '@/hooks/use-blocos-do-negocio';
 
 interface HistoricoDoNegocioProps {
   pedidoId?: string | null;
@@ -64,6 +65,16 @@ export function HistoricoDoNegocio({
 }: HistoricoDoNegocioProps) {
   const navigate = useNavigate();
   const { data: registros = [] } = useHistoricoContatos(pedidoId ?? null);
+  // O gancho vive AQUI, e não dentro de BlocosDeAtendimento, porque só quem
+  // enxerga os dois lados — atendimentos e anotações manuais — pode decidir se
+  // o histórico está mesmo vazio.
+  const { linhas } = useBlocosDoNegocio({
+    clienteId,
+    empresaNome,
+    dataPedido,
+    prazoResposta,
+    status,
+  });
 
   return (
     <div className="space-y-2">
@@ -75,15 +86,9 @@ export function HistoricoDoNegocio({
           é cada vez que a conversa foi aberta e fechada. Decisão do dono do
           produto em 09/09/2026, revendo a de 04/09. O e-mail entra pelo mesmo
           componente, agrupado por assunto. */}
-      <BlocosDeAtendimento
-        clienteId={clienteId}
-        empresaNome={empresaNome}
-        dataPedido={dataPedido}
-        prazoResposta={prazoResposta}
-        status={status}
-      />
+      <BlocosDeAtendimento linhas={linhas} />
 
-      {registros.length === 0 ? (
+      {registros.length === 0 && linhas.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Nenhuma conversa, e-mail, visita ou ligação neste negócio.
         </p>
