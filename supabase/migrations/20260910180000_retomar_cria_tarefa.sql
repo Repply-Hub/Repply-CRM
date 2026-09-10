@@ -19,9 +19,14 @@
 --
 -- 🔴 E aqui errar é PIOR do que o CLAUDE.md descreve: `tarefas.usuario_id` **não tem chave
 -- estrangeira** (medido em 10/09/2026 — `tarefas` só tem FK em `cliente_id`, `pedido_id` e
--- `conversa_id`). Mandar um `usuarios.user_id` no lugar de `usuarios.id` não seria recusado
--- por ninguém: a tarefa gravaria em silêncio e simplesmente nunca apareceria na fila de
--- pessoa nenhuma.
+-- `conversa_id`), e ainda por cima é **anulável**. Mandar um `usuarios.user_id` no lugar de
+-- `usuarios.id` não seria recusado por ninguém: a tarefa gravaria em silêncio.
+--
+-- 🔴 E o estrago não é "some do mundo", como este comentário chegou a dizer. Corrigido na
+-- revisão de 10/09/2026: a política `tarefas_select` tem a perna `OR usuario_id IS NULL`.
+-- Uma tarefa órfã não desaparece — ela fica **visível para todo usuário autenticado de
+-- QUALQUER empresa**. Ou seja, o campo errado aqui não é um dado perdido: é vazamento entre
+-- inquilinos. É por isso que a guarda `v_dono is not null` abaixo não é zelo, é cerca.
 --
 -- 🔴 O arquivo inteiro está em BEGIN/COMMIT porque há um DROP aqui dentro. Sem transação, um
 -- CREATE que falhasse deixaria o DROP de pé sozinho e o "Retomar depois" morreria para todo
@@ -104,16 +109,18 @@ begin
   -- A tarefa vai para o DONO, não para quem clicou: quem adia o negócio de um colega está
   -- marcando trabalho na agenda dele, e é ele que precisa achar isso amanhã.
   --
-  -- 🔴 `v_dono is not null` não é paranoia: tarefa com `usuario_id` nulo não é de ninguém —
-  -- não apareceria na fila de pessoa alguma e ficaria órfã para sempre. Sem dono, não se cria
-  -- tarefa e o resto do gesto acontece normalmente.
+  -- 🔴 `v_dono is not null` não é paranoia, e o motivo é pior do que "ficaria órfã": a política
+  -- `tarefas_select` tem a perna `OR usuario_id IS NULL`, então tarefa sem dono fica **visível
+  -- para todo usuário autenticado de QUALQUER empresa** (conferido na revisão de 10/09/2026).
+  -- O motivo do adiamento, escrito por quem adiou, apareceria para gente de fora da empresa.
+  -- Sem dono, não se cria tarefa e o resto do gesto acontece normalmente.
   --
   -- 🔴 O PRAZO É ÀS 09:00 DE SÃO PAULO, NÃO `p_retorno_em::timestamptz`. O banco roda em UTC
   -- (medido em 10/09/2026: `TimeZone = UTC`), então `'2026-09-10'::date::timestamptz` vale
   -- `2026-09-10 00:00+00` — que em São Paulo é 09/09 às 21h. A tarefa apareceria na fila UM
   -- DIA ANTES do retorno e, no dia certo, a fila mostraria ZERO linha: o negócio escondido
   -- pela cláusula do passo 2 e a tarefa já vencida. É a armadilha do CLAUDE.md §7.12 vista do
-  -- lado do banco. 09:00 de São Paulo = 12:00 UTC é a âncora que as 38 tarefas com prazo já
+  -- lado do banco. 09:00 de São Paulo = 12:00 UTC é a âncora que 37 das 38 tarefas com prazo já
   -- usam hoje, escrita pela tela de Tarefas.
   if p_criar_tarefa and v_dono is not null then
     select u.nome into v_meu_nome from public.usuarios u where u.id = v_eu;
