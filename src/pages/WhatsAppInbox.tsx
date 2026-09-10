@@ -4322,6 +4322,9 @@ export default function WhatsAppInbox() {
       (prev) => {
         const next = new URLSearchParams(prev);
         next.delete("conversaId");
+        // `mensagemId` NÃO sai aqui: quem o consome é o efeito abaixo, que só
+        // roda depois de as mensagens da conversa chegarem. Apagar junto
+        // deixaria o histórico do negócio abrindo a conversa no lugar errado.
         return next;
       },
       { replace: true },
@@ -4490,6 +4493,30 @@ export default function WhatsAppInbox() {
     hasOlderMensagens,
     loadingOlderMensagens,
   } = useWaMensagens(conversaAtiva?.id ?? null);
+
+  /**
+   * Vindo do histórico do negócio: além da conversa, a MENSAGEM que abriu
+   * aquele atendimento (`/whatsapp?conversaId=X&mensagemId=Y`).
+   *
+   * Espera as mensagens chegarem — rolar antes de a lista existir não acha o
+   * elemento e o clique não faz nada. E consome o parâmetro depois de usar:
+   * sem isso, qualquer mensagem nova rolaria a tela de volta e prenderia a
+   * pessoa naquele ponto.
+   */
+  useEffect(() => {
+    const alvo = searchParams.get("mensagemId");
+    if (!alvo || mensagens.length === 0) return;
+    if (!mensagens.some((m) => m.id === alvo)) return;
+    irParaMensagem(alvo);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("mensagemId");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams, mensagens]);
   // Os endereços da conversa aberta, assinados de uma vez só — um pedido por balde, não um
   // por mídia. A conversa desenha 50 mensagens de uma vez, e 50 chamadas separadas somariam
   // meio segundo antes de a primeira imagem aparecer.

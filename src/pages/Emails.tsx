@@ -225,7 +225,7 @@ const SeloMarcadores = ({
 };
 
 const Emails = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   // A busca só vira consulta depois que a digitação para. Enquanto o termo
   // cru estava na queryKey, cada tecla disparava uma ida ao servidor —
@@ -1530,6 +1530,78 @@ const Emails = () => {
       respondida: !!(email.threadId && threadsRespondidos?.has(email.threadId)),
     });
   };
+
+  /**
+   * `abrirComCorpo` é recriada a cada render; pô-la nas dependências do efeito
+   * abaixo faria a mensagem reabrir sem parar. A referência guarda sempre a
+   * versão mais nova sem entrar na conta das dependências.
+   */
+  const abrirComCorpoRef = useRef(abrirComCorpo);
+  abrirComCorpoRef.current = abrirComCorpo;
+
+  /**
+   * Vindo do histórico do negócio: `/emails?mensagemId=X` abre aquela mensagem.
+   *
+   * Busca pelo id em vez de procurar na lista: o histórico aponta para o
+   * primeiro e-mail de um assunto, que pode ser de meses atrás e não estar na
+   * página aberta — nem no marcador escolhido.
+   *
+   * O parâmetro é consumido depois de usado, senão a mensagem reabriria a cada
+   * atualização da tela.
+   */
+  useEffect(() => {
+    const alvo = searchParams.get("mensagemId");
+    if (!alvo || !isConnected) return;
+
+    let cancelado = false;
+    void (async () => {
+      const { data, error } = await supabase
+        .from("email_mensagens")
+        .select(
+          "id, lido, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, assunto, caixa_origem",
+        )
+        .eq("id", alvo)
+        .maybeSingle();
+
+      if (cancelado) return;
+      if (error || !data) {
+        // Sem acesso à caixa a RLS não devolve linha — e aí não há o que abrir.
+        toast.error("Não encontrei esta mensagem, ou você não tem acesso a ela.");
+      } else {
+        const destinatarios = (data.destinatarios ?? []) as Array<{
+          email?: string;
+        }>;
+        void abrirComCorpoRef.current({
+          id: data.id,
+          lido: data.lido,
+          assunto: data.assunto,
+          snippet: data.snippet,
+          corpo: data.snippet ?? "",
+          remetente: data.remetente_nome || data.remetente_email || "",
+          destinatario: destinatarios[0]?.email ?? "",
+          created_at: data.data_mensagem,
+          criado_em: data.data_mensagem,
+          threadId: data.nylas_thread_id ?? null,
+          gmail_message_id: data.nylas_message_id,
+          caixaOrigem: data.caixa_origem ?? null,
+          type: "received",
+        } as EmailAberto);
+      }
+
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete("mensagemId");
+          return next;
+        },
+        { replace: true },
+      );
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [searchParams, setSearchParams, isConnected]);
 
   /**
    * As DEMAIS mensagens da mesma conversa (`nylas_thread_id`) da mensagem
