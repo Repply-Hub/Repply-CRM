@@ -27,6 +27,7 @@ import {
 } from '@/lib/import/alteracoes-por-codigo';
 import { getNomeNegocioAutomatico } from '@/lib/nome-negocio';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
+import { escolherLinhasParaCadastrar } from '@/lib/import/linhas-para-cadastrar';
 import { MappingStep, sanitizeImportedRows, getExtraDisplayName, type ExtraMappingValue, type FieldDef } from '@/components/import/MappingStep';
 import { ImportInstructionsStep } from '@/components/import/ImportInstructionsStep';
 import { useBulkImport, type ResultadoDaAtualizacao } from '@/hooks/use-bulk-import';
@@ -125,6 +126,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     motivosFalha: Record<string, number>;
     atualizados: number;
     atualizacoesRecusadas: number;
+    // Erro de verdade (rede, banco) que reprovou a atualização — separado da recusa de
+    // permissão, que é silenciosa e não deixa motivo nenhum aqui. Ver Achado 3.
+    motivosAtualizacaoRecusada: Record<string, number>;
     naoEncontrados: number;
     repetidos: number;
   } | null>(null);
@@ -138,6 +142,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     resumo: ResumoDasAlteracoes;
   } | null>(null);
   const [conferindoCodigos, setConferindoCodigos] = useState(false);
+  // 🔴 Liga quando a conferência de Código/ID falha (erro de rede ou do banco), e desliga a
+  // cada nova tentativa. Sem isto, o Confirmar continuava liberado com `reencontro` nulo — e
+  // nulo, nesse instante, não significa "sem código", significa "não dá para saber quem
+  // atualiza e quem cadastra". Ver o comentário perto de `indicesParaCadastrar`.
+  const [falhaNaConferencia, setFalhaNaConferencia] = useState(false);
   // A caixinha do balde "sem código". Quem decide o valor inicial é a classificação, no efeito
   // abaixo: marcada só quando o arquivo inteiro está sem código (decisão 11 do desenho).
   const [criarOsSemCodigo, setCriarOsSemCodigo] = useState(true);
@@ -408,6 +417,9 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   // Efeito e não `useMemo` porque isto vai ao servidor. Roda só no passo "conferir", que é
   // onde o aviso aparece — e onde a pessoa ainda pode voltar e mudar o mapeamento.
   useEffect(() => {
+    // Cada nova tentativa começa sem a marca de falha da anterior — inclusive ao só sair e
+    // voltar para o passo de revisão (Alterar mapeamento → Revisar de novo).
+    setFalhaNaConferencia(false);
     if (step !== 'preview') { setReencontro(null); return; }
 
     let cancelado = false;
@@ -474,6 +486,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       } catch (err) {
         if (!cancelado) {
           setReencontro(null);
+          // 🔴 Trava o Confirmar (ver `disabled` do botão, abaixo). Sem isto, o toast some
+          // sozinho em alguns segundos, o aviso de conferência nunca chegou a aparecer na
+          // tela, e o botão continua dizendo "Importar N negócios" — um clique cadastraria
+          // a planilha inteira sem checar duplicata nenhuma contra o banco.
+          setFalhaNaConferencia(true);
           toast.error(`Não foi possível conferir os códigos: ${mensagemDeErro(err)}`);
         }
       } finally {
@@ -619,15 +636,31 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         toast.dismiss(avisoAtualizacao);
       }
 
-      // Só o balde "sem código", e só com a caixinha marcada. Sem o reencontro (planilha sem a
-      // coluna Código/ID mapeada) tudo entra, que é o comportamento de sempre. O filtro usa
-      // `indicePrevia` (guardado acima), não a posição em `enrichedRows` — são listas
-      // diferentes sempre que alguma linha foi descartada por falta de Cliente/Fabricante.
+      // Só o balde "sem código", e só com a caixinha marcada.
+      //
+      // 🔴 O QUE `reencontro` NULO REALMENTE SIGNIFICA (o comentário antigo aqui estava
+      // errado). NÃO é "planilha sem a coluna Código/ID mapeada" — nesse caso `getMappedRows`
+      // devolve `codigo: ''` para toda linha, a conferência roda do mesmo jeito e
+      // `setReencontro({...})` sempre acontece, só que com tudo no balde "sem código" (é o
+      // comportamento de sempre, cadastrando a planilha inteira quando a caixinha está
+      // marcada). `reencontro` só fica nulo em dois casos, e nos dois o Confirmar já está
+      // desabilitado antes de chegar aqui: a conferência ainda está rodando
+      // (`conferindoCodigos`) ou ela falhou (`falhaNaConferencia`). Documento que mente sobre
+      // isso é pior que documento que não existe — foi assim que o botão ficava livre para
+      // cadastrar tudo sem checar duplicata nenhuma contra o banco.
       const indicesParaCadastrar = reencontro
         ? new Set(criarOsSemCodigo ? reencontro.classificacao.semCodigo.map(l => l.indice) : [])
         : null;
+      // A extração para `escolherLinhasParaCadastrar` (função pura, testada sem React nem
+      // banco em `linhas-para-cadastrar.test.ts`) existe para que ninguém "simplifique" este
+      // filtro de volta para a posição crua em `enrichedRows` — foi exatamente esse o defeito
+      // do plano original.
       const linhasParaCadastrar = indicesParaCadastrar
-        ? enrichedRows.filter((_, j) => indicesParaCadastrar.has(linhasComIndicePrevia[j].indicePrevia))
+        ? escolherLinhasParaCadastrar(
+            enrichedRows,
+            linhasComIndicePrevia.map(l => l.indicePrevia),
+            indicesParaCadastrar,
+          )
         : enrichedRows;
 
       const summary = linhasParaCadastrar.length > 0
@@ -661,6 +694,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         motivosFalha: summary.motivosFalha,
         atualizados: resultadoAtualizacao?.aceitos ?? 0,
         atualizacoesRecusadas: resultadoAtualizacao?.recusados ?? 0,
+        motivosAtualizacaoRecusada: resultadoAtualizacao?.motivos ?? {},
         naoEncontrados: reencontro?.classificacao.naoEncontrado.length ?? 0,
         repetidos: reencontro?.classificacao.repetido.length ?? 0,
       });
@@ -928,6 +962,26 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               </div>
             )}
 
+            {falhaNaConferencia && (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 flex items-start gap-3">
+                <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-bold text-destructive">
+                    Não foi possível conferir os Códigos/ID
+                  </span>
+                  <p className="text-[11px] leading-relaxed text-destructive/90">
+                    Sem essa conferência não dá para saber quais linhas atualizam um negócio já
+                    cadastrado e quais viram negócio novo — importar agora arriscaria duplicar
+                    negócios que já existem na base. Por isso o botão de confirmar está
+                    desabilitado. Clique em "Alterar mapeamento" acima, ou em "Voltar" no
+                    rodapé, e avance de novo para tentar a conferência uma segunda vez.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {reencontro && !conferindoCodigos && (
               <div className="rounded-xl border border-border/50 bg-card p-4 flex flex-col gap-3">
                 {/* Conta que dá zero não aparece. Um arquivo saudável mostra uma linha só, e é
@@ -1186,6 +1240,19 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               )}
             </div>
 
+            {/* Reimportar a mesma exportação sem editar nada é o caminho normal de quem
+                exporta só para conferir — não um erro. Sem esta frase, a tela mostra "0 —
+                Importados com sucesso" sozinho, e quem não é técnico lê isso como falha. */}
+            {importResult.totalInseridos === 0
+              && importResult.totalFalharam === 0
+              && importResult.atualizados === 0
+              && importResult.atualizacoesRecusadas === 0 && (
+              <p className="text-sm text-muted-foreground">
+                A planilha voltou igual à que saiu — por isso nada precisou mudar. É o caminho
+                normal de quem exporta só para conferir, não uma falha da importação.
+              </p>
+            )}
+
             {importResult.atualizados > 0 && (
               <p className="text-sm text-foreground">
                 <strong>{importResult.atualizados}</strong> negócio(s) atualizado(s).
@@ -1193,14 +1260,37 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
             )}
 
             {/* 🔴 A frase mais importante desta tela. Sem ela, a pessoa acha que alterou 38
-                quando alterou 20 — e só descobre semanas depois, se descobrir. */}
+                quando alterou 20 — e só descobre semanas depois, se descobrir.
+                `recusados` é `pedidos - aceitos`: erro de rede ou do banco cai no MESMO balde
+                da recusa por permissão (a recusa por permissão não dá erro, só devolve zero
+                linhas — ver `contarResultadoDaAtualizacao` em `use-bulk-import.ts`). Por isso
+                a frase de permissão só aparece quando `motivosAtualizacaoRecusada` vem vazio;
+                havendo erro de verdade, ele é mostrado em vez de um motivo que pode nem ser
+                o certo. */}
             {importResult.atualizacoesRecusadas > 0 && (
-              <p className="text-sm text-amber-800">
-                <strong>{importResult.atualizacoesRecusadas}</strong> negócio(s) não puderam ser
-                alterados. O mais provável é que sejam de outra pessoa: só é possível editar os
-                próprios negócios, a menos que você seja gestor ou tenha a permissão de editar
-                Negócios.
-              </p>
+              Object.keys(importResult.motivosAtualizacaoRecusada).length > 0 ? (
+                <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-4">
+                  <p className="text-sm text-destructive">
+                    <strong>{importResult.atualizacoesRecusadas}</strong> negócio(s) não
+                    puderam ser alterados por um erro — não é recusa de permissão. Motivo(s):
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    {Object.entries(importResult.motivosAtualizacaoRecusada).map(([motivo, count]) => (
+                      <div key={motivo} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="text-destructive/90 truncate">{motivo}</span>
+                        <Badge variant="outline" className="shrink-0">{count}×</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-amber-800">
+                  <strong>{importResult.atualizacoesRecusadas}</strong> negócio(s) não puderam
+                  ser alterados. O mais provável é que sejam de outra pessoa: só é possível
+                  editar os próprios negócios, a menos que você seja gestor ou tenha a
+                  permissão de editar Negócios.
+                </p>
+              )
             )}
 
             {(importResult.naoEncontrados > 0 || importResult.repetidos > 0) && (
@@ -1253,7 +1343,15 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         {step === 'preview' && (
           <div className="flex justify-end items-center gap-3 border-t bg-muted/30 px-6 py-4 shrink-0">
             <Button variant="ghost" onClick={() => setStep('mapping')} disabled={importing}>Voltar</Button>
-            <Button onClick={handleImport} disabled={importing || !funilId} className="h-10 px-6 font-bold shadow-lg shadow-primary/20">
+            <Button
+              onClick={handleImport}
+              // 🔴 `conferindoCodigos` e `falhaNaConferencia` travam o botão pelo mesmo motivo:
+              // sem a conferência terminada com sucesso, ninguém sabe quem atualiza e quem
+              // cadastra, e o clique cadastraria a planilha inteira como negócio novo — 12.474
+              // duplicatas de uma vez, medido em 09/09/2026. Na dúvida, NÃO cadastra.
+              disabled={importing || !funilId || conferindoCodigos || falhaNaConferencia}
+              className="h-10 px-6 font-bold shadow-lg shadow-primary/20"
+            >
               {importing ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando...</>
               ) : (
