@@ -110,13 +110,24 @@ serve(async (req) => {
       return json({ error: "Não foi possível iniciar a conexão." }, 500);
     }
 
-    // Limpeza oportunista dos states vencidos. Sai daqui, e não de um cron, para
-    // não criar um job só para apagar uma tabela que raramente passa de dezenas
-    // de linhas.
+    // Limpeza oportunista das tentativas ANTIGAS. Sai daqui, e não de um cron,
+    // para não criar um job só para apagar uma tabela que raramente passa de
+    // dezenas de linhas.
+    //
+    // 🔴 ERA `expira_em < agora`, ou seja 15 minutos — e isso apagava a única
+    // prova de que alguém tentou conectar e não voltou do provedor. Foi
+    // exatamente o rastro que faltou para diagnosticar a JHS: as quatro
+    // tentativas de 09/09 só sobreviveram porque ninguém clicou em conectar de
+    // novo depois.
+    //
+    // Guardar não afrouxa nada: o vencimento continua sendo cobrado no
+    // email-callback (`expira_em < Date.now()` → `state_expirado`), então linha
+    // velha aqui é histórico, não credencial viva.
+    const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
     await supabase
       .from("email_conexao_estados")
       .delete()
-      .lt("expira_em", new Date().toISOString());
+      .lt("criado_em", new Date(Date.now() - SETE_DIAS_MS).toISOString());
 
     const params = new URLSearchParams({
       client_id: nylasClientId(),

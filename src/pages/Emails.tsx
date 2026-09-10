@@ -628,6 +628,10 @@ const Emails = () => {
     const conexao = searchParams.get("conexao");
     if (!conexao) return;
 
+    // A tentativa que acabou de falhar tem de aparecer no aviso da tela de
+    // conectar sem precisar recarregar.
+    queryClient.invalidateQueries({ queryKey: ["email_ultima_tentativa"] });
+
     if (conexao === "ok") {
       toast.success("Caixa de e-mail conectada.");
       queryClient.invalidateQueries({ queryKey: ["email_conta"] });
@@ -642,10 +646,18 @@ const Emails = () => {
         caixa_em_uso: "Esta caixa já está conectada a outra empresa.",
         gravacao_falhou: "Não foi possível salvar a conexão. Tente de novo.",
         retorno_incompleto: "O provedor devolveu uma resposta incompleta.",
+        // 🔴 Novo: antes, QUALQUER erro do provedor virava "Conexão cancelada"
+        // (ver email-callback). Falha era reportada como desistência.
+        provedor_recusou:
+          "O provedor recusou a conexão. O motivo dele aparece na tela de conectar.",
       };
+      const motivo = searchParams.get("motivo") ?? "";
+      const codigo = searchParams.get("codigo");
       toast.error(
-        MOTIVOS[searchParams.get("motivo") ?? ""] ??
-          "Não foi possível conectar a caixa.",
+        MOTIVOS[motivo] ?? "Não foi possível conectar a caixa.",
+        // O código cru do provedor não vira frase: fica como detalhe, para
+        // quem for pedir suporte ter o que citar.
+        codigo ? { description: codigo } : undefined,
       );
     }
 
@@ -653,6 +665,7 @@ const Emails = () => {
     const limpa = new URL(window.location.href);
     limpa.searchParams.delete("conexao");
     limpa.searchParams.delete("motivo");
+    limpa.searchParams.delete("codigo");
     window.history.replaceState({}, "", limpa.toString());
   }, [searchParams, queryClient]);
 

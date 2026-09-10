@@ -450,3 +450,55 @@ export function mensagemParaLinha(
     // cada sync. É exatamente o defeito que gmail-sync-inbox tem com `lido`.
   };
 }
+
+/**
+ * A pessoa desistiu na tela do provedor, ou o provedor recusou?
+ *
+ * 🔴 O DEFEITO: `email-callback` tratava QUALQUER `error` na volta como
+ * desistencia — `if (erroProvedor) return voltar({ conexao: "cancelada" })`.
+ * Falha de verdade chegava ao usuario como "Conexao cancelada", que e mentira,
+ * e a explicacao do provedor era jogada fora. Foi o que escondeu a falha da
+ * JHS em 09/09/2026 e custou um dia de investigacao.
+ *
+ * `access_denied` e o codigo do padrao OAuth para "a pessoa disse nao". Todo o
+ * resto (a Nylas lista `provider_not_responding`, `invalid_authentication` e
+ * `auth_limit_reached` para o fluxo hospedado) e falha, e merece ser tratado
+ * como tal.
+ */
+const CODIGOS_DE_DESISTENCIA = new Set([
+  "access_denied",
+  "user_denied",
+  "user_cancelled",
+  "cancelled",
+]);
+
+export function pessoaCancelouAConexao(codigo: string | null | undefined): boolean {
+  return CODIGOS_DE_DESISTENCIA.has((codigo ?? "").trim().toLowerCase());
+}
+
+/** Quanto da frase do provedor cabe na coluna, por linha. */
+const TETO_DO_DETALHE = 300;
+
+/**
+ * Prepara a frase do provedor (`error_description`) para ser GRAVADA.
+ *
+ * E a parte util para quem vai consertar — "Invalid credentials for
+ * imap.locaweb.com.br" diz mais do que qualquer codigo. Mas ela vem de fora e
+ * vai para o nosso banco, entao passa por duas travas:
+ *
+ * 1. 🔴 Nada que pareca credencial e gravado. Se um dia a descricao ecoar o que
+ *    foi enviado, uma senha nao pode ficar registrada aqui.
+ * 2. Teto de tamanho, para o provedor nao decidir quanto do nosso banco ocupar.
+ */
+export function detalheDoProvedorParaGuardar(
+  descricao: string | null | undefined,
+): string {
+  return (descricao ?? "")
+    // Chave de credencial seguida do valor: troca so o valor.
+    .replace(/((?:senha|password|passwd|pwd|secret|token|api[_-]?key)\s*[:=]\s*)\S+/gi, "$1[oculto]")
+    // Coisa longa e sem espaco depois de "Bearer" e token.
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]{12,}/gi, "$1[oculto]")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, TETO_DO_DETALHE);
+}

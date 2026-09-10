@@ -18,6 +18,10 @@ import {
   type ProvedorEmail,
 } from '@/hooks/use-email-empresa';
 import { useAuth } from '@/hooks/use-auth';
+import {
+  useUltimaTentativaDeConexao,
+  fraseDaTentativa,
+} from '@/hooks/use-tentativas-de-conexao';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -206,6 +210,56 @@ export function ConectarEmailCard() {
 
       <p className="mt-4 text-center text-xs text-muted-foreground">
         Você será levado ao provedor para autorizar. O CRM não guarda sua senha.
+      </p>
+
+      <AvisoDaUltimaTentativa empresaId={profile?.empresa_id} />
+    </div>
+  );
+}
+
+/**
+ * "Você já tentou, e não deu certo" — dito na tela, não escondido no log.
+ *
+ * 🔴 POR QUE EXISTE: em 09/09/2026 a JHS tentou conectar quatro vezes. A tela
+ * mostrava o mesmo "conecte sua caixa" depois de cada uma, como se nada tivesse
+ * acontecido, e descobrir o que houve exigiu ler log de servidor. Quem
+ * administra a empresa precisa ver a própria tentativa fracassada.
+ *
+ * Só aparece para quem pode conectar: a RLS de `email_conexao_estados` libera
+ * a leitura a admin, empresa e gestor, e devolve nada para o resto.
+ */
+function AvisoDaUltimaTentativa({ empresaId }: { empresaId?: string | null }) {
+  const { data: tentativa } = useUltimaTentativaDeConexao(empresaId);
+  if (!tentativa) return null;
+
+  const quando = format(new Date(tentativa.criadoEm), "d 'de' MMMM 'às' HH:mm", {
+    locale: ptBR,
+  });
+
+  return (
+    <div className="mx-auto mt-5 max-w-md rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+      <p className="flex items-start gap-2 text-xs text-foreground">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-500" />
+        <span>
+          <span className="font-medium">Tentativa anterior, {quando}.</span>{' '}
+          {fraseDaTentativa(tentativa)}
+        </span>
+      </p>
+
+      {/* A frase do provedor é a parte que resolve o problema — "Invalid
+          credentials for imap.exemplo.com.br" diz onde olhar. Fica em fonte
+          mono porque é texto de máquina, não frase nossa. */}
+      {tentativa.erroDetalhe && (
+        <p className="mt-2 break-words rounded bg-background/60 px-2 py-1.5 font-mono text-[11px] text-muted-foreground">
+          {tentativa.erroDetalhe}
+        </p>
+      )}
+
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Se o endereço não é do Google nem da Microsoft, use{' '}
+        <strong>{ROTULO_PROVEDOR.imap}</strong> e, na tela do provedor, abra
+        &quot;Additional settings&quot; para informar o servidor de entrada e de
+        saída.
       </p>
     </div>
   );

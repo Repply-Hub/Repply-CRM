@@ -11,6 +11,8 @@ import {
   nylasBase,
   nylasClientId,
   pastasDeSistema,
+  pessoaCancelouAConexao,
+  detalheDoProvedorParaGuardar,
 } from "../_shared/nylas.ts";
 
 /**
@@ -42,18 +44,66 @@ serve(async (req) => {
     const state = url.searchParams.get("state");
     const erroProvedor = url.searchParams.get("error");
 
-    if (erroProvedor) {
-      // Usuário clicou em cancelar na tela do provedor. Não é falha do sistema.
-      return voltar({ conexao: "cancelada" });
-    }
-    if (!code || !state) {
-      return voltar({ conexao: "erro", motivo: "retorno_incompleto" });
-    }
-
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
+
+    /**
+     * Grava COMO a tentativa terminou, na própria linha dela.
+     *
+     * 🔴 Não consome a linha: o consumo é `DELETE ... RETURNING` por `state`, e
+     * é ele que impede alguém de amarrar a caixa dele à empresa de outro. Isto
+     * só descreve tentativa que NÃO virou conexão — e existe porque a falha da
+     * JHS não deixou rastro nenhum, o que custou um dia de investigação.
+     *
+     * Falhar ao registrar não pode atrapalhar o retorno da pessoa: o desfecho é
+     * para quem vai investigar depois, não para ela agora.
+     */
+    const registrarDesfecho = async (
+      resultado: string,
+      codigo?: string | null,
+      detalhe?: string | null,
+    ) => {
+      if (!state) return;
+      const { error } = await supabase
+        .from("email_conexao_estados")
+        .update({
+          resultado,
+          erro_codigo: codigo ?? null,
+          erro_detalhe: detalheDoProvedorParaGuardar(detalhe) || null,
+          concluido_em: new Date().toISOString(),
+        })
+        .eq("state", state);
+      if (error) {
+        console.error("[email-callback] não consegui registrar o desfecho:", error.message);
+      }
+    };
+
+    if (erroProvedor) {
+      const descricao = url.searchParams.get("error_description");
+      // 🔴 ANTES: qualquer `error` virava `conexao=cancelada`, e a descrição era
+      // jogada fora. Falha de verdade era reportada como desistência — mentira
+      // que escondia exatamente o que precisávamos ler.
+      const desistiu = pessoaCancelouAConexao(erroProvedor);
+      console.error(
+        `[email-callback] provedor devolveu erro (desistencia=${desistiu}): ` +
+          `${erroProvedor} — ${detalheDoProvedorParaGuardar(descricao)}`,
+      );
+      await registrarDesfecho(
+        desistiu ? "cancelada" : "recusada",
+        erroProvedor,
+        descricao,
+      );
+      if (desistiu) return voltar({ conexao: "cancelada" });
+      // O código vai na URL porque é curto e enumerável; a frase inteira fica no
+      // banco, para a tela mostrar sem despejar texto de terceiro no endereço.
+      return voltar({ conexao: "erro", motivo: "provedor_recusou", codigo: erroProvedor });
+    }
+    if (!code || !state) {
+      await registrarDesfecho("erro", "retorno_incompleto");
+      return voltar({ conexao: "erro", motivo: "retorno_incompleto" });
+    }
 
     // DELETE ... RETURNING: consumo atômico. Duas chegadas do mesmo state (o
     // usuário aperta F5 na volta) só encontram linha uma vez. Este é o único
