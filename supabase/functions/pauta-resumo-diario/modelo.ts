@@ -9,6 +9,12 @@
  * As restrições de e-mail que moldaram este HTML estão explicadas naquele README: fonte de
  * sistema (a da marca vem de servidor externo e os clientes removem) e estilo inline em
  * tabela (bloco `<style>` é descartado, e flex quebra no Outlook).
+ *
+ * 🔴 O RÓTULO DO BOTÃO É `{{PAUTA_BOTAO}}`, e a última frase do rodapé é `{{PAUTA_RODAPE}}`, em
+ * vez de texto fixo (10/09/2026). O mesmo modelo serve DOIS e-mails: a fila pessoal e o pulso da
+ * equipe. No pulso, um botão dizendo "Abrir minha pauta" mandaria a pessoa para uma pauta que
+ * está VAZIA — é justamente por ela estar vazia que aquele e-mail existe —, e o rodapé dizendo
+ * "é a mesma pauta que aparece na tela Hoje" apontaria para o lugar errado da mesma tela.
  */
 
 export const MODELO_RESUMO = String.raw`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;background:#f5f5f4;">
@@ -48,7 +54,7 @@ export const MODELO_RESUMO = String.raw`<table role="presentation" width="100%" 
               <tr>
                 <td style="background:#FF5A1F;border-radius:9px;">
                   <a href="{{PAUTA_LINK}}" style="display:inline-block;padding:13px 26px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
-                    Abrir minha pauta
+                    {{PAUTA_BOTAO}}
                   </a>
                 </td>
               </tr>
@@ -61,7 +67,7 @@ export const MODELO_RESUMO = String.raw`<table role="presentation" width="100%" 
             <div style="height:1px;background:#e7e5e4;margin-bottom:16px;"></div>
             <p style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#a8a29e;">
               Este resumo sai nos dias escolhidos pelo gestor da sua empresa, em Configurações →
-              Automação. É a mesma pauta que aparece na tela "Hoje".
+              Automação. {{PAUTA_RODAPE}}
             </p>
           </td>
         </tr>

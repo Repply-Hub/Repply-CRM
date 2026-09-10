@@ -1,18 +1,59 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { MODELO_RESUMO, MODELO_ITEM } from "./modelo.ts";
+import {
+  assuntoDaPauta,
+  assuntoDoPulso,
+  montarEmail,
+  montarPulsoDaEquipe,
+  type ItemDaPauta,
+  type NegocioDaEquipe,
+} from "./corpo.ts";
 
 /**
  * O resumo diário da pauta, às 7h de Brasília.
  *
- * ESTA FUNÇÃO NÃO DECIDE NADA. Ela pergunta ao banco duas coisas e manda o e-mail:
+ * ESTA FUNÇÃO NÃO DECIDE NADA. Ela pergunta ao banco e manda o e-mail:
  *
  *   pauta_resumo_destinatarios()  quem deve receber HOJE (seção ligada, resumo ligado,
  *                                 hoje entre os dias escolhidos pelo gestor)
- *   pauta_do_dia_de(usuario)      a pauta de cada um — a MESMA função que a tela usa
+ *   pauta_do_dia_de(usuario)      a fila de cada um — a MESMA função que a tela usa
+ *   ve_pauta_de_todos(usuario)    a chave `pauta_de_todos` — a MESMA leitura que a tela usa
+ *   negocios_em_risco_de(usuario) a tabela do time — a MESMA lista que a tela mostra
  *
  * É por isso que existe: se a regra fosse reimplementada aqui em TypeScript, a tela diria
  * "5 orçamentos parados" e o e-mail diria 7, e ninguém confiaria em nenhum dos dois. Esse
  * tipo de divergência leva meses até alguém notar.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * DOIS E-MAILS, E A REGRA QUE ESCOLHE ENTRE ELES (decisão do dono do produto, 09/09/2026)
+ * ────────────────────────────────────────────────────────────────────────────
+ * Desde a migration 20260909120000 a fila da tela "Hoje" voltou a ser SEMPRE pessoal. Quem tem
+ * a chave `pauta_de_todos` e nenhum negócio próprio passou a ter fila vazia — e fila vazia não
+ * gerava e-mail. Na MD isso é a Fabiola, o Gabriel Medeiros e o Gabriel Pereira: três gestoras
+ * parariam de receber o e-mail das 7h em silêncio, uma delas a principal usuária do cliente.
+ *
+ * Em vez de sumir, o e-mail MUDA DE ASSUNTO. A regra tem DUAS condições, e as duas contam:
+ *
+ *   fila pessoal vazia   +  TEM a chave  →  o PULSO DA EQUIPE (os 5 maiores da tabela do time)
+ *   fila pessoal vazia   +  não tem      →  não sai nada, como sempre
+ *   fila pessoal com item                →  a fila pessoal, como sempre — inclusive para quem
+ *                                           tem a chave. Não se troca o e-mail de quem já
+ *                                           tinha um útil.
+ *
+ * 🔴 O CASO DE BORDA — chave, fila vazia E a equipe sem nada em risco: NÃO SAI E-MAIL, e conta
+ * como `pulso_vazio` no registro. Três motivos:
+ *   1. É a mesma decisão de produto que já vale para todo mundo, logo abaixo: "você não tem
+ *      nada hoje", todo dia, é o caminho mais rápido para a pessoa criar um filtro e nunca
+ *      mais ver a mensagem. Um pulso de zero é essa mesma mensagem com outra roupa.
+ *   2. A regressão que este trecho existe para impedir é "três gestoras param de receber um
+ *      e-mail ÚTIL". No dia em que nem a fila nem a equipe têm nada, não há e-mail útil a
+ *      perder — nada foi tirado de ninguém.
+ *   3. O plano B (`docs/superpowers/plans/2026-09-09-hoje-b-a-voz.md`, Tarefa 1) vai colocar a
+ *      frase do dia vazio — "Nada parado. Seu dia está seu." — numa função só, com uma cópia
+ *      para o Deno e um teste prendendo as duas. Escrevê-la aqui agora criaria a segunda cópia
+ *      antes da primeira existir, que é como duas versões da mesma frase começam a divergir
+ *      (CLAUDE.md §7.14). Quando a Tarefa 1 entrar, a decisão se revê ALI, num lugar só.
+ *   Medido em 10/09/2026: na MD o recorte da equipe está em 161 negócios, então este ramo não
+ *   dispara hoje. Ele é o dia raro, não o normal.
  *
  * 🔴 PAUTA VAZIA NÃO GERA E-MAIL. "Você não tem nada hoje", todo dia, é o caminho mais rápido
  * para a pessoa criar uma regra de filtro e nunca mais ver a mensagem. Medido em 25/08/2026:
@@ -27,19 +68,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface ItemDaPauta {
-  tipo: string;
-  selo: string;
-  titulo: string;
-  detalhe: string;
-  valor: number | null;
-  quando: string | null;
-  // Nome do dono do negócio. `pauta_do_dia_de` só preenche este campo quando o item NÃO é
-  // de quem vai receber o e-mail (gestor com a chave `pauta_de_todos` vendo a pauta de toda
-  // a equipe) — para o próprio dono ele vem nulo de propósito, senão o e-mail ficaria
-  // repetindo o nome da própria pessoa em todo item.
-  responsavel?: string | null;
-}
+/** Quantas linhas da tabela do time cabem num e-mail. E-mail não é tabela. */
+const ITENS_DO_PULSO = 5;
 
 /** O nome que este projeto usa por convenção — igual aos outros 8 segredos. */
 const NOME_CANONICO = "RESEND_API_KEY";
@@ -81,72 +111,22 @@ function lerChaveDoResend(): { valor?: string; nomeUsado?: string; foraDoPadrao:
   return { foraDoPadrao: false };
 }
 
-const BRL = new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "BRL",
-  maximumFractionDigits: 0,
-});
-
-/** Escapa o que vai para dentro do HTML. Nome de cliente com "&" ou "<" quebraria o e-mail. */
-function esc(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function montarItens(itens: ItemDaPauta[]): string {
-  return itens
-    .map((i) => {
-      // Compromisso mostra a HORA no lugar do valor: é o que decide a ordem do dia dele.
-      // A hora vem em UTC do banco; o fuso é fixado aqui, senão o das 21h aparece como 00h.
-      const direita = i.quando
-        ? new Date(i.quando).toLocaleTimeString("pt-BR", {
-            hour: "2-digit",
-            minute: "2-digit",
-            timeZone: "America/Sao_Paulo",
-          })
-        : i.valor !== null
-        ? BRL.format(Number(i.valor))
-        : "";
-
-      return MODELO_ITEM
-        .replaceAll("ITEM_SELO", esc(i.selo))
-        .replaceAll("ITEM_VALOR", esc(direita))
-        .replaceAll("ITEM_TITULO", esc(i.titulo))
-        // `responsavel` só vem quando o negócio NÃO é de quem recebe o e-mail — a função de
-        // banco já resolve isso. Sem esta linha, o gestor recebe negócio de colega sem saber
-        // de quem é, e cobra a pessoa errada.
-        .replaceAll(
-          "ITEM_DETALHE",
-          esc(i.responsavel ? `${i.detalhe} · ${i.responsavel}` : i.detalhe),
-        );
-    })
-    .join("\n");
-}
-
-function montarEmail(nome: string, itens: ItemDaPauta[], link: string): string {
-  const total = itens.length;
-  const valor = itens.reduce((soma, i) => soma + (Number(i.valor) || 0), 0);
-
-  return MODELO_RESUMO
-    // Primeiro nome só: "Bom dia, Érika" soa como pessoa; o nome completo soa como cadastro.
-    .replaceAll("{{PAUTA_NOME}}", esc(nome.trim().split(/\s+/)[0] ?? ""))
-    .replaceAll(
-      "{{PAUTA_MANCHETE}}",
-      total === 1 ? "1 coisa espera você" : `${total} coisas esperam você`,
-    )
-    .replaceAll("{{PAUTA_VALOR}}", valor > 0 ? `${BRL.format(valor)} em jogo` : "")
-    .replaceAll("{{PAUTA_ITENS}}", montarItens(itens))
-    .replaceAll("{{PAUTA_LINK}}", link);
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const inicio = Date.now();
-  const resultado = { destinatarios: 0, enviados: 0, pauta_vazia: 0, erros: [] as string[] };
+  const resultado = {
+    destinatarios: 0,
+    // `enviados` conta TODO e-mail que saiu, dos dois formatos; `pulsos` é o pedaço dele que
+    // foi pulso da equipe. `pauta_vazia` continua sendo "não recebeu nada", e `pulso_vazio` é
+    // o pedaço dele em que a pessoa TINHA a chave e a equipe é que não tinha nada. Assim a
+    // conta continua fechando: destinatarios = enviados + pauta_vazia + (falhas em `erros`).
+    enviados: 0,
+    pulsos: 0,
+    pauta_vazia: 0,
+    pulso_vazio: 0,
+    erros: [] as string[],
+  };
 
   try {
     const supabase = createClient(
@@ -156,6 +136,8 @@ Deno.serve(async (req) => {
 
     const { valor: apiKey, nomeUsado, foraDoPadrao } = lerChaveDoResend();
     const remetente = Deno.env.get("EMAIL_REMETENTE") ?? "Repply <nao-responda@repplyhub.com.br>";
+    // O mesmo endereço para os dois e-mails: a tabela do time mora na tela "Hoje", ao lado da
+    // fila. O que muda é o rótulo do botão, em `corpo.ts`.
     const linkDaPauta = (Deno.env.get("APP_URL") ?? "https://crm.repplyhub.com.br") + "/hoje";
 
     // A LISTA VEM ANTES DA CHAVE, de propósito.
@@ -215,14 +197,50 @@ Deno.serve(async (req) => {
         if (erroPauta) throw erroPauta;
 
         const itens = (pauta ?? []) as ItemDaPauta[];
-        if (itens.length === 0) {
-          resultado.pauta_vazia++;
-          continue;
-        }
 
-        const html = montarEmail(pessoa.nome ?? "", itens, linkDaPauta);
-        const assunto =
-          itens.length === 1 ? "1 coisa espera você hoje" : `${itens.length} coisas esperam você hoje`;
+        let html: string;
+        let assunto: string;
+        let ehPulso = false;
+
+        if (itens.length > 0) {
+          html = montarEmail(pessoa.nome ?? "", itens, linkDaPauta);
+          assunto = assuntoDaPauta(itens);
+        } else {
+          // Primeira condição: a chave. Sem ela, nada muda — a pessoa continua sem receber.
+          // A leitura é a MESMA da tela (`ve_pauta_de_todos`), e não uma terceira cópia da
+          // regra: `pauta_do_dia_de` e a tabela do time já leem por ela.
+          const { data: chave, error: erroChave } = await supabase.rpc("ve_pauta_de_todos", {
+            p_usuario_id: pessoa.usuario_id,
+          });
+          if (erroChave) throw erroChave;
+          if (chave !== true) {
+            resultado.pauta_vazia++;
+            continue;
+          }
+
+          // 🔴 A PESSOA VAI POR PARÂMETRO, e é por isso que a variante `_de` existe. Esta
+          // função fala com o banco como `service_role`, onde não há usuário logado:
+          // `auth.uid()` é nulo e o portão de `negocios_em_risco` (que o resolve pela sessão)
+          // devolveria NULO — a consulta voltaria vazia todo dia, para todo mundo. A variante
+          // também é quem escreve a cerca de empresa, que `service_role` pula junto com a RLS.
+          const { data: risco, error: erroRisco } = await supabase.rpc("negocios_em_risco_de", {
+            p_usuario_id: pessoa.usuario_id,
+            p_limite: ITENS_DO_PULSO,
+          });
+          if (erroRisco) throw erroRisco;
+
+          const equipe = (risco ?? []) as NegocioDaEquipe[];
+          if (equipe.length === 0) {
+            // Nem a fila nem a equipe têm nada. Ver o caso de borda no topo do arquivo.
+            resultado.pauta_vazia++;
+            resultado.pulso_vazio++;
+            continue;
+          }
+
+          html = montarPulsoDaEquipe(pessoa.nome ?? "", equipe, linkDaPauta);
+          assunto = assuntoDoPulso(equipe);
+          ehPulso = true;
+        }
 
         const resp = await fetch("https://api.resend.com/emails", {
           method: "POST",
@@ -246,9 +264,14 @@ Deno.serve(async (req) => {
         }
 
         resultado.enviados++;
+        if (ehPulso) resultado.pulsos++;
       } catch (e) {
         // Um destinatário que falha não derruba os outros. É a diferença entre "duas pessoas
         // não receberam" e "ninguém recebeu porque o e-mail de alguém estava recusado".
+        //
+        // ⚠️ É AQUI que cai a migration 20260909130000 não aplicada: `negocios_em_risco_de`
+        // não existiria e o erro do banco entra nesta lista, com nome e tudo, em vez de o
+        // e-mail sumir calado. Era o sumiço calado o problema que este trecho veio resolver.
         resultado.erros.push(
           `${pessoa.email}: ${e instanceof Error ? e.message : String(e)}`,
         );
