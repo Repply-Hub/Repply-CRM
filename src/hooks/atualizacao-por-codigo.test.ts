@@ -26,4 +26,13 @@ describe('contarResultadoDaAtualizacao', () => {
       pedidos: 0, aceitos: 0, recusados: 0, motivos: {},
     });
   });
+
+  it('recusa total: o banco recusou tudo em silêncio', () => {
+    // Uma vendedora comum importa uma planilha só com negócios de colegas.
+    // O banco recusa todas as 38 alterações em silêncio — não dá erro, apenas não altera nada.
+    // É o cenário que justifica a função existir: contar o que foi de fato devolvido,
+    // não o que foi pedido. Aqui o resultado que chega de verdade é vazio.
+    const r = contarResultadoDaAtualizacao(38, [], []);
+    expect(r).toEqual({ pedidos: 38, aceitos: 0, recusados: 38, motivos: {} });
+  });
 });

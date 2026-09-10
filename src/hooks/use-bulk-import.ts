@@ -391,7 +391,7 @@ export function useBulkImport() {
    * Grava as alterações vindas da planilha.
    *
    * Uma gravação POR NEGÓCIO, e isso é inevitável: cada um recebe valores diferentes, então
-   * não existe um `update` só que sirva para todos. Segue o mesmo limite de 4 em paralelo da
+   * não existe um `update` só que sirva para todos. Segue o mesmo limite de concorrência da
    * inserção — mais que isso não acelera (a regra de segurança do banco é o gargalo) e
    * atrapalha o resto do app.
    */
@@ -426,7 +426,7 @@ export function useBulkImport() {
       }
     };
 
-    await Promise.all([trabalhador(), trabalhador(), trabalhador(), trabalhador()]);
+    await Promise.all(Array.from({ length: PEDIDO_CONCURRENCY }, () => trabalhador()));
     return contarResultadoDaAtualizacao(alteracoes.length, devolvidos, erros);
   }
 
