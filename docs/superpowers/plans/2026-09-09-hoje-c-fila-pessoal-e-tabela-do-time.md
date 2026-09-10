@@ -311,6 +311,43 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>" --only -- supabase/migrat
 - Criar: `src/components/pauta/TabelaDoTime.tsx`
 - Modificar: `src/hooks/use-dashboard.ts` (novo hook; `DashboardNegociosRisco` perde `top_parados`)
 - Modificar: `src/components/pauta/RadarDeRisco.tsx` (monta a tabela nova no lugar do bloco dos 10)
+- Modificar: `src/pages/Hoje.tsx` (o vazio deixa de mentir — ver os dois requisitos herdados)
+- Modificar: `src/hooks/use-minha-permissao.ts` e `src/lib/pauta-de-todos.ts` (comentários que passaram a mentir)
+
+### 🔴 Dois requisitos herdados da revisão da Tarefa 1 — não são opcionais
+
+A Tarefa 1 fez a fila voltar a ser pessoal, e três gestoras da MD (Fabiola, Gabriel Medeiros,
+Gabriel Pereira) **não têm negócio próprio nenhum**. A fila delas fica em zero, e isso descobre
+dois problemas na tela que existem **no estado final**, não só entre uma tarefa e outra:
+
+**(a) A tela passa a dizer uma coisa falsa.** O ramo `total === 0` de `Hoje.tsx` substitui a área
+inteira da fila pela comemoração:
+
+> ☀️ **Pauta zerada** — *Nada em aberto para hoje. Nenhum orçamento parado além do prazo e nenhum
+> compromisso na agenda.*
+
+Para essas três, isso vira **permanente** — e aparece logo acima da tabela do time dizendo que
+**145 negócios estão parados**. A frase precisa mudar quando a pessoa tem a chave e a tabela
+abaixo contradiz o texto. **Escreva a frase nova pensando em quem só supervisiona:** a fila dela
+estar vazia é normal e não é conquista.
+
+**(b) A tela pisca uma mentira antes de carregar.** O `isLoading` cobre só `usePauta`, então a
+sequência a cada visita é: esqueleto → "Pauta zerada" sozinha → a tabela do time aparece. Quem
+tem a chave vê a comemoração por um instante, todo dia. Trate o carregamento das duas peças.
+
+### 🟠 Três comentários passaram a dizer o contrário do sistema
+
+Corrija junto — é o texto que explica justamente o que estas tarefas mudaram, e comentário que
+contradiz o código é pior que comentário nenhum:
+
+| arquivo | o que diz de errado |
+|---|---|
+| `src/pages/Hoje.tsx:143-146` | que "a pauta lê a chave `pauta_de_todos`" — não lê mais |
+| `src/hooks/use-minha-permissao.ts:78-88` | idem |
+| `src/lib/pauta-de-todos.ts:5,26,30-31` | fala três vezes em "pauta ampliada", que deixou de existir |
+
+⚠️ **Não apague a leitura da chave** — ela continua valendo, só mudou de dono: agora governa a
+**tabela do time**, o gráfico por vendedor e o filtro de responsável, não a fila.
 
 **Interfaces:**
 - Consome: `negocios_em_risco` (Tarefa 2); `PainelDoNegocio` e `useNegocioNoEndereco` (Plano A).
