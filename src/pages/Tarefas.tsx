@@ -1,13 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { useTarefas, useUpdateTarefa, useDeleteTarefa, Tarefa } from '@/hooks/use-tarefas';
+import { useTarefas, useUpdateTarefa, useDeleteTarefa, useBulkDeleteTarefas, frasesDaExclusaoEmMassa, Tarefa } from '@/hooks/use-tarefas';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
 import { useVendedores, useClientes } from '@/hooks/use-clientes';
 import { usePedidosOptions } from '@/hooks/use-pedidos';
 import { getNomeNegocio } from '@/lib/nome-negocio';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,7 +24,7 @@ import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { ResizableTh } from '@/components/shared/ResizableTh';
-import { supabase } from '@/integrations/supabase/client';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
 import { TarefaKanbanColumn } from '@/components/tarefas/TarefaKanbanColumn';
 import { TarefaKanbanColunasDialog } from '@/components/tarefas/TarefaKanbanColunasDialog';
@@ -73,9 +72,9 @@ export default function Tarefas() {
   const { data: vendedores = [] } = useVendedores();
   const { data: clientes = [] } = useClientes();
   const { data: pedidosOptions = [] } = usePedidosOptions(empresaId);
-  const queryClient = useQueryClient();
   const updateTarefa = useUpdateTarefa();
   const deleteTarefa = useDeleteTarefa();
+  const bulkDeleteTarefas = useBulkDeleteTarefas();
 
   const KANBAN_STAGES = useMemo(
     () => kanbanColunas.map(c => ({ key: c.slug, label: c.nome, color: c.cor })),
@@ -203,7 +202,12 @@ export default function Tarefas() {
     try {
       await deleteTarefa.mutateAsync(id);
       toast.success('Tarefa excluída');
-    } catch { toast.error('Erro ao excluir'); }
+    } catch (e) {
+      // A frase vem pronta do hook (recusa muda em silêncio) ou do banco (erro de verdade).
+      // `mensagemDeErro` é obrigatório aqui: erro do Supabase não é um `Error`, e o
+      // `e instanceof Error ? ... : '...'` cairia na frase genérica justamente no caso útil.
+      toast.error(mensagemDeErro(e, 'Não foi possível excluir a tarefa.'));
+    }
   }
 
   async function confirmDeleteTarefaSingle() {
@@ -220,8 +224,10 @@ export default function Tarefas() {
       await updateTarefa.mutateAsync({ id: draggableId, status: destination.droppableId });
       const label = KANBAN_STAGES.find(s => s.key === destination.droppableId)?.label ?? destination.droppableId;
       toast.success(`Tarefa movida para "${label}"`);
-    } catch {
-      toast.error('Erro ao mover tarefa');
+    } catch (e) {
+      // O cartão já pulou de coluna na tela antes de o banco responder. Quando a recusa é muda,
+      // esta frase é a ÚNICA pista de que ele vai voltar sozinho ao recarregar.
+      toast.error(mensagemDeErro(e, 'Não foi possível mover a tarefa.'));
     }
   }
 
@@ -282,19 +288,28 @@ export default function Tarefas() {
     setIsDeleting(true);
     try {
       const ids = Array.from(selected);
-      const BATCH_SIZE = 500;
-      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-        const batch = ids.slice(i, i + BATCH_SIZE);
-        const { error } = await supabase.from('tarefas').delete().in('id', batch);
-        if (error) throw error;
-      }
-      queryClient.invalidateQueries({ queryKey: ['tarefas'] });
-      toast.success(`${ids.length} tarefa(s) removida(s)!`);
-      setSelected(new Set());
+      // O hook conta as linhas que o banco realmente apagou. Anunciar `ids.length` era o defeito:
+      // uma seleção inteira podia ser recusada em silêncio e a tela dizia "N removida(s)!".
+      const resultado = await bulkDeleteTarefas.mutateAsync(ids);
+      const { tipo, frase } = frasesDaExclusaoEmMassa(resultado);
+
+      // O diálogo fecha nos três casos — insistir no mesmo botão daria o mesmo "não" —, mas a
+      // SELEÇÃO só é limpa quando alguma coisa saiu de fato. Desmarcar depois de uma recusa
+      // apagaria o trabalho de quem marcou 40 linhas e faria parecer que elas foram embora.
       setConfirmDeleteOpen(false);
-    } catch (err: any) {
+
+      if (tipo === 'recusa') {
+        toast.error(frase);
+        return;
+      }
+
+      if (tipo === 'parcial') toast.warning(frase);
+      else toast.success(frase);
+
+      setSelected(new Set());
+    } catch (err) {
       console.error('[bulk-delete tarefas]', err);
-      toast.error(err?.message || 'Erro ao remover tarefas');
+      toast.error(mensagemDeErro(err, 'Não foi possível excluir as tarefas.'));
     } finally {
       setIsDeleting(false);
     }
@@ -720,7 +735,9 @@ export default function Tarefas() {
                                   setSelectedTarefa({ ...selectedTarefa, status: value });
                                   toast.success('Etapa atualizada.');
                                 },
-                                onError: () => toast.error('Erro ao atualizar etapa.'),
+                                // Sem isto, uma recusa muda deixava o crachá mostrando a etapa
+                                // nova em cima de uma tarefa que continuava na antiga no banco.
+                                onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível mudar a etapa.')),
                               }
                             );
                           }}

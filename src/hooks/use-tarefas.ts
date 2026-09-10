@@ -1,5 +1,26 @@
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { recusaSemErro } from '@/lib/recusa-do-banco';
+
+// 🔴 ZERO LINHAS NÃO É SUCESSO — e é por isso que as três gravações abaixo pedem `count`.
+//
+// A política `tarefas_delete` só deixa apagar quem é gestor ou tem a funcionalidade
+// `tarefas.excluir`; a `tarefas_update` só deixa alterar tarefa própria (ou qualquer uma, se
+// gestor). Quem não passa nessas cláusulas NÃO recebe erro: o `USING` da regra simplesmente não
+// encontra a linha, o comando mexe em zero registros e a resposta volta com `error: null`.
+//
+// Medido em 09/09/2026 na empresa de demonstração, com um `vendedor` sem `tarefas.excluir`:
+// clicar em Excluir mostrava "Tarefa excluída" e a tarefa continuava lá depois de recarregar;
+// trocar a etapa de uma tarefa de outra pessoa mostrava "Etapa atualizada." e o `updated_at` no
+// banco nem se mexia. Ver `CLAUDE.md` §4.6.
+//
+// `count: 'exact'` é a forma documentada do cliente instalado (@supabase/supabase-js 2.98) de
+// pedir as linhas afetadas, e já era usada na exclusão em massa de negócios (`use-pedidos.ts`).
+// A comparação é com `0` CRAVADO, nunca com falsidade: `count` vem `null` quando a resposta não
+// traz o cabeçalho de contagem, e tratar `null` como recusa inventaria um erro em cima de uma
+// gravação que funcionou — a mentira ao contrário.
+const RECUSA_AO_EXCLUIR = 'Excluir tarefa é uma permissão à parte, e o seu usuário não tem.';
+const RECUSA_AO_ALTERAR = 'Só o responsável pela tarefa ou um gestor da empresa pode alterá-la.';
 
 // Os dois painéis da tela "Hoje" que mudam de conteúdo quando uma TAREFA muda. Ficam numa
 // função só porque as três mutações de tarefa precisam dos mesmos dois, e uma lista repetida
@@ -144,11 +165,16 @@ export function useUpdateTarefa() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Tarefa> & { id: string }) => {
-      const { error } = await supabase
+      const { error, count } = await supabase
         .from('tarefas' as any)
-        .update({ ...updates, updated_at: new Date().toISOString() } as any)
+        .update({ ...updates, updated_at: new Date().toISOString() } as any, { count: 'exact' })
         .eq('id', id);
       if (error) throw error;
+      if (count === 0) {
+        throw new Error(
+          recusaSemErro('A tarefa NÃO foi alterada: ela continua como estava.', RECUSA_AO_ALTERAR),
+        );
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tarefas'] });
@@ -171,8 +197,16 @@ export function useDeleteTarefa() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('tarefas' as any).delete().eq('id', id);
+      const { error, count } = await supabase
+        .from('tarefas' as any)
+        .delete({ count: 'exact' })
+        .eq('id', id);
       if (error) throw error;
+      if (count === 0) {
+        throw new Error(
+          recusaSemErro('A tarefa NÃO foi excluída: ela continua na lista.', RECUSA_AO_EXCLUIR),
+        );
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tarefas'] });
@@ -182,4 +216,91 @@ export function useDeleteTarefa() {
       invalidarPaineisQueContamTarefa(qc);
     },
   });
+}
+
+/** Quantas tarefas a exclusão em massa pediu, e quantas o banco realmente apagou. */
+export interface ResultadoDaExclusaoEmMassa {
+  pedidas: number;
+  removidas: number;
+}
+
+/**
+ * A exclusão em massa da tela de Tarefas.
+ *
+ * Ela morava dentro de `src/pages/Tarefas.tsx`, falando com o banco por conta própria — e era o
+ * caminho que mais mentia: somava `ids.length` e anunciava "N tarefa(s) removida(s)!" sem nunca
+ * perguntar quantas saíram. Trazê-la para cá conserta duas coisas de uma vez, porque a versão da
+ * tela também **não invalidava os painéis da tela "Hoje"**: apagar tarefa em massa deixava a fila
+ * e os cartões de risco mostrando compromissos que já não existiam, por até meia hora.
+ *
+ * O retorno é o par (pedidas, removidas) em vez de um `boolean`, porque a recusa costuma ser
+ * PARCIAL: numa seleção com tarefas de vários donos, um vendedor apaga as suas e o banco recusa
+ * as dos colegas em silêncio. Dizer só "deu certo" ou só "deu errado" seria falso nos dois casos.
+ */
+export function useBulkDeleteTarefas() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]): Promise<ResultadoDaExclusaoEmMassa> => {
+      if (ids.length === 0) return { pedidas: 0, removidas: 0 };
+
+      const TAMANHO_DO_LOTE = 500;
+      let removidas = 0;
+      for (let i = 0; i < ids.length; i += TAMANHO_DO_LOTE) {
+        const lote = ids.slice(i, i + TAMANHO_DO_LOTE);
+        // Sem `as any` aqui: `tarefas` está nos tipos gerados, e era assim que a tela fazia.
+        // As outras chamadas deste arquivo carregam o `as any` por herança, não por precisão.
+        const { error, count } = await supabase
+          .from('tarefas')
+          .delete({ count: 'exact' })
+          .in('id', lote);
+        if (error) throw error;
+        // Sem cabeçalho de contagem não dá para saber quantas saíram; contar o lote inteiro é a
+        // suposição otimista, e é a mesma que `use-pedidos.ts` faz. A recusa muda só o número
+        // exibido, nunca o que foi de fato apagado.
+        removidas += count ?? lote.length;
+      }
+      return { pedidas: ids.length, removidas };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tarefas'] });
+      qc.invalidateQueries({ queryKey: ['tarefas_por_pedido'] });
+      invalidarPaineisQueContamTarefa(qc);
+    },
+  });
+}
+
+/**
+ * A frase que a tela mostra depois de uma exclusão em massa, e de que tipo ela é.
+ *
+ * Está separada da tela de propósito: é a regra que decide quando "removidas" vira comemoração,
+ * ressalva ou recusa, e é o que o teste prende. Espelha o que `src/pages/Clientes.tsx` já fazia
+ * na exclusão em massa de clientes desde antes — aqui só ganhou nome e teste.
+ */
+export function frasesDaExclusaoEmMassa({ pedidas, removidas }: ResultadoDaExclusaoEmMassa): {
+  tipo: 'sucesso' | 'parcial' | 'recusa';
+  frase: string;
+} {
+  if (removidas === 0) {
+    return {
+      tipo: 'recusa',
+      frase: recusaSemErro(
+        pedidas === 1
+          ? 'A tarefa NÃO foi excluída: ela continua na lista.'
+          : `Nenhuma das ${pedidas} tarefas foi excluída: elas continuam na lista.`,
+        RECUSA_AO_EXCLUIR,
+      ),
+    };
+  }
+
+  if (removidas < pedidas) {
+    return {
+      tipo: 'parcial',
+      frase: `${removidas} de ${pedidas} tarefas excluídas. As outras ${pedidas - removidas} continuam na lista: ${RECUSA_AO_EXCLUIR} Peça a um gestor da sua empresa.`,
+    };
+  }
+
+  return {
+    tipo: 'sucesso',
+    frase: removidas === 1 ? 'Tarefa excluída.' : `${removidas} tarefas excluídas.`,
+  };
 }

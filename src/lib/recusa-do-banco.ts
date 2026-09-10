@@ -88,3 +88,44 @@ export function recusaDeAcesso(e: unknown): string | null {
   // pessoas para o lugar errado.
   return 'O banco recusou esta alteração. Isso acontece quando o acesso da empresa está bloqueado, ou quando o seu usuário não tem permissão neste registro.';
 }
+
+/**
+ * A frase para a recusa que NÃO chega como erro — a que some.
+ *
+ * 🔴 ZERO LINHAS NÃO É SUCESSO. `recusaDeAcesso` acima trata a recusa BARULHENTA, a que
+ * chega com o código 42501. Esta trata a MUDA, e as duas nascem da mesma política. Quando a
+ * regra de acesso barra um `UPDATE` ou um `DELETE`, o banco não reclama: a cláusula `USING`
+ * simplesmente não encontra a linha, o comando apaga zero registros e a resposta volta
+ * **sem erro nenhum**. O `catch` da tela nunca dispara, e ela anuncia sucesso.
+ *
+ * É o contrário do `INSERT`, cuja regra é `WITH CHECK` — essa viola e o banco grita. Por isso
+ * a mesma trava parece resolvida na tela que cria e continua mentindo na tela que apaga.
+ *
+ * Quem chama passa duas coisas, e as duas são obrigatórias porque a frase precisa dizer o que
+ * aconteceu E o que fazer:
+ *
+ *   · `oQueNaoMudou` — o estrago em português, no lugar do registro real
+ *     ("A tarefa NÃO foi excluída: ela continua na lista.");
+ *   · `porQuePodeTerSido` — a causa provável naquela tela, já com a saída embutida
+ *     ("Excluir tarefa é uma permissão à parte, e o seu usuário não tem.").
+ *
+ * O estado de cobrança decide o resto: empresa bloqueada e falta de permissão zeram as linhas
+ * do mesmo jeito, e mandar a pessoa para o lugar errado custa a ida e a volta.
+ */
+export function recusaSemErro(oQueNaoMudou: string, porQuePodeTerSido: string): string {
+  if (estadoConhecido?.encerrada) {
+    return `${oQueNaoMudou} Esta conta foi encerrada, então o sistema não aceita mais alterações. Fale com o suporte se isso não era esperado.`;
+  }
+
+  if (estadoConhecido?.bloqueado) {
+    return `${oQueNaoMudou} O acesso da sua empresa está bloqueado: dá para consultar tudo, mas nada é alterado. O aviso no topo da tela explica como regularizar.`;
+  }
+
+  if (estadoConhecido) {
+    // A empresa está em dia, então sobrou a permissão — e essa a pessoa resolve pedindo.
+    return `${oQueNaoMudou} ${porQuePodeTerSido} Peça a um gestor da sua empresa.`;
+  }
+
+  // Sem saber o estado da empresa, as duas causas continuam de pé. Dizer as duas é o honesto.
+  return `${oQueNaoMudou} ${porQuePodeTerSido} Peça a um gestor da sua empresa — e, se houver aviso de cobrança no topo da tela, é ele que está barrando.`;
+}

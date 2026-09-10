@@ -2650,6 +2650,89 @@ visíveis (com contagem) nos dois cartões ao lado.
 
 ---
 
+## 68. Gravação que não confere as linhas afetadas — 118 pontos que podem comemorar sem ter gravado
+
+> Levantado em 10/09/2026, ao consertar a exclusão de tarefas. Explicação da armadilha em
+> [`CLAUDE.md`](../CLAUDE.md) §4.6, sob "zero linhas não é sucesso".
+
+**O que acontece.** Quando a regra de acesso do banco barra um `UPDATE` ou um `DELETE`, ela
+não devolve erro: a cláusula `USING` da política simplesmente não encontra a linha, o comando
+mexe em zero registros e a resposta volta com `error: null`. A tela vê "não deu erro" e
+anuncia sucesso. O usuário só descobre ao recarregar — se recarregar.
+
+É diferente do `INSERT`, cuja regra é `WITH CHECK`: essa viola e o banco grita 42501, o
+`catch` dispara e a tela mostra a recusa. **A mesma trava é barulhenta na tela que cria e muda
+na tela que apaga.**
+
+**Medido em 09 e 10/09/2026, na empresa de demonstração, com um `vendedor` sem a
+funcionalidade `tarefas.excluir`:**
+
+| gesto | o que a tela disse | o que o banco fez |
+|---|---|---|
+| Excluir tarefa | "Tarefa excluída" | nada — a tarefa continua lá depois de recarregar |
+| Excluir N marcadas | "N tarefa(s) removida(s)!" | nada |
+| Mudar a etapa de uma tarefa de outra pessoa | "Etapa atualizada." | nada — `updated_at` parado em 31/08 |
+
+**O tamanho.** Varredura de `src/` em 10/09/2026, no commit `62c8af16`:
+
+| | pontos | conferem o efeito |
+|---|---|---|
+| `.delete()` em tabela | 49 | 5 |
+| `.update()` em tabela | 80 | 3 |
+
+Os 8 que conferiam já existiam antes desta varredura e são o padrão a copiar:
+`useBulkDeletePedidos` / `useBulkUpdatePedidos` (`src/hooks/use-pedidos.ts`, por
+`{ count: 'exact' }`), `useDeleteChatMessage` (`src/hooks/use-chat.ts:803`) e a exclusão em
+massa de clientes (`src/pages/Clientes.tsx:888`), as duas últimas por `.select('id')` com
+teste de tamanho. **A exclusão em massa de clientes até distingue os três casos** — tudo,
+parte, nada — e o comentário dela descreve a armadilha inteira desde antes; ela nunca subiu
+para o `CLAUDE.md`, e por isso o resto do sistema nasceu sem.
+
+**Toda tabela alcançada está exposta, não só as de permissão granular.** Lido em `pg_policies`
+em 10/09/2026: as políticas `<tabela>_exige_plano_delete` são RESTRICTIVE e usam `USING`.
+Quando a empresa está **bloqueada por cobrança**, portanto, **todo** `DELETE` do sistema volta
+com zero linhas e sem erro — e a tela comemora. (A de `UPDATE` é `WITH CHECK`, então essa
+grita; mais uma vez, a mesma trava sai barulhenta de um lado e muda do outro.)
+
+**O que já foi consertado (10/09/2026):** o módulo de Tarefas — exclusão avulsa, exclusão em
+massa e alteração (`src/hooks/use-tarefas.ts`, `src/pages/Tarefas.tsx`), com o teste
+`src/hooks/zero-linhas-nao-e-sucesso.test.tsx`. Restam **118**.
+
+**Como consertar cada um** (cinco linhas, e o teste do módulo é o que segura):
+
+```ts
+const { error, count } = await supabase.from('x').delete({ count: 'exact' }).eq('id', id);
+if (error) throw error;
+if (count === 0) throw new Error(recusaSemErro('O registro NÃO foi excluído…', '…'));
+```
+
+🔴 **`count === 0`, nunca `!count`.** `count` vem `null` quando a resposta não traz o cabeçalho
+de contagem; tratar `null` como recusa grita "não excluiu" em cima de uma exclusão que
+funcionou — a mesma mentira, virada do avesso, e mais cara, porque a pessoa apaga de novo.
+
+**Por onde começar, se alguém pegar o resto.** A ordem é por quanto o usuário perde ao
+acreditar na tela, não por número de arquivos:
+
+1. **Clientes, contatos e obras** (`src/hooks/use-mutations.ts:103, 126, 287`) — as políticas
+   `clientes_delete` / `contatos_delete` / `obras_delete` exigem a permissão `excluir` do
+   módulo, exatamente como a de tarefas. O de obras é o mais enganoso: **já faz `.select()` e
+   não olha o que voltou** — só imprime no console. Parece conferido e não é.
+2. **Eventos da agenda** (`src/hooks/use-eventos.ts:818-819`) — `eventos_delete` só deixa o
+   dono apagar; apagar evento de outra pessoa é gesto comum numa agenda de equipe.
+3. **Configuração da empresa** (`funis`, `kanban_colunas`, `marcadores`, `marcadores_obras`,
+   `origens_pedido`, `clientes_tipos`, `cargos_contato`, `tarefas_kanban_colunas`,
+   `metas_vendas`, `perfis_customizados`) — todas são `is_admin() OR is_gestor()`. Um vendedor
+   que alcance essas telas apaga no vazio.
+4. **O resto dos `.update()`**, que é o grosso dos 118 e o de menor consequência individual —
+   mas é onde mora o caso do Kanban: o cartão pula de coluna na tela e volta ao recarregar.
+
+**Por que não foi tudo de uma vez.** Cada ponto precisa de uma frase própria — "peça a um
+gestor" muda conforme a permissão que falta —, e nenhum deles tem teste de tela hoje. Trocar
+118 chamadas no escuro, num sistema com cliente pagante, troca uma mentira conhecida por um
+risco não medido. O caminho é módulo a módulo, cada um com o seu teste, como o de Tarefas.
+
+---
+
 ## 70. Datas que mudam de dia fora do banco: o que sobrou da varredura de 11/09
 
 **Gravidade: baixa.** Nenhuma exportação que o cliente usa hoje escreve data errada. O que sobra é

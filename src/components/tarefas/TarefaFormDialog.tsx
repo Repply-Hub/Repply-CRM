@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCreateTarefa, useUpdateTarefa, Tarefa } from '@/hooks/use-tarefas';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { useVendedores, useClientes } from '@/hooks/use-clientes';
 import {
   usePedidosOptions,
@@ -160,9 +161,14 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
         toast.success('Tarefa criada');
       }
       onOpenChange(false);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[tarefas] erro ao salvar:', err);
-      toast.error(err?.message || 'Erro ao salvar tarefa');
+      // `err?.message` sozinho jogava fora `details` e `hint` do banco — e, quando a recusa é
+      // MUDA (zero linhas alteradas), a frase acionável vem inteira dentro da mensagem que
+      // `useUpdateTarefa` monta. Ver `CLAUDE.md` §4.6.
+      toast.error(mensagemDeErro(err, 'Não foi possível salvar a tarefa.'));
+      // O formulário fica aberto de propósito: fechá-lo depois de uma recusa apagaria o que a
+      // pessoa digitou, e ela não teria como tentar de novo nem copiar o que escreveu.
     }
   }
 
