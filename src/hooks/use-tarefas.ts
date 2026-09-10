@@ -17,8 +17,14 @@ import { supabase } from '@/integrations/supabase/client';
 //
 //   · `dashboard_negocios_risco` — `sem_proxima_acao` é `NOT EXISTS (tarefas do negócio com
 //     status <> 'concluida')`, então uma tarefa aberta tira o negócio do cartão "Sem próxima
-//     ação", do "Valor em risco", do resumo por fabricante e da tabela "Os 10 maiores em risco";
-//     concluí-la ou excluí-la o traz de volta.
+//     ação", do "Valor em risco" e do resumo por fabricante; concluí-la ou excluí-la o traz de
+//     volta.
+//
+//   · `negocios_em_risco` — a TABELA DO TIME, logo abaixo desses cartões. Desde 09/09/2026 ela
+//     tem função de banco própria (migration 20260909130000) e, portanto, chave de cache
+//     própria: era uma coluna de dentro de `dashboard_negocios_risco` e vinha de carona na linha
+//     de cima. Sem esta linha, criar uma tarefa some com o negócio dos cartões e o DEIXA na
+//     tabela — a mesma tela dizendo as duas coisas ao mesmo tempo.
 //
 // 🔴 A lista para aqui de propósito. A tela "Hoje" é pesada, e cada chave a mais é requisição
 // paga em toda tarefa salva. `tarefas` e `tarefas_por_pedido` continuam do lado de fora porque
@@ -27,6 +33,7 @@ import { supabase } from '@/integrations/supabase/client';
 function invalidarPaineisQueContamTarefa(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: ['pauta-do-dia'] });
   qc.invalidateQueries({ queryKey: ['dashboard_negocios_risco'] });
+  qc.invalidateQueries({ queryKey: ['negocios_em_risco'] });
 }
 
 export interface Tarefa {

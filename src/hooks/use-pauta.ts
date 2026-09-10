@@ -98,6 +98,12 @@ export function useRegistrarRetorno() {
       // não se mexe: ele tem 5 minutos de vida (staleTime) e não refaz sozinho ao voltar o
       // foco. Isso apagaria exatamente o retorno que "Retomar depois" promete mostrar.
       qc.invalidateQueries({ queryKey: ['dashboard_negocios_risco'] });
+      // E a TABELA DO TIME logo abaixo, que desde 09/09/2026 tem chave própria
+      // (`negocios_em_risco`, migration 20260909130000) — antes ela era uma coluna de dentro do
+      // painel acima e vinha de carona na linha anterior. Sem isto, "Retomar depois" clicado NA
+      // PRÓPRIA TABELA deixaria a linha exatamente onde estava: o negócio deixou de estar sem
+      // próxima ação, mas quem a desenha não fica sabendo.
+      qc.invalidateQueries({ queryKey: ['negocios_em_risco'] });
       // Adiar o negócio de um colega cria um aviso para o DONO — e a regra de leitura de
       // `notificacoes` deixa um gestor ver os avisos da própria equipe. Ou seja: o sininho de
       // quem acabou de adiar também muda. Sem isto, ele só mudaria quando o aviso em tempo

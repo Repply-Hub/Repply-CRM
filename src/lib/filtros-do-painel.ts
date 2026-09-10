@@ -31,6 +31,35 @@ export function lerFiltrosDoEndereco(params: URLSearchParams): FiltrosDoPainel {
   };
 }
 
+/**
+ * O recorte como as CONSULTAS o querem — os mesmos filtros, com os nomes que os hooks de
+ * `use-dashboard.ts` usam.
+ *
+ * 🔴 EXISTE PARA HAVER UMA TRADUÇÃO SÓ. Três consultas leem estes filtros (o painel de números,
+ * a tabela do time, e a contagem que a tela "Hoje" usa para saber se a fila vazia pode comemorar),
+ * e as três precisam mandar exatamente o mesmo recorte — senão a tela mostra um número que a
+ * tabela abaixo contradiz. É a mesma lição do CLAUDE.md §7.14: duas cópias da mesma regra viram
+ * duas respostas, e a divergência só aparece meses depois.
+ *
+ * 🔴 `responsaveis` SÓ VAI PARA O SERVIDOR COM A CHAVE `pauta_de_todos`. Os filtros moram no
+ * endereço, e revogar a chave de alguém não limpa o `?responsaveis=` que essa pessoa já tinha
+ * salvo ou favoritado: sem esta condição, o controle sumia da barra e o recorte continuava
+ * valendo, com os cartões mostrando números que não correspondiam a nenhum controle visível.
+ *
+ * `undefined` (e não `[]`) é o que significa "sem filtro" — array vazio vira `= ANY('{}')`, que
+ * não casa com nada e zeraria o painel (CLAUDE.md §7.8). Quem converte de vez é o hook.
+ */
+export function recorteParaOServidor(
+  filtros: FiltrosDoPainel,
+  podeFiltrarPorResponsavel: boolean,
+): { etapas: string[]; fabricanteIds: string[]; usuarioIds: string[] | undefined } {
+  return {
+    etapas: filtros.etapas,
+    fabricanteIds: filtros.fabricantes,
+    usuarioIds: podeFiltrarPorResponsavel ? filtros.responsaveis : undefined,
+  };
+}
+
 /** Devolve uma cópia — nunca altera o que recebeu, e preserva parâmetro de terceiros (`negocio`). */
 export function escreverFiltrosNoEndereco(
   params: URLSearchParams,

@@ -337,6 +337,13 @@ export function invalidarPaineisDeNegocios(qc: QueryClient) {
     'dashboard_indicadores_vendedor',
     'dashboard_stats',
     'dashboard_negocios_risco',
+    // A TABELA DO TIME da tela "Hoje" (`negocios_em_risco`, hook `use-dashboard.ts`). Chave
+    // própria desde 09/09/2026, quando a lista saiu de dentro de `dashboard_negocios_risco` e
+    // virou função de banco paginada — até então ela era invalidada de carona pela linha de
+    // cima. Ela mostra nome, fabricante, etapa, responsável, valor e dias parados de cada
+    // negócio: mudar qualquer um desses campos, ou passar o negócio a um colega, muda o que a
+    // tabela desenha (e pode tirar a linha dela).
+    'negocios_em_risco',
     // A FILA da tela "Hoje" (`pauta_do_dia_de`, hook `use-pauta.ts`). Entrou nesta lista em
     // 09/09/2026, quando o painel do negócio passou a abrir POR CIMA dela: até então só a tela
     // de Negócios tinha esses botões, e ela não mostra fila nenhuma. A fila junta `pedidos` por

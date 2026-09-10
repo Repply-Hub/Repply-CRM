@@ -144,19 +144,6 @@ export function useDashboardStats(
   });
 }
 
-// Um dos "10 maiores parados" que dashboard_negocios_risco devolve em top_parados
-// (migration 20260905120000). fabrica e responsavel podem vir nulos; nome nunca
-// vem vazio — a função já resolve a cadeia de alternativas antes de devolver.
-export interface TopParado {
-  id: string;
-  nome: string;
-  fabrica: string | null;
-  etapa: string;
-  responsavel: string | null;
-  valor: number;
-  dias_parado: number;
-}
-
 export interface DashboardNegociosRisco {
   qtd_parados: number;
   valor_parados: number;
@@ -171,9 +158,11 @@ export interface DashboardNegociosRisco {
   // gestor (ele também fica vazio quando não há nenhum negócio em risco).
   risco_por_vendedor: { vendedor: string; qtd: number; valor: number }[];
   risco_por_fabricante: { fabrica: string; qtd: number; valor: number }[];
-  // Os 10 negócios abertos com maior valor entre os parados/sem próxima ação,
-  // já ordenados pela RPC. Ver TopParado acima.
-  top_parados: TopParado[];
+  // 🔴 NÃO PROCURE `top_parados` AQUI. Até 09/09/2026 esta função devolvia também a lista dos
+  // 10 maiores em risco, e a tela a lia daqui. A lista virou função própria e paginada
+  // (`negocios_em_risco`, migration 20260909130000) porque 10 linhas fixas eram tudo o que
+  // existia num recorte de 159 — quem enxerga a equipe não tinha como ver o resto.
+  // Quem quiser a lista chama `useNegociosEmRisco`, logo abaixo.
 }
 
 // "Radar de Risco": negócios ABERTOS (nem ganhos nem perdidos) parados há
@@ -216,10 +205,80 @@ export function useDashboardNegociosRisco(
         valor_risco_total: 0,
         risco_por_vendedor: [],
         risco_por_fabricante: [],
-        top_parados: [],
       }) as DashboardNegociosRisco;
     },
     enabled: !!empresaId,
+    placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTS,
+  });
+}
+
+// Uma linha da tabela do time. Espelha `negocios_em_risco` (migration 20260909130000), coluna
+// por coluna. `fabrica` e `responsavel` vêm de LEFT JOIN e podem ser nulos; `nome` nunca vem
+// vazio — a função já resolve a cadeia de alternativas antes de devolver.
+//
+// `total_geral` repete em toda linha o total do RECORTE, não da página: é assim que o "Ver mais"
+// sabe quando parar, sem uma segunda consulta só para contar.
+export type NegocioEmRisco = {
+  id: string;
+  nome: string;
+  fabrica: string | null;
+  etapa: string | null;
+  responsavel: string | null;
+  valor: number | null;
+  dias_parado: number | null;
+  total_geral: number;
+};
+
+// A TABELA DO TIME da tela "Hoje": os negócios da equipe que pedem atenção — os mesmos
+// `parado OR sem_proxima_acao` dos três cartões acima, agora um por linha e com ação em cada uma.
+//
+// 🔴 O PORTÃO É A CHAVE `pauta_de_todos`, NÃO O PAPEL, e ele fica no SERVIDOR: quem tem a chave
+// recebe a empresa inteira, quem não tem recebe só os próprios negócios. Esconder coluna na tela
+// é cosmético (CLAUDE.md §6.1) — a função é que decide o que sai do banco.
+//
+// Sem filtro de período, pelo mesmo motivo de `useDashboardNegociosRisco`: negócio aberto criado
+// há meses continua sendo risco hoje.
+//
+// ⚠️ "VER MAIS" CRESCE O `LIMIT`, NÃO ANDA COM O `OFFSET`, e é de propósito. Com deslocamento a
+// tela teria de costurar páginas e conviver com linha que se move entre elas enquanto alguém edita
+// um negócio; crescendo o limite, cada chamada devolve a lista inteira até ali, na mesma ordem.
+// É por isso que o teto de 100 dentro da função importa — ver o cabeçalho da migration.
+export function useNegociosEmRisco(
+  empresaId: string | undefined,
+  filtros: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number; etapas?: string[] },
+  quantos: number,
+) {
+  const { usuarioIds, fabricanteIds, funilId, diasParado = 7, etapas } = filtros;
+
+  return useQuery({
+    // `quantos` entra na chave: cada "Ver mais" é uma consulta nova, e a anterior fica em cache.
+    queryKey: ['negocios_em_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado, etapas, quantos],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('negocios_em_risco', {
+        // Array vazio em filtro de RPC filtra tudo fora (CLAUDE.md §7.8): `= ANY('{}')` não casa
+        // com nada, e a tabela voltaria vazia em vez de "sem filtro". `null` é quem significa
+        // "sem filtro" — mesma conversão que `useDashboardNegociosRisco` faz nos quatro filtros.
+        p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
+        p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
+        p_funil_id: funilId ?? null,
+        p_dias_parado: diasParado,
+        p_etapas: etapas && etapas.length > 0 ? etapas : null,
+        p_limite: quantos,
+        // Sempre zero: ver o comentário sobre o `LIMIT` que cresce, acima.
+        p_deslocamento: 0,
+      });
+      if (error) throw error;
+      const linhas = (data ?? []) as NegocioEmRisco[];
+      // Página vazia não tem `total_geral` para ler — e daí NÃO se conclui que o recorte é zero
+      // em geral; aqui se conclui, porque o deslocamento é sempre 0 e a primeira página vazia
+      // significa mesmo recorte vazio.
+      return { linhas, total: Number(linhas[0]?.total_geral ?? 0) };
+    },
+    enabled: !!empresaId,
+    // Mantém a lista anterior na tela enquanto o novo recorte carrega — sem isso, mexer num
+    // filtro (ou clicar em "Ver mais") apagaria a tabela inteira por um instante, porque a
+    // `queryKey` muda junto. Mesmo motivo de `useDashboardStats`.
     placeholderData: keepPreviousData,
     ...DASHBOARD_QUERY_OPTS,
   });

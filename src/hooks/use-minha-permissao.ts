@@ -72,20 +72,28 @@ export function useMinhaPermissao(modulo: string, acao: AcaoPermissao): {
 }
 
 /**
- * "EU vejo a pauta e os números de toda a equipe?" — o espelho de
+ * "EU vejo os negócios de toda a equipe na tela 'Hoje'?" — o espelho de
  * `public.ve_pauta_de_todos(uuid)` no banco.
  *
- * 🔴 ISTO NÃO PROTEGE NADA. Quem decide é `pauta_do_dia()` (quais itens entram na fila) e
- * `dashboard_negocios_risco` (se a lista nominal por responsável vem preenchida), as duas no
- * servidor. Aqui serve para não oferecer um filtro de "Responsável" que voltaria vazio.
+ * 🔴 A CHAVE MUDOU DE DONO EM 09/09/2026, E O NOME DELA FICOU PARA TRÁS. Ela NÃO governa mais a
+ * FILA da tela "Hoje": desde a migration 20260909120000 a fila é sempre pessoal, para todo mundo
+ * — gestor inclusive. O que a chave `pauta_de_todos` libera hoje é o painel "No geral" de baixo:
+ * a TABELA DO TIME (`negocios_em_risco`), o gráfico "Risco por Vendedor" e o filtro de
+ * Responsável. Quem tem a chave vê a carteira da equipe ali; quem não tem vê a própria.
+ *
+ * 🔴 ISTO NÃO PROTEGE NADA. Quem decide são `negocios_em_risco` (quais negócios entram na tabela)
+ * e `dashboard_negocios_risco` (se a lista nominal por responsável vem preenchida), as duas no
+ * servidor, pelo mesmo `eu_vejo_pauta_de_todos()`. Aqui serve para não oferecer um filtro de
+ * "Responsável" que voltaria vazio, e para não desenhar uma coluna de dono que repetiria o mesmo
+ * nome em todas as linhas.
  *
  * 🔴 POR QUE ELE NÃO USA `usePodeFazer('pedidos', 'ver', 'pauta_de_todos')`, que já existe:
  * aquele hook começa com `if (ehGestor) return true` — **sem olhar a linha de permissão**. É o
  * mesmo atalho de `has_funcionalidade()` no banco, e ele torna IMPOSSÍVEL o caso que mais
  * importa: um gestor com o interruptor "Ver a pauta de toda a equipe" DESLIGADO à mão tem de
- * voltar a ver só os próprios negócios, porque é assim que a pauta e o adiamento já se
- * comportam no servidor desde a Tarefa 4. Com o atalho, a tela diria "vê tudo" e o servidor
- * devolveria só os próprios — o tipo de desencontro que leva meses até alguém notar.
+ * voltar a ver só os próprios negócios, porque é assim que o servidor já se comporta. Com o
+ * atalho, a tela diria "vê tudo" e o servidor devolveria só os próprios — o tipo de desencontro
+ * que leva meses até alguém notar.
  *
  * A decisão em si mora em `src/lib/pauta-de-todos.ts`, como função pura, com teste que fixa os
  * quatro casos (chave ligada/desligada × vendedor/gestor).
@@ -101,9 +109,10 @@ export function usePossoVerPautaDeTodos(): boolean {
 
   return useMemo(() => {
     // Enquanto não se sabe, a resposta é "não vejo" — mesmo raciocínio de `useMinhaPermissao`.
-    // O preço é o filtro de Responsável aparecer uma fração de segundo depois para o gestor; o
-    // preço do contrário seria ele PISCAR ligado e sumir justamente para quem teve a chave
-    // desligada à mão, que é o caso que este hook existe para acertar.
+    // O preço é o filtro de Responsável e a coluna de dono da tabela do time aparecerem uma
+    // fração de segundo depois para o gestor; o preço do contrário seria os dois PISCAREM ligados
+    // e sumirem justamente para quem teve a chave desligada à mão, que é o caso que este hook
+    // existe para acertar.
     if (loading || carregandoPermissoes || !permissoes) return false;
     return vePautaDeTodos(profile?.role, permissoes);
   }, [loading, carregandoPermissoes, permissoes, profile?.role]);

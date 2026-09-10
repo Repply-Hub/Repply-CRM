@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { lerFiltrosDoEndereco, escreverFiltrosNoEndereco, type FiltrosDoPainel } from './filtros-do-painel';
+import {
+  lerFiltrosDoEndereco,
+  escreverFiltrosNoEndereco,
+  recorteParaOServidor,
+  type FiltrosDoPainel,
+} from './filtros-do-painel';
 
 const VAZIO: FiltrosDoPainel = { etapas: [], fabricantes: [], responsaveis: [] };
 
@@ -39,5 +44,37 @@ describe('filtros do painel no endereço', () => {
   it('ida e volta preserva o conteúdo', () => {
     const filtros: FiltrosDoPainel = { etapas: ['a', 'b'], fabricantes: ['c'], responsaveis: ['d'] };
     expect(lerFiltrosDoEndereco(escreverFiltrosNoEndereco(new URLSearchParams(''), filtros))).toEqual(filtros);
+  });
+});
+
+/**
+ * A tradução para as consultas. Três lugares a usam — o painel de números, a tabela do time e a
+ * contagem que a tela "Hoje" lê para saber se a fila vazia pode comemorar —, e é justamente por
+ * serem três que ela precisa ser uma só: se um deles mandar um recorte diferente, a tela mostra um
+ * número que a tabela logo abaixo contradiz.
+ */
+describe('recorte que vai para o servidor', () => {
+  const CHEIO: FiltrosDoPainel = { etapas: ['proposta'], fabricantes: ['fab-1'], responsaveis: ['usr-1'] };
+
+  it('renomeia os campos para o que a consulta espera', () => {
+    expect(recorteParaOServidor(CHEIO, true)).toEqual({
+      etapas: ['proposta'],
+      fabricanteIds: ['fab-1'],
+      usuarioIds: ['usr-1'],
+    });
+  });
+
+  // 🔴 O caso que já foi bug: os filtros moram no endereço, e revogar a chave de alguém não limpa
+  // o `?responsaveis=` que essa pessoa tinha salvo. Sem esta regra o controle some da barra e o
+  // recorte continua valendo, com os números respondendo a algo que não está mais na tela.
+  it('sem a chave, o responsável NÃO vai para o servidor nem que esteja no endereço', () => {
+    expect(recorteParaOServidor(CHEIO, false).usuarioIds).toBeUndefined();
+  });
+
+  // `undefined` é "sem filtro"; `[]` viraria `= ANY('{}')`, que não casa com nada (CLAUDE.md
+  // §7.8). Aqui a lista vazia é repassada como lista vazia de propósito — quem converte para
+  // `null` é o hook, num lugar só, e o mesmo para os quatro filtros.
+  it('sem responsável escolhido, com a chave, repassa a lista vazia', () => {
+    expect(recorteParaOServidor({ ...CHEIO, responsaveis: [] }, true).usuarioIds).toEqual([]);
   });
 });

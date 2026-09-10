@@ -6,9 +6,10 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartTooltip, chartColors, commonAxisProps, commonGridProps } from '@/components/charts/DashboardChartTooltip';
 import { formatarMoedaBRL } from '@/lib/moeda';
-import { useDashboardNegociosRisco } from '@/hooks/use-dashboard';
+import { useDashboardNegociosRisco, type NegocioEmRisco } from '@/hooks/use-dashboard';
 import { BarraDeFiltros } from '@/components/pauta/BarraDeFiltros';
-import type { FiltrosDoPainel } from '@/lib/filtros-do-painel';
+import { TabelaDoTime } from '@/components/pauta/TabelaDoTime';
+import { recorteParaOServidor, type FiltrosDoPainel } from '@/lib/filtros-do-painel';
 
 /**
  * Radar de Risco — negócios ABERTOS parados ou sem próxima ação agendada.
@@ -71,22 +72,32 @@ interface Props {
    * propriedade fica porque deixa o componente melhor, não porque o hook seja frágil.
    */
   onAbrirNegocio: (pedidoId: string) => void;
+  /**
+   * Abre o diálogo "Retomar depois" da linha clicada na tabela do time.
+   *
+   * Vem por propriedade pelo mesmo motivo de `onAbrirNegocio`: o diálogo é UM SÓ na tela, montado
+   * pela página "Hoje", e é o MESMO que a fila de cima usa. Montar um segundo aqui dentro daria
+   * duas cópias do mesmo formulário e duas verdades sobre o mesmo gesto.
+   */
+  onRetomarNegocio: (linha: NegocioEmRisco) => void;
 }
 
-export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarPorResponsavel, onAbrirNegocio }: Props) {
-  const { data: bruto } = useDashboardNegociosRisco(empresaId, {
-    etapas: filtros.etapas,
-    fabricanteIds: filtros.fabricantes,
-    // 🔴 Sem a chave `pauta_de_todos`, o filtro de responsável NÃO vai para o servidor — nem
-    // que ele esteja no endereço. Os filtros moram na URL (ver `filtros-do-painel.ts`), e
-    // revogar a chave de alguém não limpa o `?responsaveis=` que essa pessoa já tinha salvo ou
-    // favoritado: o controle sumia da barra e o recorte continuava valendo, com os três cartões
-    // mostrando números que não correspondiam a nenhum controle visível.
-    // `undefined` (e não `[]`) é o que significa "sem filtro": array vazio vira `= ANY('{}')`,
-    // que não casa com nada e zeraria o painel (CLAUDE.md §7.8). Quem faz essa conversão é o
-    // `useDashboardNegociosRisco`, do mesmo jeito para os quatro filtros.
-    usuarioIds: podeFiltrarPorResponsavel ? filtros.responsaveis : undefined,
-  });
+export function RadarDeRisco({
+  empresaId,
+  filtros,
+  onChangeFiltros,
+  podeFiltrarPorResponsavel,
+  onAbrirNegocio,
+  onRetomarNegocio,
+}: Props) {
+  // O recorte que vai ao servidor — a MESMA tradução que a tabela do time e a tela "Hoje" usam,
+  // para os três não discordarem sobre o que está sendo contado. Inclui a regra de só mandar
+  // `responsaveis` para quem tem a chave; ver `recorteParaOServidor`.
+  const recorte = useMemo(
+    () => recorteParaOServidor(filtros, podeFiltrarPorResponsavel),
+    [filtros, podeFiltrarPorResponsavel],
+  );
+  const { data: bruto } = useDashboardNegociosRisco(empresaId, recorte);
 
   const risco = useMemo(() => ({
     qtdParados: bruto?.qtd_parados ?? 0,
@@ -100,11 +111,6 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
     // desligado à mão recebe [] aqui, e vendedor com a chave ligada recebe a lista.
     riscoPorVendedor: bruto?.risco_por_vendedor ?? [],
     riscoPorFabricante: bruto?.risco_por_fabricante ?? [],
-    // 🔴 Desde 07/09/2026 esta lista TAMBÉM segue a chave, no servidor: quem não enxerga a
-    // pauta de toda a equipe recebe aqui só os próprios negócios. Antes ela vinha com a
-    // empresa inteira — nome do colega, nome do negócio e valor — para qualquer vendedor,
-    // duas linhas abaixo do gráfico que a mesma função já recusava a essa pessoa.
-    topParados: bruto?.top_parados ?? [],
   }), [bruto]);
 
   const riscoVendedorAxisWidth = useMemo(() => {
@@ -271,65 +277,22 @@ export function RadarDeRisco({ empresaId, filtros, onChangeFiltros, podeFiltrarP
         </Card>
       </div>
 
-      {/* Título e cabeçalho de coluna: "em risco"/"Sem mexer há", não "parados". O SQL
-          seleciona `WHERE parado OR sem_proxima_acao` (migration 20260905120000) — na MD,
-          hoje, os 146 negócios da lista são todos "sem próxima ação", não "parado" (o
-          corte de parado é 7 dias). Um título que só diz "parados" mentia sobre o que a
-          tabela de fato lista.
-          Única parte deste painel que gera ação direta: cada linha abre o painel do negócio
-          SOBRE esta mesma tela, pelo mesmo caminho que a pauta de cima usa — escreve
-          `?negocio=<id>` no endereço, e o `PainelDoNegocio` que a página "Hoje" monta lê dali.
-          Antes daqui a linha navegava para a tela de Negócios (/app?negocio=<id>) e tirava a
-          pessoa da pauta, perdendo o filtro e o lugar na lista. */}
-      <Card className="shadow-card border-border/60 mt-5">
-        <CardHeader className="pb-1">
-          <CardTitle className="text-sm font-bold">Os 10 maiores em risco</CardTitle>
-          <CardDescription className="text-xs">Clique para abrir o negócio</CardDescription>
-        </CardHeader>
-        <CardContent className="pt-2">
-          {risco.topParados.length === 0 ? (
-            <p className="py-4 text-sm text-muted-foreground">Nenhum negócio em risco no momento.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <th className="py-2 text-left font-semibold">Negócio</th>
-                    <th className="py-2 text-left font-semibold">Fabricante</th>
-                    {/* Sem a chave, o servidor só manda negócio da própria pessoa — a coluna
-                        repetiria o mesmo nome em todas as linhas. Esconder aqui é cosmético,
-                        não é proteção: o corte de verdade é o da função de banco. */}
-                    {podeFiltrarPorResponsavel && (
-                      <th className="py-2 text-left font-semibold">Responsável</th>
-                    )}
-                    <th className="py-2 text-right font-semibold">Sem mexer há</th>
-                    <th className="py-2 text-right font-semibold">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {risco.topParados.map((n) => (
-                    <tr
-                      key={n.id}
-                      className="cursor-pointer border-b border-border/50 last:border-0 hover:bg-muted/50"
-                      onClick={() => onAbrirNegocio(n.id)}
-                    >
-                      <td className="py-2">{n.nome}</td>
-                      <td className="py-2 text-muted-foreground">{n.fabrica ?? '—'}</td>
-                      {podeFiltrarPorResponsavel && (
-                        <td className="py-2 text-muted-foreground">{n.responsavel ?? '—'}</td>
-                      )}
-                      <td className="py-2 text-right font-mono tabular-nums">
-                        {n.dias_parado} {n.dias_parado === 1 ? 'dia' : 'dias'}
-                      </td>
-                      <td className="py-2 text-right font-mono tabular-nums">{formatCurrency(n.valor)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* A TABELA DO TIME, no lugar do bloco "Os 10 maiores em risco" que ficava aqui até
+          09/09/2026. Aquele bloco lia `top_parados`, uma coluna de dentro do painel de números:
+          dez linhas fixas, sem ação nenhuma, num recorte que na MD tem 159 negócios.
+
+          A lista agora tem função de banco própria e paginada (`negocios_em_risco`), cresce de 10
+          em 10 e ganha duas ações por linha. "Abrir negócio" abre o painel SOBRE esta mesma tela,
+          pelo mesmo caminho que a pauta de cima usa; "Retomar depois" abre o MESMO diálogo da
+          fila. Os dois chegam por propriedade porque quem os monta, uma vez só, é a página
+          "Hoje" — ver `onAbrirNegocio` e `onRetomarNegocio` acima. */}
+      <TabelaDoTime
+        empresaId={empresaId}
+        filtros={recorte}
+        podeVerDeTodos={podeFiltrarPorResponsavel}
+        onAbrir={onAbrirNegocio}
+        onRetomar={onRetomarNegocio}
+      />
     </div>
     </section>
   );

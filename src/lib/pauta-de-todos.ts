@@ -1,12 +1,20 @@
 /**
- * "Esta pessoa enxerga a pauta de TODA a equipe?" — a mesma resposta que o banco dá.
+ * "Esta pessoa enxerga os negócios de TODA a equipe na tela 'Hoje'?" — a mesma resposta que o
+ * banco dá.
+ *
+ * ⚠️ O NOME DA CHAVE FICOU PARA TRÁS. `pauta_de_todos` já ampliou a FILA da tela "Hoje"; desde
+ * 09/09/2026 (migration 20260909120000) a fila é sempre pessoal, para todo mundo. A chave passou
+ * a governar o painel "No geral": a TABELA DO TIME (`negocios_em_risco`), o gráfico "Risco por
+ * Vendedor" e o filtro de Responsável. Renomeá-la reescreveria linha de permissão em produção, e
+ * o que ela decide continua sendo o mesmo — "vejo só os meus ou os da equipe?".
  *
  * 🔴 ISTO NÃO PROTEGE NADA (CLAUDE.md §6.1). Quem decide de verdade é
- * `public.ve_pauta_de_todos(uuid)` no Postgres, que a pauta e o painel de risco consultam.
- * Aqui a resposta serve só para a TELA não oferecer um filtro que voltaria vazio nem esconder
- * um que o servidor mandaria preenchido. **Se as duas divergirem, quem manda é o banco** — e a
- * divergência aparece como filtro que existe e não filtra nada, ou como lista que aparece sem o
- * controle para recortá-la.
+ * `public.ve_pauta_de_todos(uuid)` no Postgres — e, para as consultas do painel,
+ * `eu_vejo_pauta_de_todos()`, que é a mesma resposta pelo usuário logado. Aqui a resposta serve
+ * só para a TELA não oferecer um filtro que voltaria vazio nem esconder um que o servidor
+ * mandaria preenchido. **Se as duas divergirem, quem manda é o banco** — e a divergência aparece
+ * como filtro que existe e não filtra nada, ou como lista que aparece sem o controle para
+ * recortá-la.
  *
  * ────────────────────────────────────────────────────────────────────────────
  * A REGRA, COPIADA DE `public.ve_pauta_de_todos(p_usuario_id uuid)`:
@@ -28,7 +36,7 @@
  *   2. **Chave AUSENTE não é chave falsa.** O `?` do Postgres exige que a chave exista no JSON.
  *      Hoje é o caso de todo mundo: medido em 07/09/2026, **zero** linhas de
  *      `permissoes_usuario` têm `pauta_de_todos` gravada. Tratar ausência como `false` tiraria
- *      dos 5 gestores da MD a pauta ampliada que o servidor já lhes entrega.
+ *      dos 5 gestores da MD a visão da equipe que o servidor já lhes entrega.
  */
 
 /** Os três papéis que `is_gestor()` aceita, e que o `coalesce` usa quando a chave não está lá. */

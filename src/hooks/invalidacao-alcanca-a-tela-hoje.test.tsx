@@ -12,13 +12,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
  * (`usePauta` guarda 30 minutos e o app não refaz consulta ao voltar o foco): a pessoa criava a
  * tarefa, a fila não se mexia, e a leitura natural era "não salvou".
  *
- * As duas consultas da tela "Hoje" usam "tem tarefa aberta" como critério, e é isso que as
+ * As três consultas da tela "Hoje" usam "tem tarefa aberta" como critério, e é isso que as
  * amarra a uma tabela que não é a delas:
  *
  *   · a FILA (`pauta_do_dia_de`) põe a tarefa com prazo hoje na lista como compromisso E desconta
  *     uma vaga (`v_vagas = v_max - v_compromissos`), então um negócio parado sai no mesmo gesto;
- *   · a TABELA DE RISCO (`dashboard_negocios_risco`) calcula `sem_proxima_acao` como
- *     `NOT EXISTS (tarefas do negócio com status <> 'concluida')`.
+ *   · os CARTÕES de risco (`dashboard_negocios_risco`) calculam `sem_proxima_acao` como
+ *     `NOT EXISTS (tarefas do negócio com status <> 'concluida')`;
+ *   · a TABELA DO TIME (`negocios_em_risco`) usa a MESMA condição, e desde 09/09/2026 tem chave
+ *     de cache PRÓPRIA — antes ela era uma coluna de dentro dos cartões (`top_parados`) e vinha
+ *     invalidada de carona. Esquecer a chave nova não quebra nada visível: os cartões acima
+ *     dizem que o negócio saiu, e a tabela logo abaixo continua mostrando a linha.
  *
  * A fila depende ainda do NEGÓCIO em si: ela junta `pedidos` por `usuario_id` e desenha valor,
  * etapa e data — por isso `'pauta-do-dia'` também entrou em `invalidarPaineisDeNegocios`.
@@ -31,6 +35,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: { getUser: async () => ({ data: { user: { id: 'auth-1' } } }) },
+    // `registrar_retorno` é function de banco, não gravação direta em tabela — por isso `rpc`
+    // precisa existir no esboço. Ver `useRegistrarRetorno` em `use-pauta.ts`.
+    rpc: async () => ({ error: null }),
     from: () => ({
       select: () => ({
         eq: () => ({
@@ -46,6 +53,7 @@ vi.mock('@/integrations/supabase/client', () => ({
 
 import { useCreateTarefa, useUpdateTarefa, useDeleteTarefa } from './use-tarefas';
 import { invalidarPaineisDeNegocios } from './use-pedidos';
+import { useRegistrarRetorno } from './use-pauta';
 
 /** A chave da fila, como `usePauta` a escreve — com HÍFEN. Com sublinhado não casa nada. */
 const FILA = ['pauta-do-dia'];
@@ -58,6 +66,14 @@ const FILA = ['pauta-do-dia'];
  */
 const RISCO = ['dashboard_negocios_risco', 'emp-1', null, null, null, 7, null];
 
+/**
+ * A chave da TABELA DO TIME como a tela a monta: os mesmos seis recortes e, na cauda, o `quantos`
+ * do "Ver mais" (`use-dashboard.ts`). O 20 aqui não é enfeite — é o caso de quem já clicou uma
+ * vez em "Ver mais": a invalidação pela chave curta tem de alcançar QUALQUER tamanho de página,
+ * não só a primeira.
+ */
+const TABELA_DO_TIME = ['negocios_em_risco', 'emp-1', null, null, null, 7, null, 20];
+
 const TAREFAS_DO_NEGOCIO = ['tarefas_por_pedido', 'ped-1'];
 
 function envolver() {
@@ -68,6 +84,7 @@ function envolver() {
   // consulta como velha sem disparar requisição — e é essa marca que se lê aqui.
   qc.setQueryData(FILA, []);
   qc.setQueryData(RISCO, {});
+  qc.setQueryData(TABELA_DO_TIME, { linhas: [], total: 0 });
   qc.setQueryData(TAREFAS_DO_NEGOCIO, []);
   qc.setQueryData(['pedidos_stats'], {});
   qc.setQueryData(['vw_faturamento_mensal'], []);
@@ -94,13 +111,22 @@ describe('criar tarefa', () => {
     expect(velha(qc, FILA)).toBe(true);
   });
 
-  it('🔴 recarrega a tabela "Os 10 maiores em risco" — o negócio deixa de estar sem próxima ação', async () => {
+  it('🔴 recarrega os cartões de risco — o negócio deixa de estar sem próxima ação', async () => {
     const { wrapper, qc } = envolver();
     const { result } = renderHook(() => useCreateTarefa(), { wrapper });
 
     await act(async () => { await result.current.mutateAsync({ titulo: 'Ligar amanhã', pedido_id: 'ped-1' }); });
 
     expect(velha(qc, RISCO)).toBe(true);
+  });
+
+  it('🔴 recarrega a TABELA DO TIME — senão os cartões dizem que o negócio saiu e a linha fica', async () => {
+    const { wrapper, qc } = envolver();
+    const { result } = renderHook(() => useCreateTarefa(), { wrapper });
+
+    await act(async () => { await result.current.mutateAsync({ titulo: 'Ligar amanhã', pedido_id: 'ped-1' }); });
+
+    expect(velha(qc, TABELA_DO_TIME)).toBe(true);
   });
 
   it('🔴 NÃO recarrega os painéis de dinheiro — nenhum valor mudou de lugar', async () => {
@@ -115,7 +141,7 @@ describe('criar tarefa', () => {
 });
 
 describe('editar tarefa', () => {
-  it('🔴 recarrega a fila e a tabela de risco — concluir ou mudar o prazo tira a tarefa das duas', async () => {
+  it('🔴 recarrega a fila, os cartões e a tabela do time — concluir ou mudar o prazo tira a tarefa das três', async () => {
     const { wrapper, qc } = envolver();
     const { result } = renderHook(() => useUpdateTarefa(), { wrapper });
 
@@ -123,6 +149,7 @@ describe('editar tarefa', () => {
 
     expect(velha(qc, FILA)).toBe(true);
     expect(velha(qc, RISCO)).toBe(true);
+    expect(velha(qc, TABELA_DO_TIME)).toBe(true);
   });
 
   it('🔴 recarrega a tabela de tarefas do próprio painel, mesmo sem saber de qual negócio', async () => {
@@ -138,7 +165,7 @@ describe('editar tarefa', () => {
 });
 
 describe('excluir tarefa', () => {
-  it('🔴 recarrega a fila, a tabela de risco e a tabela do painel', async () => {
+  it('🔴 recarrega a fila, os cartões, a tabela do time e a tabela do painel', async () => {
     const { wrapper, qc } = envolver();
     const { result } = renderHook(() => useDeleteTarefa(), { wrapper });
 
@@ -146,7 +173,29 @@ describe('excluir tarefa', () => {
 
     expect(velha(qc, FILA)).toBe(true);
     expect(velha(qc, RISCO)).toBe(true);
+    expect(velha(qc, TABELA_DO_TIME)).toBe(true);
     expect(velha(qc, TAREFAS_DO_NEGOCIO)).toBe(true);
+  });
+});
+
+/**
+ * "Retomar depois" agora é clicado DENTRO da tabela do time, não só na fila. Sem invalidar a
+ * chave nova, a pessoa marca o retorno, o diálogo fecha, o aviso vai para o dono — e a linha
+ * continua exatamente onde estava, na lista de onde ela acabou de sair. A leitura natural é "não
+ * salvou", e a pessoa faz de novo.
+ */
+describe('retomar depois', () => {
+  it('🔴 recarrega a fila, os cartões e a tabela do time — o negócio deixa de estar sem próxima ação', async () => {
+    const { wrapper, qc } = envolver();
+    const { result } = renderHook(() => useRegistrarRetorno(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ pedidoId: 'ped-1', motivo: 'cliente decide em outubro', retornoEm: '2026-10-01' });
+    });
+
+    expect(velha(qc, FILA)).toBe(true);
+    expect(velha(qc, RISCO)).toBe(true);
+    expect(velha(qc, TABELA_DO_TIME)).toBe(true);
   });
 });
 
@@ -157,5 +206,16 @@ describe('invalidarPaineisDeNegocios', () => {
     invalidarPaineisDeNegocios(qc);
 
     expect(velha(qc, FILA)).toBe(true);
+  });
+
+  // A tabela do time desenha nome, fabricante, etapa, responsável, valor e dias parados. Editar
+  // qualquer um desses campos muda o que ela mostra — e passar o negócio a um colega pode tirar a
+  // linha de lá para quem não tem a chave `pauta_de_todos`.
+  it('🔴 alcança a tabela do time', () => {
+    const { qc } = envolver();
+
+    invalidarPaineisDeNegocios(qc);
+
+    expect(velha(qc, TABELA_DO_TIME)).toBe(true);
   });
 });
