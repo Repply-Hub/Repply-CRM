@@ -6,10 +6,12 @@ import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
 import { erroLegivelDaFunction } from '@/lib/erro-edge-function';
 import { infoPreviewMensagem } from '@/lib/wa-mensagem-preview';
-import { tocarNotificacao, tocarEnvio } from '@/lib/som';
+import { tocarEnvio } from '@/lib/som';
 import { somLigado } from '@/hooks/use-som-ligado';
-
-const MENSAGEM_TOAST_MAX_CHARS = 100;
+import {
+  avisarMensagemNova,
+  previaDaMensagem,
+} from '@/lib/aviso-de-mensagem-nova';
 
 // WhatsApp/uazapi às vezes usa o JID de celulares BR sem o 9º dígito (número antigo).
 // Normaliza para o formato canônico, igual ao _shared/whatsapp.ts das edge functions
@@ -1463,25 +1465,18 @@ export function useUnreadWaMessages() {
                   createElement(infoTipo.icon, { size: 14, className: 'shrink-0' }),
                   infoTipo.label,
                 )
-              : ultimaMensagem
-                ? ultimaMensagem.length > MENSAGEM_TOAST_MAX_CHARS
-                  ? `${ultimaMensagem.slice(0, MENSAGEM_TOAST_MAX_CHARS)}...`
-                  : ultimaMensagem
-                : 'Nova mensagem';
-            // O som decide sozinho se cala: ja sabe qual conversa esta aberta na
-            // frente da pessoa (ver definirConversaEmFoco em WhatsAppInbox).
-            tocarNotificacao({ ligado: somLigado(), conversaId: row.id });
-            toast(() => createElement('span', null, createElement('b', null, nomeConversa), ' enviou uma mensagem'), {
-              description: descricao,
-              style: { background: '#f97316', color: '#fff', border: 'none' },
-              descriptionClassName: '!text-white/90',
-              // Leva direto para a conversa que gerou o toast — `row.id` já veio no
-              // payload do realtime, sem precisar de consulta extra.
-              action: {
-                label: 'Abrir conversa',
-                onClick: () => navigate(`/whatsapp?conversaId=${row.id}`),
-              },
-              actionButtonStyle: { background: 'rgba(255,255,255,0.2)', color: '#fff' },
+              : previaDaMensagem(ultimaMensagem, 'Nova mensagem');
+            // A MESMA função que avisa o chat interno — ver
+            // aviso-de-mensagem-nova. Os dois eram escritos à mão e divergiram:
+            // o do chat ficou sem o botão de abrir. Um lugar só resolve para
+            // sempre. O som sai de lá dentro e cala sozinho quando a pessoa já
+            // está com esta conversa aberta (ver definirConversaEmFoco).
+            avisarMensagemNova({
+              de: nomeConversa,
+              previa: descricao,
+              conversaId: row.id,
+              // `row.id` já veio no payload do realtime, sem consulta extra.
+              aoAbrir: () => navigate(`/whatsapp?conversaId=${row.id}`),
             });
           }
 

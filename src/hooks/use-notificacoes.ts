@@ -1,13 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, createElement } from 'react';
-import { toast } from 'sonner';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './use-auth';
 import { useSecaoLigada } from '@/hooks/use-secoes';
-import { tocarNotificacao } from '@/lib/som';
-import { somLigado } from '@/hooks/use-som-ligado';
-
-const MENSAGEM_TOAST_MAX_CHARS = 100;
+import {
+  avisarMensagemNova,
+  previaDaMensagem,
+} from '@/lib/aviso-de-mensagem-nova';
 
 export interface Notificacao {
   id: string;
@@ -109,6 +109,7 @@ export function useUnreadEmails() {
 
 export function useUnreadChatMessages() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { user, profile } = useAuth();
   const meId = profile?.id;
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id;
@@ -163,19 +164,15 @@ export function useUnreadChatMessages() {
           }
 
           const nomeConversa = sender?.nome || 'Alguém';
-          const conteudo = payload.new.conteudo?.trim();
-          const descricao = conteudo
-            ? conteudo.length > MENSAGEM_TOAST_MAX_CHARS
-              ? `${conteudo.slice(0, MENSAGEM_TOAST_MAX_CHARS)}...`
-              : conteudo
-            : 'Enviou um arquivo';
-          // Chat interno nao tem conversa de WhatsApp em foco para comparar:
-          // toca sempre que a aba nao esta a vista.
-          tocarNotificacao({ ligado: somLigado() });
-          toast(() => createElement('span', null, createElement('b', null, nomeConversa), ' enviou uma mensagem'), {
-            description: descricao,
-            style: { background: '#f97316', color: '#fff', border: 'none' },
-            descriptionClassName: '!text-white/90',
+          // O MESMO aviso do WhatsApp, pela mesma função — inclusive o botão
+          // para abrir, que faltava aqui. Ver aviso-de-mensagem-nova.
+          avisarMensagemNova({
+            de: nomeConversa,
+            previa: previaDaMensagem(payload.new.conteudo, 'Enviou um arquivo'),
+            // O chat interno não tem rota por conversa: leva para a seção,
+            // que é onde a mensagem está. `navigate` e não `location.assign`
+            // para não recarregar o app inteiro.
+            aoAbrir: () => navigate('/chat'),
           });
         }
       })
@@ -185,7 +182,7 @@ export function useUnreadChatMessages() {
     // que o admin desligasse o Chat continuaria recebendo aviso até recarregar a página.
     // Com ele, o mapa de seções recarrega ao voltar para a aba (30s + refetchOnWindowFocus),
     // este efeito roda de novo e o canal é fechado.
-  }, [qc, user?.id, meId, temChat]);
+  }, [qc, user?.id, meId, temChat, navigate]);
 
   return query;
 }
