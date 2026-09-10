@@ -1,17 +1,27 @@
 import { useMemo, useState } from 'react';
-import { Inbox, Tag, Loader2, ShieldAlert, Trash2, Search, ChevronDown, ChevronUp, Plus } from 'lucide-react';
+import { Inbox, Mails, Tag, Loader2, ShieldAlert, Trash2, Search, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import type { PastaEmail } from '@/hooks/use-email-pastas';
 import { CriarMarcadorDialog } from '@/components/email/CriarMarcadorDialog';
 
-/** `null` = sem filtro de pasta (a aba Recebidos/Enviados manda). */
-export type PastaSelecionada = string | null;
+/**
+ * As constantes e o tipo saíram daqui e foram para `@/lib/filtro-da-caixa`,
+ * junto da regra que diz o que cada item da barra mostra. Reexportados porque
+ * quem já importava daqui continua funcionando.
+ */
+import {
+  PASTA_SPAM,
+  PASTA_LIXEIRA,
+  CAIXA_DE_ENTRADA,
+  type PastaSelecionada,
+} from '@/lib/filtro-da-caixa';
 
-/** Ids das pastas de sistema que a barra oferece como filtro próprio. */
-export const PASTA_SPAM = 'SPAM';
-export const PASTA_LIXEIRA = 'TRASH';
+// Nada de reexportar as constantes daqui: arquivo de componente que tambem
+// exporta constante perde o recarregamento rapido do Vite (o aviso
+// react-refresh/only-export-components), e o lugar delas agora e
+// `@/lib/filtro-da-caixa`, junto da regra que as usa.
 
 /** Marcadores visíveis antes do "ver todos" — uma caixa com 900+ mensagens pode ter dezenas. */
 const LIMITE_MARCADORES_VISIVEIS = 10;
@@ -22,7 +32,10 @@ interface Props {
   selecionada: PastaSelecionada;
   onSelecionar: (pastaId: PastaSelecionada) => void;
   /** Quantas mensagens a aba atual tem sem filtro de pasta. */
-  totalSemFiltro: number;
+  /** Total da Caixa de entrada — o que chegou e nao esta em marcador nenhum. */
+  totalDaEntrada: number;
+  /** Total de Todos os e-mails — marcador incluso, sem spam e sem lixeira. */
+  totalDeTodos: number;
   /** Contagem LOCAL por pasta: quantas o CRM tem e quantas estão por ler. */
   contagens: Map<string, { total: number; naoLidas: number }>;
   /** Conta cujo marcador está sendo criado — sem ela o botão "Novo marcador" some. */
@@ -131,7 +144,8 @@ export function BarraPastas({
   carregando,
   selecionada,
   onSelecionar,
-  totalSemFiltro,
+  totalDaEntrada,
+  totalDeTodos,
   contagens,
   contaId,
   podeCriarMarcador,
@@ -164,21 +178,36 @@ export function BarraPastas({
   // rouba largura da lista de mensagens sem dar nada em troca. Mas não quando
   // dá para criar marcador — aí a coluna vazia é o próprio caminho para deixar
   // de estar vazia, e escondê-la tornaria a ação inalcançável.
-  if (!carregando && marcadores.length === 0 && !temSpam && !temLixeira && !podeCriarMarcador) {
-    return null;
-  }
+  // 🔴 A barra NAO some mais por falta de marcador: os dois itens do topo
+  // (Caixa de entrada e Todos os e-mails) sao filtros distintos e uteis mesmo
+  // numa caixa sem marcador nenhum — esconde-los tiraria da pessoa a unica
+  // forma de ver o que ja foi arquivado. A guarda antiga existia quando o topo
+  // tinha um item so ("Todas"), que nao filtrava nada.
+  
 
   return (
     <aside className="hidden w-72 shrink-0 flex-col overflow-hidden border-r bg-muted/20 md:flex">
       {/* Itens fixos do topo — fora de qualquer contêiner com rolagem, para
           não sumirem quando a lista de marcadores, abaixo, rolar sozinha. */}
       <div className="flex shrink-0 flex-col gap-0.5 p-2">
+        {/* A regra e a do Gmail: mover para um marcador TIRA da entrada, e a
+            mensagem segue existindo em Todos e no marcador. Quem decide o que
+            cada um mostra e `filtroDaCaixa` — a mesma funcao que conta estes
+            numeros, para o selo nao prometer o que a lista esconde. */}
         <Item
           icone={<Inbox className="h-4 w-4" />}
-          rotulo="Todas"
+          rotulo="Caixa de entrada"
+          ativo={selecionada === CAIXA_DE_ENTRADA}
+          onClick={() => onSelecionar(CAIXA_DE_ENTRADA)}
+          total={totalDaEntrada}
+          naoLidas={0}
+        />
+        <Item
+          icone={<Mails className="h-4 w-4" />}
+          rotulo="Todos os e-mails"
           ativo={selecionada === null}
           onClick={() => onSelecionar(null)}
-          total={totalSemFiltro}
+          total={totalDeTodos}
           naoLidas={0}
         />
 

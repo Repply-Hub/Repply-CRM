@@ -78,12 +78,14 @@ import {
   normalizarAssinaturaAntiga,
 } from "@/lib/assinatura-email";
 import { GerenciarCaixaDialog } from "@/components/email/GerenciarCaixaDialog";
+import { BarraPastas } from "@/components/email/BarraPastas";
 import {
-  BarraPastas,
+  filtroDaCaixa,
+  CAIXA_DE_ENTRADA,
   PASTA_SPAM,
   PASTA_LIXEIRA,
   type PastaSelecionada,
-} from "@/components/email/BarraPastas";
+} from "@/lib/filtro-da-caixa";
 import {
   useEmailPastas,
   useContagemPorPasta,
@@ -239,7 +241,10 @@ const Emails = () => {
   const [gerenciarCaixaAberto, setGerenciarCaixaAberto] = useState(false);
   // Marcador escolhido na barra lateral. null = a aba manda sozinha.
   const [pastaSelecionada, setPastaSelecionada] =
-    useState<PastaSelecionada>(null);
+    // Abre na Caixa de entrada, e nao em Todos os e-mails: quem abre a secao
+    // quer ver o que chegou e ainda nao foi tratado. Decisao do dono do
+    // produto, 09/09/2026.
+    useState<PastaSelecionada>(CAIXA_DE_ENTRADA);
   const [somenteNaoLidas, setSomenteNaoLidas] = useState(false);
   const [emailToDelete, setEmailToDelete] = useState<{
     id: string;
@@ -274,6 +279,16 @@ const Emails = () => {
   } = useEmailEmpresa();
   const { data: pastas = [], isLoading: pastasCarregando } = useEmailPastas(
     conta?.id,
+  );
+
+  /**
+   * So o que a PESSOA criou. Pasta de sistema (INBOX, SENT, as abas do Gmail,
+   * as superestrelas) nao tira mensagem da entrada — quem separa marcador de
+   * pasta de sistema e `ehSistema`, em use-email-pastas.
+   */
+  const idsDosMarcadores = useMemo(
+    () => pastas.filter((p) => !p.ehSistema).map((p) => p.pastaId),
+    [pastas],
   );
   const { data: contagens = new Map() } = useContagemPorPasta(conta?.id);
   /** Mesma mutação que o diálogo de "mover para marcador" por clique já usa — o arrasto não duplica a lógica de mover. */
@@ -743,6 +758,9 @@ const Emails = () => {
       "received_emails",
       pageReceived,
       pastaSelecionada,
+      // Sem isto a lista nao refaz quando as pastas chegam, e a Caixa de
+      // entrada abriria mostrando tambem o que esta em marcador.
+      idsDosMarcadores,
       buscaAplicada,
       somenteNaoLidas,
     ],
@@ -757,27 +775,27 @@ const Emails = () => {
         .eq("direcao", "recebido")
         .eq("excluido", false);
 
-      // O marcador escolhido na barra lateral. `pastas` é TEXT[] com os ids do
-      // provedor, que o sync já grava em cada mensagem — `contains` vira o
-      // operador `@>` do Postgres, que usa índice se um dia houver um GIN aqui.
-      if (pastaSelecionada) {
-        consulta = consulta.contains("pastas", [pastaSelecionada]);
-      } else {
-        /**
-         * Sem pasta escolhida, "Recebidos" é a CAIXA DE ENTRADA — e lixo não
-         * entra nela.
-         *
-         * `direcao` é decidida só pelo remetente (ver mensagemParaLinha), sem
-         * olhar em que pasta a mensagem está. Então spam e lixeira caíam aqui
-         * como qualquer outra: hoje mesmo há 2 mensagens da lixeira contadas
-         * nos 337 e aparecendo na lista. Com spam passando a ser sincronizado,
-         * isso deixaria de ser duas linhas e viraria volume.
-         *
-         * Elas continuam alcançáveis — pelos itens Spam e Lixeira da barra.
-         */
-        consulta = consulta
-          .not("pastas", "cs", `{${PASTA_SPAM}}`)
-          .not("pastas", "cs", `{${PASTA_LIXEIRA}}`);
+      /**
+       * O que a barra lateral escolheu, decidido por `filtroDaCaixa` — a MESMA
+       * função que alimenta o selo, para os dois números não terem como
+       * divergir.
+       *
+       * `pastas` é TEXT[] com os ids do provedor, que o sync já grava em cada
+       * mensagem. `contains` vira o operador `@>` do Postgres, e cada exclusão
+       * vira um `NOT @>`. Uma exclusão por pasta, e não um `ov` com a lista
+       * inteira: `cs` já é o operador usado aqui (menos risco de escrever a
+       * sintaxe errada) e um id com vírgula não teria como quebrar a consulta.
+       *
+       * A caixa da MD tem 25 marcadores, o que cabe folgado numa URL. Se um
+       * cliente passar de ~80, isto sai da URL e vira função no banco — e o
+       * ponto a trocar são estas linhas.
+       */
+      const filtro = filtroDaCaixa(pastaSelecionada, idsDosMarcadores);
+      if (filtro.precisaTer) {
+        consulta = consulta.contains("pastas", [filtro.precisaTer]);
+      }
+      for (const fora of filtro.naoPodeTer) {
+        consulta = consulta.not("pastas", "cs", `{${fora}}`);
       }
 
       if (somenteNaoLidas) consulta = consulta.eq("lido", false);
@@ -867,46 +885,63 @@ const Emails = () => {
   });
 
   /**
-   * Quantas mensagens a aba Recebidos tem IGNORANDO o marcador — o número que
-   * fica ao lado de "Todas" na barra lateral.
+   * Monta a consulta de contagem de UMA seleção da barra.
    *
-   * Precisa ser uma consulta própria porque `totalReceived` vem do mesmo
-   * `select` que já aplicou o `contains`: com um marcador escolhido, os dois
-   * números seriam idênticos e "Todas" mostraria a contagem do marcador, como
-   * se a caixa inteira tivesse encolhido.
+   * Passa pelo MESMO `filtroDaCaixa` da listagem de propósito: quando as duas
+   * regras eram escritas à mão, o selo contava spam e lixeira e prometia
+   * mensagens que a lista, por regra, escondia. Agora não têm como divergir.
    *
-   * `head: true` — só o cabeçalho com a contagem, nenhuma linha trafega. E só
-   * roda quando há marcador escolhido; sem ele, `totalReceived` já é a resposta.
+   * `head: true` — só o cabeçalho com a contagem, nenhuma linha trafega.
+   *
+   * 🔴 Sem gancho nenhum dentro: gancho tem de ser chamado sempre na mesma
+   * ordem, e uma função que devolvesse `useQuery` convidaria a chamada
+   * condicional. As duas consultas abaixo estão escritas por extenso.
    */
-  const { data: totalRecebidosSemMarcador } = useQuery({
-    queryKey: ["received_emails_total", buscaAplicada, somenteNaoLidas],
-    queryFn: async () => {
-      let consulta = supabase
-        .from("email_mensagens")
-        .select("id", { count: "exact", head: true })
-        .eq("direcao", "recebido")
-        .eq("excluido", false)
-        // Os MESMOS cortes da listagem sem marcador. Se "Todas" contasse spam e
-        // lixeira, o badge prometeria mensagens que a lista, por regra, esconde.
-        .not("pastas", "cs", `{${PASTA_SPAM}}`)
-        .not("pastas", "cs", `{${PASTA_LIXEIRA}}`);
+  const contarSelecao = async (selecao: PastaSelecionada, marcadores: string[]) => {
+    let consulta = supabase
+      .from("email_mensagens")
+      .select("id", { count: "exact", head: true })
+      .eq("direcao", "recebido")
+      .eq("excluido", false);
 
-      if (somenteNaoLidas) consulta = consulta.eq("lido", false);
+    const filtro = filtroDaCaixa(selecao, marcadores);
+    if (filtro.precisaTer) consulta = consulta.contains("pastas", [filtro.precisaTer]);
+    for (const fora of filtro.naoPodeTer) {
+      consulta = consulta.not("pastas", "cs", `{${fora}}`);
+    }
 
-      // Mesmos campos da listagem (ver o comentário lá): sem remetente aqui, o
-      // badge de "Todas" contaria diferente do que a lista realmente mostra
-      // para o mesmo termo.
-      if (buscaAplicada) {
-        consulta = consulta.or(
-          `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%,` +
-            `remetente_nome.ilike.%${buscaAplicada}%,remetente_email.ilike.%${buscaAplicada}%`,
-        );
-      }
+    if (somenteNaoLidas) consulta = consulta.eq("lido", false);
 
-      const { count } = await consulta;
-      return count ?? 0;
-    },
-    enabled: isConnected && !!pastaSelecionada,
+    // Mesmos campos da listagem (ver o comentário lá): sem remetente aqui, o
+    // selo contaria diferente do que a lista mostra para o mesmo termo.
+    if (buscaAplicada) {
+      consulta = consulta.or(
+        `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%,` +
+          `remetente_nome.ilike.%${buscaAplicada}%,remetente_email.ilike.%${buscaAplicada}%`,
+      );
+    }
+
+    const { count } = await consulta;
+    return count ?? 0;
+  };
+
+  const { data: totalDaEntrada = 0 } = useQuery({
+    queryKey: [
+      "email_total_selecao", "entrada",
+      idsDosMarcadores, buscaAplicada, somenteNaoLidas,
+    ],
+    queryFn: () => contarSelecao(CAIXA_DE_ENTRADA, idsDosMarcadores),
+    enabled: isConnected,
+    placeholderData: keepPreviousData,
+  });
+
+  const { data: totalDeTodos = 0 } = useQuery({
+    queryKey: [
+      "email_total_selecao", "todos",
+      idsDosMarcadores, buscaAplicada, somenteNaoLidas,
+    ],
+    queryFn: () => contarSelecao(null, idsDosMarcadores),
+    enabled: isConnected,
     placeholderData: keepPreviousData,
   });
 
@@ -931,7 +966,9 @@ const Emails = () => {
 
   /** Nome do marcador aberto, para as mensagens de tela falarem dele pelo nome. */
   const nomeDaPastaSelecionada =
-    pastaSelecionada === PASTA_SPAM
+    pastaSelecionada === CAIXA_DE_ENTRADA
+      ? "Caixa de entrada"
+      : pastaSelecionada === PASTA_SPAM
       ? "Spam"
       : pastaSelecionada === PASTA_LIXEIRA
         ? "Lixeira"
@@ -939,7 +976,10 @@ const Emails = () => {
           "este marcador");
 
   useEffect(() => {
-    if (!isConnected || !pastaSelecionada) return;
+    // A Caixa de entrada nao e pasta do provedor: pedir mais dela devolveria
+    // erro, porque nao existe `pasta_id` para mandar.
+    if (!isConnected || !pastaSelecionada || pastaSelecionada === CAIXA_DE_ENTRADA)
+      return;
     if (activeTab !== "received") return;
     if (isReceivedLoading || buscaAplicada || somenteNaoLidas) return;
     if (totalReceived > 0) return;
@@ -1888,7 +1928,9 @@ const Emails = () => {
                   no marcador ativo na barra lateral não desmarca (o clique
                   sempre grava o id, sem comparar com o atual); este chip é o
                   atalho que resolve isso sem mexer naquele clique. */}
-              {activeTab === "received" && pastaSelecionada && (
+              {activeTab === "received" &&
+                pastaSelecionada &&
+                pastaSelecionada !== CAIXA_DE_ENTRADA && (
                 <Badge
                   variant="secondary"
                   className="h-8 shrink-0 gap-1.5 rounded-full border-none bg-primary/10 pl-3 pr-1.5 text-xs font-medium text-primary"
@@ -1896,7 +1938,9 @@ const Emails = () => {
                   {nomeDaPastaSelecionada}
                   <button
                     type="button"
-                    onClick={() => escolherPasta(null)}
+                    // Limpar volta para a Caixa de entrada, que e o estado
+                    // padrao — nao para Todos os e-mails.
+                    onClick={() => escolherPasta(CAIXA_DE_ENTRADA)}
                     className="rounded-full p-0.5 hover:bg-primary/20"
                     title="Limpar filtro de marcador"
                     aria-label="Limpar filtro de marcador"
@@ -2002,13 +2046,10 @@ const Emails = () => {
               // existe.
               selecionada={activeTab === "sent" ? null : pastaSelecionada}
               onSelecionar={escolherPasta}
-              totalSemFiltro={
-                activeTab === "sent"
-                  ? totalSent
-                  : pastaSelecionada
-                    ? (totalRecebidosSemMarcador ?? totalReceived)
-                    : totalReceived
-              }
+              // Em Enviados a barra fala da aba, não da caixa: os dois itens
+              // do topo mostram o total de enviados, que é o que a lista tem.
+              totalDaEntrada={activeTab === "sent" ? totalSent : totalDaEntrada}
+              totalDeTodos={activeTab === "sent" ? totalSent : totalDeTodos}
               contagens={contagens}
               contaId={conta?.id}
               podeCriarMarcador={podeGerenciarCaixa}
