@@ -100,7 +100,7 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
     setQuantos(PAGINA);
   }
 
-  const { data, isPending, isPaused, isFetching, error } = useNegociosEmRisco(
+  const { data, isPending, isPaused, isFetching, error, failureReason } = useNegociosEmRisco(
     empresaId,
     filtros,
     quantos,
@@ -148,9 +148,18 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
 
              `isPending &&` porque isto vale só quando NÃO HÁ o que mostrar. Perder a rede durante
              uma recarga de uma lista que já está na tela não é motivo para apagá-la: as linhas
-             continuam sendo a melhor informação disponível, e o que envelhece é a idade delas. */
+             continuam sendo a melhor informação disponível, e o que envelhece é a idade delas.
+
+             🔴 A FRASE NÃO DIZ "SEM CONEXÃO", e isso é de propósito. `isPaused` tem DUAS portas,
+             não uma: `canContinue()` do Query exige rede E foco da aba, então trocar de aba no
+             meio de uma tentativa também pausa. Medido em 10/09/2026 no `localhost`: pausada com
+             `navigator.onLine` verdadeiro e o `fetch` respondendo 200. Culpar a internet ali é
+             mandar a pessoa conferir o wi-fi por causa de um erro do servidor — e ainda joga
+             fora a explicação que o banco mandou, que fica guardada em `failureReason`. */
           <p className="py-4 text-sm text-muted-foreground">
-            Sem conexão para carregar a lista. Ela aparece assim que a internet voltar.
+            {failureReason
+              ? `Ainda não consegui carregar a lista: ${mensagemDeErro(failureReason, 'vou tentar de novo em instantes')}`
+              : 'Ainda não consegui carregar a lista. Vou tentar de novo em instantes.'}
           </p>
         ) : isPending ? (
           <div className="space-y-2 py-2" aria-busy="true">

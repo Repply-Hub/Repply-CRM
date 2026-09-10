@@ -191,13 +191,38 @@ describe('a tabela do time', () => {
     expect(screen.queryByText('Nenhum negócio pedindo atenção agora.')).toBeNull();
   });
 
-  it('🔴 sem rede, diz que está sem conexão — nunca "nenhum negócio pedindo atenção"', async () => {
+  it('🔴 consulta pausada diz que ainda não carregou — nunca "nenhum negócio pedindo atenção"', async () => {
     onlineManager.setOnline(false);
     montar();
 
-    expect(await screen.findByText(/Sem conexão para carregar a lista/)).toBeInTheDocument();
+    expect(await screen.findByText(/Ainda não consegui carregar a lista/)).toBeInTheDocument();
     expect(screen.queryByText('Nenhum negócio pedindo atenção agora.')).toBeNull();
     expect(estado.chamadas).toHaveLength(0);
+  });
+
+  /**
+   * 🔴 A FRASE DA PAUSA NÃO PODE CULPAR A INTERNET.
+   *
+   * `isPaused` tem DUAS portas: o `canContinue()` do Query exige rede **e** foco da aba, então
+   * trocar de aba no meio de uma tentativa também pausa. Medido em 10/09/2026 no `localhost`:
+   * consulta pausada com `navigator.onLine` verdadeiro e o `fetch` respondendo 200, guardando em
+   * `failureReason` o erro de verdade — "Could not find the function public.negocios_em_risco".
+   *
+   * Dizer "sem conexão" ali manda a pessoa conferir o wi-fi por causa de um erro do servidor, e
+   * joga fora a explicação que o banco mandou. Este teste falha se alguém reescrever a frase
+   * culpando a rede de novo.
+   */
+  it('🔴 pausada com um motivo guardado, mostra o motivo — não culpa a internet', async () => {
+    estado.erro = {
+      code: 'PGRST202',
+      message: 'Could not find the function public.negocios_em_risco in the schema cache',
+    };
+    onlineManager.setOnline(false);
+    montar();
+
+    expect(await screen.findByText(/Ainda não consegui carregar a lista/)).toBeInTheDocument();
+    expect(screen.queryByText(/[Ss]em conexão/)).toBeNull();
+    expect(screen.queryByText(/internet/)).toBeNull();
   });
 
   it('cada linha tem as duas ações, e "Retomar depois" não abre o negócio junto', async () => {
