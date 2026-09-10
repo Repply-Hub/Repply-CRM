@@ -13,12 +13,14 @@ import {
   DialogDescription,
 } from '@/components/shared/DialogoResponsivo';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
+import { avisoDaTarefaDoRetorno } from '@/lib/aviso-da-tarefa-do-retorno';
 import { useRegistrarRetorno } from '@/hooks/use-pauta';
 
 interface Props {
@@ -89,18 +91,42 @@ export function DialogoRetorno({
 }: Props) {
   const [motivo, setMotivo] = useState('');
   const [retorno, setRetorno] = useState<Date>(sugestaoDeRetorno);
+  // Marcada por padrão: adiar sem deixar nada marcado na agenda é como o negócio some da
+  // vista e ninguém volta a ele. Quem não quer a tarefa desmarca — é um clique, e a escolha
+  // fica visível antes de apertar o botão, não escondida numa configuração.
+  const [criarTarefa, setCriarTarefa] = useState(true);
   const registrar = useRegistrarRetorno();
 
   // Reabrir o diálogo para outro negócio tem de começar limpo: sem isto, o motivo do
-  // anterior aparece escrito no próximo, e alguém salva sem reparar.
+  // anterior aparece escrito no próximo, e alguém salva sem reparar. 🔴 A caixinha entra na
+  // mesma limpeza, e pelo mesmo motivo: desmarcada uma vez, ela ficaria desmarcada para
+  // todos os negócios seguintes da sessão — e o padrão do produto é criar a tarefa.
   useEffect(() => {
     if (aberto) {
       setMotivo('');
       setRetorno(sugestaoDeRetorno());
+      setCriarTarefa(true);
     }
   }, [aberto, pedidoId]);
 
   const motivoValido = motivo.trim().length >= 3;
+
+  /**
+   * 🔴 A MESMA STRING QUE VAI AO BANCO alimenta a frase de ajuda. Se cada uma formatasse a
+   * data do seu jeito, a tela poderia prometer um dia e a gravação usar outro — e ninguém
+   * repararia, porque as duas pareceriam certas isoladamente.
+   *
+   * `format` lê o fuso LOCAL, e o calendário entrega meia-noite local: os dois falam a mesma
+   * língua e não há nada a converter. Passar por `toISOString()` aqui recuaria um dia a
+   * partir das 21h (CLAUDE.md §7.12).
+   */
+  const retornoEmTexto = format(retorno, 'yyyy-MM-dd');
+
+  /**
+   * Nulo significa "o negócio é meu" — ver a propriedade `responsavel` lá em cima. Normalizado
+   * num lugar só para a frase de ajuda e o aviso de sucesso não discordarem sobre quem recebe.
+   */
+  const donoDaTarefa = responsavel?.trim() || null;
 
   const salvar = async () => {
     if (!pedidoId || !motivoValido) return;
@@ -108,12 +134,23 @@ export function DialogoRetorno({
       await registrar.mutateAsync({
         pedidoId,
         motivo: motivo.trim(),
-        // `format` lê o fuso LOCAL, e o calendário entrega meia-noite local: os dois falam a
-        // mesma língua e não há nada a converter. Passar por `toISOString()` aqui recuaria
-        // um dia a partir das 21h (CLAUDE.md §7.12).
-        retornoEm: format(retorno, 'yyyy-MM-dd'),
+        retornoEm: retornoEmTexto,
+        criarTarefa,
       });
-      toast.success(`Retorno marcado para ${format(retorno, "dd 'de' MMMM", { locale: ptBR })}`);
+      // O aviso de sucesso conta a SEGUNDA coisa que aconteceu. Sem isto, a pessoa acabou de
+      // mandar trabalho para a agenda de um colega e a tela só fala do retorno — e o colega
+      // descobre pela tarefa aparecendo na fila dele, sem que ninguém tenha avisado quem
+      // criou. Desmarcada a caixinha, não há segunda linha porque não há segunda coisa.
+      toast.success(
+        `Retorno marcado para ${format(retorno, "dd 'de' MMMM", { locale: ptBR })}`,
+        criarTarefa
+          ? {
+              description: donoDaTarefa
+                ? `Uma tarefa foi criada para ${donoDaTarefa}.`
+                : 'Uma tarefa foi criada no seu nome.',
+            }
+          : undefined,
+      );
       aoFechar();
     } catch (e) {
       // Mesma armadilha da aba de Automação: o erro do banco não é um `Error`, e o
@@ -192,6 +229,32 @@ export function DialogoRetorno({
                 ? `Este negócio é de ${responsavel}. Ao marcar o retorno, ele sai da pauta de vocês dois até essa data, e ${responsavel} recebe um aviso com o motivo que você escreveu.`
                 : 'O negócio volta para a sua pauta nesse dia.'}{' '}
               A data também aparece no calendário da equipe.
+            </p>
+          </div>
+
+          {/*
+            A caixinha vem DEPOIS da data de propósito: ela promete um prazo, e o prazo é a
+            data escolhida logo acima. Invertida a ordem, a frase de ajuda falaria de um dia
+            que a pessoa ainda não escolheu.
+          */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="criar-tarefa-retorno"
+                checked={criarTarefa}
+                // `onCheckedChange` do Radix devolve também `'indeterminate'`, que nunca
+                // acontece aqui — `=== true` é o que garante um booleano de verdade indo
+                // para o banco, e não a string.
+                onCheckedChange={(marcado) => setCriarTarefa(marcado === true)}
+              />
+              <Label htmlFor="criar-tarefa-retorno" className="cursor-pointer font-normal">
+                Criar tarefa para o responsável
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {criarTarefa
+                ? avisoDaTarefaDoRetorno(donoDaTarefa, retornoEmTexto)
+                : 'Sem tarefa na agenda: só o retorno fica registrado.'}
             </p>
           </div>
         </CorpoDialogo>

@@ -69,7 +69,22 @@ export function useRegistrarRetorno() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async (args: { pedidoId: string; motivo: string; retornoEm: string }) => {
+    mutationFn: async (args: {
+      pedidoId: string;
+      motivo: string;
+      retornoEm: string;
+      /**
+       * A caixinha "Criar tarefa para o responsável" do diálogo. Marcada, o banco cria uma
+       * tarefa para o DONO do negócio — nunca para quem clicou — com o motivo na descrição e
+       * prazo no dia do retorno. Desmarcada, só o retorno é gravado.
+       *
+       * 🔴 SEM VALOR PADRÃO AQUI, de propósito. O padrão "marcada" mora no estado do diálogo,
+       * que é onde a pessoa vê a escolha. Repetir `= true` neste ponto criaria um segundo
+       * lugar para a mesma decisão, e uma chamada que esquecesse o campo criaria tarefa
+       * caladamente achando que não criou.
+       */
+      criarTarefa: boolean;
+    }) => {
       // O "hoje" do registro passou a ser o do calendário brasileiro decidido no servidor —
       // antes vinha do relógio deste navegador. Some assim a chance de um computador com o
       // fuso trocado gravar o dia errado (CLAUDE.md §7.12).
@@ -77,6 +92,7 @@ export function useRegistrarRetorno() {
         p_pedido_id: args.pedidoId,
         p_motivo: args.motivo,
         p_retorno_em: args.retornoEm,
+        p_criar_tarefa: args.criarTarefa,
       });
       // Sobe o erro do Supabase CRU, de propósito: `DialogoRetorno` já o traduz com
       // `mensagemDeErro`, que sabe ler `code`/`details`/`hint` — e é o `code` 42501 que
@@ -109,6 +125,24 @@ export function useRegistrarRetorno() {
       // quem acabou de adiar também muda. Sem isto, ele só mudaria quando o aviso em tempo
       // real chegasse, e não chega quando essa conexão cai.
       qc.invalidateQueries({ queryKey: ['notificacoes'] });
+      // A TAREFA NASCE AGORA, no mesmo gesto, e duas telas a mostram.
+      //
+      // 🔴 As chaves foram CONFERIDAS em `use-tarefas.ts`, não deduzidas: `['tarefas']`
+      // (linha 82, a tela de Tarefas) e `['tarefas_por_pedido', pedidoId]` (linha 116, a
+      // lista dentro do painel do negócio). É o mesmo par que `use-tarefas.ts` invalida
+      // quando ele próprio cria uma tarefa. Este arquivo já teve uma invalidação escrita com
+      // hífen enquanto a consulta usava sublinhado — nunca casaram, em silêncio, por meses.
+      //
+      // Sem `['tarefas']`: a pessoa adia o negócio, abre Tarefas e não acha a tarefa que
+      // acabou de mandar para a agenda de um colega — a tela tem a lista em mãos e não
+      // refaz a consulta sozinha.
+      qc.invalidateQueries({ queryKey: ['tarefas'] });
+      // Sem `['tarefas_por_pedido']`: a tela "Hoje" abre o painel do negócio por cima da
+      // pauta (`PainelDoNegocio`), e a aba de tarefas de lá continuaria mostrando a lista de
+      // antes do adiamento — no MESMO negócio que a pessoa acabou de adiar, sem trocar de
+      // tela. Sem o segundo elemento de propósito: a chave completa leva o `pedidoId`, e o
+      // prefixo alcança o painel de qualquer negócio que já tenha sido aberto.
+      qc.invalidateQueries({ queryKey: ['tarefas_por_pedido'] });
     },
   });
 }
