@@ -527,17 +527,47 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       .map((r, indicePrevia) => ({ r, indicePrevia }))
       .filter(({ r }) => !((r as any).__dateError) && r.cliente && r.fabricante);
     const rows = linhasComIndicePrevia.map(({ r }) => r);
-    const ignoredRowsData = rawData.filter((_, index) => {
-      const mapped = allRows[index];
-      return !((mapped as any).__dateError) && !(mapped.cliente && mapped.fabricante);
-    });
-    
-    if (rows.length === 0) {
+    // 🔴 Achado 2 da revisão final: uma linha com Código/ID válido não precisa ter Cliente
+    // nem Fabricante preenchidos, porque ela não vai ser CADASTRADA — vai ser ATUALIZADA. Sem
+    // este desconto, ela caía no filtro de baixo (que só enxerga "falta Cliente ou
+    // Fabricante") e era gravada como ignorada com esse motivo, mesmo tendo acabado de ser
+    // atualizada com sucesso pelo bloco de `atualizarNegociosPorCodigo` mais abaixo — a tela
+    // dizia "ignorada" para uma linha que funcionou. `l.indice`, aqui, é o índice da PRÉVIA
+    // (posição em `previewRows`/`reencontro.classificacao`), e o `.map` logo abaixo captura o
+    // índice de `rawData`/`allRows` ANTES de qualquer filtro — são o MESMO espaço de índice
+    // (as duas listas vêm de `getMappedRows()` sem nada no meio, ver o comentário de
+    // `linhasComIndicePrevia` acima), então dá para comparar direto, sem traduzir nada.
+    const indicesAtualizados = new Set(reencontro?.classificacao.atualiza.map(l => l.indice) ?? []);
+    const ignoredRowsData = rawData
+      .map((row, index) => ({ row, index }))
+      .filter(({ index }) => {
+        const mapped = allRows[index];
+        return !((mapped as any).__dateError) && !(mapped.cliente && mapped.fabricante);
+      })
+      .filter(({ index }) => !indicesAtualizados.has(index))
+      .map(({ row }) => row);
+
+    // 🔴 Achado 1 da revisão final: Cliente e Fabricante são obrigatórios para CADASTRAR um
+    // negócio novo, mas NÃO para ATUALIZAR um que já existe — a atualização só toca nome,
+    // observações e marcador (decisão 4 do desenho). A planilha enxuta de anotação que
+    // motivou este trabalho inteiro (só Código/ID e Observações, sem essas duas colunas) faz
+    // `rows` ficar vazio de propósito. Se o corte olhasse só `rows`, essa planilha prometeria
+    // "38 negócios serão atualizados" na prévia e cairia direto nesta mensagem no Confirmar —
+    // uma mensagem que fala só de Cliente e Fabricante, que ela não precisa preencher — e
+    // nada seria gravado. Por isso o corte só acontece quando NENHUM dos dois caminhos (nem
+    // cadastro, nem atualização) tem o que fazer, e a mensagem só aparece nesse caso — é o
+    // único em que ela não mente.
+    if (rows.length === 0 && (!reencontro || reencontro.resumo.negocios.length === 0)) {
       toast.error('Nenhum registro válido para importar. Verifique se as colunas de Cliente e Fabricante estão mapeadas e preenchidas.');
       return;
     }
-    
+
     setImporting(true);
+    // 🔴 Achado 3 da revisão final: declarada FORA do `try` de propósito. O `catch`, mais
+    // abaixo, precisa ler quantas atualizações já tinham sido gravadas quando o cadastro (que
+    // roda depois, dentro do `try`) lança — declarada dentro do `try`, como estava, essa
+    // variável não existiria mais no escopo do `catch`.
+    let resultadoAtualizacao: ResultadoDaAtualizacao | null = null;
     try {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       if (!vid) throw new Error('Vendedor não encontrado');
@@ -627,7 +657,6 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       // Dois caminhos, e eles não se misturam: quem tem código é ATUALIZADO, quem não tem é
       // CADASTRADO (e só se a pessoa deixou a caixinha marcada). Recusado por código
       // inexistente ou repetido não entra em nenhum dos dois — foi decidido na prévia.
-      let resultadoAtualizacao: ResultadoDaAtualizacao | null = null;
       if (reencontro && reencontro.resumo.negocios.length > 0) {
         const avisoAtualizacao = toast.loading(
           `Atualizando ${reencontro.resumo.negocios.length} negócio(s)...`,
@@ -661,13 +690,23 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
       // banco em `linhas-para-cadastrar.test.ts`) existe para que ninguém "simplifique" este
       // filtro de volta para a posição crua em `enrichedRows` — foi exatamente esse o defeito
       // do plano original.
+      //
+      // 🔴 Achado 4 da revisão final: `indicesParaCadastrar` só é nulo quando `reencontro` é
+      // nulo, e a trava de profundidade no topo de `handleImport`
+      // (`if (conferindoCodigos || falhaNaConferencia || !reencontro) return;`) já barra
+      // `reencontro` nulo antes de qualquer linha deste bloco rodar — este ramo é
+      // inalcançável hoje. Fica como cinto de segurança para se aquela trava algum dia falhar
+      // (por exemplo, alguém remover a checagem sem perceber a dependência). `[]` é o pior
+      // caso seguro — "não cadastra nada". O `enrichedRows` que estava aqui era o pior caso
+      // possível: cadastraria a planilha inteira como negócio novo, exatamente a duplicação
+      // que este trabalho existe para impedir.
       const linhasParaCadastrar = indicesParaCadastrar
         ? escolherLinhasParaCadastrar(
             enrichedRows,
             linhasComIndicePrevia.map(l => l.indicePrevia),
             indicesParaCadastrar,
           )
-        : enrichedRows;
+        : [];
 
       const summary = linhasParaCadastrar.length > 0
         ? await importNegocios(linhasParaCadastrar, undefined, funilId, empresaId)
@@ -685,12 +724,6 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         }
       }
 
-      // A lista completa de chaves que dependem de `pedidos` — inclui painéis que não parecem
-      // ligados, como o faturamento mensal e o Plano de Vendas (CLAUDE.md §6.6). Atualizar um
-      // negócio muda o mesmo dado que criar um.
-      invalidarPaineisDeNegocios(qc);
-      qc.invalidateQueries({ queryKey: ['clientes'] });
-
       setImportResult({
         totalNoArquivo: rawData.length,
         totalValidados: rows.length,
@@ -705,9 +738,35 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         repetidos: reencontro?.classificacao.repetido.length ?? 0,
       });
       setStep('done');
-    } catch (err: any) {
-      toast.error('Erro na importação: ' + (err.message || 'erro desconhecido'));
+    } catch (err) {
+      // 🔴 Achado 3 da revisão final, duas partes.
+      // 1) Erro do Supabase NÃO é um `Error` (CLAUDE.md §4.6): `e instanceof Error` dá FALSO
+      //    justamente para o erro que interessa, e a frase que o banco mandou junto se perdia
+      //    atrás de "erro desconhecido". `mensagemDeErro` lê `message`/`details`/`hint`.
+      // 2) A atualização por Código/ID roda ANTES do cadastro e pode já ter gravado no banco
+      //    quando o cadastro (que roda depois, no mesmo `try`) lança. `setImportResult` e
+      //    `setStep('done')`, acima, nunca chegam a rodar neste caminho — não dá para montar a
+      //    tela de resultado inteira sem saber quantas linhas o cadastro chegou a inserir
+      //    antes de falhar (o `summary` também não existe aqui). Por isso a contagem do que já
+      //    foi salvo entra na própria mensagem de erro, para a pessoa não achar que perdeu uma
+      //    atualização que já está gravada.
+      const jaAtualizados = resultadoAtualizacao?.aceitos ?? 0;
+      const aviso = jaAtualizados > 0
+        ? ` ${jaAtualizados} negócio(s) já haviam sido atualizado(s) antes da falha e continuam gravados.`
+        : '';
+      toast.error(`Erro na importação: ${mensagemDeErro(err)}.${aviso}`);
     } finally {
+      // A lista completa de chaves que dependem de `pedidos` — inclui painéis que não parecem
+      // ligados, como o faturamento mensal e o Plano de Vendas (CLAUDE.md §6.6). Atualizar um
+      // negócio muda o mesmo dado que criar um.
+      //
+      // 🔴 Achado 3 da revisão final: a invalidação mora no `finally`, não mais só no fim
+      // feliz do `try` — a atualização por Código/ID pode ter gravado no banco mesmo quando o
+      // cadastro que roda depois lança, e sem isto a tela de Negócios continuava mostrando o
+      // valor velho de um dado que já tinha mudado, até alguém recarregar a página por conta
+      // própria.
+      invalidarPaineisDeNegocios(qc);
+      qc.invalidateQueries({ queryKey: ['clientes'] });
       setImporting(false);
     }
   };
@@ -720,6 +779,25 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     const slug = matchPedidoStatusToColuna(rawStatus, kanbanColunas);
     return kanbanColunas.find(c => c.slug === slug) ?? null;
   };
+
+  // 🔴 Achado 5 da revisão final: o rótulo antigo ("Importar {previewRows.length} negócios")
+  // contava as LINHAS DA PLANILHA, não o que a importação de fato faz. Depois deste trabalho,
+  // uma volta de exportação com 3 edições mostrava "Importar 151 negócios" e o resultado real
+  // era 3 atualizados, 0 inseridos. O painel de cima já dá a conta certa, mas este texto é o
+  // que a pessoa lê no instante de clicar em Confirmar — precisa dizer a mesma coisa.
+  const rotuloConfirmar = (() => {
+    if (!reencontro) return `Importar ${previewRows.length} negócios`;
+    const atualizar = reencontro.resumo.negocios.length;
+    // Mesma conta que a caixinha do balde "sem código" já mostra mais acima, na prévia (o
+    // balde inteiro, sem descontar quem também não tem Cliente/Fabricante e por isso nem
+    // chega a ser cadastrado) — manter os dois números iguais dentro do mesmo passo importa
+    // mais do que casar exatamente com o resultado final da tela de conclusão.
+    const cadastrar = criarOsSemCodigo ? reencontro.classificacao.semCodigo.length : 0;
+    const partes: string[] = [];
+    if (atualizar > 0) partes.push(`Atualizar ${atualizar}`);
+    if (cadastrar > 0) partes.push(`Cadastrar ${cadastrar}`);
+    return partes.length > 0 ? partes.join(' · ') : 'Importar 0 negócios';
+  })();
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
@@ -1379,7 +1457,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
               {importing ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando...</>
               ) : (
-                <><CheckCircle2 className="h-4 w-4 mr-2" /> Importar {previewRows.length} negócios</>
+                <><CheckCircle2 className="h-4 w-4 mr-2" /> {rotuloConfirmar}</>
               )}
             </Button>
           </div>
