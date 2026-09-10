@@ -4858,7 +4858,12 @@ export type Database = {
         }[]
       }
       registrar_retorno: {
-        Args: { p_motivo: string; p_pedido_id: string; p_retorno_em: string }
+        Args: {
+          p_criar_tarefa?: boolean
+          p_motivo: string
+          p_pedido_id: string
+          p_retorno_em: string
+        }
         Returns: undefined
       }
       restaurar_usuario_por_email: {
