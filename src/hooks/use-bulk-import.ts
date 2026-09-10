@@ -5,8 +5,46 @@ import { resolveClienteId, resolveFabricanteId, resolveMarcadorId, resetResolveC
 import { computeRowHash } from '@/lib/import/row-hash';
 import { resolveEspelhoPdfUrls, type ResolvePdfResult } from '@/lib/import/resolve-pedido-pdf';
 import { matchPedidoStatusToColuna, type ImportKanbanColuna } from '@/components/import-pedidos/importPedidosUtils';
+import type { AlteracaoDeNegocio } from '@/lib/import/alteracoes-por-codigo';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 
 export type ImportType = 'clientes' | 'negocios';
+
+export interface ResultadoDaAtualizacao {
+  /** Quantos negócios a planilha mandou alterar. */
+  pedidos: number;
+  /** Quantos o banco de fato alterou. */
+  aceitos: number;
+  recusados: number;
+  /** Erro de verdade, agrupado pela frase. Recusa silenciosa não aparece aqui. */
+  motivos: Record<string, number>;
+}
+
+/**
+ * A conta honesta do que aconteceu.
+ *
+ * 🔴 SEPARADA DA GRAVAÇÃO DE PROPÓSITO, para poder ser testada sem banco — e porque a regra
+ * que ela carrega é a mais fácil de errar do trabalho inteiro.
+ *
+ * A política de `pedidos` deixa um vendedor comum EDITAR só os próprios negócios (ele VÊ os
+ * da empresa toda, o que é outra coisa). Um `update` numa linha que a política recusa **não
+ * dá erro**: ele simplesmente não altera nada e devolve zero linhas. Então "quantos foram
+ * alterados" só se sabe contando o que voltou do `select()` da gravação — nunca somando o
+ * que foi pedido.
+ */
+export function contarResultadoDaAtualizacao(
+  pedidos: number,
+  devolvidos: Array<{ id: string }>,
+  errosDeVerdade: string[],
+): ResultadoDaAtualizacao {
+  const motivos: Record<string, number> = {};
+  for (const motivo of errosDeVerdade) {
+    const chave = motivo.length > 80 ? `${motivo.slice(0, 80)}…` : motivo;
+    motivos[chave] = (motivos[chave] ?? 0) + 1;
+  }
+  const aceitos = devolvidos.length;
+  return { pedidos, aceitos, recusados: Math.max(0, pedidos - aceitos), motivos };
+}
 
 export interface ImportSummary {
   total: number;
@@ -349,5 +387,48 @@ export function useBulkImport() {
     }
   }
 
-  return { importClientes, importNegocios, importing, progress };
+  /**
+   * Grava as alterações vindas da planilha.
+   *
+   * Uma gravação POR NEGÓCIO, e isso é inevitável: cada um recebe valores diferentes, então
+   * não existe um `update` só que sirva para todos. Segue o mesmo limite de 4 em paralelo da
+   * inserção — mais que isso não acelera (a regra de segurança do banco é o gargalo) e
+   * atrapalha o resto do app.
+   */
+  async function atualizarNegociosPorCodigo(
+    alteracoes: AlteracaoDeNegocio[],
+    aoProgredir?: (feitos: number) => void,
+  ): Promise<ResultadoDaAtualizacao> {
+    const devolvidos: Array<{ id: string }> = [];
+    const erros: string[] = [];
+    let feitos = 0;
+
+    const fila = [...alteracoes];
+    const trabalhador = async () => {
+      for (;;) {
+        const item = fila.shift();
+        if (!item) return;
+        try {
+          const { data, error } = await supabase
+            .from('pedidos')
+            .update(item.patch)
+            .eq('id', item.id)
+            .select('id');
+          if (error) throw error;
+          // Vazio aqui NÃO é erro: é a política do banco recusando em silêncio.
+          if (data && data.length > 0) devolvidos.push({ id: item.id });
+        } catch (err) {
+          erros.push(mensagemDeErro(err, 'Não foi possível atualizar'));
+        } finally {
+          feitos += 1;
+          aoProgredir?.(feitos);
+        }
+      }
+    };
+
+    await Promise.all([trabalhador(), trabalhador(), trabalhador(), trabalhador()]);
+    return contarResultadoDaAtualizacao(alteracoes.length, devolvidos, erros);
+  }
+
+  return { importClientes, importNegocios, atualizarNegociosPorCodigo, importing, progress };
 }
