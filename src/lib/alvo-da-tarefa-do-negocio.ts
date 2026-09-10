@@ -31,8 +31,14 @@ export interface AlvoDaTarefaDoNegocio {
  * "Empresa (cliente)" por `extraFields?.cliente_id !== undefined`. Com `undefined` o campo
  * aparecia, mas o `...extraFields` do `handleSave` sobrescrevia a escolha da pessoa com
  * `undefined` na hora de gravar — ou seja, um campo que aceitava o clique e jogava fora a
- * resposta. Medido em 10/09/2026: negócio sem cliente mostrava o campo e gravava nulo assim
- * mesmo.
+ * resposta.
+ *
+ * ⚠️ Correção de 10/09/2026, na revisão: isso NÃO acontecia por "negócio sem cliente", como
+ * este comentário chegou a afirmar. `pedidos.cliente_id` é `NOT NULL` e não há uma linha nula
+ * na base inteira — negócio sem cliente não existe. O campo aparecia porque **o painel já tinha
+ * fechado** e o alvo vinha vazio, que é o próprio defeito que este arquivo conserta. Em todo
+ * caso real, o `extraFields` novo e o antigo entregam exatamente os mesmos valores; o `?? null`
+ * é cinto de segurança contra o alvo incompleto, não conserto de um dado que falta.
  *
  * 🔴 POR QUE MORA EM `lib/` E NÃO DENTRO DO PAINEL: exportar uma função (não um componente) de
  * um arquivo `.tsx` de componente acende o aviso `react-refresh/only-export-components` do

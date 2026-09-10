@@ -223,6 +223,14 @@ export function PainelDoNegocio({
             O que isto NÃO desliga: o botão Fechar, o "X", o Esc e o clique fora quando não há
             formulário de tarefa aberto — tudo segue igual. E o Esc com o formulário aberto já
             era do formulário, não do painel: o Radix só entrega a tecla ao layer mais alto.
+
+            🔴 E POR ISSO O ALVO CONGELADO NÃO É REDUNDANTE. Medido na revisão em 10/09/2026:
+            com o formulário aberto, clicar no botão "Fechar" do rodapé DERRUBA o painel — o
+            `onInteractOutside` não é chamado, porque o botão é do próprio painel e o clique não
+            vem de fora. O formulário fica de pé sozinho, que é exatamente o estado final do
+            defeito antigo. A tarefa continua nascendo ligada só porque `alvoDaTarefa` guardou o
+            negócio no instante em que o formulário abriu. Quem apagar uma das duas metades
+            achando que a outra basta reabre o defeito por esse caminho.
           */
           onInteractOutside={(evento) => {
             if (formularioDeTarefaAberto) evento.preventDefault();
