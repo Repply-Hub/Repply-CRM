@@ -100,7 +100,11 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
     setQuantos(PAGINA);
   }
 
-  const { data, isLoading, isFetching, error } = useNegociosEmRisco(empresaId, filtros, quantos);
+  const { data, isPending, isPaused, isFetching, error } = useNegociosEmRisco(
+    empresaId,
+    filtros,
+    quantos,
+  );
 
   const linhas = data?.linhas ?? [];
   const total = data?.total ?? 0;
@@ -125,13 +129,7 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
       </CardHeader>
 
       <CardContent className="pt-2">
-        {isLoading ? (
-          <div className="space-y-2 py-2" aria-busy="true">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-9 w-full" />
-            ))}
-          </div>
-        ) : error ? (
+        {error ? (
           /* Erro do Supabase NÃO é um `Error` (CLAUDE.md §4.6): `mensagemDeErro` lê
              `message`/`details`/`hint`, que é onde o banco escreve o que de fato aconteceu.
              Mostrar a frase do banco em vez de "algo deu errado" é o que separa um chamado de
@@ -139,6 +137,23 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
           <p className="py-4 text-sm text-destructive">
             Não foi possível carregar a lista: {mensagemDeErro(error, 'tente recarregar a página')}
           </p>
+        ) : isPaused ? (
+          /* 🔴 SEM RESPOSTA NÃO É "NÃO HÁ NADA". Quando o navegador perde a rede, o TanStack Query
+             PAUSA a consulta em vez de deixá-la falhar: ela fica sem dados e sem erro, e é um
+             estado que dura enquanto a conexão não voltar. Se isso caísse no ramo de lista vazia
+             abaixo, a tabela diria "nenhum negócio pedindo atenção" — a mesma tela mentindo por
+             falta de resposta, que é justamente o que este trabalho veio consertar.
+             Medido no navegador em 10/09/2026: consulta `pending` com `fetchStatus: paused`
+             deixa `isLoading` FALSO, então o esqueleto sozinho também não cobria este caso. */
+          <p className="py-4 text-sm text-muted-foreground">
+            Sem conexão para carregar a lista. Ela aparece assim que a internet voltar.
+          </p>
+        ) : isPending ? (
+          <div className="space-y-2 py-2" aria-busy="true">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-9 w-full" />
+            ))}
+          </div>
         ) : linhas.length === 0 ? (
           <p className="py-4 text-sm text-muted-foreground">Nenhum negócio pedindo atenção agora.</p>
         ) : (

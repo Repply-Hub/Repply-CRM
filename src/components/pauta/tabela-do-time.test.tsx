@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 /**
@@ -22,12 +22,16 @@ import type { ReactNode } from 'react';
 const estado = vi.hoisted(() => ({
   chamadas: [] as { p_limite: number; p_etapas: string[] | null }[],
   total: 145,
+  // O erro do Supabase é um objeto simples, não um `Error` — é essa a forma que chega na tela
+  // (CLAUDE.md §4.6), e é por isso que o esboço devolve exatamente ela.
+  erro: null as null | { message: string; details?: string; hint?: string; code?: string },
 }));
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     rpc: async (_nome: string, args: { p_limite: number; p_etapas: string[] | null }) => {
       estado.chamadas.push(args);
+      if (estado.erro) return { data: null, error: estado.erro };
       // O servidor devolve no máximo o que existe no recorte — e nunca mais de 100, que é o teto
       // escrito dentro da função (`least(p_limite, 100)`, migration 20260909130000).
       const quantas = Math.min(args.p_limite, 100, estado.total);
@@ -75,9 +79,13 @@ function montar(filtros: { etapas?: string[] } = {}, podeVerDeTodos = true) {
 beforeEach(() => {
   estado.chamadas = [];
   estado.total = 145;
+  estado.erro = null;
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  onlineManager.setOnline(true);
+});
 
 describe('a tabela do time', () => {
   it('abre com 10 linhas e diz onde a pessoa está na lista', async () => {
@@ -161,6 +169,35 @@ describe('a tabela do time', () => {
     montar({}, true);
     await screen.findByText('Negócio 0');
     expect(screen.getByRole('columnheader', { name: 'Responsável' })).toBeInTheDocument();
+  });
+
+  /**
+   * 🔴 AUSÊNCIA DE RESPOSTA NÃO É "NÃO HÁ NADA" — as duas maneiras de não ter resposta.
+   *
+   * O erro do banco a tela mostra com a frase que o banco escreveu (CLAUDE.md §4.6). Já a falta de
+   * REDE não vira erro: o TanStack Query PAUSA a consulta, e ela fica sem dados, sem erro e com
+   * `isLoading` falso — medido no navegador em 10/09/2026 (`status: pending`,
+   * `fetchStatus: paused`). Sem um ramo próprio, os dois cairiam no "nenhum negócio pedindo
+   * atenção", que é a tela mentindo por falta de resposta.
+   */
+  it('mostra a frase que o BANCO escreveu quando a consulta falha', async () => {
+    estado.erro = {
+      code: 'PGRST202',
+      message: 'Could not find the function public.negocios_em_risco in the schema cache',
+    };
+    montar();
+
+    expect(await screen.findByText(/Could not find the function public\.negocios_em_risco/)).toBeInTheDocument();
+    expect(screen.queryByText('Nenhum negócio pedindo atenção agora.')).toBeNull();
+  });
+
+  it('🔴 sem rede, diz que está sem conexão — nunca "nenhum negócio pedindo atenção"', async () => {
+    onlineManager.setOnline(false);
+    montar();
+
+    expect(await screen.findByText(/Sem conexão para carregar a lista/)).toBeInTheDocument();
+    expect(screen.queryByText('Nenhum negócio pedindo atenção agora.')).toBeNull();
+    expect(estado.chamadas).toHaveLength(0);
   });
 
   it('cada linha tem as duas ações, e "Retomar depois" não abre o negócio junto', async () => {

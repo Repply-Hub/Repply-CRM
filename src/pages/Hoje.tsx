@@ -189,9 +189,14 @@ const Hoje = () => {
   const {
     data: primeiraPaginaDoTime,
     isLoading: carregandoOTime,
-    error: erroDoTime,
+    status: estadoDoTime,
   } = useNegociosEmRisco(empresaId, recorte, 10);
   const totalDoTime = primeiraPaginaDoTime?.total ?? 0;
+  // 🔴 "RESPONDEU" É O QUE VALE, e não "não deu erro". São três os jeitos de não haver resposta —
+  // ainda carregando, erro, e a consulta PAUSADA porque o navegador está sem rede — e nos três a
+  // tela não sabe o que há na tabela de baixo. Perguntar por `status === 'success'` cobre os três
+  // de uma vez; perguntar "tem erro?" deixaria a pausa de fora, e sem rede a tela comemoraria.
+  const timeRespondeu = estadoDoTime === 'success';
 
   function trocarFiltros(novos: FiltrosDoPainel) {
     setSearchParams((prev) => escreverFiltrosNoEndereco(new URLSearchParams(prev), novos), {
@@ -252,11 +257,12 @@ const Hoje = () => {
   // com a soma das esperas a tela ficaria em esqueleto por segundos com os itens já em mãos.
   const esperandoOTime = total === 0 && carregandoOTime;
 
-  // A fila vazia só COMEMORA quando não há nada esperando na tabela de baixo. Para as três
+  // A fila vazia só COMEMORA quando a tabela de baixo RESPONDEU e veio vazia. Para as três
   // gestoras da MD que não têm negócio próprio, a fila fica em zero todo dia — comemorar ali
-  // seria dizer "acabou" logo acima de uma tabela com a carteira da equipe inteira.
-  // A consulta que falhou também cai aqui: sem saber o que há embaixo, não se comemora.
-  const filaVaziaEComemora = total === 0 && totalDoTime === 0 && !erroDoTime;
+  // seria dizer "acabou" logo acima de uma tabela com a carteira da equipe inteira. E ausência de
+  // resposta não é resposta: sem saber o que há embaixo, a tela usa a frase sóbria, que não
+  // promete nada.
+  const filaVaziaEComemora = total === 0 && timeRespondeu && totalDoTime === 0;
 
   return (
     <AppLayout title="Hoje" subtitle={format(hoje, "EEEE, d 'de' MMMM", { locale: ptBR })}>
