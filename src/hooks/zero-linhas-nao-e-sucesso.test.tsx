@@ -246,6 +246,20 @@ describe('frasesDaExclusaoEmMassa', () => {
     expect(frase).toContain('As outras 2 continuam na lista');
   });
 
+  /**
+   * A frase que sobra UMA é a que mais aparece na prática — marcar duas e ter uma recusada é o
+   * caso comum, não o extremo. E "As outras 1 continuam na lista" corrói a confiança justamente
+   * num aviso cuja função é dizer que o sistema NÃO fez o que parecia ter feito.
+   */
+  it('sobrando UMA, a frase fala no singular — nunca "As outras 1"', () => {
+    const { tipo, frase } = frasesDaExclusaoEmMassa({ pedidas: 2, removidas: 1 });
+
+    expect(tipo).toBe('parcial');
+    expect(frase).toContain('1 de 2');
+    expect(frase).toContain('A outra continua na lista');
+    expect(frase).not.toContain('As outras 1');
+  });
+
   it('todas removidas é sucesso, e o número é o que saiu', () => {
     expect(frasesDaExclusaoEmMassa({ pedidas: 3, removidas: 3 })).toEqual({
       tipo: 'sucesso',

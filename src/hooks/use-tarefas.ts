@@ -293,9 +293,18 @@ export function frasesDaExclusaoEmMassa({ pedidas, removidas }: ResultadoDaExclu
   }
 
   if (removidas < pedidas) {
+    // Concordância no singular quando sobra UMA: "As outras 1 continuam na lista" é a frase
+    // que a pessoa lê na tela, e ler errado corrói a confiança no aviso inteiro — ainda mais
+    // num aviso cuja função é dizer que o sistema NÃO fez o que parecia ter feito.
+    const sobraram = pedidas - removidas;
     return {
       tipo: 'parcial',
-      frase: `${removidas} de ${pedidas} tarefas excluídas. As outras ${pedidas - removidas} continuam na lista: ${RECUSA_AO_EXCLUIR} Peça a um gestor da sua empresa.`,
+      frase:
+        `${removidas} de ${pedidas} tarefas excluídas. ` +
+        (sobraram === 1
+          ? 'A outra continua na lista: '
+          : `As outras ${sobraram} continuam na lista: `) +
+        `${RECUSA_AO_EXCLUIR} Peça a um gestor da sua empresa.`,
     };
   }
 
