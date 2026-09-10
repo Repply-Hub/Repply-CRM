@@ -3,6 +3,8 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeFileName } from '@/lib/file-validation';
 import { toast } from 'sonner';
+import { tocarEnvio } from '@/lib/som';
+import { somLigado } from '@/hooks/use-som-ligado';
 
 export interface ChatMessage {
   id: string;
@@ -620,6 +622,10 @@ export function useSendMessage() {
       toast.error(`Erro ao enviar mensagem: ${err.message || 'Erro desconhecido'}`);
     },
     onSuccess: (data, variables, context) => {
+      // O mesmo som do WhatsApp, pelo mesmo motivo: e resposta ao clique da
+      // pessoa. Faltava aqui — o chat interno enviava calado.
+      tocarEnvio(somLigado());
+
       // Substitui apenas as mensagens otimistas desta chamada pelas reais —
       // não mexe nas mensagens otimistas de outras chamadas ainda pendentes.
       qc.setQueryData<ChatMessage[]>(['chat_mensagens', variables.grupoId, variables.recipientId], (old) => {

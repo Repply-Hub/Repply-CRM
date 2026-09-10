@@ -58,7 +58,7 @@ import {
 import { useVendedores, useClientes } from "@/hooks/use-clientes";
 import { usePedidosOptions } from "@/hooks/use-pedidos";
 import { getNomeNegocio } from "@/lib/nome-negocio";
-import { definirConversaEmFoco, tocarEnvio } from "@/lib/som";
+import { definirConversaEmFoco } from "@/lib/som";
 import {
   lerRascunhos,
   gravarRascunho,
@@ -6420,7 +6420,6 @@ export default function WhatsAppInbox() {
     if (conversaAtivaId && profile?.id) {
       setRascunhos(limparRascunho(profile.id, conversaAtivaId));
     }
-    tocarEnvio(somLigado());
     setMentionedParticipantes(new Map());
     fecharMencao();
     clearAttachments();

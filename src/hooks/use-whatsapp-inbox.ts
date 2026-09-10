@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
 import { erroLegivelDaFunction } from '@/lib/erro-edge-function';
 import { infoPreviewMensagem } from '@/lib/wa-mensagem-preview';
-import { tocarNotificacao } from '@/lib/som';
+import { tocarNotificacao, tocarEnvio } from '@/lib/som';
 import { somLigado } from '@/hooks/use-som-ligado';
 
 const MENSAGEM_TOAST_MAX_CHARS = 100;
@@ -843,6 +843,15 @@ export function useWaSendMessage() {
     },
 
     onSuccess: (data, vars, context) => {
+      // 🔴 O som de envio mora AQUI, e nao na tela.
+      //
+      // Estava em `handleSend`, que e so o caminho do texto e do anexo — audio,
+      // figurinha e imagem-como-figurinha saiam caladas. O pedido do dono do
+      // produto era explicito: "qualquer que seja esse tipo de mensagem".
+      // Na mutation, todo caminho de envio passa por aqui, inclusive os que
+      // ainda nao existem.
+      tocarEnvio(somLigado());
+
       if (!vars.conversa_id || !context?.msgOtimista) return;
       // Atualiza só o status — não muda o id, para o Realtime conseguir substituir o otimista
       qc.setQueryData<WaMensagem[]>(['wa_mensagens', vars.conversa_id], (old) => {
