@@ -4673,6 +4673,22 @@ export type Database = {
       delete_current_user: { Args: never; Returns: undefined }
       delete_obras_bulk: { Args: { obra_ids: string[] }; Returns: undefined }
       empresa_plano_ativo: { Args: never; Returns: boolean }
+      email_do_negocio: {
+        Args: {
+          p_cliente_id: string
+          p_de: string
+          p_ate: string
+        }
+        Returns: {
+          thread_id: string
+          assunto: string | null
+          primeira_em: string
+          ultima_em: string
+          mensagens: number
+          primeira_mensagem_id: string
+          com_quem: string | null
+        }[]
+      }
       empresa_tem_secao: { Args: { p_secao: string }; Returns: boolean }
       get_my_empresa_id: { Args: never; Returns: string }
       get_my_usuario_id: { Args: never; Returns: string }

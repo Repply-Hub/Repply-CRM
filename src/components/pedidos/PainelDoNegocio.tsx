@@ -444,6 +444,9 @@ export function PainelDoNegocio({
                 pedidoId={pedidoId}
                 clienteId={negocio.cliente_id}
                 empresaNome={negocio.cliente?.empresa}
+                dataPedido={negocio.data_pedido}
+                prazoResposta={negocio.prazo_resposta}
+                status={negocio.status}
               />
 
               {/* Tarefas / Observações do negócio — some quando a empresa não contratou a

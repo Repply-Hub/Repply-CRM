@@ -137,3 +137,64 @@ export function blocosNaJanela(
 ): BlocoDeAtendimento[] {
   return blocos.filter((b) => b.inicioEm >= de && b.inicioEm <= ate);
 }
+
+/**
+ * Slugs das etapas em que o negócio está ENCERRADO.
+ *
+ * Amarrado ao SLUG, e não ao nome: renomear a etapa troca só o rótulo, o slug
+ * fica. Uma empresa já chama "Fechamento" de "Faturado" e o slug continua
+ * `fechamento`. As duas são `is_sistema` e existem em todas as empresas.
+ */
+const ETAPAS_ENCERRADAS = ['fechamento', 'perdido'];
+
+export function negocioEncerrado(status: string | null | undefined): boolean {
+  return ETAPAS_ENCERRADAS.includes((status ?? '').trim().toLowerCase());
+}
+
+export interface JanelaDoNegocio {
+  de: string;
+  ate: string;
+}
+
+/**
+ * De quando até quando o histórico daquele negócio conta.
+ *
+ * 🔴 A DATA DE INÍCIO É `data_pedido`, NUNCA `created_at`. Os 11.989 negócios
+ * importados do Bitrix compartilham um único `created_at` — o instante da
+ * importação. Usar aquilo daria a mesma janela para todos (ver CLAUDE.md §4.4).
+ *
+ * 🔴 E A DATA DE FIM SÓ VALE SE FOR DEPOIS DO INÍCIO. Medido em 10/09/2026:
+ * **445 negócios encerrados têm data de fechamento ANTERIOR à de criação** —
+ * fecha-mês legítimo, que a casa já decidiu não reparar nem travar. Com a
+ * janela crua, esses 445 mostrariam histórico vazio, porque nenhum bloco pode
+ * começar depois do início e antes de um fim que veio antes. Quando a data não
+ * serve, a janela corre até agora: mostrar o que houve é melhor do que mostrar
+ * nada.
+ *
+ * Negócio EM ABERTO ignora a data de fechamento de propósito — para ele ela é
+ * uma previsão herdada da planilha que ninguém atualiza, e cortaria a janela
+ * antes das conversas de agora.
+ */
+export function janelaDoNegocio({
+  dataPedido,
+  prazoResposta,
+  status,
+  agora,
+}: {
+  dataPedido: string;
+  prazoResposta?: string | null;
+  status?: string | null;
+  /** Injetável para o teste; em produção é o relógio. */
+  agora?: string;
+}): JanelaDoNegocio {
+  const de = dataPedido;
+  const fim = agora ?? new Date().toISOString();
+
+  if (!negocioEncerrado(status)) return { de, ate: fim };
+  if (!prazoResposta) return { de, ate: fim };
+  // Fim do dia: `prazo_resposta` é data seca, e um bloco das 15h do próprio dia
+  // do fechamento pertence ao negócio.
+  const ate = `${prazoResposta}T23:59:59.999Z`;
+  if (ate < de) return { de, ate: fim };
+  return { de, ate };
+}

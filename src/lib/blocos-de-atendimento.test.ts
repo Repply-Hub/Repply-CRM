@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { blocosDeAtendimento, blocosNaJanela } from './blocos-de-atendimento';
+import {
+  blocosDeAtendimento,
+  blocosNaJanela,
+  janelaDoNegocio,
+  negocioEncerrado,
+} from './blocos-de-atendimento';
 
 const msg = (id: string, created_at: string, conteudo = 'oi') => ({
   id, created_at, conteudo, is_nota_interna: false,
@@ -162,5 +167,58 @@ describe('blocosNaJanela', () => {
 
   it('janela sem nada devolve vazio', () => {
     expect(blocosNaJanela(blocos, '2025-01-01T00:00:00Z', '2025-02-01T00:00:00Z')).toEqual([]);
+  });
+});
+
+describe('janelaDoNegocio', () => {
+  const AGORA = '2026-09-10T12:00:00.000Z';
+
+  it('negócio encerrado vai da criação ao fim do dia do fechamento', () => {
+    expect(janelaDoNegocio({
+      dataPedido: '2025-03-01', prazoResposta: '2025-06-15',
+      status: 'fechamento', agora: AGORA,
+    })).toEqual({ de: '2025-03-01', ate: '2025-06-15T23:59:59.999Z' });
+  });
+
+  it('perdido também é encerrado', () => {
+    expect(janelaDoNegocio({
+      dataPedido: '2025-03-01', prazoResposta: '2025-04-01',
+      status: 'perdido', agora: AGORA,
+    }).ate).toBe('2025-04-01T23:59:59.999Z');
+  });
+
+  it('🔴 negócio em aberto IGNORA a data de fechamento', () => {
+    // Para ele é previsão herdada da planilha que ninguém atualiza; usá-la
+    // cortaria a janela antes das conversas de agora.
+    expect(janelaDoNegocio({
+      dataPedido: '2025-03-01', prazoResposta: '2025-04-01',
+      status: 'negociacao', agora: AGORA,
+    })).toEqual({ de: '2025-03-01', ate: AGORA });
+  });
+
+  it('🔴 fechamento ANTERIOR à criação corre até agora, em vez de dar janela vazia', () => {
+    // São 445 negócios assim — fecha-mês legítimo. Com a janela crua eles
+    // mostrariam histórico vazio.
+    expect(janelaDoNegocio({
+      dataPedido: '2025-06-01', prazoResposta: '2025-03-01',
+      status: 'fechamento', agora: AGORA,
+    })).toEqual({ de: '2025-06-01', ate: AGORA });
+  });
+
+  it('encerrado sem data de fechamento corre até agora', () => {
+    expect(janelaDoNegocio({
+      dataPedido: '2025-03-01', prazoResposta: null,
+      status: 'fechamento', agora: AGORA,
+    }).ate).toBe(AGORA);
+  });
+
+  it('a etapa é lida pelo slug, então renomear não quebra', () => {
+    // Uma empresa chama "Fechamento" de "Faturado"; o slug continua o mesmo.
+    expect(negocioEncerrado('fechamento')).toBe(true);
+    expect(negocioEncerrado('Fechamento')).toBe(true);
+    expect(negocioEncerrado(' perdido ')).toBe(true);
+    expect(negocioEncerrado('Faturado')).toBe(false);
+    expect(negocioEncerrado('negociacao')).toBe(false);
+    expect(negocioEncerrado(null)).toBe(false);
   });
 });
