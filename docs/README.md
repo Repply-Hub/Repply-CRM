@@ -9,6 +9,10 @@ repositório**, não aqui:
 | [`../CLAUDE.md`](../CLAUDE.md) | Como trabalhar neste código sem quebrar nada |
 | [`../README.md`](../README.md) | Como rodar, publicar e onde fica cada coisa |
 
+Para quem **usa** o sistema (representantes, gestores, equipe comercial), e não o
+desenvolve, o documento é o [`manual-do-usuario.md`](manual-do-usuario.md) — linguagem de
+negócio, tela a tela, sem termo técnico.
+
 ---
 
 ## Por onde começar
@@ -53,7 +57,8 @@ repositório**, não aqui:
 | [`operacao/colocar-no-ar.md`](operacao/colocar-no-ar.md) | Passo a passo para publicar mudanças que dependem de configuração fora do código |
 | [`operacao/publicar-na-vercel.md`](operacao/publicar-na-vercel.md) | 🔴 **Enviar para o `main` PUBLICA** (desde 26/08/2026, repositório público de novo). Como conferir se a publicação saiu, e o comando manual que virou exceção |
 | [`operacao/cobranca-stripe.md`](operacao/cobranca-stripe.md) | O que falta fazer fora do repositório para a cobrança funcionar |
-| [`operacao/guia-de-paginas.md`](operacao/guia-de-paginas.md) | Para que serve cada tela, em linguagem de negócio. Serve de material de uso |
+| [`manual-do-usuario.md`](manual-do-usuario.md) | **Manual de uso ponta a ponta**: primeiros passos, papéis, tela a tela, importação, cobrança e o que fazer quando algo dá errado. Linguagem de negócio |
+| [`operacao/guia-de-paginas.md`](operacao/guia-de-paginas.md) | O resumo tela a tela (subconjunto do manual acima). Serve de material de apoio na entrada de uma empresa nova |
 | [`operacao/catalogo-de-produtos-removido.md`](operacao/catalogo-de-produtos-removido.md) | **Módulo removido em 26/08/2026.** O que ele fazia, de onde recuperar cada arquivo, e os números que mostram que nunca foi usado. Leia antes de propor ressuscitá-lo |
 | [`operacao/plano-reparo-datas.md`](operacao/plano-reparo-datas.md) | **Proposto, não executado.** Como reparar as datas trocadas dos 11.903 negócios já importados |
 | [`operacao/plano-blindagem-whatsapp.md`](operacao/plano-blindagem-whatsapp.md) | **Fase 0 executada, fases 1–4 propostas.** As duas falhas de segurança do WhatsApp: senha exposta e webhook sem autenticação — **o quê e o porquê** |
