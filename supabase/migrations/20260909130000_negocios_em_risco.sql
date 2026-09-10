@@ -12,13 +12,18 @@
 -- na própria linha.
 --
 -- Por que paginada, e por que o total vem junto de cada linha:
---   · A lista de hoje é fixa em 10. Quem enxerga a equipe inteira tem 157 negócios pedindo
---     atenção (medido na MD em 09/09/2026) e vê 10 deles, sem jeito nenhum de ver o resto.
+--   · A lista de hoje é fixa em 10. Quem enxerga a equipe inteira tem 159 negócios pedindo
+--     atenção (medido na MD em 10/09/2026; eram 157 na véspera — o número anda com os dados)
+--     e vê 10 deles, sem jeito nenhum de ver o resto.
 --   · `total_geral` repete em toda linha o total do recorte inteiro, não o da página. É assim
 --     que o "Ver mais" sabe quando parar, sem uma segunda chamada ao banco só para contar.
---     Quem faz isso é o `count(*) OVER ()`, que roda ANTES do `LIMIT` — medido: com
---     `p_limite := 10` as 10 linhas voltam com `total_geral = 157`, e um `count(*)` da mesma
---     condição sem paginação também dá 157.
+--     Quem faz isso é o `count(*) OVER ()`, que roda ANTES do `LIMIT`.
+--     ⚠️ A função ainda NÃO existe no banco, então isto não foi medido chamando-a: a medição
+--     foi feita rodando o CORPO dela inline, como usuária logada (ver o bloco de desempenho
+--     mais abaixo). Com página de 10, as 10 linhas voltam com `total_geral = 159`, e um
+--     `count(*)` da mesma condição sem paginação também dá 159. Refaça a conta CHAMANDO a
+--     função depois de aplicar — o plano de execução prova a ordem, com o `WindowAgg` sobre
+--     159 linhas acontecendo antes do `Sort` que corta em 10.
 --   · 🔴 O teto de 100 em `p_limite` não é decoração. Sem ele, um "Ver mais" pedindo um número
 --     grande varreria a base inteira debaixo da regra de segurança e estouraria o limite de 8
 --     segundos do papel `authenticated` (CLAUDE.md §7.15) — e a tela giraria para sempre em vez
@@ -91,7 +96,7 @@
 -- resultado de `dashboard_negocios_risco`. Sem a coluna, `bruto?.top_parados ?? []` devolve
 -- lista vazia e a tabela de risco mostra o estado "nada aqui" — sem erro na tela, sem aviso
 -- nenhum. Ou seja: aplicar isto sozinho não quebra a página, mas faz ela MENTIR, dizendo que
--- não há negócio parado num dia em que há 157. Aplique junto com o deploy da tela.
+-- não há negócio parado num dia em que há 159 (10/09/2026). Aplique junto com o deploy da tela.
 --
 -- ----------------------------------------------------------------------------
 -- DUAS COISAS QUE SAÍRAM DIFERENTES DO PLANO, E O QUE FOI MEDIDO PARA DECIDIR
@@ -172,6 +177,7 @@
 -- pode concluir "o total é zero" de uma página vazia.
 -- ============================================================================
 
+BEGIN;
 CREATE OR REPLACE FUNCTION public.negocios_em_risco(p_usuario_ids uuid[] DEFAULT NULL::uuid[], p_fabricante_ids uuid[] DEFAULT NULL::uuid[], p_funil_id uuid DEFAULT NULL::uuid, p_dias_parado integer DEFAULT 7, p_etapas text[] DEFAULT NULL::text[], p_limite integer DEFAULT 10, p_deslocamento integer DEFAULT 0)
  RETURNS TABLE(id uuid, nome text, fabrica text, etapa text, responsavel text, valor numeric, dias_parado integer, total_geral bigint)
  LANGUAGE sql
@@ -358,3 +364,16 @@ AS $function$
 $function$;
 
 GRANT EXECUTE ON FUNCTION public.dashboard_negocios_risco(uuid[],uuid[],uuid,integer,text[]) TO anon, authenticated, service_role;
+
+-- Fecha a transação aberta lá em cima.
+--
+-- 🔴 Ela existe por causa do `DROP FUNCTION` da `dashboard_negocios_risco`. Se o `CREATE`
+-- seguinte falhasse e quem executa não abrisse transação própria, o `DROP` ficaria de pé
+-- sozinho: a função sumiria do banco e o painel da tela "Hoje" morreria para todo mundo — com
+-- a tela dando erro de função inexistente, e nada para reverter senão aplicar de novo.
+--
+-- Os dois vizinhos desta família que também apagam função fazem igual
+-- (`20260907140000_adiar_negocio_de_colega.sql` e `20260907150000_pauta_segue_a_chave.sql`).
+-- A `20260909120000_fila_pessoal.sql` não precisa: lá é um `CREATE OR REPLACE` sozinho, que já
+-- é atômico por si.
+COMMIT;
