@@ -1,0 +1,76 @@
+# Scraper do Diário Oficial do Município de Natal (DOM) — publicações de licença ambiental.
+#
+# Roda AQUI, não numa Edge Function, porque cada edição do DOM de Natal tem 60-170 páginas
+# e extrair o texto de uma passa de 256 MB — o teto fixo do worker da Edge Function. Medido
+# em 10/09/2026: a função estourava com WORKER_RESOURCE_LIMIT antes de gravar. O runner do
+# GitHub tem RAM de sobra. Detalhe completo em scripts/scrape-dom-natal-licencas.ts.
+#
+# CADÊNCIA: mensal. Publicação de LP/LI/LO no diário MUNICIPAL de Natal é rara — a
+# investigação da Fase 1 varreu 10 edições e achou zero (licenciamento ambiental no RN é
+# estadual, IDEMA). Não compensa varrer todo dia. Para uma varredura fora de hora, use o
+# botão "Run workflow" (workflow_dispatch).
+#
+# PRÉ-REQUISITO: os secrets SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no repositório
+# (Settings → Secrets and variables → Actions).
+
+name: Scrape DOM Natal
+
+on:
+  schedule:
+    - cron: '0 9 1 * *' # dia 1 de cada mês, 09:00 UTC (06:00 em Brasília)
+  workflow_dispatch:
+    inputs:
+      meses_atras:
+        description: 'Quantos meses anteriores também varrer (padrão 1)'
+        required: false
+        default: '1'
+        type: string
+      mes:
+        description: 'Mês específico 1-12 (com --ano, ignora meses_atras)'
+        required: false
+        type: string
+      ano:
+        description: 'Ano específico, ex.: 2026'
+        required: false
+        type: string
+      max:
+        description: 'Teto de edições lidas nesta execução (padrão 45)'
+        required: false
+        default: '45'
+        type: string
+
+# Uma execução por vez — o scraper faz upsert idempotente, mas evita corrida no Storage.
+concurrency:
+  group: scrape-dom-natal
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    name: Varrer e importar licenças
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Executar scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -n "${{ inputs.mes }}" ] && [ -n "${{ inputs.ano }}" ]; then
+            ARGS="--mes ${{ inputs.mes }} --ano ${{ inputs.ano }}"
+          else
+            ARGS="--meses-atras ${{ inputs.meses_atras || '1' }}"
+          fi
+          ARGS="$ARGS --max ${{ inputs.max || '45' }}"
+          npx tsx scripts/scrape-dom-natal-licencas.ts $ARGS

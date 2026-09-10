@@ -4,11 +4,11 @@
  * Natal (DOM).
  *
  * É lógica pura, sem I/O, para poder ser testada (`dom-natal-licencas.test.ts`) e
- * reaproveitada. A Edge Function `scrape-dom-natal-licencas` roda em Deno e NÃO consegue
- * importar deste arquivo — ela carrega uma cópia em
- * `supabase/functions/scrape-dom-natal-licencas/licencas.ts`. **As duas precisam
- * concordar**; é a mesma situação de `normalizeWhatsappPhone` (CLAUDE.md §7.1). Se mexer
- * aqui, mexa lá.
+ * reaproveitada. FONTE ÚNICA: o scraper `scripts/scrape-dom-natal-licencas.ts` (GitHub
+ * Action) importa deste arquivo direto — não há cópia para manter em sincronia. Houve uma
+ * Edge Function em Deno que precisava de uma cópia, mas ela foi removida em 10/09/2026 (as
+ * edições do DOM de Natal têm 60-170 páginas e a leitura estourava o teto de 256 MB do
+ * worker); com ela foi-se a duplicação.
  *
  * ── Por que o filtro é conservador ──────────────────────────────────────────────────
  * O licenciamento ambiental do RN é ESTADUAL (IDEMA). O DOM municipal de Natal quase

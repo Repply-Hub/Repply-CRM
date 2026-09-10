@@ -205,7 +205,14 @@ não entrega nada. Foi um bug real, silencioso por meses (corrigido em 05/08/202
 
 **Edge Functions:**
 - `supabase/functions/scrape-licencas-idema/index.ts`
+- `supabase/functions/scrape-extremoz-licencas/index.ts`
 - `supabase/functions/portal-scraper/index.ts`
+
+**Fora da Edge Function — GitHub Action:**
+- `.github/workflows/scrape-dom-natal.yml` → `scripts/scrape-dom-natal-licencas.ts` (mensal
+  + `workflow_dispatch`). O DOM de Natal tem edições de 60-170 páginas; extrair o texto de
+  uma passa de 256 MB e estoura o worker da Edge Function (medido em 10/09/2026). Precisa
+  dos secrets `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` no repositório.
 
 **Banco de dados:**
 - `licencas_idema`, `licencas_extremoz`, `licencas_natal`

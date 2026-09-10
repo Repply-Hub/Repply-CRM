@@ -371,42 +371,13 @@ export default function Portal() {
     }
   };
 
-  // ─── Natal: dispara o scraper server-side (Edge Function scrape-dom-natal-licencas) ──
-  // A função lista as edições do mês corrente + anterior pela API JSON do DOM, baixa o PDF
-  // real de cada uma, extrai o texto, filtra LP/LI/LO e grava em `licencas_natal` (dedupe
-  // por hash do bloco). Mesmo padrão dos botões do IDEMA e do Extremoz. A janela de datas é
-  // decidida pela própria função — o seletor de período da tela não a afeta.
-  const scrapeNatal = async () => {
-    setScraping((prev) => ({ ...prev, natal: true }));
-    const toastId = toast.loading('Buscando edições do Diário Oficial de Natal...');
-    try {
-      const { data, error } = await supabase.functions.invoke('scrape-dom-natal-licencas');
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
-
-      const inseridos: number = data?.inseridos ?? 0;
-      const novas: number = data?.novas ?? 0;
-      const restantes: number = data?.restantes ?? 0;
-
-      const base =
-        novas === 0
-          ? 'Banco de dados já está atualizado.'
-          : inseridos > 0
-            ? `${inseridos} publicação${inseridos === 1 ? '' : 'ões'} de licença importada${inseridos === 1 ? '' : 's'} de ${novas} edição${novas === 1 ? '' : 'ões'}.`
-            : `${novas} edição${novas === 1 ? '' : 'ões'} lida${novas === 1 ? '' : 's'} — sem LP/LI/LO.`;
-      const cauda = restantes > 0 ? ' Pode haver mais — clique de novo para continuar.' : '';
-      toast.success(base + cauda, { id: toastId });
-
-      await fetchNatalFromDb();
-    } catch (err) {
-      console.error('Scraping Natal error:', err);
-      const message = err instanceof Error ? err.message : 'Erro desconhecido';
-      setResults((prev) => ({ ...prev, natal: { success: false, error: message } }));
-      toast.error('Erro ao acessar o Diário Oficial de Natal.', { id: toastId });
-    } finally {
-      setScraping((prev) => ({ ...prev, natal: false }));
-    }
-  };
+  // ─── Natal: NÃO tem raspagem sob demanda ──────────────────────────────────────────────
+  // O scraper do DOM de Natal roda fora daqui — GitHub Action agendada
+  // (.github/workflows/scrape-dom-natal.yml) que executa scripts/scrape-dom-natal-licencas.ts.
+  // Motivo: as edições do diário de Natal têm 60-170 páginas; extrair o texto de uma passa
+  // de 256 MB e estoura o worker da Edge Function (WORKER_RESOURCE_LIMIT, medido em
+  // 10/09/2026). O botão do Portal só recarrega o que a Action já gravou — usa
+  // fetchNatalFromDb, igual às fontes sem raspagem no navegador.
 
   // ─── IDEMA: load from DB ──────────────────────────────────────
   const fetchIdemaFromDb = async () => {
@@ -698,7 +669,7 @@ export default function Portal() {
                     variant="outline"
                     size="sm"
                     className="w-full h-7 text-xs mt-auto"
-                    onClick={() => (site.id === 'extremoz' ? scrapeExtremoz() : site.id === 'natal' ? scrapeNatal() : site.id === 'idema' ? scrapeIdema() : fetchSite(site.id))}
+                    onClick={() => (site.id === 'extremoz' ? scrapeExtremoz() : site.id === 'natal' ? fetchNatalFromDb() : site.id === 'idema' ? scrapeIdema() : fetchSite(site.id))}
                     disabled={isBusy}
                   >
                     {isBusy ? (
