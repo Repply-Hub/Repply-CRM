@@ -14,6 +14,19 @@ import { validateFile } from '@/lib/file-validation';
 import { lerPlanilhaComoObjetos } from '@/lib/import/ler-planilha';
 import { diagnosticarDatasDaPlanilha } from '@/lib/import/ordem-de-data';
 import { conferirDatasImportadas, textoDoAviso } from '@/lib/import/conferencia-de-datas';
+import {
+  codigosParaConsultar,
+  classificarPorCodigo,
+  type ClassificacaoDeLinhas,
+} from '@/lib/import/reencontro-por-codigo';
+import {
+  calcularAlteracoes,
+  textoDoResumoDeAlteracoes,
+  type NegocioAtual,
+  type ResumoDasAlteracoes,
+} from '@/lib/import/alteracoes-por-codigo';
+import { getNomeNegocioAutomatico } from '@/lib/nome-negocio';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { MappingStep, sanitizeImportedRows, getExtraDisplayName, type ExtraMappingValue, type FieldDef } from '@/components/import/MappingStep';
 import { ImportInstructionsStep } from '@/components/import/ImportInstructionsStep';
 import { useBulkImport } from '@/hooks/use-bulk-import';
@@ -112,6 +125,17 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
+
+  // O reencontro por Código/ID. Nulo enquanto a busca não terminou — a tela mostra
+  // "conferindo…" nesse intervalo, em vez de prometer um número que ainda vai mudar.
+  const [reencontro, setReencontro] = useState<{
+    classificacao: ClassificacaoDeLinhas<Record<string, unknown>>;
+    resumo: ResumoDasAlteracoes;
+  } | null>(null);
+  const [conferindoCodigos, setConferindoCodigos] = useState(false);
+  // A caixinha do balde "sem código". Quem decide o valor inicial é a classificação, no efeito
+  // abaixo: marcada só quando o arquivo inteiro está sem código (decisão 11 do desenho).
+  const [criarOsSemCodigo, setCriarOsSemCodigo] = useState(true);
   
   // Obter colunas existentes para reutilização no mapeamento
   const existingColumns = useMemo(() => {
@@ -373,6 +397,87 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     });
     return map;
   }, [previewRows, usuariosEmpresa, isGestor]);
+
+  // Busca no banco os negócios que a planilha diz atualizar, e monta o de-para.
+  //
+  // Efeito e não `useMemo` porque isto vai ao servidor. Roda só no passo "conferir", que é
+  // onde o aviso aparece — e onde a pessoa ainda pode voltar e mudar o mapeamento.
+  useEffect(() => {
+    if (step !== 'preview') { setReencontro(null); return; }
+
+    let cancelado = false;
+    (async () => {
+      setConferindoCodigos(true);
+      try {
+        const linhas = previewRows as Record<string, unknown>[];
+        const codigos = codigosParaConsultar(linhas);
+
+        // Busca em lotes de 200, por chave primária — a consulta mais barata que existe nesta
+        // tabela. A regra de segurança do banco filtra sozinha: código de outra empresa
+        // simplesmente não volta, e vira "não encontrado" como qualquer código inexistente.
+        const encontrados = new Map<string, NegocioAtual>();
+        for (let i = 0; i < codigos.length; i += 200) {
+          const lote = codigos.slice(i, i + 200);
+          const { data, error } = await supabase
+            .from('pedidos')
+            .select('id, nome, observacoes, marcador_id, cliente:clientes(empresa), fabricante:fabricantes(nome), marcador:marcadores(nome)')
+            .in('id', lote);
+          if (error) throw error;
+          for (const p of data ?? []) {
+            const automatico = getNomeNegocioAutomatico(p.cliente, p.fabricante);
+            encontrados.set(String(p.id).toLowerCase(), {
+              id: p.id,
+              nome: p.nome ?? null,
+              observacoes: p.observacoes ?? null,
+              marcador_id: p.marcador_id ?? null,
+              marcadorNome: p.marcador?.nome ?? null,
+              nomeAutomatico: automatico,
+              rotulo: (p.nome?.trim() || automatico),
+            });
+          }
+        }
+
+        // Marcadores da empresa, para a regra 3: o que não estiver aqui não é criado.
+        const marcadoresPorNome = new Map<string, string>();
+        if (empresaId) {
+          const { data } = await supabase
+            .from('marcadores').select('id, nome').eq('empresa_id', empresaId);
+          for (const m of data ?? []) {
+            marcadoresPorNome.set(String(m.nome).trim().toLowerCase(), m.id);
+          }
+        }
+
+        if (cancelado) return;
+
+        const classificacao = classificarPorCodigo(linhas, new Set(encontrados.keys()));
+        const resumo = calcularAlteracoes(
+          classificacao.atualiza.map(l => ({
+            codigo: l.codigo,
+            negocio: l.linha.negocio,
+            observacoes: l.linha.observacoes,
+            marcador: l.linha.marcador,
+          })),
+          encontrados,
+          marcadoresPorNome,
+        );
+
+        setReencontro({ classificacao, resumo });
+        // Arquivo inteiro sem código é importação de base nova: a caixinha nasce marcada e
+        // tudo segue como sempre foi. Arquivo misto é volta de exportação, e célula vazia ali
+        // é mais provavelmente acidente do que negócio novo de propósito.
+        setCriarOsSemCodigo(classificacao.arquivoInteiroSemCodigo);
+      } catch (err) {
+        if (!cancelado) {
+          setReencontro(null);
+          toast.error(`Não foi possível conferir os códigos: ${mensagemDeErro(err)}`);
+        }
+      } finally {
+        if (!cancelado) setConferindoCodigos(false);
+      }
+    })();
+
+    return () => { cancelado = true; };
+  }, [step, previewRows, empresaId]);
 
   const handleImport = async () => {
     if (importing) return;
@@ -764,6 +869,85 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                     </p>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {conferindoCodigos && (
+              <div className="rounded-xl border border-border/50 bg-card p-4 text-[11px] text-muted-foreground">
+                Conferindo os Códigos/ID contra os negócios já cadastrados…
+              </div>
+            )}
+
+            {reencontro && !conferindoCodigos && (
+              <div className="rounded-xl border border-border/50 bg-card p-4 flex flex-col gap-3">
+                {/* Conta que dá zero não aparece. Um arquivo saudável mostra uma linha só, e é
+                    isso que faz as outras chamarem atenção quando surgem. */}
+                {reencontro.resumo.negocios.length > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    {textoDoResumoDeAlteracoes(reencontro.resumo).map(frase => (
+                      <p key={frase} className="text-[11px] leading-relaxed text-foreground">{frase}</p>
+                    ))}
+                    <details className="text-[11px] text-muted-foreground">
+                      <summary className="cursor-pointer select-none font-medium text-primary">
+                        Ver o que muda nas primeiras linhas
+                      </summary>
+                      <ul className="mt-2 flex list-none flex-col gap-2 p-0">
+                        {reencontro.resumo.negocios.slice(0, 20).map(n => (
+                          <li key={n.id} className="rounded-lg bg-muted/40 p-2">
+                            <span className="font-semibold text-foreground">{n.rotulo}</span>
+                            {n.alteracoes.map(a => (
+                              <div key={a.campo} className="mt-0.5">
+                                <span className="uppercase tracking-wide">{a.campo === 'marcador_id' ? 'marcador' : a.campo}</span>
+                                {': '}
+                                <span className="line-through opacity-60">{a.de || '(vazio)'}</span>
+                                {' → '}
+                                <span className="text-foreground">{a.para}</span>
+                              </div>
+                            ))}
+                          </li>
+                        ))}
+                      </ul>
+                      {reencontro.resumo.negocios.length > 20 && (
+                        <p className="mt-2">E mais {reencontro.resumo.negocios.length - 20} negócio(s).</p>
+                      )}
+                    </details>
+                  </div>
+                )}
+
+                {reencontro.classificacao.semCodigo.length > 0 && (
+                  <label className="flex items-start gap-2 text-[11px] leading-relaxed text-foreground">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={criarOsSemCodigo}
+                      onChange={e => setCriarOsSemCodigo(e.target.checked)}
+                    />
+                    <span>
+                      <strong>{reencontro.classificacao.semCodigo.length} linha(s) não têm Código/ID.</strong>{' '}
+                      Marque para cadastrá-las como negócios novos; desmarque para descartá-las.
+                    </span>
+                  </label>
+                )}
+
+                {reencontro.classificacao.naoEncontrado.length > 0 && (
+                  <p className="text-[11px] leading-relaxed text-amber-800">
+                    <strong>{reencontro.classificacao.naoEncontrado.length} linha(s) trazem um Código/ID que
+                    não existe aqui</strong> — foram recusadas. Ou o código está errado, ou o negócio é de
+                    outra empresa. Linhas:{' '}
+                    {reencontro.classificacao.naoEncontrado.slice(0, 10).map(l => l.indice + 2).join(', ')}
+                    {reencontro.classificacao.naoEncontrado.length > 10 ? '…' : ''}
+                  </p>
+                )}
+
+                {reencontro.classificacao.repetido.length > 0 && (
+                  <p className="text-[11px] leading-relaxed text-destructive">
+                    <strong>{reencontro.classificacao.repetido.length} linha(s) repetem um Código/ID já usado
+                    no arquivo</strong> — todas foram recusadas. Duas linhas mandando coisas diferentes no
+                    mesmo negócio é contradição, e o sistema não escolhe por você. Linhas:{' '}
+                    {reencontro.classificacao.repetido.slice(0, 10).map(l => l.indice + 2).join(', ')}
+                    {reencontro.classificacao.repetido.length > 10 ? '…' : ''}
+                  </p>
+                )}
               </div>
             )}
 
