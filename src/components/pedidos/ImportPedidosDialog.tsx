@@ -29,9 +29,10 @@ import { getNomeNegocioAutomatico } from '@/lib/nome-negocio';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { MappingStep, sanitizeImportedRows, getExtraDisplayName, type ExtraMappingValue, type FieldDef } from '@/components/import/MappingStep';
 import { ImportInstructionsStep } from '@/components/import/ImportInstructionsStep';
-import { useBulkImport } from '@/hooks/use-bulk-import';
+import { useBulkImport, type ResultadoDaAtualizacao } from '@/hooks/use-bulk-import';
 import { useAuth } from '@/hooks/use-auth';
 import { useFunis } from '@/hooks/use-funis';
+import { invalidarPaineisDeNegocios } from '@/hooks/use-pedidos';
 import { useIsGestor } from '@/hooks/use-novo-pedido';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { useQuery } from '@tanstack/react-query';
@@ -89,7 +90,7 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
   });
   const [fileName, setFileName] = useState('');
   const [importing, setImporting] = useState(false);
-  const { importNegocios, progress } = useBulkImport();
+  const { importNegocios, atualizarNegociosPorCodigo, progress } = useBulkImport();
   const [ignoredColumns, setIgnoredColumns] = useState<string[]>([]);
   const [step, setStep] = useState<'instructions' | 'upload' | 'mapping' | 'preview' | 'done'>('instructions');
   const { profile } = useAuth();
@@ -122,6 +123,10 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
     totalInseridos: number;
     totalFalharam: number;
     motivosFalha: Record<string, number>;
+    atualizados: number;
+    atualizacoesRecusadas: number;
+    naoEncontrados: number;
+    repetidos: number;
   } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
@@ -489,7 +494,16 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         return acc;
       }, []
     );
-    const rows = allRows.filter(r => !((r as any).__dateError) && r.cliente && r.fabricante);
+    // 🔴 Guarda, para cada linha que sobra deste filtro, a posição que ela tinha em `allRows`
+    // — a MESMA lista, na mesma ordem, que `previewRows` usa (ambas vêm de `getMappedRows()`
+    // sem nada entre elas) e contra a qual a classificação por Código/ID (`reencontro`) foi
+    // calculada. Sem isto, o índice de `rows`/`enrichedRows` desalinha do índice de
+    // `previewRows` sempre que alguma linha anterior for descartada aqui (sem Cliente, sem
+    // Fabricante ou com data inválida) — e o balde "sem código" apontaria para a linha errada.
+    const linhasComIndicePrevia = allRows
+      .map((r, indicePrevia) => ({ r, indicePrevia }))
+      .filter(({ r }) => !((r as any).__dateError) && r.cliente && r.fabricante);
+    const rows = linhasComIndicePrevia.map(({ r }) => r);
     const ignoredRowsData = rawData.filter((_, index) => {
       const mapped = allRows[index];
       return !((mapped as any).__dateError) && !(mapped.cliente && mapped.fabricante);
@@ -587,7 +601,38 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         };
       });
 
-      const summary = await importNegocios(enrichedRows, undefined, funilId, empresaId);
+      // Dois caminhos, e eles não se misturam: quem tem código é ATUALIZADO, quem não tem é
+      // CADASTRADO (e só se a pessoa deixou a caixinha marcada). Recusado por código
+      // inexistente ou repetido não entra em nenhum dos dois — foi decidido na prévia.
+      let resultadoAtualizacao: ResultadoDaAtualizacao | null = null;
+      if (reencontro && reencontro.resumo.negocios.length > 0) {
+        const avisoAtualizacao = toast.loading(
+          `Atualizando ${reencontro.resumo.negocios.length} negócio(s)...`,
+        );
+        resultadoAtualizacao = await atualizarNegociosPorCodigo(
+          reencontro.resumo.negocios,
+          feitos => toast.loading(
+            `Atualizando... ${feitos} de ${reencontro.resumo.negocios.length}`,
+            { id: avisoAtualizacao },
+          ),
+        );
+        toast.dismiss(avisoAtualizacao);
+      }
+
+      // Só o balde "sem código", e só com a caixinha marcada. Sem o reencontro (planilha sem a
+      // coluna Código/ID mapeada) tudo entra, que é o comportamento de sempre. O filtro usa
+      // `indicePrevia` (guardado acima), não a posição em `enrichedRows` — são listas
+      // diferentes sempre que alguma linha foi descartada por falta de Cliente/Fabricante.
+      const indicesParaCadastrar = reencontro
+        ? new Set(criarOsSemCodigo ? reencontro.classificacao.semCodigo.map(l => l.indice) : [])
+        : null;
+      const linhasParaCadastrar = indicesParaCadastrar
+        ? enrichedRows.filter((_, j) => indicesParaCadastrar.has(linhasComIndicePrevia[j].indicePrevia))
+        : enrichedRows;
+
+      const summary = linhasParaCadastrar.length > 0
+        ? await importNegocios(linhasParaCadastrar, undefined, funilId, empresaId)
+        : { total: 0, inserted: 0, ignored: 0, motivosFalha: {} };
 
       // Log linhas com data inválida (filtradas antes do hook — não chegam ao importNegocios)
       if (userId) {
@@ -601,10 +646,11 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         }
       }
 
-      qc.invalidateQueries({ queryKey: ['pedidos'] });
+      // A lista completa de chaves que dependem de `pedidos` — inclui painéis que não parecem
+      // ligados, como o faturamento mensal e o Plano de Vendas (CLAUDE.md §6.6). Atualizar um
+      // negócio muda o mesmo dado que criar um.
+      invalidarPaineisDeNegocios(qc);
       qc.invalidateQueries({ queryKey: ['clientes'] });
-      qc.invalidateQueries({ queryKey: ['vw_faturamento_mensal'] });
-      qc.invalidateQueries({ queryKey: ['dashboard_indicadores_vendedor'] });
 
       setImportResult({
         totalNoArquivo: rawData.length,
@@ -613,6 +659,10 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
         totalInseridos: summary.inserted,
         totalFalharam: summary.ignored + dateErrorRows.length,
         motivosFalha: summary.motivosFalha,
+        atualizados: resultadoAtualizacao?.aceitos ?? 0,
+        atualizacoesRecusadas: resultadoAtualizacao?.recusados ?? 0,
+        naoEncontrados: reencontro?.classificacao.naoEncontrado.length ?? 0,
+        repetidos: reencontro?.classificacao.repetido.length ?? 0,
       });
       setStep('done');
     } catch (err: any) {
@@ -1135,6 +1185,31 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                 </div>
               )}
             </div>
+
+            {importResult.atualizados > 0 && (
+              <p className="text-sm text-foreground">
+                <strong>{importResult.atualizados}</strong> negócio(s) atualizado(s).
+              </p>
+            )}
+
+            {/* 🔴 A frase mais importante desta tela. Sem ela, a pessoa acha que alterou 38
+                quando alterou 20 — e só descobre semanas depois, se descobrir. */}
+            {importResult.atualizacoesRecusadas > 0 && (
+              <p className="text-sm text-amber-800">
+                <strong>{importResult.atualizacoesRecusadas}</strong> negócio(s) não puderam ser
+                alterados. O mais provável é que sejam de outra pessoa: só é possível editar os
+                próprios negócios, a menos que você seja gestor ou tenha a permissão de editar
+                Negócios.
+              </p>
+            )}
+
+            {(importResult.naoEncontrados > 0 || importResult.repetidos > 0) && (
+              <p className="text-sm text-muted-foreground">
+                {importResult.naoEncontrados > 0 && `${importResult.naoEncontrados} linha(s) com Código/ID inexistente. `}
+                {importResult.repetidos > 0 && `${importResult.repetidos} linha(s) com Código/ID repetido. `}
+                Nenhuma delas entrou.
+              </p>
+            )}
 
             {Object.keys(importResult.motivosFalha).length > 0 && (
               <div className="bg-muted/30 rounded-xl p-4 border">
