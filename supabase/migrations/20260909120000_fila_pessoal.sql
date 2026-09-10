@@ -85,6 +85,23 @@
 -- tabela do time entrar, na tarefa seguinte. Aplicar esta migration sozinha deixa três pessoas
 -- com a tela vazia no intervalo.
 --
+-- 🔴 E O EFEITO NÃO PARA NA TELA: QUEM NÃO TEM NEGÓCIO PRÓPRIO DEIXA DE RECEBER O E-MAIL DAS 7h.
+-- O resumo diário (`supabase/functions/pauta-resumo-diario/index.ts`, linhas 218-220) PULA a
+-- pessoa quando a pauta volta vazia — conta como `pauta_vazia` e segue para a próxima, sem
+-- mandar nada e sem registrar erro: a execução termina com `status: ok`. Como a fila passa a ser
+-- só a própria, quem não tem negócio aberto sai da lista de quem recebe. Diferente da tela, esse
+-- efeito NÃO é do intervalo — ele sobrevive à tabela do time, porque o e-mail lê `pauta_do_dia_de`
+-- e mais nada. Medido em `automation_logs`, os três últimos disparos das 7h na MD:
+--
+--     09/09 → 13 destinatários · 10 enviados · 3 com pauta vazia   ] com a fila ampliada
+--     08/09 → 13 destinatários · 10 enviados · 3 com pauta vazia   ]
+--     07/09 → 13 destinatários ·  7 enviados · 6 com pauta vazia   ← antes da fila ampliada
+--
+-- Depois desta migration a conta volta a ser a do dia 07/09: 7 enviados e 6 pautas vazias. As
+-- três gestoras acima param de receber, em silêncio. Se isso não for o desejado, a decisão é do
+-- dono do produto e precisa ser tomada ANTES de aplicar — não depois, por alguém perguntando
+-- "por que parei de receber?".
+--
 -- Nota: `José Artur` aparece com 7 itens e 4 negócios porque os outros 3 são COMPROMISSOS dele
 -- (evento na agenda e tarefa com prazo hoje), não negócio de colega. A fila mistura as duas
 -- coisas, e confundi-las faz parecer que há vazamento onde não há.

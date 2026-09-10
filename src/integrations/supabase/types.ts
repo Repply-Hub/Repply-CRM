@@ -4635,7 +4635,6 @@ export type Database = {
           qtd_sem_proxima_acao: number
           risco_por_fabricante: Json
           risco_por_vendedor: Json
-          top_parados: Json
           valor_parados: number
           valor_risco_total: number
           valor_sem_proxima_acao: number
@@ -4703,6 +4702,27 @@ export type Database = {
       montar_permissoes_preset_padrao: {
         Args: { p_preset_key: string }
         Returns: Json
+      }
+      negocios_em_risco: {
+        Args: {
+          p_deslocamento?: number
+          p_dias_parado?: number
+          p_etapas?: string[]
+          p_fabricante_ids?: string[]
+          p_funil_id?: string
+          p_limite?: number
+          p_usuario_ids?: string[]
+        }
+        Returns: {
+          dias_parado: number
+          etapa: string
+          fabrica: string | null
+          id: string
+          nome: string
+          responsavel: string | null
+          total_geral: number
+          valor: number
+        }[]
       }
       normalize_whatsapp_phone: { Args: { raw: string }; Returns: string }
       pauta_do_dia: {
