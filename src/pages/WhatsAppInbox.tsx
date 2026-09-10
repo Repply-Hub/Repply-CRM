@@ -8185,11 +8185,11 @@ export default function WhatsAppInbox() {
                           conversaId: conversaAtiva.id,
                           arquivada: novaArquivada,
                         });
+                        const autor = profile?.nome ?? "Alguém";
                         if (novaArquivada) {
                           // Fechar a conversa remove todos os responsáveis
                           // automaticamente (trigger no banco); registra isso no
                           // timeline pra ficar visível quem estava no atendimento.
-                          const autor = profile?.nome ?? "Alguém";
                           const responsaveisAtuais =
                             conversaAtiva.responsaveis ?? [];
                           const texto =
@@ -8201,6 +8201,15 @@ export default function WhatsAppInbox() {
                           addNota.mutate({
                             conversaId: conversaAtiva.id,
                             texto,
+                          });
+                        } else {
+                          // 🔴 Reabrir não deixava rastro nenhum: o `addNota`
+                          // estava DENTRO do `if` de fechar. A linha do tempo
+                          // pulava do fechamento direto para a mensagem
+                          // seguinte, sem dizer que alguém reabriu.
+                          addNota.mutate({
+                            conversaId: conversaAtiva.id,
+                            texto: `${autor} reabriu a conversa`,
                           });
                         }
                         if (
