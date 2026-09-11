@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   assuntoDaPauta,
   assuntoDoPulso,
+  diasParadoPorEmpresa,
   montarEmail,
   montarPulsoDaEquipe,
   type ItemDaPauta,
@@ -28,8 +29,8 @@ import {
  * ────────────────────────────────────────────────────────────────────────────
  * Desde a migration 20260909120000 a fila da tela "Hoje" voltou a ser SEMPRE pessoal. Quem tem
  * a chave `pauta_de_todos` e nenhum negócio próprio passou a ter fila vazia — e fila vazia não
- * gerava e-mail. Na MD isso é a Fabiola, o Gabriel Medeiros e o Gabriel Pereira: três gestoras
- * parariam de receber o e-mail das 7h em silêncio, uma delas a principal usuária do cliente.
+ * gerava e-mail. Na MD eram três gestoras, uma delas a principal usuária do cliente: as três
+ * parariam de receber o e-mail das 7h em silêncio.
  *
  * Em vez de sumir, o e-mail MUDA DE ASSUNTO. A regra tem DUAS condições, e as duas contam:
  *
@@ -189,6 +190,24 @@ Deno.serve(async (req) => {
       });
     }
 
+    // O AJUSTE "DIAS PARADO" DE CADA EMPRESA — UMA consulta por execução, não uma por pessoa.
+    //
+    // A frase do topo da fila pessoal (`vozDaPauta`, via `corpo.ts`) diz que um negócio "está há
+    // N dias sem mexer" medindo com a régua da empresa — a MESMA com que `pauta_do_dia_de` montou
+    // a fila. Com um 3 cravado, a empresa que mudasse o ajuste receberia a fila medida com uma
+    // régua e a frase com outra. `pauta_resumo_destinatarios` já devolve a empresa de cada
+    // pessoa, então uma leitura cobre todas.
+    //
+    // Se a leitura falhar, o e-mail sai assim mesmo, medindo com o padrão (3), e o registro diz
+    // por quê: o ajuste só muda a frase do topo, e ela não vale deixar a equipe sem o resumo.
+    const empresas = [...new Set((destinatarios ?? []).map((d) => d.empresa_id).filter(Boolean))];
+    const { data: ajustes, error: erroAjuste } = await supabase
+      .from("configuracoes_automacao")
+      .select("empresa_id, valor")
+      .eq("chave", "pauta_dias_parado")
+      .in("empresa_id", empresas);
+    const diasParadoDe = diasParadoPorEmpresa(erroAjuste ? [] : ajustes ?? []);
+
     for (const pessoa of destinatarios ?? []) {
       try {
         const { data: pauta, error: erroPauta } = await supabase.rpc("pauta_do_dia_de", {
@@ -203,8 +222,9 @@ Deno.serve(async (req) => {
         let ehPulso = false;
 
         if (itens.length > 0) {
-          html = montarEmail(pessoa.nome ?? "", itens, linkDaPauta);
-          assunto = assuntoDaPauta(itens);
+          const diasParado = diasParadoDe(pessoa.empresa_id);
+          html = montarEmail(pessoa.nome ?? "", itens, linkDaPauta, diasParado);
+          assunto = assuntoDaPauta(itens, diasParado);
         } else {
           // Primeira condição: a chave. Sem ela, nada muda — a pessoa continua sem receber.
           // A leitura é a MESMA da tela (`ve_pauta_de_todos`), e não uma terceira cópia da
@@ -293,6 +313,14 @@ Deno.serve(async (req) => {
                 `"${NOME_CANONICO}". Crie um novo com o nome certo em Project Settings → ` +
                 `Edge Functions → Secrets (NÃO no Vault) e apague o antigo — o painel do ` +
                 `Supabase não renomeia no lugar.`,
+            }
+          : {}),
+        // Só aparece quando a leitura do ajuste falhou — ver a consulta antes do laço.
+        ...(erroAjuste
+          ? {
+              aviso_ajuste_dias_parado:
+                `não foi possível ler o ajuste "dias parado" das empresas (${erroAjuste.message}); ` +
+                `a frase do topo mediu com o padrão, 3 dias.`,
             }
           : {}),
       },

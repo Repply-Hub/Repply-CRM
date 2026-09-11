@@ -8,11 +8,14 @@
  * `src/lib/corpo-do-resumo-diario.test.ts`. É o mesmo caminho que
  * `supabase/functions/_shared/nylas.ts` já usa com `src/lib/erro-do-provedor-de-email.test.ts`.
  *
- * ⚠️ O import de `./modelo.ts` leva a extensão porque este arquivo roda em Deno. O Vite resolve
- * assim também (`allowImportingTsExtensions` em `tsconfig.app.json`), então o teste importa o
- * mesmo arquivo que o servidor executa — não uma cópia.
+ * ⚠️ Os imports levam a extensão `.ts` porque este arquivo roda em Deno — sem ela a função nem
+ * sobe. O Vite resolve assim também (`allowImportingTsExtensions` em `tsconfig.app.json`), então
+ * o teste importa o mesmo arquivo que o servidor executa — não uma cópia.
  */
-import { MODELO_RESUMO, MODELO_ITEM } from "./modelo.ts";
+import { MODELO_RESUMO, MODELO_ITEM, MODELO_LINHA } from "./modelo.ts";
+// A frase do topo da fila pessoal é a da tela "Hoje". `_shared/voz-da-pauta.ts` é a cópia, byte a
+// byte, de `src/lib/voz-da-pauta.ts` — presas uma à outra por `src/lib/voz-da-pauta.test.ts`.
+import { vozDaPauta } from "../_shared/voz-da-pauta.ts";
 
 /** Um item da fila pessoal, como `pauta_do_dia_de` devolve. */
 export interface ItemDaPauta {
@@ -22,6 +25,9 @@ export interface ItemDaPauta {
   detalhe: string;
   valor: number | null;
   quando: string | null;
+  // Dias desde a última mudança de etapa, como `pauta_do_dia_de` conta; nulo para compromisso.
+  // É com ele que a voz da pauta acha o negócio que destoa dos outros.
+  dias_parado: number | null;
   // Nome do dono do negócio. `pauta_do_dia_de` só preenche este campo quando o item NÃO é
   // de quem vai receber o e-mail — para o próprio dono ele vem nulo de propósito, senão o
   // e-mail ficaria repetindo o nome da própria pessoa em todo item.
@@ -130,14 +136,36 @@ export function montarItens(itens: ItemDaPauta[]): string {
     .join("\n");
 }
 
-export function montarEmail(nome: string, itens: ItemDaPauta[], link: string): string {
-  const total = itens.length;
-  const valor = itens.reduce((soma, i) => soma + (Number(i.valor) || 0), 0);
+/**
+ * A linha de baixo da manchete: o parágrafo inteiro, ou nada — nunca um `<p>` vazio (ver o topo
+ * de `modelo.ts`). Serve aos dois e-mails, que usam o mesmo modelo.
+ *
+ * 🔴 `esc()` aqui dentro: no degrau do negócio que destoa, a linha traz o NOME dele, que vem do
+ * banco e pode ter `<` ou `&`.
+ */
+function linhaDeBaixo(texto: string | null): string {
+  return texto ? preencher(MODELO_LINHA, { LINHA_TEXTO: esc(texto) }) : "";
+}
+
+/**
+ * O e-mail da fila pessoal. Manchete, linha de baixo e assunto são os da tela "Hoje": saem de
+ * `vozDaPauta`, medindo "parado" com o ajuste da empresa de quem recebe
+ * (`diasParadoPorEmpresa`, lido pelo `index.ts`).
+ */
+export function montarEmail(
+  nome: string,
+  itens: ItemDaPauta[],
+  link: string,
+  diasParadoDaEmpresa: number,
+): string {
+  const voz = vozDaPauta(itens, diasParadoDaEmpresa);
 
   return preencher(MODELO_RESUMO, {
     "{{PAUTA_NOME}}": esc(primeiroNome(nome)),
-    "{{PAUTA_MANCHETE}}": total === 1 ? "1 coisa espera você" : `${total} coisas esperam você`,
-    "{{PAUTA_VALOR}}": valor > 0 ? `${BRL.format(valor)} em jogo` : "",
+    // O ponto final da manchete é o do modelo — o ponto laranja da marca. A frase do dia vazio já
+    // termina em ponto ("…Seu dia está seu."), e sem este corte o e-mail sairia com dois.
+    "{{PAUTA_MANCHETE}}": esc(voz.manchete.replace(/\.$/, "")),
+    "{{PAUTA_VALOR}}": linhaDeBaixo(voz.apoio),
     "{{PAUTA_ITENS}}": montarItens(itens),
     "{{PAUTA_BOTAO}}": "Abrir minha pauta",
     "{{PAUTA_RODAPE}}": 'É a mesma pauta que aparece na tela "Hoje".',
@@ -145,10 +173,45 @@ export function montarEmail(nome: string, itens: ItemDaPauta[], link: string): s
   });
 }
 
-export function assuntoDaPauta(itens: ItemDaPauta[]): string {
-  return itens.length === 1
-    ? "1 coisa espera você hoje"
-    : `${itens.length} coisas esperam você hoje`;
+export function assuntoDaPauta(itens: ItemDaPauta[], diasParadoDaEmpresa: number): string {
+  return vozDaPauta(itens, diasParadoDaEmpresa).assunto;
+}
+
+/** Uma linha de `configuracoes_automacao` com `chave = 'pauta_dias_parado'`. */
+export interface AjusteDaEmpresa {
+  empresa_id: string;
+  // `jsonb`. A tela de Automação grava número; texto só aparece se alguém editar à mão no painel.
+  valor: unknown;
+}
+
+/** O que `pauta_do_dia_de` usa quando a empresa nunca salvou o ajuste. */
+const DIAS_PARADO_PADRAO = 3;
+
+/**
+ * O ajuste "dias parado" de cada empresa, lido como o BANCO lê.
+ *
+ * 🔴 A régua da frase tem de ser a da fila. `pauta_do_dia_de` monta a fila com
+ * `coalesce((valor #>> '{}')::int, 3)`; com um 3 cravado aqui, no dia em que uma empresa mudasse
+ * o ajuste o e-mail diria que um negócio está esquecido enquanto a fila dela não o considera
+ * parado — ou o contrário. Então: número vale, texto com número vale (é o que o `::int` faz), nulo
+ * e ausência de linha caem em 3. Ajuste abaixo de 1 passa adiante como veio: quem o trata é
+ * `vozDaPauta`.
+ *
+ * `index.ts` lê as linhas de todas as empresas dos destinatários numa consulta só e chama isto
+ * uma vez; a função devolvida responde por empresa sem voltar ao banco.
+ */
+export function diasParadoPorEmpresa(linhas: AjusteDaEmpresa[]): (empresaId: string) => number {
+  const porEmpresa = new Map<string, number>();
+  for (const { empresa_id, valor } of linhas) {
+    const n =
+      typeof valor === "number"
+        ? valor
+        : typeof valor === "string" && valor.trim() !== ""
+        ? Number(valor)
+        : NaN;
+    if (Number.isFinite(n)) porEmpresa.set(empresa_id, n);
+  }
+  return (empresaId) => porEmpresa.get(empresaId) ?? DIAS_PARADO_PADRAO;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -190,7 +253,7 @@ export function montarPulsoDaEquipe(
     "{{PAUTA_MANCHETE}}": esc(
       comValor ? `${BRL.format(valor)} pedem atenção` : `${quantos} da equipe pedem atenção`,
     ),
-    "{{PAUTA_VALOR}}": esc(comValor ? `em ${quantos} da equipe` : ""),
+    "{{PAUTA_VALOR}}": linhaDeBaixo(comValor ? `em ${quantos} da equipe` : null),
     "{{PAUTA_ITENS}}": montarItensDaEquipe(equipe),
     "{{PAUTA_BOTAO}}": "Ver a tabela do time",
     "{{PAUTA_RODAPE}}": 'É a mesma tabela do time que aparece na tela "Hoje".',
