@@ -140,7 +140,12 @@ function ProfileTab() {
   const marcaDaMinhaEmpresa = marcaDaEmpresa(profile);
   // A assinatura (e a logo do rodapé) só existem para serem anexadas ao e-mail
   // que o módulo de E-mail envia. Sem o módulo, é configuração sem efeito.
-  const { ligada: temEmails } = useSecaoLigada('emails');
+  const { ligada: temEmails, carregando: carregandoSecoes } = useSecaoLigada('emails');
+  // O cartão Personalizar muda de coluna conforme a empresa tenha o módulo de e-mail:
+  // com ele, o editor de assinatura deixa Informações Pessoais alto, e Personalizar
+  // vai para a direita equilibrar. Enquanto a resposta não chega, o cartão espera —
+  // aparecer num lado e pular para o outro é pior que demorar um instante.
+  const personalizarNaDireita = temEmails === true;
   const qc = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
@@ -513,7 +518,7 @@ function ProfileTab() {
 
         <CardDeSom />
 
-        <CustomizeTab />
+        {!carregandoSecoes && !personalizarNaDireita && <CustomizeTab />}
         {/* GmailSettings sai daqui: a conexão de e-mail passou a ser da EMPRESA,
             via Nylas, e mora na própria aba de E-mails. Deixar os dois caminhos
             visíveis daria duas portas para conectar e-mail fazendo coisas
@@ -523,6 +528,7 @@ function ProfileTab() {
       </div>
 
       <div className="space-y-6">
+        {!carregandoSecoes && personalizarNaDireita && <CustomizeTab />}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
