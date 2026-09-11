@@ -305,8 +305,7 @@ Detalhe métrica a métrica em [`docs/modulos/dashboard.md`](docs/modulos/dashbo
    Achado em 11/09/2026: 15 arquivos publicados tinham dado real da MD. Os de quem registrou esta
    regra foram limpos. Ainda têm, e quem mexer neles limpa junto:
    `docs/operacao/plano-multi-responsavel.md`,
-   `docs/superpowers/plans/2026-09-09-b-historico-por-blocos.md`,
-   `src/lib/assinatura-email.test.ts`, `src/lib/blocos-de-atendimento.test.ts` e
+   `src/lib/assinatura-email.test.ts` e
    `src/lib/historico-legivel.test.ts`. As 5 migrations com dado real ficam como estão (a regra 3
    acima proíbe editar migration existente), e o histórico do git guarda as versões antigas de tudo.
 ---
