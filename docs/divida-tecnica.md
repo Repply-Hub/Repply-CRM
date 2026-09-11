@@ -2832,6 +2832,36 @@ lá que se mexe.
 
 ---
 
+## 71. A voz da pauta: o que as revisões de 11/09 deixaram para depois
+
+**Gravidade: baixa nos quatro — nenhum morde hoje, e cada um tem o gatilho descrito.**
+
+A frase que muda com o dia (`vozDaPauta`, em `src/lib/voz-da-pauta.ts`, com a cópia do e-mail em
+`supabase/functions/_shared/voz-da-pauta.ts`) foi publicada em 11/09/2026 na tela "Hoje" e no
+e-mail das 7h. As revisões acharam quatro pontas soltas, nenhuma por defeito de código:
+
+1. **Nenhum teste prende a ligação do ajuste no e-mail.** `index.ts` lê o ajuste "dias parado"
+   de cada empresa e o passa a `montarEmail`; um erro de digitação em `"pauta_dias_parado"` ou em
+   `empresa_id` devolve lista vazia SEM erro, e todo mundo passa a ser medido com 3 — calado. Hoje
+   não aparece porque nenhuma empresa salvou o ajuste. **Gatilho:** a próxima edição do
+   `index.ts`. O teste que falta: montar o `index.ts` com o banco e o envio simulados e conferir a
+   frase de quem recebe — a revisão fez esse ensaio uma vez, à mão.
+2. **"Parados" sobre negócio que não está parado.** A fila completa o mínimo de itens com negócio
+   abaixo do corte (`r.posicao <= greatest(v_min - v_compromissos, 0)`, em `pauta_do_dia_de`), e
+   o degrau 5 chama o total de "R$ X parados". O pulso da equipe já evita essa armadilha dizendo
+   "pedem atenção". Hoje é verdade para todo mundo. **Gatilho:** alguém com menos de três negócios
+   de fato parados. É decisão de texto do dono do produto, não conserto técnico.
+3. **Tela e e-mail podem ler o ajuste de jeitos diferentes.** O gancho da tela
+   (`src/hooks/use-configuracoes-automacao.ts`) só aceita número; o banco e o e-mail aceitam
+   também número guardado como texto ("7"). **Gatilho:** alguém gravar o ajuste à mão no painel
+   do Supabase — a tela de Automação sempre grava número.
+4. **A tarefa vencida volta à fila, mas não ao cartão.** Desde a migration `20260911090000`, a
+   tarefa vencida deixa de esconder o negócio da pauta; o cartão "Sem Próxima Ação" e a tabela do
+   time ainda contam tarefa aberta — vencida ou não — como próxima ação. **Gatilho:** já vale; hoje
+   só se nota comparando os três. Alinhar é outra decisão, anotada na própria migration.
+
+---
+
 ## Resolvidos
 
 ### 21/08/2026 — seleção em massa na lista de Negócios
