@@ -44,7 +44,7 @@ const CommandInput = React.forwardRef<
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        "flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+        "flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none text-ellipsis placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}
@@ -60,7 +60,14 @@ const CommandList = React.forwardRef<
 >(({ className, onWheel, ...props }, ref) => (
   <CommandPrimitive.List
     ref={ref}
-    className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)}
+    className={cn(
+      // Nunca mais alta que o espaço que sobra na tela. Num notebook de 720 px com
+      // um diálogo aberto, a lista de 300 px passava do rodapé e o último item sumia.
+      // O Radix informa esse espaço em `--radix-popover-content-available-height`;
+      // fora de um Popover a variável não existe e vale o `100vh`.
+      "max-h-[min(300px,calc(var(--radix-popover-content-available-height,100vh)-3.5rem))] overflow-y-auto overflow-x-hidden",
+      className,
+    )}
     // Quando este dropdown abre dentro de um Dialog modal, o react-remove-scroll
     // do Radix trava o scroll nativo de tudo que não faz parte da árvore do
     // Dialog — incluindo o Popover deste Command, que é portalizado à parte.
