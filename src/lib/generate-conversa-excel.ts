@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { ConversaExportRow, ConversaParaExportar } from '@/lib/generate-conversa-pdf';
+import { hojeLocal } from '@/lib/data-local';
 
 export function generateConversaExcel(linhas: ConversaExportRow[], contato: string) {
   const rows = linhas.map(l => ({
@@ -21,7 +22,7 @@ export function generateConversaExcel(linhas: ConversaExportRow[], contato: stri
   XLSX.utils.book_append_sheet(wb, ws, 'Conversa');
 
   const nomeArquivo = contato.replace(/[^a-zA-Z0-9À-ÿ -]/g, '').trim() || 'conversa';
-  XLSX.writeFile(wb, `conversa-${nomeArquivo}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(wb, `conversa-${nomeArquivo}-${hojeLocal()}.xlsx`);
 }
 
 // Nome de aba do Excel: até 31 caracteres e sem : \ / ? * [ ] (limite do
@@ -67,5 +68,5 @@ export function generateConversasExcel(conversas: ConversaParaExportar[]) {
     XLSX.utils.book_append_sheet(wb, ws, nomeAbaValido(conversa.nomeContato, nomesUsados));
   }
 
-  XLSX.writeFile(wb, `todas-as-conversas-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(wb, `todas-as-conversas-${hojeLocal()}.xlsx`);
 }

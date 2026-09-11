@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { desenharMarca, desenharRodape, encurtar, type MarcaDaEmpresa } from '@/lib/marca-do-pdf';
+import { hojeLocal } from '@/lib/data-local';
 
 export interface ConversaExportRow {
   dataHora: string;
@@ -126,7 +127,7 @@ export async function generateConversaPdf(
   desenharTabelaMensagens(doc, pageWidth, marca, linhas);
 
   const nomeArquivo = contato.replace(/[^a-zA-Z0-9À-ÿ -]/g, '').trim() || 'conversa';
-  doc.save(`conversa-${nomeArquivo}-${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`conversa-${nomeArquivo}-${hojeLocal()}.pdf`);
 }
 
 // Exportação consolidada: um único PDF com todas as conversas, cada uma
@@ -150,5 +151,5 @@ export async function generateConversasPdf(
     desenharTabelaMensagens(doc, pageWidth, marca, conversa.linhas);
   }
 
-  doc.save(`todas-as-conversas-${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`todas-as-conversas-${hojeLocal()}.pdf`);
 }

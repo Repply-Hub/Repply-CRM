@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { desenharMarca, desenharRodape, encurtar, type MarcaDaEmpresa } from '@/lib/marca-do-pdf';
+import { hojeLocal } from '@/lib/data-local';
 
 export interface PedidoRow {
   cliente: string;
@@ -110,5 +111,5 @@ export async function generatePedidosPdf(
     },
   });
 
-  doc.save(`orcamentos-${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`orcamentos-${hojeLocal()}.pdf`);
 }

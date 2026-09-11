@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { ColumnSettings } from '@/components/shared/ColumnSettings';
 import { DateRangePicker, type DateRange } from '@/components/shared/DateRangePicker';
 import { cn } from '@/lib/utils';
+import { hojeLocal } from '@/lib/data-local';
 import { ListPagination } from '@/components/shared/ListPagination';
 
 import { Loader2, Search, ExternalLink, Globe, AlertTriangle, RefreshCw, Download, ChevronDown, ChevronUp, CloudDownload, List, Settings2, Calendar as CalendarLucide, FilterX } from 'lucide-react';
@@ -555,7 +556,7 @@ export default function Portal() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${siteId}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `${siteId}_${hojeLocal()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success('CSV exportado com sucesso');

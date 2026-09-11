@@ -1,4 +1,5 @@
 import type { ConversaExportRow, ConversaParaExportar } from '@/lib/generate-conversa-pdf';
+import { hojeLocal } from '@/lib/data-local';
 
 // Evita que a mensagem do contato seja lida como estrutura do documento: um
 // "# " no início de linha viraria título, e ``` abriria um bloco de código
@@ -47,7 +48,7 @@ export function generateConversaMarkdown(
   const conteudo = cabecalhoExportacao(`Conversa — ${contato}`, periodo) + blocoMensagens(linhas) + '\n';
 
   const nomeArquivo = contato.replace(/[^a-zA-Z0-9À-ÿ -]/g, '').trim() || 'conversa';
-  baixarMarkdown(conteudo, `conversa-${nomeArquivo}-${new Date().toISOString().slice(0, 10)}.md`);
+  baixarMarkdown(conteudo, `conversa-${nomeArquivo}-${hojeLocal()}.md`);
 }
 
 // Exportação consolidada: um único arquivo, cada conversa como uma seção com
@@ -59,5 +60,5 @@ export function generateConversasMarkdown(conversas: ConversaParaExportar[], per
     .join('\n\n---\n\n');
 
   const conteudo = cabecalhoExportacao('Conversas exportadas', periodo) + secoes + '\n';
-  baixarMarkdown(conteudo, `todas-as-conversas-${new Date().toISOString().slice(0, 10)}.md`);
+  baixarMarkdown(conteudo, `todas-as-conversas-${hojeLocal()}.md`);
 }
