@@ -16,6 +16,8 @@
  * tem regra de produto e merece teste; tocar de fato não tem o que testar.
  */
 
+import { somDoCatalogo } from './catalogo-de-sons';
+
 /** Dois toques de notificação nunca saem a menos disto um do outro. */
 const INTERVALO_MINIMO_MS = 2_000;
 
@@ -99,6 +101,8 @@ export interface ContextoDaNotificacao {
   ligado: boolean;
   /** Conversa que gerou a notificação, quando houver. */
   conversaId?: string | null;
+  /** O som escolhido pela pessoa. Ausente ou desconhecido = padrão. */
+  somId?: string | null;
 }
 
 export function tocarNotificacao(ctx: ContextoDaNotificacao): void {
@@ -113,7 +117,16 @@ export function tocarNotificacao(ctx: ContextoDaNotificacao): void {
   });
   if (!deve) return;
   ultimoToqueEm = agora;
-  tocar('/sons/notificacao.mp3');
+  tocar(somDoCatalogo(ctx.somId).arquivo);
+}
+
+/**
+ * O ▶ da tela de Configurações. Toca mesmo com o som desligado e ignora o intervalo
+ * mínimo: é um gesto explícito da pessoa, não um aviso — e não conta como toque de
+ * notificação (não mexe em `ultimoToqueEm`).
+ */
+export function ouvirAmostra(id: string): void {
+  tocar(somDoCatalogo(id).arquivo);
 }
 
 /**
