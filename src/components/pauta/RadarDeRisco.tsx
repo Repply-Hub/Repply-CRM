@@ -32,8 +32,11 @@ import { recorteParaOServidor, type FiltrosDoPainel } from '@/lib/filtros-do-pai
 // Recharts quebra o texto do tick em várias linhas quando ele não cabe na largura reservada
 // pro eixo — tick em SVG puro (sem a prop `width`, que é o que dispara o word-wrap) e a
 // largura do eixo calculada a partir do nome mais longo.
+// Os nomes na cor do texto principal, e não no cinza secundário: são o que se lê primeiro no
+// gráfico. A grade e o eixo de valores continuam em `commonAxisProps`/`commonGridProps`, que são
+// compartilhados com o Dashboard — mexer lá mudaria aquela tela também.
 const renderVendedorTick = ({ x, y, payload }: { x: number; y: number; payload: { value: string } }) => (
-  <text x={x} y={y} dy={4} textAnchor="end" fontSize={11} fill="hsl(var(--muted-foreground))">
+  <text x={x} y={y} dy={4} textAnchor="end" fontSize={11} fill="hsl(var(--card-foreground))">
     {payload?.value ?? ''}
   </text>
 );
@@ -276,18 +279,18 @@ export function RadarDeRisco({
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b text-[11px] uppercase tracking-wider text-muted-foreground">
-                      <th className="py-2 text-left font-semibold">Fabricante</th>
-                      <th className="py-2 text-right font-semibold">Negócios</th>
-                      <th className="py-2 text-right font-semibold">Valor</th>
+                    <tr className="bg-muted text-[11px] uppercase tracking-wider text-muted-foreground">
+                      <th className="px-3 py-2 text-left font-semibold">Fabricante</th>
+                      <th className="px-3 py-2 text-right font-semibold">Negócios</th>
+                      <th className="px-3 py-2 text-right font-semibold">Valor</th>
                     </tr>
                   </thead>
                   <tbody>
                     {risco.riscoPorFabricante.map((f) => (
-                      <tr key={f.fabrica} className="border-b border-border/50 last:border-0">
-                        <td className="py-2">{f.fabrica}</td>
-                        <td className="py-2 text-right font-mono tabular-nums">{f.qtd}</td>
-                        <td className="py-2 text-right font-mono tabular-nums">{formatCurrency(f.valor)}</td>
+                      <tr key={f.fabrica} className="border-b border-border last:border-0">
+                        <td className="px-3 py-2 text-card-foreground">{f.fabrica}</td>
+                        <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums text-card-foreground">{f.qtd}</td>
+                        <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums text-card-foreground">{formatCurrency(f.valor)}</td>
                       </tr>
                     ))}
                   </tbody>

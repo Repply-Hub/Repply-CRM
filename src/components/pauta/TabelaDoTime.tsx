@@ -180,16 +180,16 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
             <div className="overflow-x-auto">
               <table className="w-full min-w-[880px] text-sm">
                 <thead>
-                  <tr className="border-b text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <th className="py-2 text-left font-semibold">Negócio</th>
-                    <th className="py-2 text-left font-semibold">Fabricante</th>
-                    <th className="py-2 text-left font-semibold">Etapa</th>
+                  <tr className="bg-muted text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <th className="px-3 py-2 text-left font-semibold">Negócio</th>
+                    <th className="px-3 py-2 text-left font-semibold">Fabricante</th>
+                    <th className="px-3 py-2 text-left font-semibold">Etapa</th>
                     {podeVerDeTodos && (
-                      <th className="py-2 text-left font-semibold">Responsável</th>
+                      <th className="px-3 py-2 text-left font-semibold">Responsável</th>
                     )}
-                    <th className="py-2 text-right font-semibold">Valor</th>
-                    <th className="py-2 text-right font-semibold">Sem mexer há</th>
-                    <th className="py-2 text-right font-semibold">
+                    <th className="px-3 py-2 text-right font-semibold">Valor</th>
+                    <th className="px-3 py-2 text-right font-semibold">Sem mexer há</th>
+                    <th className="px-3 py-2 text-right font-semibold">
                       <span className="sr-only">Ações</span>
                     </th>
                   </tr>
@@ -198,19 +198,19 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
                   {linhas.map((n) => (
                     <tr
                       key={n.id}
-                      className="cursor-pointer border-b border-border/50 last:border-0 hover:bg-muted/50"
+                      className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/50"
                       onClick={() => onAbrir(n.id)}
                     >
-                      <td className="py-2 pr-3">{n.nome}</td>
-                      <td className="py-2 pr-3 text-muted-foreground">{n.fabrica ?? '—'}</td>
-                      <td className="py-2 pr-3 text-muted-foreground">{n.etapa ?? '—'}</td>
+                      <td className="px-3 py-2 font-medium text-card-foreground">{n.nome}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{n.fabrica ?? '—'}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{n.etapa ?? '—'}</td>
                       {podeVerDeTodos && (
-                        <td className="py-2 pr-3 text-muted-foreground">{n.responsavel ?? '—'}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{n.responsavel ?? '—'}</td>
                       )}
-                      <td className="py-2 pr-3 text-right font-mono tabular-nums">
+                      <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums text-card-foreground">
                         {n.valor === null ? '—' : formatarMoedaBRL(n.valor)}
                       </td>
-                      <td className="py-2 pr-3 text-right font-mono tabular-nums">
+                      <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums text-card-foreground">
                         {n.dias_parado === null
                           ? '—'
                           : `${n.dias_parado} ${n.dias_parado === 1 ? 'dia' : 'dias'}`}
@@ -220,7 +220,7 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
                           seria regressão silenciosa para quem se acostumou. Sem o
                           `stopPropagation`, "Retomar depois" abriria o painel do negócio ao mesmo
                           tempo em que abre o diálogo. */}
-                      <td className="py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="outline" onClick={() => onAbrir(n.id)}>
                             Abrir negócio
