@@ -1263,7 +1263,7 @@ const Clientes = () => {
                     {step === 4 && (
                       <div className="space-y-2">
                         <Label className="text-xs font-semibold uppercase text-muted-foreground">Vincular Contato</Label>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <Button type="button" size="sm" variant={contatoMode === 'nenhum' ? 'default' : 'outline'} onClick={() => setContatoMode('nenhum')}>Nenhum</Button>
                           <Button type="button" size="sm" variant={contatoMode === 'existente' ? 'default' : 'outline'} onClick={() => setContatoMode('existente')}>Selecionar existente</Button>
                           <Button type="button" size="sm" variant={contatoMode === 'novo' ? 'default' : 'outline'} onClick={() => setContatoMode('novo')}>Novo contato</Button>
