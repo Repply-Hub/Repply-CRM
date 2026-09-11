@@ -567,7 +567,10 @@ export default function Portal() {
       <div className="p-3 sm:p-4 md:p-6 flex flex-col gap-4 sm:gap-6">
         {/* Search bar */}
         <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <div className="relative flex-1">
+          {/* Abaixo de `sm`: linha inteira, sem dividir espaço com data e botão —
+              senão o `flex-1` some para um input de ~74px (medido a 375px). De
+              `sm` para cima volta a crescer na fileira, como sempre foi. */}
+          <div className="relative w-full min-w-0 sm:w-auto sm:flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por CNPJ, empresa, licença, obra..."
