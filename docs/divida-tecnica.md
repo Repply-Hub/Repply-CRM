@@ -82,7 +82,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 65 | [As duas telas mais delicadas do calendário não têm teste](#65-as-duas-telas-mais-delicadas-do-calendário-não-têm-teste-nenhum) | Baixa | Não |
 | 66 | [A grade de figurinhas usa endereço público cru](#66-a-grade-de-figurinhas-usa-endereço-público-cru-e-para-quando-o-balde-fechar) | Média | Não hoje — **sim** no dia em que `whatsapp-media` fechar |
 | 67 | [Falta a contagem distinta de negócios em risco](#67-falta-a-contagem-distinta-de-negócios-em-risco) | Baixa | Não — só limita o cartão "Valor em Risco" a mostrar valor sem quantidade |
-| 70 | [Datas que mudam de dia fora do banco](#70-datas-que-mudam-de-dia-fora-do-banco-o-que-sobrou-da-varredura-de-1109) | Baixa | Não — nenhuma exportação do cliente sai errada; sobram a "Data de criação" de quem é cadastrado depois das 21h e o nome de 10 arquivos |
+| 70 | [Datas que mudam de dia fora do banco](#70-datas-que-mudam-de-dia-fora-do-banco-o-que-sobrou-da-varredura-de-1109) | Baixa | Não — código consertado em 11/09; sobram os cadastros antigos feitos depois das 21h (dado, pede conversa) e o Calendário (item 51) |
 
 > ⚠️ Os itens **61 e 62** existem no corpo deste documento mas não têm linha aqui — quem os
 > escreveu esqueceu a tabela. Vale acrescentar ao passar por perto.
@@ -2769,9 +2769,9 @@ pessoa.
 ---
 ## 70. Datas que mudam de dia fora do banco: o que sobrou da varredura de 11/09
 
-**Gravidade: baixa.** Nenhuma exportação que o cliente usa hoje escreve data errada. O que sobra é
-exibição e nome de arquivo — e uma data de criação gravada com o dia seguinte, que não entra em
-métrica nenhuma.
+**Gravidade: baixa.** Nenhuma exportação que o cliente usa hoje escreve data errada, e o código dos
+três defeitos achados foi consertado no mesmo dia (abaixo). O que sobra é dado já gravado e o
+Calendário, que já é o item 51.
 
 Varredura de 11/09/2026, feita depois que o gerador `src/lib/generate-excel.ts` foi flagrado
 escrevendo cada data um dia antes (`CLAUDE.md` §7.12). Procurou-se `new Date(<coluna date>)`
@@ -2788,10 +2788,19 @@ demais datas do sistema são carimbo com fuso, e para elas `new Date(...)` está
 
 | onde | o que acontece | conserto |
 |---|---|---|
-| `src/hooks/use-mutations.ts:23` (cliente) e `:58` (contato); `src/hooks/use-criar-contato-da-conversa.ts:79` (contato criado da conversa) | Cadastro feito **depois das 21h** grava `data_criacao` com a data de **amanhã** — `toISOString()` é a hora em UTC; o terceiro grava o carimbo inteiro, e a lista o recorta. Fica gravado, e é o que a ficha e a lista de Clientes mostram em "Data de Criação" | `format(new Date(), 'yyyy-MM-dd')` do date-fns, que é local — o mesmo que `Negocios.tsx:1894` já usa. Os registros já gravados dão para achar comparando `data_criacao` com `created_at` no horário de Brasília; corrigi-los é mudança em dado de produção e pede conversa antes (`CLAUDE.md` §11) |
-| `src/pages/ClienteDetalhe.tsx:666` | Sem `data_criacao`, cai em `created_at` e recorta os 10 primeiros caracteres — de um carimbo UTC. Medido: cliente criado às 22h30 de 24/08 aparece como 25/08 | Recortar só a data seca; carimbo passa por `format(new Date(...), 'dd/MM/yyyy')` |
-| Nome do arquivo em 10 exportações: `generate-pdf.ts:113`, `generate-dashboard-pdf.ts:103`, `generate-conversa-pdf.ts:129` e `:153`, `generate-conversa-excel.ts:24` e `:70`, `generate-conversa-markdown.ts:50` e `:62`, `ExportClientesButton.tsx:46`, `exportCsv` em `Portal.tsx` | Mesmo idioma: depois das 21h o arquivo sai com a data de amanhã **no nome**. O conteúdo está certo | O mesmo `format(new Date(), 'yyyy-MM-dd')` |
+| Clientes e contatos **já cadastrados** depois das 21h, antes do conserto de 11/09 | A "Data de Criação" continua gravada com o dia seguinte — o código novo só vale para cadastro novo | Dá para achar comparando `data_criacao` com `created_at` no horário de Brasília. Corrigir é mudança em dado de produção e pede conversa antes (`CLAUDE.md` §11) |
 | Calendário, `use-eventos.ts:184` | Desenha o fechamento um dia antes | Já é o [item 51](#51-o-calendário-mostra-menos-de-10-dos-prazos-e-desenha-um-dia-antes), que cita a linha de antes (164) |
+
+✅ **Consertado em 11/09/2026**, com `src/lib/data-local.ts` (`hojeLocal` e `formatarDataBR`, com
+teste) e um guarda estrutural, `src/test/hoje-no-fuso-local.test.ts`, que falha se o idioma voltar:
+
+- **Data de criação:** os três cadastros — cliente e contato em `use-mutations.ts`, e o contato
+  criado da conversa em `use-criar-contato-da-conversa.ts` — gravam `hojeLocal()`, a data no fuso
+  de quem usa. O da conversa gravava o carimbo UTC inteiro; agora grava só a data, como os outros.
+- **A ficha do cliente** (`ClienteDetalhe.tsx`, "Data de criação"): `formatarDataBR` reescreve a
+  data seca e leva o carimbo `created_at` ao fuso de quem olha, em vez de recortar o texto UTC.
+- **O nome dos arquivos** das 10 exportações — PDF de Negócios, Dashboard, conversas em PDF, Excel
+  e Markdown, Clientes e o CSV do Portal — sai com `hojeLocal()`.
 
 ✅ **O gerador que originou a varredura, `src/lib/generate-excel.ts`, foi apagado em 11/09/2026**,
 junto com o teste. Escrevia cada data um dia antes — o 1º de janeiro, no **ano** anterior —, mas

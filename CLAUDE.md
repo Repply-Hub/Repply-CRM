@@ -489,6 +489,12 @@ Ler do banco sempre esteve certo e é o padrão a copiar: âncora de meio-dia,
 Passou dois anos sem ninguém notar porque só **4 negócios** nasceram dentro do CRM — os
 outros 11.903 vieram da importação, que monta a data por outro caminho.
 
+**"Hoje" como texto é `hojeLocal()`, e data ou carimbo na tela é `formatarDataBR()`** — os dois
+em `src/lib/data-local.ts`. `new Date().toISOString().slice(0, 10)` parece "hoje" e é a data em
+UTC: das 21h à meia-noite já é amanhã. Foi assim que o cadastro de cliente e de contato gravou a
+data de criação do dia seguinte e dez exportações saíram com a data de amanhã no nome (medido em
+11/09/2026). `src/test/hoje-no-fuso-local.test.ts` falha se o idioma voltar.
+
 ### 7.13 Calendário abre no mês de hoje, não no mês da data escolhida
 
 `react-day-picker` v8 decide o mês de abertura por `month ?? defaultMonth ?? hoje`.
@@ -714,6 +720,7 @@ Além disso, conforme o que mudou:
 - ❌ `type="number"` ou `parseFloat` em campo de dinheiro (use `CampoMoeda` / `parseMoedaBRL`)
 - ❌ `<DialogContent>` cru em modal com formulário (use `ConteudoDialogo`)
 - ❌ Converter fuso na data que veio do calendário (§7.12) — a conversão recua um dia
+- ❌ `new Date().toISOString().slice(0, 10)` como "hoje" (§7.12) — é a data em UTC, e depois das 21h já é amanhã; use `hojeLocal()`
 - ❌ `<Calendar>` sem `defaultMonth` (§7.13) — abre no mês de hoje e ignora a data escolhida
 - ❌ Parâmetro que escolhe entre duas colunas de data dentro de uma RPC (§7.9)
 - ❌ Tratar `prazo_resposta` como prazo (§4.4) — é a data de fechamento, e o nome mente
