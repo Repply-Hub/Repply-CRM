@@ -69,9 +69,9 @@ export function vozDaPauta(itens: ItemParaVoz[], diasParadoDaEmpresa: number): V
     const alvo = porParado[0];
     const valorDoAlvo = Number(alvo.valor) || 0;
     return {
-      manchete: `Um negócio seu está há ${primeiro} dias sem mexer`,
+      manchete: `Um negócio seu está há ${plural(primeiro, 'dia', 'dias')} sem mexer`,
       apoio: valorDoAlvo > 0 ? `${dinheiro(valorDoAlvo)} · ${alvo.titulo}` : alvo.titulo,
-      assunto: `Um negócio seu está há ${primeiro} dias sem mexer`,
+      assunto: `Um negócio seu está há ${plural(primeiro, 'dia', 'dias')} sem mexer`,
     };
   }
 
@@ -88,6 +88,6 @@ export function vozDaPauta(itens: ItemParaVoz[], diasParadoDaEmpresa: number): V
   }
 
   // Degrau 6 — negócio sem valor preenchido existe nesta base e não pode virar "R$ 0,00 parados".
-  const frase = `${plural(negocios.length, 'negócio', 'negócios')} parados`;
+  const frase = plural(negocios.length, 'negócio parado', 'negócios parados');
   return { manchete: frase, apoio: null, assunto: `${frase} hoje` };
 }

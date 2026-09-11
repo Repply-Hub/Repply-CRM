@@ -119,3 +119,28 @@ describe('as duas cópias dizem a mesma coisa', () => {
     expect(ler('supabase/functions/_shared/voz-da-pauta.ts')).toBe(ler('src/lib/voz-da-pauta.ts'));
   });
 });
+
+/**
+ * A concordância no singular, que a primeira versão errava em dois degraus. As frases são as
+ * aprovadas pelo dono do produto; o que muda é só o número concordar com o substantivo quando ele
+ * é 1. "1 negócio parados" chega na caixa de entrada de alguém toda manhã em que a fila tiver um
+ * único negócio sem valor — e texto errado todo dia corrói a confiança no resto da tela.
+ */
+describe('concordância no singular', () => {
+  it('degrau 6 com UM negócio: "1 negócio parado", nunca "1 negócio parados"', () => {
+    const v = vozDaPauta([negocio('A', null, 5)], 3);
+    expect(v.manchete).toBe('1 negócio parado');
+    expect(v.assunto).toBe('1 negócio parado hoje');
+  });
+
+  it('degrau 6 com dois continua no plural', () => {
+    expect(vozDaPauta([negocio('A', null, 5), negocio('B', 0, 5)], 3).manchete).toBe('2 negócios parados');
+  });
+
+  it('degrau 3 com 1 dia: "há 1 dia", nunca "há 1 dias"', () => {
+    // Só acontece se a empresa ajustar `pauta_dias_parado` para 1 — a tela aceita de 1 a 365.
+    const v = vozDaPauta([negocio('Obra Exemplo', 100, 1), negocio('Outro', 50, 0)], 1);
+    expect(v.manchete).toBe('Um negócio seu está há 1 dia sem mexer');
+    expect(v.assunto).toBe('Um negócio seu está há 1 dia sem mexer');
+  });
+});
