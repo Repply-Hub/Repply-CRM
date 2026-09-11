@@ -1865,11 +1865,15 @@ const Emails = () => {
               "Escrever" — que é o ÚNICO caminho para um e-mail novo — sumia por
               inteiro entre ~768 e ~917px de janela, sem barra de rolagem em lugar
               nenhum para alcançá-lo. Mesmo padrão de Negocios.tsx:1862.
-              `flex-wrap` só abaixo de `md`: no celular deixa a busca (que passou a
-              aparecer ali) e o filtro "Todas/Não lidas" quebrarem para a própria
-              linha em vez de vazar para fora da tela sem barra visível. Do `md`
-              para cima continua `nowrap`, como sempre foi. */}
-          <div className="flex flex-wrap md:flex-nowrap items-center gap-4 flex-1 min-w-0 overflow-x-auto custom-scrollbar">
+              `flex-wrap` até `lg` (exclusive): no celular E no tablet deixa a
+              busca (que passou a aparecer ali) e o filtro "Todas/Não lidas"
+              quebrarem para a própria linha em vez de vazar para fora da tela
+              sem barra visível. Era `md` (768px) até 11/09/2026 à tarde, mas a
+              768px o modo `nowrap` não cabe — a fileira toda (abas + filtro +
+              busca) é mais larga que a tela, e o `overflow-x-auto` deixa a
+              busca alcançável só rolando pro lado, sem indicação nenhuma disso.
+              De `lg` (1024px) para cima sobra espaço e volta a ser `nowrap`. */}
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-4 flex-1 min-w-0 overflow-x-auto custom-scrollbar">
             {selectedIds.length > 0 ? (
               <div className="flex shrink-0 items-center gap-4 bg-primary/5 px-3 py-1 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-left-2 duration-200">
                 <div className="flex items-center gap-2">
@@ -2000,7 +2004,7 @@ const Emails = () => {
               </div>
             )}
 
-            <div className="flex items-center gap-2 w-full md:w-auto md:flex-1 md:min-w-[14rem] md:max-w-md">
+            <div className="flex items-center gap-2 w-full lg:w-auto lg:flex-1 lg:min-w-[14rem] lg:max-w-md">
               {/* Marcador só filtra Recebidos (ver `escolherPasta`) — o chip só
                   existe onde há filtro de verdade para limpar. Clicar de novo
                   no marcador ativo na barra lateral não desmarca (o clique
