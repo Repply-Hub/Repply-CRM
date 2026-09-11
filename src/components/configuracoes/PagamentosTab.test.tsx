@@ -60,12 +60,17 @@ afterEach(() => {
 const AMANHA = new Date(Date.now() + 5 * 86_400_000).toISOString();
 const ONTEM = new Date(Date.now() - 86_400_000).toISOString();
 
-function comAssinatura(assinatura: Record<string, unknown> | null) {
+function comAssinatura(assinatura: Record<string, unknown> | null, empresaCriadaEm?: string) {
   useAuthFalso.mockReturnValue({
     profile: {
       id: 'usuario-1',
       role: 'gestor',
-      empresas: { id: 'empresa-1', nome: 'Construtora Meridiano', empresa_assinaturas: assinatura },
+      empresas: {
+        id: 'empresa-1',
+        nome: 'Construtora Meridiano',
+        created_at: empresaCriadaEm,
+        empresa_assinaturas: assinatura,
+      },
     },
     session: { user: { id: 'auth-1' } },
   });
@@ -170,5 +175,31 @@ describe('PagamentosTab', () => {
     comAssinatura(null);
     render(<PagamentosTab />);
     expect(screen.getByText(/não foi possível carregar/i)).toBeTruthy();
+  });
+
+  it('cortesia mostra desde quando, pela criação da empresa', () => {
+    comAssinatura({ plan_status: 'active', origem: 'cortesia' }, '2026-03-10T12:00:00.000Z');
+    render(<PagamentosTab />);
+    expect(screen.getByText(/cortesia desde/i)).toBeTruthy();
+    expect(screen.getByText(/10 de março de 2026/i)).toBeTruthy();
+  });
+
+  it('pagante mostra o início da assinatura no provedor', () => {
+    comAssinatura({ ...PAGANTE, assinatura_iniciada_em: '2026-05-15T12:00:00.000Z' });
+    render(<PagamentosTab />);
+    expect(screen.getByText(/assinatura iniciada em/i)).toBeTruthy();
+    expect(screen.getByText(/maio de 2026/i)).toBeTruthy();
+  });
+
+  it('🔴 pagante sem a data do provedor não ganha linha de início', () => {
+    comAssinatura(PAGANTE);
+    render(<PagamentosTab />);
+    expect(screen.queryByText(/assinatura iniciada em/i)).toBeNull();
+  });
+
+  it('teste não mostra data de início', () => {
+    comAssinatura({ plan_status: 'trialing', origem: 'trial', current_period_end: AMANHA }, '2026-03-10T12:00:00.000Z');
+    render(<PagamentosTab />);
+    expect(screen.queryByText(/desde|iniciada em/i)).toBeNull();
   });
 });

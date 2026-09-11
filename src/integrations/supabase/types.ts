@@ -1692,6 +1692,7 @@ export type Database = {
       empresa_assinaturas: {
         Row: {
           ativado_em: string | null
+          assinatura_iniciada_em: string | null
           cancel_at_period_end: boolean
           current_period_end: string | null
           empresa_id: string
@@ -1706,6 +1707,7 @@ export type Database = {
         }
         Insert: {
           ativado_em?: string | null
+          assinatura_iniciada_em?: string | null
           cancel_at_period_end?: boolean
           current_period_end?: string | null
           empresa_id: string
@@ -1720,6 +1722,7 @@ export type Database = {
         }
         Update: {
           ativado_em?: string | null
+          assinatura_iniciada_em?: string | null
           cancel_at_period_end?: boolean
           current_period_end?: string | null
           empresa_id?: string

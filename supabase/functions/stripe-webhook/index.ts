@@ -225,6 +225,13 @@ async function aplicarAssinatura(
   if (planoSlug) patch.plano_slug = planoSlug;
   if (liberado) patch.ativado_em = new Date().toISOString();
 
+  // O início que o PRÓPRIO Stripe informa. Fixo dentro de uma assinatura; uma nova
+  // (depois de um cancelamento) traz a data dela. Gravado a cada evento que o tiver —
+  // regravar o mesmo valor é inofensivo, e é o que conserta uma linha que ficou nula.
+  if (typeof sub.start_date === "number") {
+    patch.assinatura_iniciada_em = new Date(sub.start_date * 1000).toISOString();
+  }
+
   const { error } = await supabase
     .from("empresa_assinaturas")
     .upsert(patch, { onConflict: "empresa_id" });
