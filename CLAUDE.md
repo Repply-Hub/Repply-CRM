@@ -292,6 +292,23 @@ Detalhe métrica a métrica em [`docs/modulos/dashboard.md`](docs/modulos/dashbo
 8. **`src/integrations/supabase/types.ts` é gerado**, mas não há banco local neste
    ambiente. Ao criar RPC ou mudar tabela, **atualize o arquivo à mão** para bater.
 
+
+### Dado de cliente
+
+9. 🔴 **Dado real não entra em teste, plano, desenho, comentário nem migration.** O repositório é
+   **público** (§16): nome de pessoa da equipe, nome ou valor de negócio de cliente, e-mail,
+   telefone e código interno de conta (`usuarios.id`, `auth.users.id`) ficam à vista de
+   qualquer um. Use nomes e valores inventados ("Ana Souza", "Obra Exemplo", 180000) — o teste
+   prova a regra do mesmo jeito. Ao medir no banco, relate o número na conversa; não copie o dado
+   para dentro do arquivo.
+
+   Achado em 11/09/2026: 15 arquivos publicados tinham dado real da MD. Os de quem registrou esta
+   regra foram limpos. Ainda têm, e quem mexer neles limpa junto:
+   `docs/operacao/plano-multi-responsavel.md`,
+   `docs/superpowers/plans/2026-09-09-b-historico-por-blocos.md`,
+   `src/lib/assinatura-email.test.ts`, `src/lib/blocos-de-atendimento.test.ts` e
+   `src/lib/historico-legivel.test.ts`. As 5 migrations com dado real ficam como estão (a regra 3
+   acima proíbe editar migration existente), e o histórico do git guarda as versões antigas de tudo.
 ---
 
 ## 7. Armadilhas medidas neste código
@@ -708,6 +725,7 @@ Além disso, conforme o que mudou:
 - ❌ Painel que atribua culpa — ver o princípio "registra, não interpreta" (`SPEC.md` §3.5)
 - ❌ Transformar prática da MD em regra do sistema (`SPEC.md` §4)
 - ❌ Chamar este produto de "Imob"
+- ❌ Dado real de cliente ou da equipe em teste, plano ou comentário (§6.9) — o repositório é público
 - ❌ Commitar ou enviar qualquer coisa **sem autorização do Lucas** (ver §13)
 - ❌ Commitar sem antes rodar `git fetch` e conferir se entrou commit de outra pessoa
 - ❌ `git add -A` (§13) — outra sessão trabalha nesta pasta; liste os arquivos um a um
