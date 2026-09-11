@@ -55,6 +55,7 @@ import {
   unmaskCnpj,
   isValidCnpjDigits,
   fetchCnpjData,
+  telefoneDaReceita,
 } from "@/lib/cnpj";
 import {
   AlertDialog,
@@ -141,7 +142,10 @@ function FabricanteForm({
       if (sessionRef.current !== session) return; // formulário foi fechado/reaberto enquanto a consulta rodava
       setCnpjStatus("valid");
       if (data.razao_social && !nome) setNome(data.razao_social);
-      if (data.ddd_telefone_1 && !telefone) setTelefone(data.ddd_telefone_1);
+      // A Receita manda o telefone só em dígitos, com o DDD grudado ("2121660000"). Sem passar
+      // pelo formatador ele entrava cru no campo — ver `telefoneDaReceita` em src/lib/cnpj.ts.
+      const telefoneReceita = telefoneDaReceita(data);
+      if (telefoneReceita && !telefone) setTelefone(telefoneReceita);
       toast.success("CNPJ validado!");
     } catch {
       if (sessionRef.current !== session) return;
