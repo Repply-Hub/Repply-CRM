@@ -27,12 +27,21 @@ export type VozDaPauta = {
   assunto: string;
 };
 
+// Dinheiro SEM centavos, como o e-mail já faz (`BRL` em `pauta-resumo-diario/corpo.ts`): numa
+// manchete os centavos só roubam a atenção do número que importa — e é assim que o texto aprovado
+// escreve ("R$ 482.900 parados em 7 negócios"). Com centavos, o mesmo e-mail mostraria
+// "R$ 482.900,00" na manchete e "R$ 180.000" nos itens logo abaixo.
 const dinheiro = (v: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v);
 
 const plural = (n: number, um: string, muitos: string) => `${n} ${n === 1 ? um : muitos}`;
 
 export function vozDaPauta(itens: ItemParaVoz[], diasParadoDaEmpresa: number): VozDaPauta {
+  // O banco troca ajuste ausente por 3 (`pauta_do_dia_de`), e a tela de Automação aceita de 1 a
+  // 365. Sem esta guarda, ajuste 0 ou nulo faria o degrau 3 dizer "há 0 dias sem mexer" sobre
+  // negócio mexido hoje.
+  const limite =
+    Number.isFinite(diasParadoDaEmpresa) && diasParadoDaEmpresa >= 1 ? diasParadoDaEmpresa : 3;
   const negocios = itens.filter((i) => i.tipo !== 'compromisso');
   const compromissos = itens.length - negocios.length;
   const valor = negocios.reduce((s, i) => s + (Number(i.valor) || 0), 0);
@@ -65,7 +74,7 @@ export function vozDaPauta(itens: ItemParaVoz[], diasParadoDaEmpresa: number): V
   );
   const primeiro = Number(porParado[0]?.dias_parado) || 0;
   const segundo = Number(porParado[1]?.dias_parado) || 0;
-  if (porParado.length >= 2 && primeiro >= diasParadoDaEmpresa && primeiro >= segundo * 2) {
+  if (porParado.length >= 2 && primeiro >= limite && primeiro >= segundo * 2) {
     const alvo = porParado[0];
     const valorDoAlvo = Number(alvo.valor) || 0;
     return {

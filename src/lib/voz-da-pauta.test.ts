@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { vozDaPauta, type ItemParaVoz } from './voz-da-pauta';
 import { vozDaPauta as vozDoEmail } from '../../supabase/functions/_shared/voz-da-pauta';
+
+/** A raiz do projeto, a partir DESTE arquivo: o teste não depende da pasta de onde é rodado. */
+// Sem `new URL(...)`: no ambiente jsdom dos testes o `URL` global é o do jsdom, e o
+// `fileURLToPath` do Node recusa essa instância. `import.meta.url` já chega como texto.
+const RAIZ_DO_PROJETO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /**
  * A escada de seis degraus que decide o que a tela "Hoje" e o e-mail das 7h dizem.
@@ -42,23 +48,23 @@ describe('vozDaPauta', () => {
       negocio('Outro', 10000, 8),
     ], 3);
     expect(v.manchete).toBe('Um negócio seu está há 40 dias sem mexer');
-    expect(semNbsp(v.apoio)).toBe('R$ 180.000,00 · Obra Exemplo');
+    expect(semNbsp(v.apoio)).toBe('R$ 180.000 · Obra Exemplo');
   });
 
   it('degrau 3 NÃO casa quando o primeiro não é o dobro do segundo', () => {
     const v = vozDaPauta([negocio('A', 100, 12), negocio('B', 50, 10)], 3);
-    expect(semNbsp(v.manchete)).toBe('R$ 150,00 parados em 2 negócios');
+    expect(semNbsp(v.manchete)).toBe('R$ 150 parados em 2 negócios');
   });
 
   it('degrau 3 NÃO casa com um negócio só — não há segundo colocado', () => {
     const v = vozDaPauta([negocio('A', 100, 90)], 3);
-    expect(semNbsp(v.manchete)).toBe('R$ 100,00 parados em 1 negócio');
+    expect(semNbsp(v.manchete)).toBe('R$ 100 parados em 1 negócio');
   });
 
   it('degrau 3 NÃO casa abaixo do ajuste da empresa', () => {
     // 4 é o dobro de 2, mas a empresa só considera parado a partir de 10 dias.
     const v = vozDaPauta([negocio('A', 100, 4), negocio('B', 50, 2)], 10);
-    expect(semNbsp(v.manchete)).toBe('R$ 150,00 parados em 2 negócios');
+    expect(semNbsp(v.manchete)).toBe('R$ 150 parados em 2 negócios');
   });
 
   it('degrau 3 ignora compromissos ao eleger primeiro e segundo', () => {
@@ -80,7 +86,7 @@ describe('vozDaPauta', () => {
 
   it('degrau 5 — só negócios, com valor', () => {
     const v = vozDaPauta([negocio('A', 250000, 5), negocio('B', 120500, 5)], 3);
-    expect(semNbsp(v.manchete)).toBe('R$ 370.500,00 parados em 2 negócios');
+    expect(semNbsp(v.manchete)).toBe('R$ 370.500 parados em 2 negócios');
   });
 
   it('degrau 6 — só negócios, sem valor somado', () => {
@@ -111,11 +117,14 @@ describe('as duas cópias dizem a mesma coisa', () => {
     expect(vozDoEmail(itens, 3)).toEqual(vozDaPauta(itens, 3));
   });
 
-  it('e são o mesmo arquivo, byte a byte', () => {
+  it('e são o mesmo texto — só o fim de linha pode variar', () => {
     // Os seis casos acima visitam seis dias possíveis; uma divergência num caminho que eles não
     // visitam passaria calada. Comparar o texto dos dois arquivos pega qualquer vírgula — e é o
     // que o cabeçalho de `voz-da-pauta.ts` promete.
-    const ler = (caminho: string) => readFileSync(join(process.cwd(), caminho), 'utf8');
+    // Fim de linha normalizado: no Windows o git troca LF por CRLF sozinho, e uma cópia salva por
+    // um editor com outro fim de linha não muda o que a função faz.
+    const ler = (caminho: string) =>
+      readFileSync(join(RAIZ_DO_PROJETO, caminho), 'utf8').split(String.fromCharCode(13)).join('');
     expect(ler('supabase/functions/_shared/voz-da-pauta.ts')).toBe(ler('src/lib/voz-da-pauta.ts'));
   });
 });
@@ -142,5 +151,61 @@ describe('concordância no singular', () => {
     const v = vozDaPauta([negocio('Obra Exemplo', 100, 1), negocio('Outro', 50, 0)], 1);
     expect(v.manchete).toBe('Um negócio seu está há 1 dia sem mexer');
     expect(v.assunto).toBe('Um negócio seu está há 1 dia sem mexer');
+  });
+});
+
+/**
+ * O que a revisão de 11/09/2026 achou SEM teste: cinco mutações plausíveis da função passavam com a
+ * suíte inteira verde. Cada caso abaixo derruba uma delas.
+ */
+describe('o que a revisão achou sem teste', () => {
+  it('degrau 3 na ordem em que a lista chega de verdade: do maior valor para o menor', () => {
+    // A fila vem ordenada por VALOR, então o negócio esquecido raramente é o primeiro da lista.
+    // Eleger "o primeiro da lista" daria os 40 dias certos com o nome e o valor do negócio errado.
+    const v = vozDaPauta([negocio('Grande', 500000, 5), negocio('Esquecido', 1000, 40)], 3);
+    expect(v.manchete).toBe('Um negócio seu está há 40 dias sem mexer');
+    expect(semNbsp(v.apoio)).toBe('R$ 1.000 · Esquecido');
+  });
+
+  it('degrau 3 no empate exato: o dobro já casa ("pelo menos o dobro")', () => {
+    expect(vozDaPauta([negocio('A', 100, 6), negocio('B', 50, 3)], 3).manchete)
+      .toBe('Um negócio seu está há 6 dias sem mexer');
+  });
+
+  it('degrau 3 exatamente no ajuste da empresa: "a partir de", como a própria fila', () => {
+    expect(vozDaPauta([negocio('A', 100, 3), negocio('B', 50, 1)], 3).manchete)
+      .toBe('Um negócio seu está há 3 dias sem mexer');
+  });
+
+  it('degrau 3 com o negócio sem valor: embaixo vai só o nome, nunca "R$ 0 · nome"', () => {
+    expect(vozDaPauta([negocio('Sem Valor', 0, 40), negocio('B', 100, 8)], 3).apoio).toBe('Sem Valor');
+  });
+
+  it('o assunto do degrau 1 é o aprovado', () => {
+    expect(vozDaPauta([], 3).assunto).toBe('Seu dia está livre');
+  });
+
+  it('o assunto do degrau 5 é o aprovado, sem centavos', () => {
+    const v = vozDaPauta([negocio('A', 250000, 5), negocio('B', 120500, 5)], 3);
+    expect(semNbsp(v.assunto)).toBe('R$ 370.500 esperando você hoje');
+  });
+
+  it('dinheiro sem centavos, como o e-mail: numa manchete os centavos só atrapalham', () => {
+    const v = vozDaPauta([negocio('A', 1234.56, 5), negocio('B', 0.4, 5)], 3);
+    expect(semNbsp(v.manchete)).toBe('R$ 1.235 parados em 2 negócios');
+  });
+});
+
+describe('o ajuste da empresa ausente ou inválido vale 3, como no banco', () => {
+  // `pauta_do_dia_de` troca ajuste ausente por 3, e a tela de Automação aceita de 1 a 365. Sem esta
+  // guarda, ajuste 0 ou nulo faria o degrau 3 dizer "há 0 dias sem mexer" sobre negócio mexido hoje.
+  const mexidosHoje = [negocio('A', 100, 0), negocio('B', 50, 0)];
+  it.each([
+    ['zero', 0],
+    ['nulo', null as unknown as number],
+    ['não-número', Number.NaN],
+    ['negativo', -5],
+  ])('ajuste %s: nunca "há 0 dias"', (_nome, ajuste) => {
+    expect(semNbsp(vozDaPauta(mexidosHoje, ajuste).manchete)).toBe('R$ 150 parados em 2 negócios');
   });
 });
