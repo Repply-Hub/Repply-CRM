@@ -647,7 +647,14 @@ export default function Obras() {
                 onValueChange={setSearch}
                 storageKey="obras_recent_searches"
                 showAddressSuggestions={true}
-                className="w-full min-w-0 sm:w-auto sm:flex-1"
+                // `SearchWithRecent` já nasce com `flex-1` embutido (raiz do próprio
+                // componente) — e `flex-1` é `flex: 1 1 0%`, cuja base de 0% vence o
+                // `w-full` daqui, porque as duas classes não se cancelam (nenhuma das
+                // duas é exatamente `flex-1` sem variante, então o tailwind-merge não
+                // as considera do mesmo grupo). Sem o `flex-none` abaixo o input
+                // continuava com ~78px a 375px mesmo com `w-full` escrito. `flex-none`
+                // some com a base 0% embutida e deixa o `w-full` decidir a largura.
+                className="w-full min-w-0 flex-none sm:w-auto sm:flex-1"
               />
             </div>
 
