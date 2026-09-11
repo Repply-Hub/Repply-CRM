@@ -41,7 +41,7 @@ vi.mock('@/integrations/supabase/client', () => ({
           nome: `Negócio ${i}`,
           fabrica: 'Fábrica X',
           etapa: 'Proposta',
-          responsavel: 'Érika Marques',
+          responsavel: 'Ana Souza',
           valor: 10_000 - i,
           dias_parado: 9,
           // `total_geral` repete em toda linha o total do RECORTE, não o da página.

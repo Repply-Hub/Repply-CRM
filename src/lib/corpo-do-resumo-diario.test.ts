@@ -32,7 +32,7 @@ const negocio = (over: Partial<NegocioDaEquipe> = {}): NegocioDaEquipe => ({
   fabrica: 'Marca A',
   etapa: 'Negociação',
   responsavel: 'Vendedora Um',
-  valor: 214000,
+  valor: 180000,
   dias_parado: 40,
   total_geral: 145,
   valor_geral: 7402422,
@@ -45,7 +45,7 @@ const texto = (html: string) =>
 
 describe('pulso da equipe — o e-mail de quem tem a chave e ficou sem negócio próprio', () => {
   const cinco = [
-    negocio({ id: '1', nome: 'Cond Residl Dionisio | Deca Metais', valor: 214000, dias_parado: 40, responsavel: 'Érika Marques' }),
+    negocio({ id: '1', nome: 'Obra Exemplo | Fabricante Exemplo', valor: 180000, dias_parado: 40, responsavel: 'Ana Souza' }),
     negocio({ id: '2', nome: 'Jampa Ocean Palace | Deca', valor: 198000, dias_parado: 32, responsavel: 'Pricila Azevedo' }),
     negocio({ id: '3', nome: 'ML8 Empreendimentos', valor: 120000, dias_parado: 9, responsavel: 'José Artur' }),
     negocio({ id: '4', nome: 'Construtora Licenge', valor: 90000, dias_parado: 3, responsavel: 'Margley Pontes' }),
@@ -57,8 +57,8 @@ describe('pulso da equipe — o e-mail de quem tem a chave e ficou sem negócio 
   });
 
   it('a manchete traz o dinheiro do recorte inteiro, e a linha de baixo a contagem', () => {
-    const t = texto(montarPulsoDaEquipe('Fabiola Medeiros', cinco, LINK));
-    expect(t).toContain('Bom dia, Fabiola.');
+    const t = texto(montarPulsoDaEquipe('Carla Dias', cinco, LINK));
+    expect(t).toContain('Bom dia, Carla.');
     expect(t).toContain('R$ 7.402.422 pedem atenção');
     expect(t).toContain('em 145 negócios da equipe');
     // A soma das 5 linhas é R$ 672.000. Se algum dia alguém trocar `valor_geral` por um
@@ -67,20 +67,20 @@ describe('pulso da equipe — o e-mail de quem tem a chave e ficou sem negócio 
   });
 
   it('cada linha traz nome, dono, etapa, valor e dias sem mexer', () => {
-    const t = texto(montarPulsoDaEquipe('Fabiola', cinco, LINK));
-    expect(t).toContain('Cond Residl Dionisio | Deca Metais');
-    expect(t).toContain('Érika Marques · Negociação · sem mexer há 40 dias');
-    expect(t).toContain('R$ 214.000');
+    const t = texto(montarPulsoDaEquipe('Carla', cinco, LINK));
+    expect(t).toContain('Obra Exemplo | Fabricante Exemplo');
+    expect(t).toContain('Ana Souza · Negociação · sem mexer há 40 dias');
+    expect(t).toContain('R$ 180.000');
     expect(t).toContain('Pricila Azevedo · Negociação · sem mexer há 32 dias');
   });
 
   it('mostra as 5 linhas recebidas e nada além disso', () => {
-    const html = montarPulsoDaEquipe('Fabiola', cinco, LINK);
+    const html = montarPulsoDaEquipe('Carla', cinco, LINK);
     expect(html.match(/Pede atenção/g)).toHaveLength(5);
   });
 
   it('o botão leva à tabela do time, e não a "minha pauta" — que está vazia', () => {
-    const html = montarPulsoDaEquipe('Fabiola', cinco, LINK);
+    const html = montarPulsoDaEquipe('Carla', cinco, LINK);
     expect(html).toContain('Ver a tabela do time');
     expect(html).not.toContain('Abrir minha pauta');
     expect(html).toContain(`href="${LINK}"`);
@@ -88,7 +88,7 @@ describe('pulso da equipe — o e-mail de quem tem a chave e ficou sem negócio 
   });
 
   it('o rodapé aponta para a tabela do time, não para a pauta vazia', () => {
-    const t = texto(montarPulsoDaEquipe('Fabiola', cinco, LINK));
+    const t = texto(montarPulsoDaEquipe('Carla', cinco, LINK));
     expect(t).toContain('É a mesma tabela do time que aparece na tela "Hoje".');
     expect(t).not.toContain('É a mesma pauta que aparece');
   });
@@ -110,38 +110,38 @@ describe('pulso da equipe — o e-mail de quem tem a chave e ficou sem negócio 
     // `replaceAll(alvo, texto)` interpreta `$&` como "o trecho casado". Com o nome vindo do
     // banco, um negócio chamado assim reescrevia o próprio marcador dentro do e-mail. Ver o
     // comentário de `preencher` em `corpo.ts`.
-    const t = texto(montarPulsoDaEquipe('Fabiola', [negocio({ nome: 'Obra $& Cia' })], LINK));
+    const t = texto(montarPulsoDaEquipe('Carla', [negocio({ nome: 'Obra $& Cia' })], LINK));
     expect(t).toContain('Obra $&amp; Cia');
     expect(t).not.toContain('ITEM_TITULO');
   });
 
   it('singular: um negócio só pede atenção, não pedem', () => {
-    const um = [negocio({ total_geral: 1, valor_geral: 214000 })];
+    const um = [negocio({ total_geral: 1, valor_geral: 180000 })];
     expect(assuntoDoPulso(um)).toBe('1 negócio da equipe pede atenção');
-    expect(texto(montarPulsoDaEquipe('Fabiola', um, LINK))).toContain('em 1 negócio da equipe');
+    expect(texto(montarPulsoDaEquipe('Carla', um, LINK))).toContain('em 1 negócio da equipe');
   });
 
   it('sem valor somado, a manchete vira a contagem — nunca "R$ 0 pedem atenção"', () => {
     const semValor = [negocio({ valor: null, valor_geral: 0, total_geral: 12 })];
-    const t = texto(montarPulsoDaEquipe('Fabiola', semValor, LINK));
+    const t = texto(montarPulsoDaEquipe('Carla', semValor, LINK));
     expect(t).toContain('12 negócios da equipe pedem atenção');
     expect(t).not.toContain('R$ 0');
   });
 
   it('sem mexer há 0 dias não é frase — some, e o resto da linha fica', () => {
     const hoje = [negocio({ dias_parado: 0, responsavel: 'Vendedor X', etapa: 'Proposta' })];
-    const t = texto(montarPulsoDaEquipe('Fabiola', hoje, LINK));
+    const t = texto(montarPulsoDaEquipe('Carla', hoje, LINK));
     expect(t).toContain('Vendedor X · Proposta');
     expect(t).not.toContain('sem mexer há 0');
   });
 
   it('linha sem dono, sem etapa e sem dias não fica muda', () => {
     const orfao = [negocio({ responsavel: null, etapa: null, dias_parado: null })];
-    expect(texto(montarPulsoDaEquipe('Fabiola', orfao, LINK))).toContain('Negócio da equipe');
+    expect(texto(montarPulsoDaEquipe('Carla', orfao, LINK))).toContain('Negócio da equipe');
   });
 
   it('dia único no singular', () => {
-    const t = texto(montarPulsoDaEquipe('Fabiola', [negocio({ dias_parado: 1 })], LINK));
+    const t = texto(montarPulsoDaEquipe('Carla', [negocio({ dias_parado: 1 })], LINK));
     expect(t).toContain('sem mexer há 1 dia ');
   });
 });
@@ -153,14 +153,14 @@ describe('a fila pessoal continua como era', () => {
   ];
 
   it('a manchete conta os itens e soma o valor deles', () => {
-    const t = texto(montarEmail('Érika Marques', itens, LINK));
+    const t = texto(montarEmail('Ana Souza', itens, LINK));
     expect(t).toContain('2 coisas esperam você');
     expect(t).toContain('R$ 20.000 em jogo');
     expect(assuntoDaPauta(itens)).toBe('2 coisas esperam você hoje');
   });
 
   it('o botão dela continua sendo "Abrir minha pauta"', () => {
-    const html = montarEmail('Érika', itens, LINK);
+    const html = montarEmail('Ana', itens, LINK);
     expect(html).toContain('Abrir minha pauta');
     expect(html).not.toContain('Ver a tabela do time');
     expect(html).not.toContain('{{PAUTA_');
@@ -169,12 +169,12 @@ describe('a fila pessoal continua como era', () => {
 
   it('item de colega continua trazendo o nome do dono', () => {
     const comDono: ItemDaPauta[] = [{ ...itens[0], responsavel: 'Pricila Azevedo' }];
-    expect(texto(montarEmail('Fabiola', comDono, LINK)))
+    expect(texto(montarEmail('Carla', comDono, LINK)))
       .toContain('Em Negociação desde 01/09/2026 · Pricila Azevedo');
   });
 
   it('um item só fica no singular', () => {
     expect(assuntoDaPauta([itens[0]])).toBe('1 coisa espera você hoje');
-    expect(texto(montarEmail('Érika', [itens[0]], LINK))).toContain('1 coisa espera você');
+    expect(texto(montarEmail('Ana', [itens[0]], LINK))).toContain('1 coisa espera você');
   });
 });
