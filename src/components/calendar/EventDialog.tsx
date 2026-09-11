@@ -472,7 +472,7 @@ export function EventDialog({
                         {todosParticipantesSelecionados ? 'Limpar seleção' : 'Selecionar todos'}
                       </button>
                     </div>
-                    <CommandList className="max-h-[240px] overflow-y-auto overflow-x-hidden">
+                    <CommandList className="max-h-[min(240px,calc(var(--radix-popover-content-available-height,100vh)-3.5rem))] overflow-y-auto overflow-x-hidden">
                       <CommandEmpty className="py-6 text-center text-sm">
                         Nenhum funcionário encontrado.
                       </CommandEmpty>

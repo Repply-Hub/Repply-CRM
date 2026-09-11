@@ -86,7 +86,7 @@ export function MultiSelectSearch({
           filter={(value, search) => (correspondeBusca(value, search) ? 1 : 0)}
         >
           <CommandInput placeholder={`Buscar ${placeholder.toLowerCase()}...`} />
-          <CommandList className="max-h-[200px] overflow-y-auto overflow-x-hidden">
+          <CommandList className="max-h-[min(200px,calc(var(--radix-popover-content-available-height,100vh)-3.5rem))] overflow-y-auto overflow-x-hidden">
             <CommandEmpty className="py-6 text-center text-sm">
               {emptyMessage}
             </CommandEmpty>

@@ -663,7 +663,7 @@ export function NovaRotaVisitaDialog({
                     filter={(value, search) => (value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}
                   >
                     <CommandInput placeholder="Buscar funcionário..." />
-                    <CommandList className="max-h-[240px] overflow-y-auto overflow-x-hidden">
+                    <CommandList className="max-h-[min(240px,calc(var(--radix-popover-content-available-height,100vh)-3.5rem))] overflow-y-auto overflow-x-hidden">
                       <CommandEmpty className="py-6 text-center text-sm">Nenhum funcionário encontrado.</CommandEmpty>
                       <CommandGroup>
                         {funcionariosDisponiveis.map((u: { id: string; user_id: string; nome: string; email: string }) => {
@@ -730,7 +730,7 @@ export function NovaRotaVisitaDialog({
                   filter={(value, search) => (value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0)}
                 >
                   <CommandInput placeholder="Buscar obra..." />
-                  <CommandList className="max-h-[240px] overflow-y-auto overflow-x-hidden">
+                  <CommandList className="max-h-[min(240px,calc(var(--radix-popover-content-available-height,100vh)-3.5rem))] overflow-y-auto overflow-x-hidden">
                     <CommandEmpty className="py-6 text-center text-sm">Nenhuma obra encontrada.</CommandEmpty>
                     <CommandGroup>
                       {obrasDisponiveis.map((o) => (

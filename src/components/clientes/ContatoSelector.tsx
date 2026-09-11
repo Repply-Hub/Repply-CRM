@@ -124,7 +124,7 @@ export function ContatoSelector({
             value={busca}
             onValueChange={setBusca}
           />
-          <CommandList className="max-h-[300px]">
+          <CommandList>
             <CommandGroup>
               {visiveis.map(c => {
                 const detalhe = detalheDe(c);
