@@ -9,6 +9,7 @@ import {
   tituloDoSininho,
   type AvisoDeEvento,
   type DadosDoEvento,
+  type TipoDeAviso,
 } from '../../supabase/functions/_shared/aviso-de-evento';
 
 // 16/09/2026 é quarta-feira; 17h UTC = 14h em São Paulo.
@@ -24,7 +25,7 @@ const BASE: DadosDoEvento = {
   organizador: 'Carlos Lima',
   participantes: ['Carlos Lima', 'Ana Souza'],
 };
-const aviso = (over: Partial<AvisoDeEvento> & { dados?: Partial<DadosDoEvento> } = {}): AvisoDeEvento => ({
+const aviso = (over: { tipo?: TipoDeAviso; minutos?: number | null; dados?: Partial<DadosDoEvento> } = {}): AvisoDeEvento => ({
   tipo: over.tipo ?? 'convite',
   minutos: over.minutos ?? null,
   dados: { ...BASE, ...(over.dados ?? {}) },
