@@ -1,6 +1,11 @@
 import * as XLSX from 'xlsx';
 import type { PedidoRow } from '@/lib/generate-pdf';
 
+// ⚠️ NENHUMA TELA CHAMA ESTE ARQUIVO desde 22/08/2026 (commit 3ecc6b8c). A planilha que o botão
+// "Exportar → Excel" da tela de Negócios entrega é montada em `handleExportExcel`
+// (`src/pages/Negocios.tsx`), com os cabeçalhos da importação e a data crua do banco. Quem vier
+// consertar a planilha do cliente: o lugar é lá. Ver `docs/divida-tecnica.md` §70.
+
 /**
  * `opcoes.comObra` desliga a coluna "Obra" da planilha.
  *
@@ -23,7 +28,10 @@ export function generatePedidosExcel(
     Vendedor: p.vendedor,
     Valor: p.valor,
     Etapa: p.etapa,
-    Data: p.data ? new Date(p.data).toLocaleDateString('pt-BR') : '-',
+    // Sem `new Date()`: a data vem como texto AAAA-MM-DD, e o JavaScript lê isso como
+    // meia-noite UTC — no Brasil, 21h do DIA ANTERIOR (CLAUDE.md §7.12). O dia 1º saía no mês
+    // anterior, e o 1º de janeiro no ano anterior. Mesmo recorte do PDF irmão (`generate-pdf.ts`).
+    Data: p.data ? p.data.slice(0, 10).split('-').reverse().join('/') : '-',
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
