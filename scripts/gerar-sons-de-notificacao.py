@@ -3,9 +3,18 @@ Gera os sons de notificação criados pela Repply e nivela o volume de TODAS as
 opções pelo som padrão (≈ −15 LUFS), para que trocar de som não mude o volume.
 
 Uso (na raiz do repositório):
-  python scripts/gerar-sons-de-notificacao.py "public/sons/opções secundárias"
+  python scripts/gerar-sons-de-notificacao.py "<pasta com os 5 arquivos originais>"
 
-Saída: public/sons/opcoes/*.mp3 — mono, 44,1 kHz, 128 kbps.
+A pasta de origem é qualquer uma que contenha os 5 arquivos com os nomes listados em
+DO_LUCAS (logo abaixo) — hoje isso é o backup em ../_sons-originais, fora do
+repositório, já que a pasta antiga dentro do repositório foi removida depois da
+primeira geração.
+
+Saída: public/sons/opcoes/*.mp3 — mono, 44,1 kHz, 128 kbps, dentro de ±1 LU de
+ALVO_LUFS. Cada arquivo é medido DEPOIS de gravado (nunca só calculado a partir da
+origem) e corrigido de novo, até 3 vezes, se o limitador (`alimiter`) tiver deixado
+o volume real longe do pedido. Se mesmo assim continuar fora da faixa, o script para
+com um erro nomeando o arquivo — nunca escreve um arquivo fora da faixa em silêncio.
 
 Os 4 sons "da Repply" são sintetizados aqui, por soma de senoides: não há
 arquivo de terceiro, então não há direito autoral a verificar. Os outros 5 são
@@ -13,6 +22,7 @@ os arquivos que o dono do produto escolheu (Pixabay), só renomeados e nivelados
 """
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,6 +32,9 @@ import numpy as np
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DESTINO = os.path.join(RAIZ, "public", "sons", "opcoes")
 ALVO_LUFS = -15.0
+TOLERANCIA_OK = 0.5  # abaixo disso, para de corrigir
+TOLERANCIA_MAXIMA = 1.0  # acima disso, mesmo depois das correções, é erro
+MAX_PASSADAS_CORRECAO = 3
 SR = 44100
 
 DO_LUCAS = {
@@ -115,7 +128,46 @@ def gravar_mp3(origem, destino, ganho_db):
     )
 
 
+def gravar_e_corrigir(origem, destino):
+    """Grava o mp3 final e confere o volume que REALMENTE saiu.
+
+    A primeira gravação usa o ganho calculado a partir da loudness da ORIGEM.
+    Só que o limitador (`alimiter`) entra para cortar pico e pode entregar um
+    volume menor do que o pedido — foi assim que `toque-suave.mp3` saiu a
+    −18,8 LUFS numa passada só. Por isso aqui a saída é sempre MEDIDA de novo
+    depois de escrita, nunca só calculada, e corrigida a partir de si mesma
+    (grava num arquivo temporário NA MESMA PASTA do destino — para o
+    `os.replace` trocar os dois sem depender de mover entre unidades de disco
+    — e só então substitui o destino) até chegar perto do alvo ou esgotar as
+    passadas.
+    """
+    gravar_mp3(origem, destino, ALVO_LUFS - lufs(origem))
+    atual = lufs(destino)
+    passadas = 0
+    while abs(atual - ALVO_LUFS) > TOLERANCIA_OK and passadas < MAX_PASSADAS_CORRECAO:
+        temporario = os.path.join(
+            os.path.dirname(destino), f".correcao-{passadas}-{os.path.basename(destino)}"
+        )
+        gravar_mp3(destino, temporario, ALVO_LUFS - atual)
+        os.replace(temporario, destino)
+        atual = lufs(destino)
+        passadas += 1
+    if abs(atual - ALVO_LUFS) > TOLERANCIA_MAXIMA:
+        sys.exit(
+            f"{os.path.basename(destino)} ficou em {atual:.1f} LUFS depois de "
+            f"{passadas} correção(ões) — fora da faixa aceita "
+            f"({ALVO_LUFS - TOLERANCIA_MAXIMA:.1f} a {ALVO_LUFS + TOLERANCIA_MAXIMA:.1f} LUFS). "
+            "Confira o arquivo de origem antes de gerar de novo."
+        )
+    return atual
+
+
 def main():
+    if shutil.which("ffmpeg") is None:
+        sys.exit(
+            "ffmpeg não foi encontrado no PATH. Instale o ffmpeg (inclui o ffprobe) e "
+            "tente de novo — este script depende dele para medir e gravar os sons."
+        )
     if len(sys.argv) != 2:
         sys.exit('uso: python scripts/gerar-sons-de-notificacao.py "<pasta com os arquivos do Lucas>"')
     origem = sys.argv[1]
@@ -133,8 +185,8 @@ def main():
             fontes[novo] = wav
         for novo, caminho in fontes.items():
             destino = os.path.join(DESTINO, novo)
-            gravar_mp3(caminho, destino, ALVO_LUFS - lufs(caminho))
-            print(f"{novo:18s} {lufs(destino):6.1f} LUFS")
+            final = gravar_e_corrigir(caminho, destino)
+            print(f"{novo:18s} {final:6.1f} LUFS")
 
 
 if __name__ == "__main__":
