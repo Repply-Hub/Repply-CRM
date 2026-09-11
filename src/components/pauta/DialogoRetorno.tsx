@@ -20,7 +20,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
-import { avisoDaTarefaDoRetorno } from '@/lib/aviso-da-tarefa-do-retorno';
+import { avisoDaTarefaDoRetorno, rotuloDaTarefaDoRetorno } from '@/lib/aviso-da-tarefa-do-retorno';
 import { useRegistrarRetorno } from '@/hooks/use-pauta';
 
 interface Props {
@@ -248,12 +248,12 @@ export function DialogoRetorno({
                 onCheckedChange={(marcado) => setCriarTarefa(marcado === true)}
               />
               <Label htmlFor="criar-tarefa-retorno" className="cursor-pointer font-normal">
-                Criar tarefa para o responsável
+                {rotuloDaTarefaDoRetorno(donoDaTarefa)}
               </Label>
             </div>
             <p className="text-xs text-muted-foreground">
               {criarTarefa
-                ? avisoDaTarefaDoRetorno(donoDaTarefa, retornoEmTexto)
+                ? avisoDaTarefaDoRetorno(retornoEmTexto)
                 : 'Sem tarefa na agenda: só o retorno fica registrado.'}
             </p>
           </div>
