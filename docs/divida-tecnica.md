@@ -2674,8 +2674,16 @@ demais datas do sistema são carimbo com fuso, e para elas `new Date(...)` está
 | `src/hooks/use-mutations.ts:23` (cliente) e `:58` (contato); `src/hooks/use-criar-contato-da-conversa.ts:79` (contato criado da conversa) | Cadastro feito **depois das 21h** grava `data_criacao` com a data de **amanhã** — `toISOString()` é a hora em UTC; o terceiro grava o carimbo inteiro, e a lista o recorta. Fica gravado, e é o que a ficha e a lista de Clientes mostram em "Data de Criação" | `format(new Date(), 'yyyy-MM-dd')` do date-fns, que é local — o mesmo que `Negocios.tsx:1894` já usa. Os registros já gravados dão para achar comparando `data_criacao` com `created_at` no horário de Brasília; corrigi-los é mudança em dado de produção e pede conversa antes (`CLAUDE.md` §11) |
 | `src/pages/ClienteDetalhe.tsx:666` | Sem `data_criacao`, cai em `created_at` e recorta os 10 primeiros caracteres — de um carimbo UTC. Medido: cliente criado às 22h30 de 24/08 aparece como 25/08 | Recortar só a data seca; carimbo passa por `format(new Date(...), 'dd/MM/yyyy')` |
 | Nome do arquivo em 10 exportações: `generate-pdf.ts:113`, `generate-dashboard-pdf.ts:103`, `generate-conversa-pdf.ts:129` e `:153`, `generate-conversa-excel.ts:24` e `:70`, `generate-conversa-markdown.ts:50` e `:62`, `ExportClientesButton.tsx:46`, `exportCsv` em `Portal.tsx` | Mesmo idioma: depois das 21h o arquivo sai com a data de amanhã **no nome**. O conteúdo está certo | O mesmo `format(new Date(), 'yyyy-MM-dd')` |
-| `src/lib/generate-excel.ts` | Escrevia cada data um dia antes — o 1º de janeiro, no **ano** anterior. Consertado em 11/09, com teste. Mas **nenhuma tela o chama desde 22/08/2026** (`3ecc6b8c`), e ele já enganou duas vezes: em 23/08 ganhou a opção `comObra` (`59d4aee0`), um dia depois de perder a única chamada; e o pedido de 11/09 que originou este item mirou nele achando que era a planilha do cliente | Apagar o arquivo e o teste dele. Antes, confirmar que o `grep` por `generate-excel` em `src/` e `supabase/` só acha ele mesmo |
 | Calendário, `use-eventos.ts:184` | Desenha o fechamento um dia antes | Já é o [item 51](#51-o-calendário-mostra-menos-de-10-dos-prazos-e-desenha-um-dia-antes), que cita a linha de antes (164) |
+
+✅ **O gerador que originou a varredura, `src/lib/generate-excel.ts`, foi apagado em 11/09/2026**,
+junto com o teste. Escrevia cada data um dia antes — o 1º de janeiro, no **ano** anterior —, mas
+nenhuma tela o chamava desde 22/08/2026 (`3ecc6b8c`), e ele já tinha enganado duas vezes: em 23/08
+ganhou a opção `comObra` (`59d4aee0`), um dia depois de perder a única chamada; e o pedido de 11/09
+mirou nele achando que era a planilha do cliente. Saiu consertado e com teste: quem precisar dele de
+volta acha a versão consertada com `git log -- src/lib/generate-excel.ts`, no commit anterior ao que
+o apagou. **A planilha de Negócios é montada em `handleExportExcel`, dentro de `Negocios.tsx`**: é
+lá que se mexe.
 
 ### Conferidos e certos — não precisa varrer de novo
 
