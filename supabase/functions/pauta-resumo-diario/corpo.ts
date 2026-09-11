@@ -59,7 +59,7 @@ export interface NegocioDaEquipe {
 }
 
 /**
- * Dinheiro em e-mail vai SEM centavos: "R$ 10.580.166". Numa manchete, os centavos só roubam
+ * Dinheiro em e-mail vai SEM centavos: "R$ 1.234.567". Numa manchete, os centavos só roubam
  * a atenção do número que importa. `Intl.NumberFormat` é o equivalente Deno de
  * `formatarMoedaBRL` (CLAUDE.md §7.10) — nunca montar isso à mão, nunca `parseFloat`.
  */
@@ -78,7 +78,7 @@ export function esc(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** "Bom dia, Érika" soa como pessoa; o nome completo soa como cadastro. */
+/** "Bom dia, Ana" soa como pessoa; o nome completo soa como cadastro. */
 export function primeiroNome(nome: string): string {
   return nome.trim().split(/\s+/)[0] ?? "";
 }
@@ -223,14 +223,10 @@ export function diasParadoPorEmpresa(linhas: AjusteDaEmpresa[]): (empresaId: str
 
 /**
  * 🔴 "PEDEM ATENÇÃO", E NÃO "PARADOS". A lista vem de `WHERE parado OR sem_proxima_acao`, e as
- * duas metades são bem diferentes de tamanho. Medido na MD em 10/09/2026, no recorte de 161:
- *
- *     107 estão de fato parados além do prazo   →  R$  5.681.469
- *      54 entraram só por não ter próxima ação  →  R$  4.898.696
- *                                        total  →  R$ 10.580.166
- *
- * Dizer "R$ 10.580.166 parados" inventaria R$ 4,9 milhões de negócio parado que não existe —
- * quase o dobro do que está parado de verdade. A tela já tinha resolvido isso do mesmo jeito
+ * duas metades são bem diferentes de tamanho. Num levantamento real de 10/09/2026, perto de um
+ * terço da lista tinha entrado só por não ter próxima ação — e esse terço carregava quase metade
+ * do valor. Chamar a lista inteira de "parada" inventaria quase o dobro do valor que está parado
+ * de verdade. A tela já tinha resolvido isso do mesmo jeito
  * (`TabelaDoTime.tsx`: "Um título que só dissesse 'parados' mentiria sobre o que a tabela
  * lista"), e o e-mail não pode contar uma história diferente da tela sobre o mesmo dia.
  */

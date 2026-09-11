@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
     //
     // Se a leitura falhar, o e-mail sai assim mesmo, medindo com o padrão (3), e o registro diz
     // por quê: o ajuste só muda a frase do topo, e ela não vale deixar a equipe sem o resumo.
-    const empresas = [...new Set((destinatarios ?? []).map((d) => d.empresa_id).filter(Boolean))];
+    const empresas = [...new Set((destinatarios ?? []).map((d: { empresa_id: string | null }) => d.empresa_id).filter(Boolean))];
     const { data: ajustes, error: erroAjuste } = await supabase
       .from("configuracoes_automacao")
       .select("empresa_id, valor")

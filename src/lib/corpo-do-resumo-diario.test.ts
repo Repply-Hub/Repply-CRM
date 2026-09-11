@@ -39,8 +39,8 @@ const negocio = (over: Partial<NegocioDaEquipe> = {}): NegocioDaEquipe => ({
   responsavel: 'Vendedora Um',
   valor: 180000,
   dias_parado: 40,
-  total_geral: 145,
-  valor_geral: 7402422,
+  total_geral: 128,
+  valor_geral: 6500000,
   ...over,
 });
 
@@ -66,14 +66,14 @@ describe('pulso da equipe — o e-mail de quem tem a chave e ficou sem negócio 
   ];
 
   it('o assunto conta o recorte inteiro, não as 5 linhas lidas', () => {
-    expect(assuntoDoPulso(cinco)).toBe('145 negócios da equipe pedem atenção');
+    expect(assuntoDoPulso(cinco)).toBe('128 negócios da equipe pedem atenção');
   });
 
   it('a manchete traz o dinheiro do recorte inteiro, e a linha de baixo a contagem', () => {
     const t = texto(montarPulsoDaEquipe('Carla Dias', cinco, LINK));
     expect(t).toContain('Bom dia, Carla.');
-    expect(t).toContain('R$ 7.402.422 pedem atenção');
-    expect(t).toContain('em 145 negócios da equipe');
+    expect(t).toContain('R$ 6.500.000 pedem atenção');
+    expect(t).toContain('em 128 negócios da equipe');
     // A soma das 5 linhas é R$ 590.000. Se algum dia alguém trocar `valor_geral` por um
     // `reduce` das linhas, é este número que vai aparecer — e o teste quebra.
     expect(t).not.toContain('590.000');
@@ -149,7 +149,7 @@ describe('pulso da equipe — o e-mail de quem tem a chave e ficou sem negócio 
   it('com valor somado, a contagem continua dentro do parágrafo dela', () => {
     // O outro lado da troca de cima: a linha de baixo passou a só existir quando tem texto, e
     // o pulso não pode perder o parágrafo — nem o estilo dele — quando a linha existe.
-    expect(montarPulsoDaEquipe('Carla', cinco, LINK)).toMatch(/<p[^>]*>\s*em 145 negócios da equipe\s*<\/p>/);
+    expect(montarPulsoDaEquipe('Carla', cinco, LINK)).toMatch(/<p[^>]*>\s*em 128 negócios da equipe\s*<\/p>/);
   });
 
   it('sem mexer há 0 dias não é frase — some, e o resto da linha fica', () => {
