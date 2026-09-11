@@ -1864,8 +1864,12 @@ const Emails = () => {
               busca não cediam espaço, a linha estourava para a direita e o
               "Escrever" — que é o ÚNICO caminho para um e-mail novo — sumia por
               inteiro entre ~768 e ~917px de janela, sem barra de rolagem em lugar
-              nenhum para alcançá-lo. Mesmo padrão de Negocios.tsx:1862. */}
-          <div className="flex items-center gap-4 flex-1 min-w-0 overflow-x-auto custom-scrollbar">
+              nenhum para alcançá-lo. Mesmo padrão de Negocios.tsx:1862.
+              `flex-wrap` só abaixo de `md`: no celular deixa a busca (que passou a
+              aparecer ali) e o filtro "Todas/Não lidas" quebrarem para a própria
+              linha em vez de vazar para fora da tela sem barra visível. Do `md`
+              para cima continua `nowrap`, como sempre foi. */}
+          <div className="flex flex-wrap md:flex-nowrap items-center gap-4 flex-1 min-w-0 overflow-x-auto custom-scrollbar">
             {selectedIds.length > 0 ? (
               <div className="flex shrink-0 items-center gap-4 bg-primary/5 px-3 py-1 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-left-2 duration-200">
                 <div className="flex items-center gap-2">
@@ -1962,10 +1966,12 @@ const Emails = () => {
 
             {/* Somente não lidas.
                 Fica FORA do bloco que a barra de seleção em massa substitui, e
-                fora do contêiner `hidden md:flex` da busca — senão sumiria no
-                celular, que é justamente onde triar o que falta ler importa
-                mais. Só na aba Recebidos: "não lida" não quer dizer nada em
-                Enviados. Mesmo padrão de botão do filtro do WhatsApp Inbox. */}
+                fora do bloco de busca — visibilidade independente da busca, que
+                desde 11/09/2026 também aparece no celular (numa linha própria,
+                ver comentário no bloco abaixo), que é justamente onde triar o
+                que falta ler importa mais. Só na aba Recebidos: "não lida" não
+                quer dizer nada em Enviados. Mesmo padrão de botão do filtro do
+                WhatsApp Inbox. */}
             {activeTab === "received" && selectedIds.length === 0 && (
               <div className={cn(TOGGLE_LIST_CLASS, "w-fit shrink-0")}>
                 {[
@@ -1994,7 +2000,7 @@ const Emails = () => {
               </div>
             )}
 
-            <div className="flex items-center gap-2 flex-1 min-w-[14rem] max-w-md hidden md:flex">
+            <div className="flex items-center gap-2 w-full md:w-auto md:flex-1 md:min-w-[14rem] md:max-w-md">
               {/* Marcador só filtra Recebidos (ver `escolherPasta`) — o chip só
                   existe onde há filtro de verdade para limpar. Clicar de novo
                   no marcador ativo na barra lateral não desmarca (o clique
