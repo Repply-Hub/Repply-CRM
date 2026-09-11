@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { MOLDURA_DA_PAUTA } from '@/components/pauta/moldura-da-pauta';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatarMoedaBRL } from '@/lib/moeda';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
@@ -114,7 +115,7 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
   const temMais = linhas.length < total;
 
   return (
-    <Card className="shadow-card border-border/60 mt-5">
+    <Card className={`${MOLDURA_DA_PAUTA} mt-5`}>
       <CardHeader className="pb-1">
         <CardTitle className="text-sm font-bold">
           {podeVerDeTodos ? 'Negócios da equipe que pedem atenção' : 'Seus negócios que pedem atenção'}

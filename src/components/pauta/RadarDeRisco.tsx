@@ -9,6 +9,7 @@ import { formatarMoedaBRL } from '@/lib/moeda';
 import { useDashboardNegociosRisco, type NegocioEmRisco } from '@/hooks/use-dashboard';
 import { BarraDeFiltros } from '@/components/pauta/BarraDeFiltros';
 import { TabelaDoTime } from '@/components/pauta/TabelaDoTime';
+import { MOLDURA_DA_PAUTA } from '@/components/pauta/moldura-da-pauta';
 import { recorteParaOServidor, type FiltrosDoPainel } from '@/lib/filtros-do-painel';
 
 /**
@@ -144,7 +145,7 @@ export function RadarDeRisco({
         continua sendo risco hoje mesmo fora da janela de data escolhida no topo. */}
     <div className="mt-5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-        <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+        <Card className={MOLDURA_DA_PAUTA}>
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1.5">
@@ -160,7 +161,7 @@ export function RadarDeRisco({
             </div>
           </CardContent>
         </Card>
-        <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+        <Card className={MOLDURA_DA_PAUTA}>
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1.5">
@@ -180,7 +181,7 @@ export function RadarDeRisco({
             </div>
           </CardContent>
         </Card>
-        <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+        <Card className={MOLDURA_DA_PAUTA}>
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1.5">
@@ -200,11 +201,31 @@ export function RadarDeRisco({
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      {/* A TABELA DO TIME, no lugar do bloco "Os 10 maiores em risco" que ficava aqui até
+          09/09/2026. Aquele bloco lia `top_parados`, uma coluna de dentro do painel de números:
+          dez linhas fixas, sem ação nenhuma, num recorte que na MD tem 159 negócios.
+
+          A lista agora tem função de banco própria e paginada (`negocios_em_risco`), cresce de 10
+          em 10 e ganha duas ações por linha. "Abrir negócio" abre o painel SOBRE esta mesma tela,
+          pelo mesmo caminho que a pauta de cima usa; "Retomar depois" abre o MESMO diálogo da
+          fila. Os dois chegam por propriedade porque quem os monta, uma vez só, é a página
+          "Hoje" — ver `onAbrirNegocio` e `onRetomarNegocio` acima. */}
+      <TabelaDoTime
+        empresaId={empresaId}
+        filtros={recorte}
+        podeVerDeTodos={podeFiltrarPorResponsavel}
+        onAbrir={onAbrirNegocio}
+        onRetomar={onRetomarNegocio}
+      />
+
+      {/* Os dois gráficos vêm DEPOIS da tabela do time, por pedido do dono do produto em
+          10/09/2026: a tabela é onde se age, e ficava embaixo deles. `radar-ordem.test.tsx`
+          prende a ordem. */}
+      <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Risco por Vendedor — só aparece pra quem enxerga a pauta de toda a equipe: a RPC já
             devolve o array vazio pra quem não enxerga (ver comentário de risco.riscoPorVendedor). */}
         {risco.riscoPorVendedor.length > 0 && (
-          <Card className="shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300">
+          <Card className={MOLDURA_DA_PAUTA}>
             <CardHeader className="pb-1">
               <CardTitle className="text-sm font-bold flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-[hsl(var(--warning))]" /> Risco por Vendedor
@@ -241,7 +262,7 @@ export function RadarDeRisco({
         {/* Era gráfico de pizza — virou tabela: é o que o pessoal da MD de fato lê, e
             mostra quantidade e valor juntos, coisa que a pizza não fazia. O gráfico de
             barras por responsável ao lado não mudou nesta etapa. */}
-        <Card className={`shadow-card border-border/60 hover:shadow-card-hover transition-all duration-300 ${risco.riscoPorVendedor.length > 0 ? '' : 'lg:col-span-2'}`}>
+        <Card className={`${MOLDURA_DA_PAUTA} ${risco.riscoPorVendedor.length > 0 ? '' : 'lg:col-span-2'}`}>
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
               <Factory className="h-4 w-4 text-[hsl(var(--warning))]" /> Resumo por fabricante
@@ -276,23 +297,6 @@ export function RadarDeRisco({
           </CardContent>
         </Card>
       </div>
-
-      {/* A TABELA DO TIME, no lugar do bloco "Os 10 maiores em risco" que ficava aqui até
-          09/09/2026. Aquele bloco lia `top_parados`, uma coluna de dentro do painel de números:
-          dez linhas fixas, sem ação nenhuma, num recorte que na MD tem 159 negócios.
-
-          A lista agora tem função de banco própria e paginada (`negocios_em_risco`), cresce de 10
-          em 10 e ganha duas ações por linha. "Abrir negócio" abre o painel SOBRE esta mesma tela,
-          pelo mesmo caminho que a pauta de cima usa; "Retomar depois" abre o MESMO diálogo da
-          fila. Os dois chegam por propriedade porque quem os monta, uma vez só, é a página
-          "Hoje" — ver `onAbrirNegocio` e `onRetomarNegocio` acima. */}
-      <TabelaDoTime
-        empresaId={empresaId}
-        filtros={recorte}
-        podeVerDeTodos={podeFiltrarPorResponsavel}
-        onAbrir={onAbrirNegocio}
-        onRetomar={onRetomarNegocio}
-      />
     </div>
     </section>
   );
