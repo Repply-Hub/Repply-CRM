@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatarMoedaBRL } from '@/lib/moeda';
 import { cn } from '@/lib/utils';
+import { vozDaPauta } from '@/lib/voz-da-pauta';
 import { useAuth } from '@/hooks/use-auth';
+import { useConfiguracoesAutomacao, PADROES_DA_PAUTA } from '@/hooks/use-configuracoes-automacao';
 import { usePossoVerPautaDeTodos } from '@/hooks/use-minha-permissao';
 import { usePauta, type ItemDaPauta } from '@/hooks/use-pauta';
 import { DialogoRetorno } from '@/components/pauta/DialogoRetorno';
@@ -234,13 +236,30 @@ const Hoje = () => {
     });
   }
 
-  const { total, valorEmJogo } = useMemo(() => {
-    const itens = pauta ?? [];
-    return {
-      total: itens.length,
-      valorEmJogo: itens.reduce((soma, i) => soma + (i.valor ?? 0), 0),
-    };
-  }, [pauta]);
+  const total = pauta?.length ?? 0;
+
+  // 🔴 A RÉGUA DE "PARADO" DA FRASE É A DA EMPRESA — a mesma com que o banco montou a fila.
+  // `pauta_do_dia_de` lê `pauta_dias_parado` de `configuracoes_automacao` e cai em 3 quando a
+  // empresa nunca salvou; este hook lê a mesma chave e cai no mesmo 3 (`PADROES_DA_PAUTA`). Um 3
+  // cravado aqui mediria com outra régua no dia em que uma empresa mudasse o ajuste: a fila AFROUXA
+  // o corte para chegar ao mínimo de itens, então com o ajuste em 10 ela pode trazer um negócio de
+  // 8 dias — e a frase o chamaria de esquecido sem ele nem estar parado para aquela empresa.
+  //
+  // A chave de cache é a mesma da aba Automação, e salvar lá invalida esta leitura junto com a fila
+  // (`useSalvarConfiguracaoAutomacao`). Enquanto a resposta não chega — ou se ela falhar —, vale o
+  // padrão, que é o do banco.
+  const { data: ajustesDaPauta } = useConfiguracoesAutomacao(empresaId);
+  const diasParadoDaEmpresa =
+    ajustesDaPauta?.pauta_dias_parado ?? PADROES_DA_PAUTA.pauta_dias_parado;
+
+  // O que o topo da tela diz sai de `vozDaPauta` (`src/lib/voz-da-pauta.ts`), a escada de seis
+  // degraus desenhada para a tela e o e-mail das 7h dizerem a mesma coisa. Lá o dinheiro sai sem
+  // centavos, de propósito — é o texto aprovado. Os itens logo abaixo continuam com
+  // `formatarMoedaBRL`, com centavos.
+  const voz = useMemo(
+    () => vozDaPauta(pauta ?? [], diasParadoDaEmpresa),
+    [pauta, diasParadoDaEmpresa],
+  );
 
   const hoje = new Date();
 
@@ -278,12 +297,12 @@ const Hoje = () => {
           </div>
         ) : filaVaziaEComemora ? (
           // O vazio COMEMORA. É o dia em que a pessoa terminou — e é exatamente o momento
-          // que faz ela abrir a tela amanhã.
+          // que faz ela abrir a tela amanhã. Com a fila vazia, a voz é sempre o degrau 1.
           <div className="flex flex-col items-center gap-3 py-20 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
               <Sun className="h-6 w-6 text-primary" />
             </div>
-            <h2 className="text-2xl font-semibold text-card-foreground">Pauta zerada</h2>
+            <h2 className="text-2xl font-semibold text-card-foreground">{voz.manchete}</h2>
             <p className="max-w-sm text-sm text-muted-foreground">
               Nada em aberto para hoje. Nenhum orçamento parado além do prazo e nenhum
               compromisso na agenda.
@@ -306,12 +325,12 @@ const Hoje = () => {
           <>
             <header className="mb-6">
               <h2 className="text-2xl font-semibold leading-tight tracking-tight text-card-foreground sm:text-[34px]">
-                {total === 1 ? '1 coisa espera você' : `${total} coisas esperam você`}
+                {voz.manchete}
                 <span className="text-primary">.</span>
               </h2>
-              {valorEmJogo > 0 && (
+              {voz.apoio && (
                 <p className="mt-1 font-mono text-sm tabular-nums text-muted-foreground">
-                  {formatarMoedaBRL(valorEmJogo)} em jogo
+                  {voz.apoio}
                 </p>
               )}
             </header>
