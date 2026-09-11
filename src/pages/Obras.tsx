@@ -624,7 +624,7 @@ export default function Obras() {
         <div className="flex min-w-0 flex-1 flex-col gap-6 min-h-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 flex-1 flex flex-col min-h-0">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex flex-1 items-center gap-3">
+            <div className="flex flex-1 flex-wrap items-center gap-3">
               <TabsList className={cn(TOGGLE_LIST_CLASS, 'shrink-0')}>
                 {/* Ordem pedida pelo Lucas em 27/08/2026: Mapa primeiro, Lista por último.
                     O mapa é onde a obra faz sentido — endereço no espaço, não linha de tabela.
@@ -647,6 +647,7 @@ export default function Obras() {
                 onValueChange={setSearch}
                 storageKey="obras_recent_searches"
                 showAddressSuggestions={true}
+                className="w-full min-w-0 sm:w-auto sm:flex-1"
               />
             </div>
 
