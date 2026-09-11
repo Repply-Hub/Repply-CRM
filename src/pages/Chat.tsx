@@ -17,11 +17,12 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import {
   Send, Loader2, MessageCircle, MessageSquare, Users, Circle, PanelLeftClose, PanelLeftOpen,
   Paperclip, FileText, X, Download, Users2, Calendar, Eraser, ChevronDown,
-  Video, Link2, ExternalLink, Play, Pause, Camera, Pencil, Check, CheckCheck, Search, Trash2, UserPlus, Mic, Square, Reply
+  Video, Link2, ExternalLink, Play, Pause, Camera, Pencil, Check, CheckCheck, Search, Trash2, UserPlus, Mic, Square, Reply, ArrowLeft
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn, autoResizeTextarea } from '@/lib/utils';
+import { painelVisivelNoCelular } from '@/lib/painel-do-chat-no-celular';
 import { downloadFile } from '@/lib/download-file';
 import { linkifyText } from '@/lib/linkify';
 import { CreateGroupDialog } from '@/components/chat/CreateGroupDialog';
@@ -103,6 +104,7 @@ function MembersList({
   geralFotoUrl,
   onlineIds,
   lastActivity,
+  showOnMobile,
 }: {
   members: Vendedor[];
   myId: string | null;
@@ -116,6 +118,9 @@ function MembersList({
   geralFotoUrl?: string | null;
   onlineIds: Set<string>;
   lastActivity: Record<string, ChatLastActivity>;
+  /** Abaixo de `md`: mostra esta coluna (a lista) em vez da conversa. De `md` para
+   *  cima não faz diferença — as duas colunas ficam lado a lado, como sempre. */
+  showOnMobile: boolean;
 }) {
   const [memberSearch, setMemberSearch] = useState('');
   const searching = memberSearch.trim().length > 0;
@@ -125,7 +130,11 @@ function MembersList({
 
   if (collapsed) {
     return (
-      <div className="w-12 border-r border-border flex flex-col h-full shrink-0 items-center gap-1">
+      <div className={cn(
+        'w-12 border-r border-border flex-col h-full shrink-0 items-center gap-1',
+        showOnMobile ? 'flex' : 'hidden',
+        'md:flex'
+      )}>
         <div className="relative">
           <button
             onClick={() => onSelect({ type: 'geral' })}
@@ -212,7 +221,11 @@ function MembersList({
   }
 
   return (
-    <div className="w-64 border-r border-border flex flex-col h-full shrink-0">
+    <div className={cn(
+      'w-full md:w-64 border-r border-border flex-col h-full shrink-0',
+      showOnMobile ? 'flex' : 'hidden',
+      'md:flex'
+    )}>
       <div className="px-4 py-3 border-b border-border flex items-center h-[4rem]">
         <h2 className="text-sm font-semibold text-foreground flex items-center gap-2 flex-1">
           <Users className="h-4 w-4 text-primary" />
@@ -366,7 +379,7 @@ function MembersList({
           })}
         </div>
       </ScrollArea>
-      <div className="border-t border-border px-3 py-2 mt-auto bg-muted/30 h-[4rem] flex items-center">
+      <div className="border-t border-border px-3 py-2 mt-auto bg-muted/30 h-[4rem] hidden md:flex items-center">
         <button onClick={onToggle} className="flex items-center gap-2 w-full p-1.5 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground" title="Recolher equipe">
           <PanelLeftClose className="h-4 w-4" />
           <span className="text-[10px]">Recolher</span>
@@ -620,6 +633,12 @@ const Chat = () => {
   const canManageGrupos = isAdminEmpresa || profile?.role === 'gestor';
   const onlineIds = useOnlineUsers();
   const [target, setTarget] = useState<ChatTarget>({ type: 'geral' });
+  // Abaixo de `md`: false = mostra a lista, true = mostra a conversa (uma coisa
+  // por vez — decisão do dono do produto em 11/09/2026). Começa em `false` mesmo
+  // o alvo padrão sendo o Geral (regra 1 do brief b1-chat-celular). De `md` para
+  // cima não é usado: as duas colunas ficam sempre lado a lado.
+  const [mostrarConversaNoCelular, setMostrarConversaNoCelular] = useState(false);
+  const painelCelular = painelVisivelNoCelular(mostrarConversaNoCelular);
   const [teamCollapsed, setTeamCollapsed] = useState(false);
   const [text, setText] = useState('');
   const [previewFile, setPreviewFile] = useState<FilePreviewTarget | null>(null);
@@ -957,6 +976,14 @@ const Chat = () => {
     };
   }, [target]);
 
+  // Trocar de conversa (Geral, grupo ou pessoa) e, no celular, passar a mostrar
+  // só ela. De `md` para cima `mostrarConversaNoCelular` não é lido em lugar
+  // nenhum, então marcá-lo aqui não muda nada no computador.
+  const handleSelectTarget = (t: ChatTarget) => {
+    setTarget(t);
+    setMostrarConversaNoCelular(true);
+  };
+
   const handleSend = async () => {
     const trimmed = text.trim();
     if (!trimmed && selectedFiles.length === 0) return;
@@ -1287,7 +1314,7 @@ const Chat = () => {
           members={sortedMembers}
           myId={myVendedor ?? null}
           target={target}
-          onSelect={setTarget}
+          onSelect={handleSelectTarget}
           collapsed={teamCollapsed}
           onToggle={() => setTeamCollapsed(prev => !prev)}
           grupos={sortedGrupos}
@@ -1296,10 +1323,15 @@ const Chat = () => {
           geralFotoUrl={geralConfig?.foto_url}
           onlineIds={onlineIds}
           lastActivity={lastActivity}
+          showOnMobile={painelCelular === 'lista'}
         />
 
         <div
-          className="flex-1 flex flex-col min-w-0 relative"
+          className={cn(
+            'flex-1 flex-col min-w-0 relative',
+            painelCelular === 'conversa' ? 'flex' : 'hidden',
+            'md:flex'
+          )}
           onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -1315,6 +1347,18 @@ const Chat = () => {
           )}
           {/* Chat header */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/30 h-[4rem]">
+            {/* Só abaixo de `md`: no celular a conversa ocupa a tela inteira (regra 1
+                do brief b1-chat-celular), então precisa de um jeito de voltar para a
+                lista que não seja redimensionar a janela. De `md` para cima as duas
+                colunas já ficam lado a lado — o botão não faz sentido e fica escondido. */}
+            <button
+              type="button"
+              onClick={() => setMostrarConversaNoCelular(false)}
+              aria-label="Voltar para as conversas"
+              className="md:hidden shrink-0 -ml-1 p-1.5 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
             <Sheet open={sheetOpen} onOpenChange={(v) => {
               setSheetOpen(v);
               if (v && target.type === 'grupo') setGrupoNomeInput(activeGrupo?.nome ?? '');
