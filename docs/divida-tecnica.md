@@ -82,6 +82,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 65 | [As duas telas mais delicadas do calendário não têm teste](#65-as-duas-telas-mais-delicadas-do-calendário-não-têm-teste-nenhum) | Baixa | Não |
 | 66 | [A grade de figurinhas usa endereço público cru](#66-a-grade-de-figurinhas-usa-endereço-público-cru-e-para-quando-o-balde-fechar) | Média | Não hoje — **sim** no dia em que `whatsapp-media` fechar |
 | 67 | [Falta a contagem distinta de negócios em risco](#67-falta-a-contagem-distinta-de-negócios-em-risco) | Baixa | Não — só limita o cartão "Valor em Risco" a mostrar valor sem quantidade |
+| 70 | [Datas que mudam de dia fora do banco](#70-datas-que-mudam-de-dia-fora-do-banco-o-que-sobrou-da-varredura-de-1109) | Baixa | Não — nenhuma exportação do cliente sai errada; sobram a "Data de criação" de quem é cadastrado depois das 21h e o nome de 10 arquivos |
 
 > ⚠️ Os itens **61 e 62** existem no corpo deste documento mas não têm linha aqui — quem os
 > escreveu esqueceu a tabela. Vale acrescentar ao passar por perto.
@@ -2646,6 +2647,54 @@ função `dashboard_negocios_risco`, contando `DISTINCT` sobre a união das duas
 o mesmo cálculo que já produz `valor_risco_total`, trocando `sum(valor)` por `count(*)`.
 Não é urgente: o valor em reais já está certo, e "parado" e "sem próxima ação" continuam
 visíveis (com contagem) nos dois cartões ao lado.
+
+---
+
+## 70. Datas que mudam de dia fora do banco: o que sobrou da varredura de 11/09
+
+**Gravidade: baixa.** Nenhuma exportação que o cliente usa hoje escreve data errada. O que sobra é
+exibição e nome de arquivo — e uma data de criação gravada com o dia seguinte, que não entra em
+métrica nenhuma.
+
+Varredura de 11/09/2026, feita depois que o gerador `src/lib/generate-excel.ts` foi flagrado
+escrevendo cada data um dia antes (`CLAUDE.md` §7.12). Procurou-se `new Date(<coluna date>)`
+seguido de `toLocaleDateString` ou `format` nos caminhos de exportação e de exibição — e, de
+quebra, o idioma vizinho `new Date().toISOString().slice(0, 10)`, que calcula "hoje" em UTC:
+depois das 21h, em Brasília, já é amanhã.
+
+As colunas `date` de verdade, conferidas nas mudanças do banco: `pedidos.data_pedido`,
+`pedidos.prazo_resposta`, `licencas_idema.data_formacao`, `dom_licencas.data_edicao` e
+`pauta_adiamentos.adiado_ate`. `clientes.data_criacao` e `contatos.data_criacao` são **texto**. As
+demais datas do sistema são carimbo com fuso, e para elas `new Date(...)` está certo.
+
+### O que ficou em aberto
+
+| onde | o que acontece | conserto |
+|---|---|---|
+| `src/hooks/use-mutations.ts:23` (cliente) e `:58` (contato); `src/hooks/use-criar-contato-da-conversa.ts:79` (contato criado da conversa) | Cadastro feito **depois das 21h** grava `data_criacao` com a data de **amanhã** — `toISOString()` é a hora em UTC; o terceiro grava o carimbo inteiro, e a lista o recorta. Fica gravado, e é o que a ficha e a lista de Clientes mostram em "Data de Criação" | `format(new Date(), 'yyyy-MM-dd')` do date-fns, que é local — o mesmo que `Negocios.tsx:1894` já usa. Os registros já gravados dão para achar comparando `data_criacao` com `created_at` no horário de Brasília; corrigi-los é mudança em dado de produção e pede conversa antes (`CLAUDE.md` §11) |
+| `src/pages/ClienteDetalhe.tsx:666` | Sem `data_criacao`, cai em `created_at` e recorta os 10 primeiros caracteres — de um carimbo UTC. Medido: cliente criado às 22h30 de 24/08 aparece como 25/08 | Recortar só a data seca; carimbo passa por `format(new Date(...), 'dd/MM/yyyy')` |
+| Nome do arquivo em 10 exportações: `generate-pdf.ts:113`, `generate-dashboard-pdf.ts:103`, `generate-conversa-pdf.ts:129` e `:153`, `generate-conversa-excel.ts:24` e `:70`, `generate-conversa-markdown.ts:50` e `:62`, `ExportClientesButton.tsx:46`, `exportCsv` em `Portal.tsx` | Mesmo idioma: depois das 21h o arquivo sai com a data de amanhã **no nome**. O conteúdo está certo | O mesmo `format(new Date(), 'yyyy-MM-dd')` |
+| `src/lib/generate-excel.ts` | Escrevia cada data um dia antes — o 1º de janeiro, no **ano** anterior. Consertado em 11/09, com teste. Mas **nenhuma tela o chama desde 22/08/2026** (`3ecc6b8c`), e ele já enganou duas vezes: em 23/08 ganhou a opção `comObra` (`59d4aee0`), um dia depois de perder a única chamada; e o pedido de 11/09 que originou este item mirou nele achando que era a planilha do cliente | Apagar o arquivo e o teste dele. Antes, confirmar que o `grep` por `generate-excel` em `src/` e `supabase/` só acha ele mesmo |
+| Calendário, `use-eventos.ts:184` | Desenha o fechamento um dia antes | Já é o [item 51](#51-o-calendário-mostra-menos-de-10-dos-prazos-e-desenha-um-dia-antes), que cita a linha de antes (164) |
+
+### Conferidos e certos — não precisa varrer de novo
+
+- **A planilha que o cliente baixa** (`handleExportExcel`, em `Negocios.tsx`): grava a data crua,
+  como texto. Medido com o xlsx do projeto: célula de texto, idêntica ao banco, em Fortaleza, São
+  Paulo e UTC.
+- **O PDF de Negócios** (`generate-pdf.ts:98`): recorta o texto. As três origens de `data` em
+  `buildExportRows` são `data_pedido` — inclusive o `createdAt` do funil (`pedido-to-order.ts:18`),
+  que parece carimbo pelo nome e não é.
+- Recortam o texto ou ancoram ao meio-dia: a lista de Negócios (`PainelDeNegocios.tsx:515` e `:517`),
+  o cartão do funil (`KanbanCard.tsx:18`), a edição do negócio (`EditarPedido.tsx:164`), a prévia da
+  importação (a coluna de criação, em `ImportPedidosDialog.tsx`) e as licenças do Portal (a coluna
+  "Data Emissão" e `formatDataEdicao`, em `Portal.tsx`).
+- A conversão de número de série do Excel na importação (`MappingStep.tsx:197` e `:247`) faz a
+  conta e a leitura em UTC — está certa.
+- Os outros `format(new Date(...))` — são 42 no projeto — e os `toLocaleDateString` de Usuários,
+  Pagamentos, Admin, faixa de cobrança e histórico do negócio recebem carimbo com fuso
+  (`created_at`, início de evento, `tarefas.prazo_final`, `current_period_end`, o `quando` da
+  pauta) ou o próprio agora.
 
 ---
 
