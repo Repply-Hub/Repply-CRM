@@ -14,7 +14,13 @@ import { supabase } from '@/integrations/supabase/client';
  */
 
 export interface ItemDaPauta {
-  tipo: 'compromisso' | 'negocio_parado';
+  /**
+   * `negocio_feito` entrou em 12/09/2026: é um negócio que estava na pauta de hoje e já
+   * recebeu retorno. Ele vem no MESMO retorno da fila para a tela poder contar "3 de 7 feitos
+   * hoje" sem uma segunda consulta — e quem desenha tem de filtrar (`separarAPauta`, em
+   * `src/lib/pauta-do-dia.ts`).
+   */
+  tipo: 'compromisso' | 'negocio_parado' | 'negocio_feito';
   referencia_id: string;
   selo: string;
   titulo: string;

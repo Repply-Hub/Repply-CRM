@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatarMoedaBRL } from '@/lib/moeda';
 import { cn } from '@/lib/utils';
 import { vozDaPauta } from '@/lib/voz-da-pauta';
+import { separarAPauta } from '@/lib/pauta-do-dia';
 import { useAuth } from '@/hooks/use-auth';
 import { useConfiguracoesAutomacao, PADROES_DA_PAUTA } from '@/hooks/use-configuracoes-automacao';
 import { usePossoVerPautaDeTodos } from '@/hooks/use-minha-permissao';
@@ -85,9 +86,15 @@ function ItemPauta({
               {format(new Date(item.quando), 'HH:mm')}
             </span>
           )}
-          {/* A fila é sempre pessoal desde 09/09/2026, então `item.responsavel` vem sempre nulo e
-              a etiqueta de dono saiu daqui. O campo fica no banco: é o que a tabela do time e o
-              e-mail leem. */}
+          {/* 🔴 A ETIQUETA VOLTOU em 12/09/2026, junto com a pauta do gestor. `responsavel` só
+              vem preenchido quando o negócio é DE OUTRA PESSOA — a função de banco resolve
+              isso —, então para o próprio dono nada é desenhado aqui. Sem ela, o gestor recebe
+              negócio de colega sem saber de quem é, e cobra a pessoa errada. */}
+          {item.responsavel && (
+            <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              {item.responsavel}
+            </span>
+          )}
         </div>
 
         <h3 className="mb-1 text-base font-semibold leading-snug text-card-foreground sm:text-[17px]">
@@ -236,7 +243,12 @@ const Hoje = () => {
     });
   }
 
-  const total = pauta?.length ?? 0;
+  // 🔴 A FILA DEVOLVE DOIS TIPOS DE NEGÓCIO desde 12/09/2026: o que ainda espera retorno e o
+  // que já recebeu um hoje. `ItemPauta` desenha qualquer item que receba, então quem separa é
+  // esta linha — sem ela, o negócio resolvido às 9h continuaria na tela às 17h com o botão
+  // "Retomar depois" do lado.
+  const { naTela, feitos, negociosDoDia } = separarAPauta(pauta ?? []);
+  const total = naTela.length;
 
   // 🔴 A RÉGUA DE "PARADO" DA FRASE É A DA EMPRESA — a mesma com que o banco montou a fila.
   // `pauta_do_dia_de` lê `pauta_dias_parado` de `configuracoes_automacao` e cai em 3 quando a
@@ -256,9 +268,12 @@ const Hoje = () => {
   // degraus desenhada para a tela e o e-mail das 7h dizerem a mesma coisa. Lá o dinheiro sai sem
   // centavos, de propósito — é o texto aprovado. Os itens logo abaixo continuam com
   // `formatarMoedaBRL`, com centavos.
+  // 🔴 `naTela`, e não `pauta`: a voz conta os negócios da frase ("R$ X parados em N
+  // negócios"), e contar os já feitos faria a manchete cobrar trabalho que a pessoa acabou de
+  // entregar. A voz é a mesma do e-mail das 7h — lá o filtro é feito no `index.ts`.
   const voz = useMemo(
-    () => vozDaPauta(pauta ?? [], diasParadoDaEmpresa),
-    [pauta, diasParadoDaEmpresa],
+    () => vozDaPauta(naTela, diasParadoDaEmpresa),
+    [naTela, diasParadoDaEmpresa],
   );
 
   const hoje = new Date();
@@ -283,6 +298,12 @@ const Hoje = () => {
   // promete nada.
   const filaVaziaEComemora = total === 0 && timeRespondeu && totalDoTime === 0;
 
+  // 🔴 GANHA DOS OUTROS DOIS ESTADOS, e é o ponto do pedido de 12/09/2026: sem ele, quem
+  // trabalhou o dia inteiro e zerou vê exatamente a mesma tela de quem não tinha nada parado.
+  // Não depende da tabela do time ter respondido: o que houver embaixo não desmente o fato de
+  // a pauta DE HOJE ter sido cumprida.
+  const zerouAPautaDeHoje = total === 0 && feitos.length > 0;
+
   return (
     <AppLayout title="Hoje" subtitle={format(hoje, "EEEE, d 'de' MMMM", { locale: ptBR })}>
       <div className="mx-auto w-full max-w-5xl p-3 sm:p-4 md:p-6">
@@ -294,6 +315,20 @@ const Hoje = () => {
                 <Skeleton key={i} className="h-40 w-full" />
               ))}
             </div>
+          </div>
+        ) : zerouAPautaDeHoje ? (
+          // O dia cumprido. A frase é NEUTRA quanto a quem fez, de propósito: na pauta do
+          // gestor os negócios são da equipe, e "você zerou" seria falso ali.
+          <div className="flex flex-col items-center gap-3 py-20 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Sun className="h-6 w-6 text-primary" />
+            </div>
+            <h2 className="text-2xl font-semibold text-card-foreground">Pauta de hoje zerada</h2>
+            <p className="max-w-sm text-sm text-muted-foreground">
+              {negociosDoDia === 1
+                ? 'O negócio do dia recebeu retorno. A pauta de amanhã nasce de manhã.'
+                : `Os ${negociosDoDia} negócios do dia receberam retorno. A pauta de amanhã nasce de manhã.`}
+            </p>
           </div>
         ) : filaVaziaEComemora ? (
           // O vazio COMEMORA. É o dia em que a pessoa terminou — e é exatamente o momento
@@ -333,12 +368,17 @@ const Hoje = () => {
                   {voz.apoio}
                 </p>
               )}
+              {feitos.length > 0 && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {`${feitos.length} de ${negociosDoDia} feitos hoje`}
+                </p>
+              )}
             </header>
 
             {/* Duas colunas, em duplas. Com número ímpar, o ÚLTIMO ocupa a linha toda —
                 senão sobra um buraco do lado dele e a tela fica torta. */}
             <ol className="grid list-none gap-4 p-0 sm:grid-cols-2">
-              {pauta!.map((item, i) => (
+              {naTela.map((item, i) => (
                 <ItemPauta
                   key={`${item.tipo}-${item.referencia_id}`}
                   item={item}
