@@ -1802,6 +1802,7 @@ export type Database = {
       }
       eventos: {
         Row: {
+          avisar_participantes: boolean
           cor: string
           created_at: string
           criado_por: string
@@ -1813,6 +1814,8 @@ export type Database = {
           inicio: string
           lembrete_enviado: boolean
           lembrete_minutos: number | null
+          lembretes_minutos: number[]
+          lembretes_valem_desde: string | null
           obra_id: string | null
           rota_id: string | null
           rota_titulo: string | null
@@ -1824,6 +1827,7 @@ export type Database = {
           visita_realizada: boolean
         }
         Insert: {
+          avisar_participantes?: boolean
           cor?: string
           created_at?: string
           criado_por: string
@@ -1835,6 +1839,8 @@ export type Database = {
           inicio: string
           lembrete_enviado?: boolean
           lembrete_minutos?: number | null
+          lembretes_minutos?: number[]
+          lembretes_valem_desde?: string | null
           obra_id?: string | null
           rota_id?: string | null
           rota_titulo?: string | null
@@ -1846,6 +1852,7 @@ export type Database = {
           visita_realizada?: boolean
         }
         Update: {
+          avisar_participantes?: boolean
           cor?: string
           created_at?: string
           criado_por?: string
@@ -1857,6 +1864,8 @@ export type Database = {
           inicio?: string
           lembrete_enviado?: boolean
           lembrete_minutos?: number | null
+          lembretes_minutos?: number[]
+          lembretes_valem_desde?: string | null
           obra_id?: string | null
           rota_id?: string | null
           rota_titulo?: string | null

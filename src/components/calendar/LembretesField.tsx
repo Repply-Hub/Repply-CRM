@@ -6,12 +6,11 @@ import { Button } from '@/components/ui/button';
 import {
   LIMITE_DE_LEMBRETES,
   OPCOES_DE_LEMBRETE,
+  UNIDADE_EM_MINUTOS,
   normalizarLembretes,
   rotuloDoLembrete,
+  type UnidadeDeLembrete,
 } from '@/lib/lembretes-do-evento';
-
-type Unidade = 'minutos' | 'horas' | 'dias';
-const EM_MINUTOS: Record<Unidade, number> = { minutos: 1, horas: 60, dias: 1440 };
 
 // Seletor nativo de propósito: abre o seletor do próprio celular, e é o mais
 // fácil de usar com o dedo numa lista curta.
@@ -27,7 +26,7 @@ interface Props {
 export function LembretesField({ value, onChange, disabled }: Props) {
   const [personalizando, setPersonalizando] = useState(false);
   const [quanto, setQuanto] = useState('30');
-  const [unidade, setUnidade] = useState<Unidade>('minutos');
+  const [unidade, setUnidade] = useState<UnidadeDeLembrete>('minutos');
 
   const acrescentar = (minutos: number) => onChange(normalizarLembretes([...value, minutos]));
   const disponiveis = OPCOES_DE_LEMBRETE.filter((m) => !value.includes(m));
@@ -92,7 +91,7 @@ export function LembretesField({ value, onChange, disabled }: Props) {
             aria-label="Unidade"
             className={SELECT}
             value={unidade}
-            onChange={(e) => setUnidade(e.target.value as Unidade)}
+            onChange={(e) => setUnidade(e.target.value as UnidadeDeLembrete)}
           >
             <option value="minutos">minutos</option>
             <option value="horas">horas</option>
@@ -102,7 +101,7 @@ export function LembretesField({ value, onChange, disabled }: Props) {
             type="button"
             size="sm"
             onClick={() => {
-              const minutos = Number(quanto) * EM_MINUTOS[unidade];
+              const minutos = Number(quanto) * UNIDADE_EM_MINUTOS[unidade];
               if (Number.isInteger(minutos) && minutos > 0) acrescentar(minutos);
               setPersonalizando(false);
             }}

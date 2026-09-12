@@ -104,7 +104,7 @@ function parseICS(content: string, calendarType: CalendarType = "empresa"): Even
       diaInteiro: allDay,
       tipoCalendario: calendarType,
       cor: CALENDAR_COLORS[calendarType],
-      lembreteMinutos: null,
+      lembretes: [],
     });
   }
   return events;

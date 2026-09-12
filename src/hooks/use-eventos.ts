@@ -6,6 +6,7 @@ import type { PeriodoDoCalendario } from '@/lib/periodo-do-calendario';
 import { useAuth } from './use-auth';
 import type { CalendarEvent, CalendarType, EventoForm } from '@/components/calendar/types';
 import { CALENDAR_COLORS } from '@/components/calendar/types';
+import { normalizarLembretes } from '@/lib/lembretes-do-evento';
 
 // Estrutura local para mapear a row do banco
 interface EventoRow {
@@ -19,6 +20,8 @@ interface EventoRow {
   tipo_calendario: string;
   cor: string;
   lembrete_minutos: number | null;
+  lembretes_minutos: number[] | null;
+  avisar_participantes: boolean | null;
   grupo_id: string;
   criado_por: string;
   updated_at?: string;
@@ -166,7 +169,8 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>, periodo: 
           // a RLS de update/delete já exige user_id/criado_por = auth.uid(),
           // então isso só evita chamadas que a policy rejeitaria de qualquer forma.
           podeEditar: e.user_id === user!.id || e.criado_por === user!.id,
-          lembreteMinutos: e.lembrete_minutos,
+          lembretes: e.lembretes_minutos ?? [],
+          avisarParticipantes: e.avisar_participantes ?? false,
           grupoId: e.grupo_id,
           criadoPor: e.criado_por,
           obraId: e.obra_id,
@@ -279,7 +283,8 @@ export function useCreateEvento() {
         dia_inteiro: form.diaInteiro,
         tipo_calendario: form.tipoCalendario,
         cor: form.cor,
-        lembrete_minutos: form.lembreteMinutos,
+        lembretes_minutos: normalizarLembretes(form.lembretes ?? []),
+        avisar_participantes: form.avisarParticipantes ?? false,
         obra_id: form.obraId || null,
         visita_realizada: form.visitaRealizada ?? false,
         visita_observacao: form.visitaObservacao || null,
@@ -669,7 +674,7 @@ export function useBulkCreateEventos() {
         dia_inteiro: form.diaInteiro,
         tipo_calendario: form.tipoCalendario,
         cor: form.cor,
-        lembrete_minutos: form.lembreteMinutos,
+        lembretes_minutos: normalizarLembretes(form.lembretes ?? []),
       }));
 
       // Insere em lotes de 500 para evitar limites do PostgREST
@@ -723,7 +728,8 @@ export function useUpdateEvento() {
         dia_inteiro: form.diaInteiro,
         tipo_calendario: form.tipoCalendario,
         cor: form.cor,
-        lembrete_minutos: form.lembreteMinutos,
+        lembretes_minutos: normalizarLembretes(form.lembretes ?? []),
+        avisar_participantes: form.avisarParticipantes ?? false,
         visita_realizada: form.visitaRealizada ?? false,
         visita_observacao: form.visitaObservacao || null,
         updated_at: new Date().toISOString(),
@@ -750,9 +756,10 @@ export function useUpdateEvento() {
       const selecionados = form.participantes ?? [];
       const alvo = new Set<string>(selecionados.length > 0 ? selecionados : [criadoPor!]);
 
-      const { error: updateError } = await supabase.from('eventos').update(campos).eq('grupo_id', grupoId!);
-      if (updateError) throw updateError;
-
+      // 🔴 PRIMEIRO OS RETIRADOS, DEPOIS O UPDATE DO GRUPO. Na ordem antiga (update, depois
+      // remover) quem era tirado do evento ainda tinha a própria linha atualizada — e recebia
+      // "evento alterado" um instante antes de "cancelado para você". Apagando primeiro, o
+      // update por grupo_id não alcança mais essas linhas: só quem continua é avisado de mudança.
       const remover = [...existentesIds].filter((uid) => !alvo.has(uid));
       if (remover.length > 0) {
         const { error: delError } = await supabase
@@ -762,6 +769,9 @@ export function useUpdateEvento() {
           .in('user_id', remover);
         if (delError) throw delError;
       }
+
+      const { error: updateError } = await supabase.from('eventos').update(campos).eq('grupo_id', grupoId!);
+      if (updateError) throw updateError;
 
       const adicionar = [...alvo].filter((uid) => !existentesIds.has(uid));
       if (adicionar.length > 0) {

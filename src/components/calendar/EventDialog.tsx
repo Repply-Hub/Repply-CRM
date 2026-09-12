@@ -36,7 +36,8 @@ import { useEventoParticipantes, buscarConflitosDeVisita, type ConflitoVisita } 
 import type { CalendarEvent, EventoForm, CalendarType } from './types';
 import { EVENT_PRESET_COLORS, CALENDAR_COLORS } from './types';
 import { EventDateTimeField } from './EventDateTimeField';
-import { LembreteField } from './LembreteField';
+import { LembretesField } from './LembretesField';
+import { LEMBRETES_PADRAO, normalizarLembretes } from '@/lib/lembretes-do-evento';
 
 interface EventDialogProps {
   open: boolean;
@@ -92,7 +93,8 @@ const defaultForm = (): EventoForm => {
     tipoCalendario: 'empresa',
     cor: CALENDAR_COLORS.empresa,
     participantes: [],
-    lembreteMinutos: null,
+    lembretes: [...LEMBRETES_PADRAO],
+    avisarParticipantes: true,
     obraId: null,
     visitaRealizada: false,
     visitaObservacao: '',
@@ -161,7 +163,11 @@ export function EventDialog({
         // A lista real de participantes chega depois, pela query de
         // participantes existentes (useEventoParticipantes) — ver efeito abaixo.
         participantes: [],
-        lembreteMinutos: editingEvent.lembreteMinutos ?? null,
+        // `normalizarLembretes` de novo aqui, e não só na gravação: o `LembretesField` confia
+        // que `value` chega ordenado e sem repetição (ver seu comentário), e este é o único
+        // ponto em que um dado vindo do banco alimenta esse `value` diretamente.
+        lembretes: normalizarLembretes(editingEvent.lembretes ?? []),
+        avisarParticipantes: editingEvent.avisarParticipantes ?? false,
         obraId: editingEvent.obraId ?? null,
         visitaRealizada: editingEvent.visitaRealizada ?? false,
         visitaObservacao: editingEvent.visitaObservacao ?? '',
@@ -533,10 +539,31 @@ export function EventDialog({
             </div>
           )}
 
-          {/* Lembrete */}
-          <LembreteField
-            value={form.lembreteMinutos}
-            onChange={(v) => set('lembreteMinutos', v)}
+          {/* Aviso aos participantes — só em evento comum. Rota de visita não avisa ninguém
+              (decisão de 11/09/2026). Só quem organizou muda: a chave vale para o grupo inteiro. */}
+          {!isVisita && (
+            <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="avisar-participantes" className="text-sm">
+                  Avisar participantes por chat e e-mail
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  No convite, na mudança de horário, no cancelamento e em cada lembrete.
+                </p>
+              </div>
+              <Switch
+                id="avisar-participantes"
+                checked={form.avisarParticipantes ?? false}
+                onCheckedChange={(v) => set('avisarParticipantes', v)}
+                disabled={somenteLeitura || !podeGerenciarParticipantes}
+              />
+            </div>
+          )}
+
+          <LembretesField
+            value={form.lembretes}
+            onChange={(v) => set('lembretes', v)}
+            disabled={somenteLeitura}
           />
 
           {/* Cor */}

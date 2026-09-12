@@ -9,6 +9,15 @@ export const LEMBRETES_PADRAO: readonly number[] = [1440, 60];
 export const LIMITE_DE_LEMBRETES = 5;
 export const OPCOES_DE_LEMBRETE: readonly number[] = [15, 30, 60, 120, 1440, 2880];
 
+// Única fonte de verdade da conversão de unidade "personalizada" do formulário
+// (o campo de lembrete único removido na Tarefa 4 do Bloco 3 tinha a mesma tabela duplicada).
+export type UnidadeDeLembrete = 'minutos' | 'horas' | 'dias';
+export const UNIDADE_EM_MINUTOS: Record<UnidadeDeLembrete, number> = {
+  minutos: 1,
+  horas: 60,
+  dias: 1440,
+};
+
 export function normalizarLembretes(lista: readonly number[]): number[] {
   const validos = lista.filter((m) => Number.isInteger(m) && m > 0);
   return [...new Set(validos)].sort((a, b) => b - a).slice(0, LIMITE_DE_LEMBRETES);
