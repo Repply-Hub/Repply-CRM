@@ -22,7 +22,8 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn, autoResizeTextarea } from '@/lib/utils';
-import { painelVisivelNoCelular } from '@/lib/painel-do-chat-no-celular';
+import { painelVisivelNoCelular, equipeRecolhidaEfetiva } from '@/lib/painel-do-chat-no-celular';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { downloadFile } from '@/lib/download-file';
 import { linkifyText } from '@/lib/linkify';
 import { CreateGroupDialog } from '@/components/chat/CreateGroupDialog';
@@ -640,6 +641,12 @@ const Chat = () => {
   const [mostrarConversaNoCelular, setMostrarConversaNoCelular] = useState(false);
   const painelCelular = painelVisivelNoCelular(mostrarConversaNoCelular);
   const [teamCollapsed, setTeamCollapsed] = useState(false);
+  // Abaixo de `md` a lista precisa ocupar a largura inteira, mesmo que a
+  // equipe tenha sido recolhida numa janela larga antes de estreitar (achado
+  // da revisão do commit ee4ded63 — ver comentário de `equipeRecolhidaEfetiva`).
+  // `teamCollapsed` continua intacto: ao alargar de volta, o recolhimento
+  // manual reaparece do jeito que a pessoa deixou.
+  const isMobile = useIsMobile();
   const [text, setText] = useState('');
   const [previewFile, setPreviewFile] = useState<FilePreviewTarget | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<{ file: File; previewUrl: string | null }[]>([]);
@@ -1315,7 +1322,7 @@ const Chat = () => {
           myId={myVendedor ?? null}
           target={target}
           onSelect={handleSelectTarget}
-          collapsed={teamCollapsed}
+          collapsed={equipeRecolhidaEfetiva(teamCollapsed, isMobile)}
           onToggle={() => setTeamCollapsed(prev => !prev)}
           grupos={sortedGrupos}
           unreadCounts={unreadCounts}
