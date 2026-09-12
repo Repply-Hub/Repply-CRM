@@ -20,9 +20,14 @@ import { useAuth } from '@/hooks/use-auth';
 export const PADROES_DA_PAUTA = {
   /** Dias sem mudar de etapa para um negócio entrar na pauta. */
   pauta_dias_parado: 3,
-  /** Piso de itens: abaixo disso o corte AFROUXA, para um dia leve não parecer quebrado. */
-  pauta_min_itens: 3,
-  /** Teto de itens, contando compromissos. É o que faz a pauta poder terminar. */
+  /**
+   * Teto de itens, contando compromissos. É o que faz a pauta poder terminar.
+   *
+   * O PISO saiu em 12/09/2026 (`pauta_min_itens`). Ele completava a fila com negócios que NÃO
+   * estavam parados quando faltavam parados — exatamente a regra que o dono do produto derrubou
+   * ao decidir que só entra o que está parado. A linha guardada no banco não é apagada: a
+   * função de banco parou de lê-la, então voltar atrás é reemitir a função.
+   */
   pauta_max_itens: 7,
   /** O resumo diário por e-mail. Nasce desligado. */
   pauta_resumo_email: false,
