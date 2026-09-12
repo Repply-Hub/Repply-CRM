@@ -108,29 +108,41 @@ Deno.serve(async (req) => {
       const erros: string[] = [];
       const agora = () => new Date().toISOString();
 
+      // Cada canal é contido no próprio try/catch, não só o do Resend (achado 2 da
+      // revisão). Um INSERT que LANÇA (queda de rede, DNS) em vez de devolver {error}
+      // não pode pular os outros canais deste item nem escapar do loop e abandonar o
+      // resto do lote — vira erro registrado, igual a qualquer outra falha de envio.
       if (!a.sininho_em) {
-        const { error } = await supabase.from("notificacoes").insert({
-          usuario_id: a.destinatario_id,
-          tipo: `evento_${a.tipo}`,
-          titulo: tituloDoSininho(aviso),
-          mensagem: mensagemDoSininho(aviso),
-        });
-        if (error) erros.push(`sininho: ${error.message}`);
-        else marcas.sininho_em = agora();
+        try {
+          const { error } = await supabase.from("notificacoes").insert({
+            usuario_id: a.destinatario_id,
+            tipo: `evento_${a.tipo}`,
+            titulo: tituloDoSininho(aviso),
+            mensagem: mensagemDoSininho(aviso),
+          });
+          if (error) erros.push(`sininho: ${error.message}`);
+          else marcas.sininho_em = agora();
+        } catch (e) {
+          erros.push(`sininho: ${e instanceof Error ? e.message : String(e)}`);
+        }
       }
 
       const querChat =
         a.avisar && !!a.remetente_id && a.remetente_id !== a.destinatario_id &&
         chatPorEmpresa.get(a.empresa_id) !== false;
       if (querChat && !a.chat_em) {
-        const { error } = await supabase.from("chat_mensagens").insert({
-          conteudo: textoDoChat(aviso),
-          usuario_id: a.remetente_id,
-          empresa_id: a.empresa_id,
-          recipient_id: a.destinatario_id,
-        });
-        if (error) erros.push(`chat: ${error.message}`);
-        else marcas.chat_em = agora();
+        try {
+          const { error } = await supabase.from("chat_mensagens").insert({
+            conteudo: textoDoChat(aviso),
+            usuario_id: a.remetente_id,
+            empresa_id: a.empresa_id,
+            recipient_id: a.destinatario_id,
+          });
+          if (error) erros.push(`chat: ${error.message}`);
+          else marcas.chat_em = agora();
+        } catch (e) {
+          erros.push(`chat: ${e instanceof Error ? e.message : String(e)}`);
+        }
       }
 
       const email = emailPorId.get(a.destinatario_id);
@@ -139,7 +151,21 @@ Deno.serve(async (req) => {
         if (!apiKey) {
           erros.push("email: chave do Resend ausente");
         } else {
+          // Teto de tempo para o Resend (achado 3): sem isto, uma chamada travada prende
+          // o loop sequencial pelo resto do lote — os itens seguintes nem chegam a ser
+          // tentados dentro da janela do cron. Tempo esgotado conta como qualquer outra
+          // falha de envio: fica em `erros`, não marca `email_em`, e a próxima passada
+          // tenta de novo — nunca marca como enviado o que só travou.
+          const TEMPO_LIMITE_RESEND_MS = 10_000;
+          const controle = new AbortController();
+          const disparoDoLimite = setTimeout(() => controle.abort(), TEMPO_LIMITE_RESEND_MS);
           try {
+            // Cancelamento e retirado nunca mostram o botão da agenda no e-mail
+            // (`htmlDoEmail` descarta o link para esses dois tipos) — monta o link só
+            // quando o e-mail vai usá-lo (achado 4, custo zero nos outros três tipos).
+            const link = a.tipo === "cancelamento" || a.tipo === "retirado"
+              ? ""
+              : linkDaAgenda(appUrl, a.dados.inicio);
             const resp = await fetch("https://api.resend.com/emails", {
               method: "POST",
               headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -147,13 +173,17 @@ Deno.serve(async (req) => {
                 from: remetente,
                 to: [email],
                 subject: assuntoDoEmail(aviso),
-                html: htmlDoEmail(aviso, linkDaAgenda(appUrl, a.dados.inicio)),
+                html: htmlDoEmail(aviso, link),
               }),
+              signal: controle.signal,
             });
             if (!resp.ok) throw new Error(`Resend ${resp.status}: ${(await resp.text()).slice(0, 300)}`);
             marcas.email_em = agora();
           } catch (e) {
-            erros.push(`email: ${e instanceof Error ? e.message : String(e)}`);
+            const foiTempoLimite = e instanceof Error && e.name === "AbortError";
+            erros.push(`email: ${foiTempoLimite ? `tempo limite (${TEMPO_LIMITE_RESEND_MS}ms)` : (e instanceof Error ? e.message : String(e))}`);
+          } finally {
+            clearTimeout(disparoDoLimite);
           }
         }
       }
@@ -161,22 +191,47 @@ Deno.serve(async (req) => {
       const faltaSininho = !a.sininho_em && !marcas.sininho_em;
       const faltaChat = querChat && !a.chat_em && !marcas.chat_em;
       const faltaEmail = querEmail && !a.email_em && !marcas.email_em;
-      const concluido = !faltaSininho && !faltaChat && !faltaEmail;
-      const ultimoErro = erros.length ? erros.join(" | ").slice(0, 500) : null;
+      // Isto é só o resultado EM MEMÓRIA desta passada pelos canais — ainda não é o que
+      // vale de verdade. Só a gravação abaixo decide o que fica valendo (achado 1): sem
+      // ela persistir, `sininho_em`/`chat_em`/`email_em` continuam nulos no banco e a
+      // próxima reserva manda os três de novo, não importa o que aconteceu aqui em cima.
+      const concluidoNestaPassada = !faltaSininho && !faltaChat && !faltaEmail;
+      const erroDosCanais = erros.length ? erros.join(" | ").slice(0, 500) : null;
 
-      const { error: eMarcar } = await supabase
-        .from("evento_avisos")
-        .update({
-          ...marcas,
-          processando_desde: null,
-          ultimo_erro: ultimoErro,
-          concluido_em: concluido ? agora() : null,
-        })
-        .eq("id", a.id);
-      if (eMarcar) erros.push(`marcar: ${eMarcar.message}`);
+      try {
+        const { error: eMarcar } = await supabase
+          .from("evento_avisos")
+          .update({
+            ...marcas,
+            processando_desde: null,
+            ultimo_erro: erroDosCanais,
+            concluido_em: concluidoNestaPassada ? agora() : null,
+          })
+          .eq("id", a.id);
 
-      if (concluido) resultado.concluidos++;
-      if (ultimoErro) resultado.erros.push(`${a.id}: ${ultimoErro}`);
+        if (eMarcar) {
+          // 🔴 A gravação falhou: nada do que os canais fizeram nesta passada ficou no
+          // banco — nem as marcas de tempo, nem `concluido_em`. A linha real continua
+          // exatamente como estava antes desta passada. Contar como concluído aqui seria
+          // reportar um sucesso que não aconteceu, e quem lesse o relatório confiaria
+          // numa fila que, por dentro, ainda tem os três canais em branco — pronta para
+          // reenviar sininho, chat e e-mail inteiros na próxima reserva. Por isso NUNCA
+          // soma em `concluidos` quando a gravação falha, e o erro entra no relatório
+          // mesmo quando nenhum canal falhou.
+          const detalhe = erroDosCanais ? `${erroDosCanais} | marcar: ${eMarcar.message}` : `marcar: ${eMarcar.message}`;
+          resultado.erros.push(`${a.id}: ${detalhe.slice(0, 500)}`);
+        } else {
+          if (erroDosCanais) resultado.erros.push(`${a.id}: ${erroDosCanais}`);
+          if (concluidoNestaPassada) resultado.concluidos++;
+        }
+      } catch (e) {
+        // A própria gravação pode lançar em vez de devolver {error} — mesma classe de
+        // falha do achado 2. Contida aqui, item por item: não conta como concluído (a
+        // razão é a mesma de cima) e não abandona o resto do lote.
+        const msg = e instanceof Error ? e.message : String(e);
+        const detalhe = erroDosCanais ? `${erroDosCanais} | marcar: ${msg}` : `marcar: ${msg}`;
+        resultado.erros.push(`${a.id}: ${detalhe.slice(0, 500)}`);
+      }
     }
 
     return json(resultado);
