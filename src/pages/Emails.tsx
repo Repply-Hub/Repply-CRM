@@ -1865,15 +1865,18 @@ const Emails = () => {
               "Escrever" — que é o ÚNICO caminho para um e-mail novo — sumia por
               inteiro entre ~768 e ~917px de janela, sem barra de rolagem em lugar
               nenhum para alcançá-lo. Mesmo padrão de Negocios.tsx:1862.
-              `flex-wrap` até `lg` (exclusive): no celular E no tablet deixa a
-              busca (que passou a aparecer ali) e o filtro "Todas/Não lidas"
-              quebrarem para a própria linha em vez de vazar para fora da tela
-              sem barra visível. Era `md` (768px) até 11/09/2026 à tarde, mas a
-              768px o modo `nowrap` não cabe — a fileira toda (abas + filtro +
-              busca) é mais larga que a tela, e o `overflow-x-auto` deixa a
-              busca alcançável só rolando pro lado, sem indicação nenhuma disso.
-              De `lg` (1024px) para cima sobra espaço e volta a ser `nowrap`. */}
-          <div className="flex flex-wrap lg:flex-nowrap items-center gap-4 flex-1 min-w-0 overflow-x-auto custom-scrollbar">
+              `flex-wrap` até `xl` (exclusive): no celular, no tablet E no notebook
+              pequeno deixa a busca (que passou a aparecer ali) e o filtro
+              "Todas/Não lidas" quebrarem para a própria linha em vez de vazar
+              para fora da tela sem barra visível. Foi `md` (768px) até
+              11/09/2026 de manhã, depois `lg` (1024px) à tarde — mas o
+              levantamento no navegador real de 11/09/2026 mediu 1024×768 de
+              verdade e achou a busca ainda vazando: em `nowrap` a fileira pede
+              840px (`scrollWidth`) e só há 802px (`clientWidth`) — 38px
+              faltando, sem barra visível para alcançá-la. A 1280px a fileira
+              cabe exata (1058 = 1058). De `xl` (1280px) para cima volta a ser
+              `nowrap`. */}
+          <div className="flex flex-wrap xl:flex-nowrap items-center gap-4 flex-1 min-w-0 overflow-x-auto custom-scrollbar">
             {selectedIds.length > 0 ? (
               <div className="flex shrink-0 items-center gap-4 bg-primary/5 px-3 py-1 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-left-2 duration-200">
                 <div className="flex items-center gap-2">
@@ -2004,7 +2007,14 @@ const Emails = () => {
               </div>
             )}
 
-            <div className="flex items-center gap-2 w-full lg:w-auto lg:flex-1 lg:min-w-[14rem] lg:max-w-md">
+            {/* Mesmo ponto de quebra da fileira acima (`xl`, 1280px — ver o
+                comentário no início do bloco): os dois mudam juntos porque são
+                a mesma fileira, e o campo de busca é o que mais precisa de
+                espaço nela. Ficar em `lg` deixaria a busca espremida contra o
+                filtro "Todas/Não lidas" bem no ponto que o levantamento de
+                11/09/2026 mediu como insuficiente (1024×768: 840px pedidos,
+                802px disponíveis). */}
+            <div className="flex items-center gap-2 w-full xl:w-auto xl:flex-1 xl:min-w-[14rem] xl:max-w-md">
               {/* Marcador só filtra Recebidos (ver `escolherPasta`) — o chip só
                   existe onde há filtro de verdade para limpar. Clicar de novo
                   no marcador ativo na barra lateral não desmarca (o clique
