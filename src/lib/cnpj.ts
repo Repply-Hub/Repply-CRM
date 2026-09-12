@@ -74,6 +74,53 @@ export async function fetchCnpjData(cnpj: string): Promise<CnpjData> {
   }
 }
 
+/** Prazo da consulta. Passou disso, o caso é `demorou` — nunca "não existe". */
+export const PRAZO_DA_CONSULTA_MS = 10_000;
+
+export type CasoDaConsulta = 'encontrado' | 'nao_existe' | 'servico_falhou' | 'demorou';
+
+export type ResultadoDaConsulta =
+  | { caso: 'encontrado'; dados: CnpjData }
+  | { caso: Exclude<CasoDaConsulta, 'encontrado'> };
+
+/**
+ * A ÚNICA porta do sistema para o BrasilAPI de CNPJ — `src/test/uma-consulta-de-cnpj-so.test.ts`
+ * falha se nascer outra.
+ *
+ * 🔴 Devolve O QUE ACONTECEU, em quatro casos, e nunca lança. A versão anterior
+ * (`fetchCnpjData`) transformava qualquer resposta que não fosse 200 em "CNPJ não encontrado":
+ * recusa do Cloudflare (403), excesso de consultas (429) e servidor fora (5xx) saíam com a mesma
+ * frase de empresa inexistente. Com a fábrica passando a BLOQUEAR CNPJ inexistente, essa mistura
+ * barraria cadastro legítimo por culpa de um serviço de fora.
+ *
+ * Só é `nao_existe` o 404 com o corpo do próprio BrasilAPI (`"type":"not_found"`, medido em
+ * 11/09/2026). Um 404 sem esse corpo veio de outro lugar, e conta como falha do serviço.
+ */
+export async function consultarCnpj(
+  cnpj: string,
+  prazoMs = PRAZO_DA_CONSULTA_MS,
+): Promise<ResultadoDaConsulta> {
+  const digitos = unmaskCnpj(cnpj);
+  const controle = new AbortController();
+  const relogio = setTimeout(() => controle.abort(), prazoMs);
+
+  try {
+    const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digitos}`, {
+      signal: controle.signal,
+    });
+    if (res.ok) return { caso: 'encontrado', dados: (await res.json()) as CnpjData };
+    if (res.status === 404) {
+      const corpo = await res.json().catch(() => null);
+      return corpo?.type === 'not_found' ? { caso: 'nao_existe' } : { caso: 'servico_falhou' };
+    }
+    return { caso: 'servico_falhou' };
+  } catch {
+    return controle.signal.aborted ? { caso: 'demorou' } : { caso: 'servico_falhou' };
+  } finally {
+    clearTimeout(relogio);
+  }
+}
+
 /**
  * O telefone da Receita, pronto para o campo do formulário.
  *
