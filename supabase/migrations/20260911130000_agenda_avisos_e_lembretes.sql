@@ -36,6 +36,30 @@ update public.eventos
 
 alter table public.eventos enable trigger user;
 
+-- Teto de 5 lembretes, todos positivos. A tela já normaliza a lista
+-- (`normalizarLembretes`, em src/lib/lembretes-do-evento.ts), mas tela não é trava:
+-- CADA item da lista vira uma linha na fila, ou seja, uma mensagem direta e um e-mail.
+-- Sem teto no banco, uma gravação feita fora do formulário dispara quantos e-mails
+-- quiser em nome da empresa.
+-- `cardinality` em vez de `array_length`: devolve 0 no array vazio (e não nulo) e conta
+-- os elementos de verdade — '{{1,2},{3,4}}' são 4, mas `array_length(...,1)` diria 2, e
+-- o `unnest` do gerador de lembretes veria os 4.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.eventos'::regclass
+       and conname = 'eventos_lembretes_minutos_validos'
+  ) then
+    alter table public.eventos
+      add constraint eventos_lembretes_minutos_validos check (
+        cardinality(lembretes_minutos) <= 5
+        and array_position(lembretes_minutos, null) is null
+        and 0 < all (lembretes_minutos)
+      );
+  end if;
+end $$;
+
 -- 2. Lembretes já enviados ---------------------------------------------------------
 create table if not exists public.evento_lembretes_enviados (
   evento_id  uuid        not null references public.eventos(id) on delete cascade,
@@ -45,6 +69,11 @@ create table if not exists public.evento_lembretes_enviados (
 );
 alter table public.evento_lembretes_enviados enable row level security;
 -- Sem política: só o servidor e as funções do sistema leem e gravam.
+-- 🔴 Ligar a RLS não basta para que a frase acima seja verdade. Neste banco o padrão do
+-- Postgres (`pg_default_acl`) já entrega toda tabela nova do schema `public` inteira a
+-- `anon` e a `authenticated` — a RLS filtra as linhas, mas o privilégio de ler e gravar
+-- nasce concedido. Sem o revoke, "só o servidor" ficaria valendo só no comentário.
+revoke all on table public.evento_lembretes_enviados from anon, authenticated;
 
 -- O que o robô antigo já mandou não sai de novo.
 insert into public.evento_lembretes_enviados (evento_id, minutos)
@@ -77,9 +106,18 @@ create table if not exists public.evento_avisos (
 create index if not exists evento_avisos_pendentes
   on public.evento_avisos (criado_em) where concluido_em is null;
 alter table public.evento_avisos enable row level security;
--- Sem política: só o servidor lê e grava.
+-- Sem política: só o servidor lê e grava — e, pelo mesmo motivo da tabela acima, o
+-- privilégio precisa ser retirado na mão. Aqui pesa mais: `dados` guarda título,
+-- descrição, obra e os nomes dos participantes de todo evento avisado.
+revoke all on table public.evento_avisos from anon, authenticated;
 
 -- 4. Anotar um aviso a partir de uma linha de evento -------------------------------
+--
+-- 🔴 `search_path = public, pg_temp` em TODAS as funções daqui para baixo, nunca só
+--    `public`: quando `pg_temp` não é listado, o Postgres o procura PRIMEIRO assim mesmo.
+--    Um usuário logado que criasse uma tabela temporária chamada `usuarios` faria estas
+--    funções — que rodam com os poderes do dono, sem RLS — lerem a tabela dele.
+--    Listando `pg_temp` por último, ele passa a ser procurado por último.
 create or replace function public.anotar_aviso_de_evento(
   p_evento       public.eventos,
   p_tipo         text,
@@ -89,7 +127,7 @@ create or replace function public.anotar_aviso_de_evento(
 ) returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   v_dest  public.usuarios;
@@ -103,15 +141,37 @@ begin
   -- Empresa com o Calendário desligado: nada sai (mesma regra do robô de hoje).
   if not empresa_tem_secao_de(v_dest.empresa_id, 'calendario') then return; end if;
 
-  select * into v_rem from usuarios where user_id = p_evento.criado_por;
+  -- 🔴 QUEM ASSINA O AVISO É QUEM ESCREVEU A LINHA, não o `criado_por` que veio junto.
+  -- `remetente_id` vira o autor da mensagem direta (`chat_mensagens.usuario_id`) e o
+  -- "Organizado por" do e-mail. `eventos.criado_por` é escolhido livremente por quem
+  -- insere — sua única amarra é a chave estrangeira para `auth.users`, que não conhece
+  -- empresa. Sem o filtro abaixo, qualquer pessoa da equipe mandaria chat e e-mail
+  -- assinados por um colega, e um id de OUTRA empresa traria nome e e-mail de fora para
+  -- dentro de `dados`.
+  --
+  -- Sem sessão (`auth.uid()` nulo) não há quem assine: é o robô do lembrete chamando esta
+  -- função, e aí o organizador gravado na linha é o remetente certo — a spec (§3.2) manda
+  -- o lembrete sair por mensagem direta para cada participante, menos o organizador. A
+  -- fronteira de empresa vale igual nos dois caminhos; sem candidato válido, `v_rem` fica
+  -- vazio, o chat não sai e o e-mail vai sem o "Organizado por".
+  select * into v_rem
+    from usuarios
+   where user_id = coalesce(auth.uid(), p_evento.criado_por)
+     and empresa_id = v_dest.empresa_id;
+
   if p_evento.obra_id is not null then
     select nome_obra into v_obra from obras where id = p_evento.obra_id;
   end if;
+  -- `grupo_id` vem do cliente e não tem amarra nenhuma; como esta função roda sem RLS,
+  -- um grupo forjado listaria gente de outra empresa em `participantes`. E quem foi
+  -- excluído não entra na lista, igual à busca do destinatário logo acima.
   select coalesce(array_agg(coalesce(u.nome, u.email) order by u.nome), '{}')
     into v_nomes
     from eventos e
     join usuarios u on u.user_id = e.user_id
-   where e.grupo_id = p_evento.grupo_id;
+   where e.grupo_id = p_evento.grupo_id
+     and u.empresa_id = v_dest.empresa_id
+     and u.deleted_at is null;
 
   insert into evento_avisos (
     empresa_id, grupo_id, evento_id, destinatario_id, remetente_id,
@@ -148,7 +208,7 @@ create or replace function public.eventos_prepara_lembretes()
 returns trigger
 language plpgsql
 security definer   -- apaga em evento_lembretes_enviados, que não tem política
-set search_path = public
+set search_path = public, pg_temp
 as $$
 begin
   -- Ponte: uma aba aberta antes da publicação ainda grava só `lembrete_minutos`.
@@ -163,7 +223,19 @@ begin
     -- Horário mudou: lembretes voltam a valer para o horário novo, e só daqui para frente.
     new.lembretes_valem_desde := now();
     delete from evento_lembretes_enviados where evento_id = new.id;
+  elsif new.lembretes_minutos is distinct from old.lembretes_minutos then
+    -- Decisão do dono do produto (12/09/2026): lembrete cujo momento JÁ PASSOU quando a
+    -- lista foi salva não sai atrasado — some calado. Ex.: evento amanhã às 8h; às 18h de
+    -- hoje alguém acrescenta "1 dia antes", cujo momento era hoje às 8h.
+    -- Carimbar o piso agora resolve sozinho: o gerador (§8) só aceita lembrete cujo momento
+    -- seja posterior a `lembretes_valem_desde`, então o que ficou para trás nunca entra.
+    -- 🔴 Aqui NÃO se apaga `evento_lembretes_enviados` — só a mudança de horário faz isso.
+    -- Mexer na lista não pode fazer o que já foi enviado sair de novo.
+    new.lembretes_valem_desde := now();
   end if;
+  -- Os dois ramos acima não brigam quando horário e lista mudam no mesmo salvamento: o
+  -- carimbo é o mesmo `now()`, e quem decide é o do horário, que além de carimbar limpa os
+  -- enviados — que é justamente o que a mudança de horário exige.
   return new;
 end;
 $$;
@@ -178,28 +250,47 @@ create or replace function public.eventos_anota_aviso()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   v_quem  uuid := auth.uid();
   v_resta boolean;
+  v_tipo  text;   -- só para a mensagem de erro lá embaixo saber o que se perdeu
+  v_grupo uuid;   -- idem. `new` não existe no DELETE, por isso o if e não um coalesce
 begin
   -- Sem sessão = o próprio sistema (limpeza, exclusão de conta): nunca avisa.
   if v_quem is null then return null; end if;
+
+  if tg_op = 'DELETE' then v_grupo := old.grupo_id; else v_grupo := new.grupo_id; end if;
 
   if tg_op = 'INSERT' then
     -- Convite: evento novo ou participante incluído depois. Quem grava a própria linha
     -- (o organizador) não se convida.
     if new.avisar_participantes and new.user_id <> v_quem and new.inicio > now() then
-      perform anotar_aviso_de_evento(new, 'convite', null, null, null);
+      v_tipo := 'convite';
+      perform anotar_aviso_de_evento(new, v_tipo, null, null, null);
     end if;
 
   elsif tg_op = 'UPDATE' then
+    -- Decisão do dono do produto (12/09/2026): LIGAR a chave depois convida. Quem salvava o
+    -- evento com a chave desligada e a ligava em seguida não avisava ninguém — a chave
+    -- prometia na tela e nada saía. O convite é o mesmo da criação.
+    -- 🔴 A trava contra convidar duas vezes é `not old.avisar_participantes`: só a virada
+    -- desligada → ligada convida. Salvar de novo com a chave já ligada não reconvida.
+    -- Desligar a chave não gera aviso nenhum — ninguém recebe "você não será mais avisado".
+    -- O convite ganha do aviso de mudança quando as duas coisas vêm no mesmo salvamento: ele
+    -- já leva o evento inteiro, e as duas mensagens juntas seriam uma a mais.
+    if new.avisar_participantes and not old.avisar_participantes
+       and new.user_id <> v_quem and new.inicio > now() then
+      v_tipo := 'convite';
+      perform anotar_aviso_de_evento(new, v_tipo, null, null, null);
+
     -- Mudança de data/hora feita por outra pessoa (o organizador). Título e descrição não avisam.
-    if new.avisar_participantes and new.user_id <> v_quem
+    elsif new.avisar_participantes and new.user_id <> v_quem
        and (new.inicio is distinct from old.inicio or new.fim is distinct from old.fim)
        and greatest(new.inicio, old.inicio) > now() then
-      perform anotar_aviso_de_evento(new, 'alteracao', null, old.inicio, old.fim);
+      v_tipo := 'alteracao';
+      perform anotar_aviso_de_evento(new, v_tipo, null, old.inicio, old.fim);
     end if;
 
   elsif tg_op = 'DELETE' then
@@ -208,14 +299,18 @@ begin
       -- Gatilho AFTER ROW roda no fim do comando: se o grupo inteiro foi apagado, não resta
       -- ninguém = cancelamento; se ainda resta alguém, esta pessoa foi retirada.
       select exists (select 1 from eventos where grupo_id = old.grupo_id) into v_resta;
-      perform anotar_aviso_de_evento(
-        old, case when v_resta then 'retirado' else 'cancelamento' end, null, null, null);
+      v_tipo := case when v_resta then 'retirado' else 'cancelamento' end;
+      perform anotar_aviso_de_evento(old, v_tipo, null, null, null);
     end if;
   end if;
   return null;
 exception when others then
   -- 🔴 Aviso é consequência: NUNCA pode impedir salvar ou apagar o evento.
-  raise warning '[agenda] aviso não anotado: %', sqlerrm;
+  -- Em compensação, o aviso perdido some sem deixar rastro: o `sqlerrm` sozinho não diz
+  -- QUAL aviso se perdeu. Com tipo e grupo dá para achar o evento e reenviar na mão.
+  -- `v_tipo` nulo = a falha veio antes de decidir o tipo; aí o comando já ajuda.
+  raise warning '[agenda] aviso não anotado (tipo %, grupo %): %',
+    coalesce(v_tipo, '?' || tg_op), v_grupo, sqlerrm;
   return null;
 end;
 $$;
@@ -230,7 +325,7 @@ create or replace function public.eventos_chama_envio()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 begin
   if exists (select 1 from evento_avisos
@@ -255,7 +350,7 @@ create or replace function public.gerar_lembretes_devidos()
 returns integer
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   r   record;
@@ -294,7 +389,7 @@ create or replace function public.reservar_avisos_de_evento(p_limite integer def
 returns setof public.evento_avisos
 language sql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
   update evento_avisos a
      set processando_desde = now(),
@@ -305,7 +400,9 @@ as $$
         and tentativas < 5
         and (processando_desde is null or processando_desde < now() - interval '10 minutes')
       order by criado_em
-      limit p_limite
+      -- `limit null` em SQL significa "sem limite": chamar sem argumento usa o padrão de
+      -- 50, mas chamar com nulo explícito reservaria a fila inteira de uma vez.
+      limit coalesce(p_limite, 50)
       for update skip locked
    )
   returning a.*;
