@@ -896,8 +896,14 @@ export function NovaRotaVisitaDialog({
       //
       // Fica ao lado do conteúdo, não por cima: quem renderiza (Obras.tsx) o põe como irmão
       // da lista, e o `flex` divide a largura entre os dois.
+      //
+      // `max-w-none` abaixo de `md`: de `md` para cima o painel divide a linha com a lista
+      // (irmã), e `max-w-md` existe para não deixar o painel maior que a lista quando os
+      // dois cabem lado a lado. No celular a lista some (Obras.tsx) e o painel fica sozinho
+      // na linha — sem o `max-w-none` o teto de 28rem deixaria uma sobra de tela vazia em
+      // vez do painel ocupar tudo, em qualquer largura entre 375 e 767px.
       open && (
-        <aside className="flex w-full max-w-md flex-none flex-col gap-4 overflow-hidden rounded-xl border border-border bg-card p-6 lg:w-[26rem]">
+        <aside className="flex w-full max-w-none flex-none flex-col gap-4 overflow-hidden rounded-xl border border-border bg-card p-6 md:max-w-md lg:w-[26rem]">
           {conteudo}
         </aside>
       )

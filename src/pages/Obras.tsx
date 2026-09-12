@@ -620,8 +620,19 @@ export default function Obras() {
             Assim a lista filtrada continua visível e utilizável enquanto a rota é montada —
             que é o motivo de o Lucas ter pedido menu suspenso em vez de pop-up em 27/08/2026.
             Por isso esta div virou `flex` em linha: o `min-w-0` no filho é o que permite ao
-            conteúdo encolher quando o painel abre, em vez de empurrar tudo para fora. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-6 min-h-0">
+            conteúdo encolher quando o painel abre, em vez de empurrar tudo para fora.
+
+            No celular não há onde encolher para: com os dois lado a lado, o painel some por
+            baixo do conteúdo e a busca da lista fica por cima do título do painel (achado do
+            levantamento de 11/09/2026). Abaixo de `md` (768px), com o painel aberto, esta
+            coluna some inteira (`hidden md:flex`) e só o painel aparece — igual ao Chat. De
+            `md` para cima nada muda: os dois continuam lado a lado. */}
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 flex-col gap-6 min-h-0",
+            rotaVisitaDialogOpen && "hidden md:flex"
+          )}
+        >
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 flex-1 flex flex-col min-h-0">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex flex-1 flex-wrap items-center gap-3">
