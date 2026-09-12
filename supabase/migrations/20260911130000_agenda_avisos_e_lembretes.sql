@@ -17,7 +17,17 @@
 alter table public.eventos
   add column if not exists avisar_participantes boolean not null default false,
   add column if not exists lembretes_minutos integer[] not null default '{}',
-  add column if not exists lembretes_valem_desde timestamptz;
+  add column if not exists lembretes_valem_desde timestamptz,
+  add column if not exists avisos_remetente_id uuid references public.usuarios(id) on delete set null;
+
+-- 🔴 `avisos_remetente_id` é o id INTERNO (usuarios.id) de quem ASSINA os avisos deste
+-- evento. É carimbado na gravação pelo gatilho da §5 e NUNCA escolhido pelo cliente.
+-- Por que uma coluna, e não ler `criado_por` na hora de avisar: `criado_por` é livre — sua
+-- única amarra é a chave estrangeira para `auth.users`, que não conhece empresa. O aviso de
+-- convite dá para conferir na hora (a sessão ainda existe), mas o do LEMBRETE é anotado
+-- depois, pelo robô, quando já não há sessão nenhuma para conferir. Sem este carimbo, quem
+-- gravasse o evento com o `criado_por` de um colega faria o lembrete sair assinado por ele.
+-- `on delete set null`: excluir uma pessoa não pode travar no evento antigo dela.
 
 -- O preenchimento abaixo não pode mexer em `updated_at` nem disparar gatilho antigo:
 -- é cópia de estrutura, não edição de evento.
@@ -141,23 +151,31 @@ begin
   -- Empresa com o Calendário desligado: nada sai (mesma regra do robô de hoje).
   if not empresa_tem_secao_de(v_dest.empresa_id, 'calendario') then return; end if;
 
-  -- 🔴 QUEM ASSINA O AVISO É QUEM ESCREVEU A LINHA, não o `criado_por` que veio junto.
+  -- 🔴 QUEM ASSINA O AVISO SAI DO CARIMBO DA §1, não do `criado_por` que veio junto.
   -- `remetente_id` vira o autor da mensagem direta (`chat_mensagens.usuario_id`) e o
-  -- "Organizado por" do e-mail. `eventos.criado_por` é escolhido livremente por quem
-  -- insere — sua única amarra é a chave estrangeira para `auth.users`, que não conhece
-  -- empresa. Sem o filtro abaixo, qualquer pessoa da equipe mandaria chat e e-mail
-  -- assinados por um colega, e um id de OUTRA empresa traria nome e e-mail de fora para
-  -- dentro de `dados`.
+  -- "Organizado por" do e-mail — assinar por outra pessoa não é detalhe.
+  -- O carimbo `avisos_remetente_id` foi gravado pelo gatilho com o id interno de quem
+  -- escreveu a linha, então serve aos DOIS caminhos: o convite, anotado na hora, e o
+  -- lembrete, anotado depois pelo robô, quando já não há sessão para conferir nada.
   --
-  -- Sem sessão (`auth.uid()` nulo) não há quem assine: é o robô do lembrete chamando esta
-  -- função, e aí o organizador gravado na linha é o remetente certo — a spec (§3.2) manda
-  -- o lembrete sair por mensagem direta para cada participante, menos o organizador. A
-  -- fronteira de empresa vale igual nos dois caminhos; sem candidato válido, `v_rem` fica
-  -- vazio, o chat não sai e o e-mail vai sem o "Organizado por".
-  select * into v_rem
-    from usuarios
-   where user_id = coalesce(auth.uid(), p_evento.criado_por)
-     and empresa_id = v_dest.empresa_id;
+  -- A fronteira de empresa continua valendo por cima do carimbo: um remetente de fora não
+  -- entra nem por engano, e não cai no caminho de baixo — só o carimbo NULO cai lá.
+  -- Sem candidato válido, `v_rem` fica vazio, o chat não sai e o e-mail vai sem o
+  -- "Organizado por". Falha fechada.
+  if p_evento.avisos_remetente_id is not null then
+    select * into v_rem
+      from usuarios
+     where id = p_evento.avisos_remetente_id
+       and empresa_id = v_dest.empresa_id;
+  else
+    -- Evento gravado ANTES desta migration: não tem carimbo, e ninguém vai reescrever a
+    -- linha só para ganhá-lo. Vale a regra antiga — quem está na sessão, ou o organizador
+    -- da linha quando é o robô que chama.
+    select * into v_rem
+      from usuarios
+     where user_id = coalesce(auth.uid(), p_evento.criado_por)
+       and empresa_id = v_dest.empresa_id;
+  end if;
 
   if p_evento.obra_id is not null then
     select nome_obra into v_obra from obras where id = p_evento.obra_id;
@@ -203,7 +221,7 @@ $$;
 revoke all on function public.anotar_aviso_de_evento(public.eventos, text, integer, timestamptz, timestamptz)
   from public, anon, authenticated;
 
--- 5. Antes de gravar: ponte com a aba antiga e carimbo dos lembretes ----------------
+-- 5. Antes de gravar: quem assina, ponte com a aba antiga e carimbo dos lembretes -----
 create or replace function public.eventos_prepara_lembretes()
 returns trigger
 language plpgsql
@@ -211,6 +229,28 @@ security definer   -- apaga em evento_lembretes_enviados, que não tem política
 set search_path = public, pg_temp
 as $$
 begin
+  -- 🔴 CARIMBO DE QUEM ASSINA. Quem assina os avisos deste evento é quem está GRAVANDO a
+  -- linha, e não o `criado_por` que veio no corpo do pedido. O que o cliente mandar nesta
+  -- coluna é ignorado: no INSERT ela é sempre reescrita, e no UPDATE o dono já carimbado
+  -- prevalece — não há por onde forjar, nem criando nem editando.
+  -- Sem sessão (gravação feita pelo servidor) não há quem carimbar: aí vale o id interno de
+  -- `criado_por`, exatamente como era antes. Nesse caminho não existe usuário logado para
+  -- forjar coisa nenhuma, e é o melhor dado disponível.
+  -- No UPDATE, carimbo nulo significa linha gravada ANTES desta migration: ela ganha o dono
+  -- agora, na primeira vez que alguém a salvar.
+  if tg_op = 'INSERT' then
+    new.avisos_remetente_id := coalesce(
+      get_my_usuario_id(),
+      (select u.id from usuarios u where u.user_id = new.criado_por)
+    );
+  else
+    new.avisos_remetente_id := coalesce(
+      old.avisos_remetente_id,
+      get_my_usuario_id(),
+      (select u.id from usuarios u where u.user_id = new.criado_por)
+    );
+  end if;
+
   -- Ponte: uma aba aberta antes da publicação ainda grava só `lembrete_minutos`.
   if new.lembretes_minutos = '{}' and new.lembrete_minutos is not null
      and (tg_op = 'INSERT' or new.lembrete_minutos is distinct from old.lembrete_minutos) then
