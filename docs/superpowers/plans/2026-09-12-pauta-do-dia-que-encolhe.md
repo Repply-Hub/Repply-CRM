@@ -1058,29 +1058,19 @@ grep -n "pauta_min_itens\|v_min" supabase/migrations/20260912100000_pauta_do_dia
 
 Esperado: só as linhas de COMENTÁRIO que explicam a saída do piso — nenhuma dentro do corpo executável.
 
-- [ ] **Step 5: Escrever o que se espera, ANTES de aplicar**
+- [ ] **Step 5: Simular o "depois" SEM aplicar**
 
-Antes de mexer no banco, escrever na conversa o que a medição do Step 2 deve virar. Depois de aplicar (Step 6), rodar a mesma consulta e comparar com o resultado guardado, pessoa a pessoa:
+🔴 **NADA É APLICADO NESTA TAREFA.** Aplicar a migration antes de o site novo estar no ar é exatamente a janela que a Tarefa 7 existe para evitar — a tela antiga desenharia os negócios já feitos como pendentes. Quem aplica é a Tarefa 7.
+
+A simulação é só leitura: copie o `return query` novo para um `SELECT` puro, trocando `p_usuario_id` pelo identificador de cada pessoa e `v_dias`/`v_max`/`v_hoje`/`v_inicio`/`v_ve_todos` pelos valores que a função calcularia (o corte é 3, o teto 7 e a chave vem de `public.ve_pauta_de_todos(<id>)` quando a empresa nunca salvou ajuste — medido em 12/09/2026: **nenhuma empresa salvou**). Rodar para todas as pessoas ativas e comparar com o resultado guardado no Step 2, pessoa a pessoa:
 
 - quem **não** tem a chave: o mesmo conjunto de negócios de antes, menos os que receberam retorno hoje;
 - quem **tem** a chave: os próprios negócios primeiro, e a equipe preenchendo até o teto;
 - ninguém com mais negócios do que `pauta_max_itens` menos os compromissos da virada.
 
-- [ ] **Step 6: Aplicar a migration**
+🔴 O cenário "antes" da simulação tem de **reproduzir exatamente** a medição do Step 2, feita chamando a função de verdade. É isso que prova que a simulação é fiel; sem essa conferência ela mede outra coisa e concorda consigo mesma.
 
-Aplicar com a ferramenta `apply_migration` do Supabase (nome: `pauta_do_dia_que_encolhe`), com o conteúdo do arquivo.
-
-- [ ] **Step 7: Conferir a `proacl` DEPOIS**
-
-```sql
-select p.oid::regprocedure, coalesce(array_to_string(p.proacl,' | '),'(padrao)')
-  from pg_proc p join pg_namespace n on n.oid=p.pronamespace
- where n.nspname='public' and p.proname like 'pauta_do_dia%';
-```
-
-Esperado, idêntico à medição de antes: `pauta_do_dia_de(uuid)` com `postgres=X/postgres | service_role=X/postgres`, e `pauta_do_dia()` com `authenticated=X/postgres`.
-
-- [ ] **Step 8: Commitar**
+- [ ] **Step 6: Commitar**
 
 ```bash
 git add -N supabase/migrations/20260912100000_pauta_do_dia_que_encolhe.sql
@@ -1239,17 +1229,15 @@ $function$;
 COMMIT;
 ````
 
-- [ ] **Step 3: Aplicar e medir o "depois"**
+- [ ] **Step 3: Simular o "depois" SEM aplicar**
 
-Aplicar com `apply_migration` (nome: `risco_segue_a_chave`) e repetir a medição do Step 1 com as mesmas duas pessoas.
+🔴 **NADA É APLICADO NESTA TAREFA** — ver o aviso da Tarefa 5. Quem aplica é a Tarefa 7.
+
+Rodar o `SELECT` da função com o `WHERE` novo embutido à mão (trocando as duas chamadas por `true` e por `false` + o identificador da pessoa, para simular os dois lados da chave) e comparar com a medição do Step 1.
 
 Esperado: quem tem a chave mantém os mesmos números; quem não tem passa a ver números menores, e eles têm de bater com a soma dos negócios daquela pessoa.
 
-- [ ] **Step 4: Conferir que a tela não quebrou**
-
-Abrir a tela "Hoje" no navegador embutido, logado, e conferir que os três cartões e o "Resumo por fabricante" desenham (com números, não com erro), e que o console não tem erro de permissão.
-
-- [ ] **Step 5: Commitar**
+- [ ] **Step 4: Commitar**
 
 ```bash
 git add -N supabase/migrations/20260912110000_risco_segue_a_chave.sql
@@ -1291,9 +1279,23 @@ Conferir a versão publicada com `get_edge_function` e comparar com o commit.
 
 - [ ] **Step 3: Aplicar as duas migrations**
 
-Na ordem dos nomes: `20260912100000` e depois `20260912110000`.
+Na ordem dos nomes, com `apply_migration`: `20260912100000` (nome `pauta_do_dia_que_encolhe`) e depois `20260912110000` (nome `risco_segue_a_chave`), com o conteúdo dos arquivos.
+
+Logo em seguida, conferir que a `proacl` da pauta não mudou:
+
+```sql
+select p.oid::regprocedure, coalesce(array_to_string(p.proacl,' | '),'(padrao)')
+  from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+ where n.nspname='public' and p.proname like 'pauta_do_dia%';
+```
+
+Esperado, idêntico à medição de antes: `pauta_do_dia_de(uuid)` com `postgres=X/postgres | service_role=X/postgres`, e `pauta_do_dia()` com `authenticated=X/postgres`. Se `authenticated` aparecer em `pauta_do_dia_de`, **pare**: a fila de qualquer colega acabou de ficar aberta a qualquer pessoa logada.
+
+E repetir as medições guardadas nas Tarefas 5 e 6, comparando com o que a simulação previu.
 
 - [ ] **Step 4: Conferir no ar**
+
+Além dos itens abaixo, conferir que os três cartões de risco e o "Resumo por fabricante" desenham com números (não com erro) e que o console não acusa erro de permissão.
 
 - Abrir a tela "Hoje" logado como gestor: os negócios próprios em cima, os da equipe em seguida com o nome do dono ao lado.
 - Dar um "Retomar depois" num negócio da pauta e recarregar: ele sai da lista, o contador aparece ("1 de N feitos hoje"), e **nenhum negócio novo entra no lugar**.
