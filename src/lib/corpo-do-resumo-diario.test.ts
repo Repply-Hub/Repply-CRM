@@ -5,6 +5,7 @@ import {
   diasParadoPorEmpresa,
   montarEmail,
   montarPulsoDaEquipe,
+  soOsPendentes,
   type ItemDaPauta,
   type NegocioDaEquipe,
 } from '../../supabase/functions/pauta-resumo-diario/corpo';
@@ -301,5 +302,22 @@ describe('o ajuste "dias parado" de cada empresa, lido como o banco lê', () => 
 
   it('valor nulo cai no padrão, como no `coalesce` do banco', () => {
     expect(diasParadoPorEmpresa([{ empresa_id: 'e', valor: null }])('e')).toBe(3);
+  });
+});
+
+describe('soOsPendentes', () => {
+  const item = (tipo: string, titulo: string) => ({
+    tipo, selo: 'Orçamento parado', titulo, detalhe: 'Em Negociação',
+    valor: 180000, quando: null, dias_parado: 9,
+  });
+
+  it('🔴 tira do e-mail o negócio que já recebeu retorno hoje', () => {
+    const itens = [item('negocio_parado', 'Obra Exemplo'), item('negocio_feito', 'Obra Modelo')];
+    expect(soOsPendentes(itens).map((i) => i.titulo)).toEqual(['Obra Exemplo']);
+  });
+
+  it('compromisso da agenda continua no e-mail', () => {
+    const itens = [item('compromisso', 'Reunião com Ana Souza')];
+    expect(soOsPendentes(itens)).toHaveLength(1);
   });
 });

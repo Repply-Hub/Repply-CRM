@@ -39,6 +39,21 @@ export interface ItemDaPauta {
 }
 
 /**
+ * O e-mail lista só o que ainda espera retorno.
+ *
+ * Desde 12/09/2026 a fila devolve também os negócios que JÁ receberam retorno hoje
+ * (`tipo = 'negocio_feito'`), para a tela poder contar "3 de 7 feitos hoje". Às 7h da manhã não
+ * há nenhum — mas um reprocessamento no meio do dia mandaria à pessoa uma lista de coisas que
+ * ela já resolveu, com o selo de "parado".
+ *
+ * Fica aqui, e não dentro de `montarEmail`, porque `index.ts` decide ANTES de montar se há
+ * e-mail a mandar: com a fila inteira, uma pauta zerada pareceria cheia e o e-mail sairia.
+ */
+export function soOsPendentes(itens: ItemDaPauta[]): ItemDaPauta[] {
+  return itens.filter((i) => i.tipo !== "negocio_feito");
+}
+
+/**
  * Uma linha da tabela do time, como `negocios_em_risco_de` devolve.
  *
  * `total_geral` e `valor_geral` repetem em TODA linha o total do recorte inteiro, não o da

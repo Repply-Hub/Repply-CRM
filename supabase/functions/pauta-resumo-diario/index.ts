@@ -5,6 +5,7 @@ import {
   diasParadoPorEmpresa,
   montarEmail,
   montarPulsoDaEquipe,
+  soOsPendentes,
   type ItemDaPauta,
   type NegocioDaEquipe,
 } from "./corpo.ts";
@@ -215,7 +216,10 @@ Deno.serve(async (req) => {
         });
         if (erroPauta) throw erroPauta;
 
-        const itens = (pauta ?? []) as ItemDaPauta[];
+        // 🔴 FILTRA ANTES DE DECIDIR. A fila devolve os negócios já feitos hoje junto com os
+        // pendentes; sem esta linha, uma pauta zerada contaria como cheia no `if` logo abaixo e
+        // a pessoa receberia um e-mail listando o que ela já resolveu, com selo de "parado".
+        const itens = soOsPendentes((pauta ?? []) as ItemDaPauta[]);
 
         let html: string;
         let assunto: string;
