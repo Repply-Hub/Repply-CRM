@@ -89,6 +89,19 @@ também deixa de fora a criação de um negócio novo, o que é certo: criar nã
 Quando esta regra errar, ela erra para o lado seguro — **o negócio continua na fila**, em vez de
 sumir sem ninguém ter feito nada.
 
+Duas qualificações que só ficaram claras ao escrever o plano, e que valem estar aqui porque
+estreitam o "qualquer ação":
+
+- **Concluir a tarefa de um negócio só conta quando o negócio estava na pauta do dia.** Negócio
+  com tarefa aberta não aparece na pauta (regra de 11/09: tarefa aberta é próxima ação) — a
+  exceção é a tarefa **vencida**, e aí sim concluí-la conta como retorno. Fora desse caso,
+  concluir a tarefa não faz o negócio aparecer como "feito" hoje: ele volta amanhã, se continuar
+  parado.
+- **Negócio ganho ou perdido hoje sai da conta do dia.** Ele deixa de ser candidato pelo filtro de
+  etapa aberta, e não aparece como "feito" — o contador diz "3 de 6" em vez de "3 de 7". A lista
+  continua chegando a zero; o que se perde é o crédito. Tratar esse caso pediria descobrir em que
+  etapa o negócio estava na virada do dia, e não vale a regra a mais.
+
 ### 3.2 A lista do dia
 
 **Na virada do dia o sistema escolhe a lista, e ela vale o dia inteiro.** Durante o dia ela só
