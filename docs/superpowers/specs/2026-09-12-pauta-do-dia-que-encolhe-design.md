@@ -168,9 +168,13 @@ Para a tela saber disso, a função de banco passa a devolver também os negóci
 marcados com um tipo próprio (`negocio_feito`). Quem consome tem de filtrar:
 
 - `src/pages/Hoje.tsx` — desenha só os pendentes, conta os feitos;
-- `src/lib/voz-da-pauta.ts` e a cópia em `supabase/functions/_shared/voz-da-pauta.ts` — a manchete
-  mede só os pendentes;
-- `supabase/functions/pauta-resumo-diario/corpo.ts` — o e-mail lista só os pendentes.
+- `supabase/functions/pauta-resumo-diario/index.ts` — filtra os feitos **antes** de decidir se há
+  e-mail a mandar; com a lista inteira, uma pauta zerada pareceria cheia e o e-mail sairia.
+
+🔴 **A voz da pauta não é tocada.** `vozDaPauta` (e a cópia byte a byte do e-mail) continua como
+está: os dois lados passam a ela apenas o que está na tela. Filtrar dentro dela significaria editar
+o arquivo duplicado e mexer na frase que já está no ar — risco sem ganho, quando quem chama já sabe
+o que quer contar.
 
 ### 3.6 O e-mail das 7h
 
@@ -249,9 +253,9 @@ chamada por linha — a armadilha do CLAUDE.md §7.16).
 
 | Arquivo | O quê |
 |---|---|
+| `src/lib/pauta-do-dia.ts` (novo) | `separarAPauta`: o que a tela desenha, o que já foi feito, e o denominador do contador |
 | `src/hooks/use-pauta.ts` | o tipo do item ganha `negocio_feito` |
-| `src/pages/Hoje.tsx` | separa pendentes de feitos; linha "N de M feitos hoje"; estado "Pauta de hoje zerada"; volta a etiqueta de dono no item |
-| `src/lib/voz-da-pauta.ts` | a manchete mede só os pendentes |
+| `src/pages/Hoje.tsx` | usa `separarAPauta`; linha "N de M feitos hoje"; estado "Pauta de hoje zerada"; volta a etiqueta de dono no item |
 | `src/components/configuracoes/AutomacaoTab.tsx` | um número só, "Até quantos itens por dia" |
 | `src/hooks/use-configuracoes-automacao.ts` | sai `pauta_min_itens` |
 
@@ -259,8 +263,8 @@ chamada por linha — a armadilha do CLAUDE.md §7.16).
 
 | Arquivo | O quê |
 |---|---|
-| `supabase/functions/_shared/voz-da-pauta.ts` | cópia byte a byte do arquivo da tela |
-| `supabase/functions/pauta-resumo-diario/corpo.ts` | lista só os pendentes |
+| `supabase/functions/pauta-resumo-diario/corpo.ts` | expõe `soOsPendentes` |
+| `supabase/functions/pauta-resumo-diario/index.ts` | filtra antes de decidir se envia |
 
 ---
 
@@ -271,13 +275,14 @@ medida no banco antes de aplicar, como as migrations anteriores desta série.
 
 **Automatizados (Vitest):**
 
-1. `voz-da-pauta.test.ts` — item `negocio_feito` não entra na conta da manchete; com todos os
-   negócios feitos e nenhum pendente, a voz é a do dia vazio.
-2. Um teste da separação pendentes/feitos e do contador ("3 de 7"), com itens inventados.
-3. `Hoje.tsx` — com feitos e nenhum pendente, a tela mostra "Pauta de hoje zerada"; com feitos e
-   pendentes, mostra a linha do contador; sem nenhum feito, as frases de hoje continuam.
-4. `corpo-do-resumo-diario.test.ts` — o e-mail não lista item feito.
-5. Item de colega mostra a etiqueta com o nome do dono; item próprio, não.
+1. `pauta-do-dia.test.ts` — a separação pendentes/feitos e o denominador do contador ("3 de 7"),
+   com itens inventados; compromisso não entra no denominador.
+2. `hoje-estados.test.tsx` — com feitos e nenhum pendente, a tela mostra "Pauta de hoje zerada";
+   com feitos e pendentes, mostra a linha do contador; sem nenhum feito, as frases de hoje
+   continuam; o negócio feito não é desenhado como item da fila.
+3. `hoje-estados.test.tsx` — item de colega mostra a etiqueta com o nome do dono; item próprio,
+   não.
+4. `corpo-do-resumo-diario.test.ts` — `soOsPendentes` tira o item feito e mantém o compromisso.
 
 🔴 Nomes e valores **inventados** em todos eles (CLAUDE.md §6.9).
 
