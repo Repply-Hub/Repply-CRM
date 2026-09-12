@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useRef, useState } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import type { CnpjData, ResultadoDaConsulta, SeNaoExistir } from '@/lib/cnpj';
+import type { CnpjData, ResultadoDaConsulta, SeNaoExistir, ResultadoDoDocumento } from '@/lib/cnpj';
 
 const { consultarCnpjFalso } = vi.hoisted(() => ({
   consultarCnpjFalso: vi.fn<(cnpj: string) => Promise<ResultadoDaConsulta>>(),
@@ -25,6 +25,7 @@ function Formulario({
   inicial = '',
   onSalvar = vi.fn(),
   onDados,
+  onResultado,
 }: {
   seNaoExistir?: SeNaoExistir;
   aceitaCpf?: boolean;
@@ -32,6 +33,7 @@ function Formulario({
   inicial?: string;
   onSalvar?: (valor: string) => void;
   onDados?: (d: CnpjData) => void;
+  onResultado?: (r: ResultadoDoDocumento) => void;
 }) {
   const [valor, setValor] = useState(inicial);
   const ref = useRef<CampoCnpjHandle>(null);
@@ -52,6 +54,7 @@ function Formulario({
         aceitaCpf={aceitaCpf}
         valorJaGravado={valorJaGravado}
         onDadosEncontrados={onDados}
+        onResultado={onResultado}
       />
       <button type="submit">Salvar</button>
     </form>
@@ -165,5 +168,26 @@ describe('CampoCnpj', () => {
     responder({ caso: 'encontrado', dados: { razao_social: 'Empresa Exemplo Ltda' } as CnpjData });
     await new Promise((r) => setTimeout(r, 0));
     expect(onDados).not.toHaveBeenCalled();
+  });
+
+  it('resposta que chega após o número mudar não preenche os dados', async () => {
+    let responder!: (r: ResultadoDaConsulta) => void;
+    consultarCnpjFalso.mockReturnValue(new Promise((ok) => (responder = ok)));
+    const onDados = vi.fn();
+    const onResultado = vi.fn();
+    render(<Formulario onDados={onDados} onResultado={onResultado} />);
+
+    fireEvent.blur(digitar('11222333000181'));
+    // Muda o número enquanto a consulta do primeiro está rodando
+    digitar('98765432000198');
+
+    // Resposta do PRIMEIRO número chega
+    responder({ caso: 'encontrado', dados: { razao_social: 'Empresa Exemplo Ltda' } as CnpjData });
+
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Nenhum callback foi acionado — a guarda barrou porque o número mudou
+    expect(onDados).not.toHaveBeenCalled();
+    expect(onResultado).not.toHaveBeenCalled();
   });
 });

@@ -10,6 +10,7 @@ import {
   consultarCnpj,
   classificarDocumento,
   mensagemDoDocumento,
+  resultadoPermiteSalvar,
   type CnpjData,
   type ResultadoDoDocumento,
   type SeNaoExistir,
@@ -161,7 +162,9 @@ export const CampoCnpj = forwardRef<CampoCnpjHandle, CampoCnpjProps>(function Ca
   useImperativeHandle(ref, () => ({ conferir }));
 
   const mensagem = resultado ? mensagemDoDocumento(resultado, { seNaoExistir, aceitaCpf }) : null;
-  const bloqueado = resultado === 'nao_existe' && seNaoExistir === 'bloquear';
+  // A decisão de bloquear não é reescrita aqui: vem da função canônica `resultadoPermiteSalvar`.
+  // Se a regra mudar, muda num lugar só, e todas as telas respeitam. Ver CLAUDE.md §7.13.
+  const bloqueado = resultado === 'nao_existe' && !resultadoPermiteSalvar(resultado, seNaoExistir);
   const conferido = resultado === 'encontrado' || resultado === 'cpf';
   const borda =
     erro || mensagem?.tom === 'erro'
