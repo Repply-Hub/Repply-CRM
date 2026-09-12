@@ -628,8 +628,8 @@ e trocar o comentário do teto por:
    *
    * O PISO saiu em 12/09/2026 (`pauta_min_itens`). Ele completava a fila com negócios que NÃO
    * estavam parados quando faltavam parados — exatamente a regra que o dono do produto derrubou
-   * ao decidir que só entra o que está parado. A linha guardada no banco não é apagada: a
-   * função de banco parou de lê-la, então voltar atrás é reemitir a função.
+   * ao decidir que só entra o que está parado. A linha guardada no banco não é apagada de propósito —
+   * é ela que permite voltar atrás reemitindo a função de banco, sem ninguém ter de digitar o valor de novo.
    */
   pauta_max_itens: 7,
 ```
@@ -680,7 +680,7 @@ Em `src/components/configuracoes/AutomacaoTab.tsx`:
 grep -rn "pauta_min_itens" src/ supabase/functions/
 ```
 
-Esperado: **nenhuma linha**. (Em `supabase/migrations/` a chave continua aparecendo, e é assim que tem de ser — migration não se edita, CLAUDE.md §6.3.)
+Esperado: **uma linha só**, a menção dentro do comentário que o Step 1 acabou de escrever. Nenhuma LEITURA da chave pode sobrar. (Em `supabase/migrations/` ela continua aparecendo, e é assim que tem de ser — migration não se edita, CLAUDE.md §6.3.)
 
 - [ ] **Step 4: Conferir tipos e testes**
 
