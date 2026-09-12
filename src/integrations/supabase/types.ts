@@ -1803,6 +1803,7 @@ export type Database = {
       eventos: {
         Row: {
           avisar_participantes: boolean
+          avisos_remetente_id: string | null
           cor: string
           created_at: string
           criado_por: string
@@ -1828,6 +1829,7 @@ export type Database = {
         }
         Insert: {
           avisar_participantes?: boolean
+          avisos_remetente_id?: string | null
           cor?: string
           created_at?: string
           criado_por: string
@@ -1853,6 +1855,7 @@ export type Database = {
         }
         Update: {
           avisar_participantes?: boolean
+          avisos_remetente_id?: string | null
           cor?: string
           created_at?: string
           criado_por?: string
