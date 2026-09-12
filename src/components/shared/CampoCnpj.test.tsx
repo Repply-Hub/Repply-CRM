@@ -170,6 +170,16 @@ describe('CampoCnpj', () => {
     expect(onDados).not.toHaveBeenCalled();
   });
 
+  // 🔴 Decisão do dono do produto, 12/09/2026: uma frase só para "incompleto", em todo o
+  // sistema — inclusive na validação de salvar das telas de Obras e do negócio
+  // (`validarCnpjDaObra`, em `src/lib/obra-cnpj.ts`), que tinha a sua própria ("CNPJ
+  // incompleto") até este commit.
+  it('modo padrão (sem aceitaCpf, sem seNaoExistir — o das telas de Obras): CNPJ incompleto mostra "O CNPJ tem 14 dígitos."', async () => {
+    render(<Formulario />);
+    fireEvent.blur(digitar('11222333'));
+    expect(await screen.findByText('O CNPJ tem 14 dígitos.')).toBeInTheDocument();
+  });
+
   it('resposta que chega após o número mudar não preenche os dados', async () => {
     let responder!: (r: ResultadoDaConsulta) => void;
     consultarCnpjFalso.mockReturnValue(new Promise((ok) => (responder = ok)));

@@ -27,23 +27,33 @@ describe('validarCnpjDaObra', () => {
     expect(validarCnpjDaObra(formatCnpj(CNPJ_CRU), true)).toBeNull();
   });
 
+  // A validação passou a contar DÍGITOS, não caracteres com máscara — melhora sobre a regra
+  // antiga (acima), que exigia os 18 caracteres COM máscara e por isso rejeitava o valor cru.
+  it('aceita o valor CRU do banco, sem máscara nenhuma', () => {
+    expect(CNPJ_CRU).toHaveLength(14);
+    expect(validarCnpjDaObra(CNPJ_CRU, false)).toBeNull();
+    expect(validarCnpjDaObra(CNPJ_CRU, true)).toBeNull();
+  });
+
   it('cobra o campo quando a empresa o marcou como obrigatório', () => {
     expect(validarCnpjDaObra('', true)).toBe('CNPJ obrigatório');
   });
 
+  // A frase é a mesma que `CampoCnpj` mostra embaixo do campo (decisão do dono do produto,
+  // 12/09/2026): uma frase só para cada caso, em todo o sistema.
   it('reclama de CNPJ pela metade, sem confundir com campo vazio', () => {
     // A mensagem é diferente de propósito: "obrigatório" num campo que a pessoa preencheu
     // pela metade não diz o que fazer.
-    expect(validarCnpjDaObra('11.222.333/000', false)).toBe('CNPJ incompleto');
+    expect(validarCnpjDaObra('11.222.333/000', false)).toBe('O CNPJ tem 14 dígitos.');
   });
 
   it('recusa CNPJ com dígito verificador errado, mesmo no tamanho certo', () => {
     const invalido = '11.222.333/0001-82';
     expect(invalido).toHaveLength(18);
-    expect(validarCnpjDaObra(invalido, false)).toBe('CNPJ inválido');
+    expect(validarCnpjDaObra(invalido, false)).toBe('CNPJ inválido — confira os dígitos.');
   });
 
   it('recusa a sequência de dígitos repetidos, que passa na conta mas não existe', () => {
-    expect(validarCnpjDaObra('11.111.111/1111-11', false)).toBe('CNPJ inválido');
+    expect(validarCnpjDaObra('11.111.111/1111-11', false)).toBe('CNPJ inválido — confira os dígitos.');
   });
 });
