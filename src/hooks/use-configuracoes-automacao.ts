@@ -25,8 +25,8 @@ export const PADROES_DA_PAUTA = {
    *
    * O PISO saiu em 12/09/2026 (`pauta_min_itens`). Ele completava a fila com negócios que NÃO
    * estavam parados quando faltavam parados — exatamente a regra que o dono do produto derrubou
-   * ao decidir que só entra o que está parado. A linha guardada no banco não é apagada: a
-   * função de banco parou de lê-la, então voltar atrás é reemitir a função.
+   * ao decidir que só entra o que está parado. A linha guardada no banco não é apagada de propósito —
+   * é ela que permite voltar atrás reemitindo a função de banco, sem ninguém ter de digitar o valor de novo.
    */
   pauta_max_itens: 7,
   /** O resumo diário por e-mail. Nasce desligado. */
