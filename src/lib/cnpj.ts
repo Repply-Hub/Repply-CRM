@@ -136,3 +136,118 @@ export async function consultarCnpj(
 export function telefoneDaReceita(dados: Pick<CnpjData, 'ddd_telefone_1'>): string {
   return telefoneParaCadastro(dados?.ddd_telefone_1);
 }
+
+// ─── CPF e o campo que aceita os dois ──────────────────────────────────
+
+/**
+ * Dígito verificador do CPF. Todos os dígitos iguais (`111.111.111-11`) PASSAM na conta e não
+ * existem — por isso a recusa por regra, igual à do CNPJ.
+ */
+export function isValidCpfDigits(cpf: string): boolean {
+  const d = cpf.replace(/\D/g, '');
+  if (d.length !== 11) return false;
+  if (/^(\d)\1+$/.test(d)) return false;
+  const digito = (ate: number) => {
+    let soma = 0;
+    for (let i = 0; i < ate; i++) soma += parseInt(d[i]) * (ate + 1 - i);
+    const resto = (soma * 10) % 11;
+    return resto === 10 ? 0 : resto;
+  };
+  return digito(9) === parseInt(d[9]) && digito(10) === parseInt(d[10]);
+}
+
+// Máscara: 000.000.000-00
+export function maskCpf(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  return digits
+    .replace(/^(\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1-$2');
+}
+
+/** Máscara do campo que aceita os dois: até 11 dígitos desenha CPF; de 12 em diante, CNPJ. */
+export function maskCpfOuCnpj(value: string): string {
+  const digitos = value.replace(/\D/g, '');
+  return digitos.length <= 11 ? maskCpf(digitos) : maskCnpj(digitos);
+}
+
+/**
+ * Para MOSTRAR um documento gravado. O banco tem os dois formatos (só dígitos e com máscara), e
+ * o que está fora do formato volta como veio: inventar máscara em número incompleto mostraria um
+ * documento que não existe.
+ */
+export function formatarDocumento(valor: string | null | undefined): string {
+  const bruto = (valor ?? '').trim();
+  const digitos = bruto.replace(/\D/g, '');
+  if (digitos.length === 14) return maskCnpj(digitos);
+  if (digitos.length === 11) return maskCpf(digitos);
+  return bruto;
+}
+
+export type ClasseDoDocumento = 'vazio' | 'inalterado' | 'incompleto' | 'invalido' | 'cpf' | 'cnpj';
+/** O que o campo sabe depois de conferir: `cnpj` vira um dos casos da consulta à Receita. */
+export type ResultadoDoDocumento = Exclude<ClasseDoDocumento, 'cnpj'> | CasoDaConsulta;
+export type SeNaoExistir = 'bloquear' | 'avisar';
+
+/**
+ * O que o número digitado é, sem consultar ninguém.
+ *
+ * 🔴 CPF ou CNPJ é decidido pelo NÚMERO DE DÍGITOS, nunca pelo tipo do cliente (decisão do dono do
+ * produto, 11/09/2026). É o que faz o campo valer para os tipos que as empresas ainda vão criar.
+ *
+ * `valorJaGravado`: enquanto o campo tiver o mesmo número do banco, ele é `inalterado` e não se
+ * confere nada. Medido em 11/09/2026: 325 clientes têm documento com 5, 9, 10, 12 ou 13 dígitos;
+ * conferir sempre travaria a edição deles até para trocar o telefone.
+ */
+export function classificarDocumento(
+  valor: string | null | undefined,
+  opcoes: { aceitaCpf?: boolean; valorJaGravado?: string | null } = {},
+): ClasseDoDocumento {
+  const digitos = unmaskCnpj(valor ?? '');
+  if (!digitos) return 'vazio';
+  if (opcoes.valorJaGravado && digitos === unmaskCnpj(opcoes.valorJaGravado)) return 'inalterado';
+  if (digitos.length === 14) return isValidCnpjDigits(digitos) ? 'cnpj' : 'invalido';
+  if (opcoes.aceitaCpf && digitos.length === 11) return isValidCpfDigits(digitos) ? 'cpf' : 'invalido';
+  return 'incompleto';
+}
+
+/**
+ * Pode salvar? Número digitado errado trava em qualquer tela. A Receita dizendo que não existe só
+ * trava fábrica. Serviço fora ou lento NUNCA trava — seria barrar cadastro legítimo por culpa de
+ * um serviço de fora. Campo vazio libera: a obrigatoriedade é regra de cada formulário.
+ */
+export function resultadoPermiteSalvar(resultado: ResultadoDoDocumento, seNaoExistir: SeNaoExistir): boolean {
+  if (resultado === 'invalido' || resultado === 'incompleto') return false;
+  if (resultado === 'nao_existe') return seNaoExistir === 'avisar';
+  return true;
+}
+
+/** A frase de cada caso — as da §4.1 do desenho de 11/09/2026. Tela nenhuma escreve a sua. */
+export function mensagemDoDocumento(
+  resultado: ResultadoDoDocumento,
+  opcoes: { seNaoExistir: SeNaoExistir; aceitaCpf?: boolean },
+): { tom: 'erro' | 'aviso'; texto: string } | null {
+  switch (resultado) {
+    case 'invalido':
+      return {
+        tom: 'erro',
+        texto: opcoes.aceitaCpf ? 'CPF ou CNPJ inválido — confira os dígitos.' : 'CNPJ inválido — confira os dígitos.',
+      };
+    case 'incompleto':
+      return { tom: 'erro', texto: opcoes.aceitaCpf ? 'CPF tem 11 dígitos e CNPJ tem 14.' : 'O CNPJ tem 14 dígitos.' };
+    case 'nao_existe':
+      return opcoes.seNaoExistir === 'bloquear'
+        ? { tom: 'erro', texto: 'A Receita Federal não tem este CNPJ. Confira os números, ou cadastre a fábrica sem CNPJ.' }
+        : {
+            tom: 'aviso',
+            texto:
+              'A Receita ainda não tem este CNPJ. Empresa aberta há pouco tempo pode levar semanas para aparecer — o cadastro segue com o número.',
+          };
+    case 'servico_falhou':
+      return { tom: 'aviso', texto: 'Não conseguimos consultar a Receita agora. O cadastro segue com o CNPJ, sem a conferência.' };
+    case 'demorou':
+      return { tom: 'aviso', texto: 'A consulta à Receita demorou demais. O cadastro segue com o CNPJ, sem a conferência.' };
+    default:
+      return null;
+  }
+}
