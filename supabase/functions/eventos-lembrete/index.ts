@@ -166,9 +166,22 @@ Deno.serve(async (req) => {
             const link = a.tipo === "cancelamento" || a.tipo === "retirado"
               ? ""
               : linkDaAgenda(appUrl, a.dados.inicio);
+            // Chave de idempotência do Resend: estável para "esta linha da fila, este
+            // canal" (o `-email` no fim) e única entre linhas (`a.id` é a chave primária
+            // de `evento_avisos`, nunca se repete). É o que fecha a lacuna do achado 3 —
+            // um envio que travou e teve a resposta perdida pelo tempo limite não pode
+            // virar um SEGUNDO e-mail quando a próxima passada tentar de novo com a MESMA
+            // linha: o Resend reconhece a chave repetida (janela de 24h, folga de sobra
+            // sobre o teto de 5 tentativas) e devolve o resultado do envio original, sem
+            // despachar de novo.
+            const chaveDeIdempotencia = `evento-aviso-${a.id}-email`;
             const resp = await fetch("https://api.resend.com/emails", {
               method: "POST",
-              headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+                "Idempotency-Key": chaveDeIdempotencia,
+              },
               body: JSON.stringify({
                 from: remetente,
                 to: [email],
