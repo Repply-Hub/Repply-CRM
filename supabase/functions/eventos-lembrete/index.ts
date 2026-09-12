@@ -1,161 +1,187 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  assuntoDoEmail,
+  htmlDoEmail,
+  linkDaAgenda,
+  mensagemDoSininho,
+  textoDoChat,
+  tituloDoSininho,
+  type AvisoDeEvento,
+  type DadosDoEvento,
+  type TipoDeAviso,
+} from "../_shared/aviso-de-evento.ts";
+
+/**
+ * O robô da agenda. Roda a cada 5 min (cron) e também é chamado na hora pelo banco
+ * (gatilho `eventos_chama_envio`) sempre que um aviso é anotado.
+ *
+ * 1. Gera na fila os lembretes que ficaram devidos (`gerar_lembretes_devidos`, idempotente).
+ * 2. Reserva até 50 itens da fila sem repetir (`reservar_avisos_de_evento`, SKIP LOCKED).
+ * 3. Para cada item, cumpre os canais que faltam — sininho sempre; mensagem direta e e-mail
+ *    quando quem criou ligou "avisar participantes". Cada canal tem sua marca: se o e-mail
+ *    falhar e o chat não, a próxima tentativa manda só o e-mail. Desiste em 5 tentativas.
+ *
+ * 🔴 Nenhum erro guardado leva segredo. O corpo da resposta do Resend é cortado em 300.
+ */
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function formatAntecedencia(minutos: number): string {
-  if (minutos % 1440 === 0) {
-    const dias = minutos / 1440;
-    return dias === 1 ? "1 dia" : `${dias} dias`;
-  }
-  if (minutos % 60 === 0) {
-    const horas = minutos / 60;
-    return horas === 1 ? "1 hora" : `${horas} horas`;
-  }
-  return minutos === 1 ? "1 minuto" : `${minutos} minutos`;
+interface LinhaDoAviso {
+  id: string;
+  empresa_id: string;
+  destinatario_id: string;
+  remetente_id: string | null;
+  tipo: TipoDeAviso;
+  minutos: number | null;
+  avisar: boolean;
+  dados: DadosDoEvento;
+  sininho_em: string | null;
+  chat_em: string | null;
+  email_em: string | null;
+}
+
+const NOME_CANONICO = "RESEND_API_KEY";
+function lerChaveDoResend(): string | undefined {
+  const exato = Deno.env.get(NOME_CANONICO);
+  if (exato) return exato;
+  const outraCaixa = Object.keys(Deno.env.toObject()).find((n) => n.toUpperCase() === NOME_CANONICO);
+  return outraCaixa ? Deno.env.get(outraCaixa) : undefined;
+}
+
+function json(corpo: unknown, status = 200) {
+  return new Response(JSON.stringify(corpo), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const resultado = { lembretes_gerados: 0, avisos: 0, concluidos: 0, erros: [] as string[] };
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
 
-    const results = { lembretes_enviados: 0, erros: [] as string[] };
+    const { data: gerados, error: eGerar } = await supabase.rpc("gerar_lembretes_devidos");
+    if (eGerar) resultado.erros.push(`gerar_lembretes_devidos: ${eGerar.message}`);
+    else resultado.lembretes_gerados = (gerados as number) ?? 0;
 
-    // Janela limitada só para não varrer a tabela inteira; o filtro real de "está na hora"
-    // é feito em memória logo abaixo, já que precisa subtrair lembrete_minutos de inicio.
-    const now = new Date();
-    const windowEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-    const { data: eventos, error: errEventos } = await supabase
-      .from("eventos")
-      .select("id, user_id, titulo, inicio, lembrete_minutos")
-      .not("lembrete_minutos", "is", null)
-      .eq("lembrete_enviado", false)
-      .lte("inicio", windowEnd.toISOString());
-
-    if (errEventos) {
-      results.erros.push(`eventos query: ${errEventos.message}`);
-      return new Response(JSON.stringify(results), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const devidos = (eventos ?? []).filter((e) => {
-      const disparoEm = new Date(e.inicio).getTime() - e.lembrete_minutos! * 60_000;
-      return disparoEm <= now.getTime();
+    const { data: reservados, error: eReservar } = await supabase.rpc("reservar_avisos_de_evento", {
+      p_limite: 50,
     });
-
-    if (devidos.length === 0) {
-      return new Response(JSON.stringify(results), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (eReservar) {
+      resultado.erros.push(`reservar_avisos_de_evento: ${eReservar.message}`);
+      return json(resultado, 500);
     }
+    const lista = (reservados ?? []) as LinhaDoAviso[];
+    if (lista.length === 0) return json(resultado);
 
-    const authUserIds = [...new Set(devidos.map((e) => e.user_id))];
-    // `empresa_id` entra no select por causa da seção Calendário: esta rotina roda com
-    // service_role e enxerga os eventos de TODAS as empresas, então sem checar cada uma
-    // delas uma empresa com o Calendário desligado continuaria recebendo "🔔 Lembrete" de
-    // evento que ninguém consegue abrir — a rota recusa e o item sumiu do menu, mas o
-    // sininho toca.
-    const { data: usuarios, error: errUsuarios } = await supabase
-      .from("usuarios")
-      .select("id, user_id, empresa_id")
-      .in("user_id", authUserIds);
+    const ids = [...new Set(lista.flatMap((a) => [a.destinatario_id, a.remetente_id]).filter(Boolean))] as string[];
+    const { data: pessoas } = await supabase.from("usuarios").select("id, email").in("id", ids);
+    const emailPorId = new Map((pessoas ?? []).map((p) => [p.id as string, p.email as string | null]));
 
-    if (errUsuarios) {
-      results.erros.push(`usuarios query: ${errUsuarios.message}`);
-      return new Response(JSON.stringify(results), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const usuarioIdByAuthId = new Map(
-      (usuarios ?? []).map((u) => [u.user_id as string, u.id as string]),
-    );
-    const empresaIdByAuthId = new Map(
-      (usuarios ?? []).map((u) => [u.user_id as string, u.empresa_id as string | null]),
-    );
-
-    // Pergunta UMA vez por empresa, não uma por evento: são poucas empresas e podem ser
-    // muitos eventos.
-    //
-    // `empresa_tem_secao_de` e não `empresa_tem_secao`: aqui não há sessão, e a irmã
-    // resolveria a empresa por `get_my_empresa_id()` — que devolve nulo com service_role e
-    // faria a função liberar todo mundo, dando a impressão de que a checagem existe.
-    const temCalendarioPorEmpresa = new Map<string, boolean>();
-    for (const empresaId of new Set([...empresaIdByAuthId.values()].filter(Boolean))) {
+    // Chat desligado na empresa: a mensagem direta não sai; sininho e e-mail, sim.
+    const chatPorEmpresa = new Map<string, boolean>();
+    for (const empresaId of new Set(lista.map((a) => a.empresa_id))) {
       const { data, error } = await supabase.rpc("empresa_tem_secao_de", {
         p_empresa_id: empresaId,
-        p_secao: "calendario",
+        p_secao: "chat",
       });
-      // Na dúvida, ENVIA. Erro de rede não pode calar o lembrete de quem tem a seção — o
-      // custo de um lembrete a mais é menor que o de uma reunião perdida.
-      temCalendarioPorEmpresa.set(empresaId as string, error ? true : data === true);
+      chatPorEmpresa.set(empresaId, error ? true : data === true);
     }
 
-    for (const evento of devidos) {
-      const usuarioId = usuarioIdByAuthId.get(evento.user_id);
-      if (!usuarioId) continue; // sem usuário interno correspondente (ex.: conta órfã)
+    const apiKey = lerChaveDoResend();
+    const remetente = Deno.env.get("EMAIL_REMETENTE") ?? "Repply <nao-responda@repplyhub.com.br>";
+    const appUrl = Deno.env.get("APP_URL") ?? "https://crm.repplyhub.com.br";
 
-      // Empresa sem a seção Calendário: pula SEM marcar `lembrete_enviado`.
-      //
-      // Não marcar é o ponto todo: se marcasse, religar a seção deixaria o lembrete
-      // perdido para sempre, porque a consulta lá em cima só pega `lembrete_enviado = false`.
-      const empresaDoEvento = empresaIdByAuthId.get(evento.user_id);
-      if (empresaDoEvento && temCalendarioPorEmpresa.get(empresaDoEvento) === false) continue;
+    for (const a of lista) {
+      resultado.avisos++;
+      const aviso: AvisoDeEvento = { tipo: a.tipo, minutos: a.minutos, dados: a.dados };
+      const marcas: Record<string, string> = {};
+      const erros: string[] = [];
+      const agora = () => new Date().toISOString();
 
-      const horario = new Date(evento.inicio).toLocaleString("pt-BR", {
-        timeZone: "America/Sao_Paulo",
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-      const { error: insertErr } = await supabase.from("notificacoes").insert({
-        usuario_id: usuarioId,
-        tipo: "evento_lembrete",
-        titulo: `🔔 Lembrete: ${evento.titulo}`,
-        mensagem: `Começa às ${horario} (em ${formatAntecedencia(evento.lembrete_minutos!)}).`,
-      });
-
-      if (insertErr) {
-        results.erros.push(`insert notificacao (evento ${evento.id}): ${insertErr.message}`);
-        continue;
+      if (!a.sininho_em) {
+        const { error } = await supabase.from("notificacoes").insert({
+          usuario_id: a.destinatario_id,
+          tipo: `evento_${a.tipo}`,
+          titulo: tituloDoSininho(aviso),
+          mensagem: mensagemDoSininho(aviso),
+        });
+        if (error) erros.push(`sininho: ${error.message}`);
+        else marcas.sininho_em = agora();
       }
 
-      const { error: updateErr } = await supabase
-        .from("eventos")
-        .update({ lembrete_enviado: true })
-        .eq("id", evento.id);
-
-      if (updateErr) {
-        results.erros.push(`update evento ${evento.id}: ${updateErr.message}`);
-        continue;
+      const querChat =
+        a.avisar && !!a.remetente_id && a.remetente_id !== a.destinatario_id &&
+        chatPorEmpresa.get(a.empresa_id) !== false;
+      if (querChat && !a.chat_em) {
+        const { error } = await supabase.from("chat_mensagens").insert({
+          conteudo: textoDoChat(aviso),
+          usuario_id: a.remetente_id,
+          empresa_id: a.empresa_id,
+          recipient_id: a.destinatario_id,
+        });
+        if (error) erros.push(`chat: ${error.message}`);
+        else marcas.chat_em = agora();
       }
 
-      results.lembretes_enviados++;
+      const email = emailPorId.get(a.destinatario_id);
+      const querEmail = a.avisar && !!email;
+      if (querEmail && !a.email_em) {
+        if (!apiKey) {
+          erros.push("email: chave do Resend ausente");
+        } else {
+          try {
+            const resp = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                from: remetente,
+                to: [email],
+                subject: assuntoDoEmail(aviso),
+                html: htmlDoEmail(aviso, linkDaAgenda(appUrl, a.dados.inicio)),
+              }),
+            });
+            if (!resp.ok) throw new Error(`Resend ${resp.status}: ${(await resp.text()).slice(0, 300)}`);
+            marcas.email_em = agora();
+          } catch (e) {
+            erros.push(`email: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+      }
+
+      const faltaSininho = !a.sininho_em && !marcas.sininho_em;
+      const faltaChat = querChat && !a.chat_em && !marcas.chat_em;
+      const faltaEmail = querEmail && !a.email_em && !marcas.email_em;
+      const concluido = !faltaSininho && !faltaChat && !faltaEmail;
+      const ultimoErro = erros.length ? erros.join(" | ").slice(0, 500) : null;
+
+      const { error: eMarcar } = await supabase
+        .from("evento_avisos")
+        .update({
+          ...marcas,
+          processando_desde: null,
+          ultimo_erro: ultimoErro,
+          concluido_em: concluido ? agora() : null,
+        })
+        .eq("id", a.id);
+      if (eMarcar) erros.push(`marcar: ${eMarcar.message}`);
+
+      if (concluido) resultado.concluidos++;
+      if (ultimoErro) resultado.erros.push(`${a.id}: ${ultimoErro}`);
     }
 
-    return new Response(JSON.stringify(results), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json(resultado);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    resultado.erros.push(error instanceof Error ? error.message : String(error));
+    return json(resultado, 500);
   }
 });
