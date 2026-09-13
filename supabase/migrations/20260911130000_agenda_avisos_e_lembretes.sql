@@ -109,7 +109,11 @@ create policy evento_lembretes_enviados_recusa_tudo
 -- Ponte com o robô ANTIGO durante a publicação. Entre aplicar esta migration e publicar o
 -- robô novo, o antigo continua rodando a cada 5 min e marca o que manda SÓ em
 -- `eventos.lembrete_enviado`. Sem esta ponte, o robô novo não veria essas marcas e mandaria
--- de novo os mesmos lembretes. Com ela, não há ordem de publicação a respeitar.
+-- de novo os mesmos lembretes. A ponte resolve a REPETIÇÃO, não a ORDEM: a publicação
+-- continua sendo banco → robô novo → site, nessa ordem e em seguida. Robô antes do banco
+-- falha (as funções ainda não existem) e nada sai; site antes do robô grava só
+-- `lembretes_minutos`, que o robô antigo não lê — os lembretes desse intervalo não saem,
+-- ou saem atrasados quando o robô novo chegar.
 -- A chave é exatamente a que o gerador (§8) confere — `(evento_id, minutos)` — com o mesmo
 -- `minutos` que o preenchimento logo abaixo usa: `lembrete_minutos`, que o preenchimento da
 -- §1 copiou para `lembretes_minutos` como `array[lembrete_minutos]`.
@@ -239,11 +243,17 @@ begin
     if not exists (select 1 from usuarios o
                     where o.id = p_evento.avisos_remetente_id
                       and o.empresa_id = v_dest.empresa_id) then
+      -- Recusa silenciosa é aviso perdido sem rastro: o gerador já marcou o lembrete como
+      -- enviado. O único caso legítimo conhecido é pessoa religada a outra empresa.
+      raise warning '[agenda] aviso recusado: o evento veio de outra empresa que a do destinatário (tipo %, grupo %)',
+        p_tipo, p_evento.grupo_id;
       return;
     end if;
   elsif not exists (select 1 from usuarios o
                      where o.user_id = p_evento.criado_por
                        and o.empresa_id = v_dest.empresa_id) then
+    raise warning '[agenda] aviso recusado: o evento (sem carimbo) veio de outra empresa que a do destinatário (tipo %, grupo %)',
+      p_tipo, p_evento.grupo_id;
     return;
   end if;
 
@@ -538,7 +548,7 @@ begin
                      where d.user_id = v_linha.user_id
                        and d.deleted_at is null
                        and d.empresa_id = v_empresa_ator) then
-    raise warning '[agenda] aviso recusado: destinatário fora da empresa de quem gravou (tipo %, grupo %)',
+    raise warning '[agenda] aviso recusado: quem gravou está sem empresa ou excluído, ou o destinatário é de outra empresa ou foi excluído (tipo %, grupo %)',
       v_tipo, v_grupo;
     return null;
   end if;
