@@ -29,8 +29,7 @@
 --
 -- 🔴 O corpo abaixo foi COLHIDO com `pg_get_functiondef` em 12/09/2026 e editado a partir do
 -- texto vigente. `md5(prosrc)` do texto colhido: e65e235e52c15d1326ad51d67f43162f (6.217
--- caracteres). Fora das trocas marcadas com 🔴 no corpo, o texto é o mesmo caractere por
--- caractere.
+-- caracteres). Fora das trocas marcadas com 🔴 e de linhas em branco, o texto é o mesmo.
 --
 -- `pauta_do_dia()` NÃO é tocada: o corpo dela inteiro é
 -- `select * from public.pauta_do_dia_de(get_my_usuario_id());`. Ela herda.
@@ -65,7 +64,7 @@
 -- O QUE CONGELA NA VIRADA DO DIA, E POR QUÊ
 -- ----------------------------------------------------------------------------
 -- Se só a saída dos negócios feitos mudasse, o próximo da fila subiria para a vaga aberta — que
--- é exatamente a recomposição que o pedido derruba. Então quatro entradas passam a ser medidas
+-- é exatamente a recomposição que o pedido derruba. Então cinco entradas passam a ser medidas
 -- no começo do dia (`v_inicio`):
 --
 --   1. `ultima_etapa` — o "há quantos dias está parado" olha só o histórico anterior à virada.
@@ -78,15 +77,41 @@
 --   4. `v_compromissos`, que desconta vaga — conta os compromissos do dia que já existiam na
 --      virada, concluídos ou não. Sem isso, concluir uma tarefa abriria vaga e puxaria um
 --      negócio novo, e criar uma tarefa às 10h derrubaria um negócio da lista.
+--   5. `etapa_na_virada` — negócio GANHO OU PERDIDO hoje continua candidato pela etapa em que
+--      estava na virada: a primeira mudança de etapa do dia guarda de onde ele saiu. Ele segura a
+--      vaga e sai como FEITO, e o contador diz "3 de 7". Sem isso, o filtro de etapa lido ao vivo
+--      tiraria o negócio ganho dos candidatos, e o próximo da fila entraria na vaga dele.
 --
--- ⚠️ DUAS SIMPLIFICAÇÕES CONSCIENTES, e as duas erram para o lado de não inventar trabalho:
+-- ⚠️ UMA SIMPLIFICAÇÃO CONSCIENTE, que erra para o lado de mostrar o compromisso que existe:
 --
 --   · Os COMPROMISSOS desenhados continuam ao vivo. Reunião marcada às 10h para as 15h aparece;
 --     esconder um compromisso do dia até amanhã seria defeito, não regra. A consequência aceita:
 --     num dia assim a tela pode mostrar mais itens que o teto.
---   · Negócio GANHO OU PERDIDO hoje sai da conta do dia — ele deixa de ser candidato pelo filtro
---     de etapa aberta, que continua ao vivo, e não aparece como "feito". O contador diz "3 de 6"
---     em vez de "3 de 7". A lista continua chegando a zero; o que se perde é o crédito.
+--
+-- ----------------------------------------------------------------------------
+-- RAROS, ACEITOS, e para que lado erram
+-- ----------------------------------------------------------------------------
+-- Estas entradas continuam lidas AO VIVO e podem mexer na lista durante o dia. São raras, e selar
+-- qualquer uma delas exigiria reconstruir o estado da virada a partir do histórico, campo por
+-- campo — não vale agora. Regra geral: quando uma delas tira um negócio dos candidatos e há mais
+-- parados que vagas, o próximo da fila entra no lugar.
+--
+--   · Editar o VALOR de um negócio perto do corte pode trocar um negócio por outro: a escolha é
+--     por valor, e o valor lido é o de agora. Um sai sem crédito, outro entra.
+--   · Trocar o DONO move o negócio entre pautas: ele sai da de um (e a vaga abre) e pode entrar
+--     na do outro no mesmo dia.
+--   · Levar para outro dia, ou apagar, um compromisso que existia na virada ABRE vaga: entra um
+--     negócio a mais. O contrário — trazer para hoje um compromisso antigo — FECHA uma: um
+--     negócio sai sem crédito.
+--   · Reabrir uma tarefa concluída, estender o prazo de uma tarefa vencida ou editar hoje uma
+--     tarefa concluída antes da virada ESCONDE o negócio sem crédito.
+--   · Importação que mude a etapa no dia (linha com `status_anterior` nulo) não conta como
+--     retorno e não entra em `etapa_na_virada`: se ela fechar o negócio, ele sai pela etapa ao
+--     vivo; se reabrir um fechado, ele pode entrar.
+--   · `useDeleteTarefaKanbanColuna` (src/hooks/use-tarefas-kanban-colunas.ts) muda o `status` das
+--     tarefas SEM mexer em `updated_at`: a tarefa que ele leva para "concluida" deixa de esconder
+--     o negócio na hora, sem dar crédito; a concluída que ele leva para uma coluna aberta passa a
+--     esconder o negócio.
 -- ============================================================================
 
 BEGIN;
@@ -190,6 +215,17 @@ begin
               or (coalesce(t.status,'') = 'concluida' and t.updated_at >= v_inicio))
     ) x
   ),
+  etapa_na_virada as (
+    -- 🔴 NOVO: a etapa em que o negócio estava na virada, para quem mudou de etapa hoje — a primeira
+    -- mudança do dia guarda em `status_anterior` de onde ele saiu. Linha de importação (anterior
+    -- nulo) fica de fora, como em `agidos_hoje`. É o que faz o negócio GANHO hoje segurar a vaga.
+    select distinct on (h.pedido_id) h.pedido_id, h.status_anterior as status
+      from pedidos_historico_status h
+     where h.tipo = 'status'
+       and h.created_at >= v_inicio
+       and h.status_anterior is not null
+     order by h.pedido_id, h.created_at asc
+  ),
   candidatos as (
     select p.id,
       coalesce(nullif(trim(p.nome),''),
@@ -212,8 +248,15 @@ begin
     left join fabricantes fa    on fa.id = p.fabricante_id
     left join kanban_colunas k  on k.empresa_id = v_empresa and k.funil_id = p.funil_id and k.slug = p.status
     left join retorno_marcado r on r.pedido_id = p.id
+    -- 🔴 NOVO: as duas marcas do dia — `agidos_hoje` separa feito de pendente, e `etapa_na_virada`
+    -- diz em que etapa o negócio estava na virada.
     left join agidos_hoje ah    on ah.pedido_id = p.id
-    where p.status in (select slug from etapas_abertas)
+    left join etapa_na_virada ev on ev.pedido_id = p.id
+    -- 🔴 MUDOU: era `where p.status in (...)`. A primeira mudança de etapa de hoje guarda de onde o
+    -- negócio saiu; sem ela, o filtro ao vivo tirava dos candidatos o negócio GANHO (ou perdido)
+    -- hoje, e o próximo da fila entrava na vaga dele. Agora ele segura a vaga e sai como
+    -- `negocio_feito`.
+    where coalesce(ev.status, p.status) in (select slug from etapas_abertas)
       and (r.ate is null or r.ate <= v_hoje)
       and not exists (
         -- Uma linha só no dia do retorno. Sem isto a pessoa veria a tarefa (que já entra como
@@ -224,7 +267,9 @@ begin
         -- de onde vier.
         -- 🔴 MENOS A VENCIDA (decisão do dono do produto em 11/09/2026): tarefa que passou do
         -- prazo sem ser concluída deixa de esconder, e o negócio volta à pauta no dia seguinte ao
-        -- prazo. Tarefa sem prazo continua escondendo: não vence nunca, é próxima ação sem data.
+        -- prazo. Sem isto ele sumia da pauta do dono enquanto a tarefa ficasse aberta, porque a
+        -- tarefa só entra como compromisso NO DIA do prazo. Tarefa sem prazo continua escondendo:
+        -- não vence nunca, é próxima ação sem data.
         -- 🔴 MUDOU (12/09/2026): vale a tarefa COMO ELA ESTAVA NA VIRADA DO DIA. Criada hoje não
         -- esconde — o negócio sai como feito, e é assim que criar tarefa conta como retorno.
         -- Concluída hoje não revela — ela escondia o negócio na virada, então ele não era da
@@ -238,16 +283,23 @@ begin
       )
   ),
   do_dia as (
-    -- 🔴 MUDOU, e são duas coisas num lugar só:
+    -- 🔴 MUDOU, e são três coisas num lugar só:
     --   · era `where r.dias_parado >= v_dias or r.posicao <= greatest(v_min - v_compromissos, 0)`
     --     — o `or` era o enchimento com negócio que NÃO está parado. Saiu.
-    --   · era `order by r.valor desc, r.dias_parado desc` — agora os do próprio dono vêm antes
-    --     de qualquer negócio da equipe, e entre iguais manda quem está parado há mais tempo.
+    --   · era `order by r.valor desc, r.dias_parado desc` — agora os do próprio dono vêm antes de
+    --     qualquer negócio da equipe. Entre os parados, continuam entrando os de MAIOR VALOR, como
+    --     a função vigente já fazia (decisão do dono do produto em 13/09/2026). Não "os parados há
+    --     mais tempo": medido em 13/09/2026, na MD todo candidato mais parado está parado há
+    --     exatamente 12 dias — é a data da importação do Bitrix. "Parado há mais tempo" hoje quer
+    --     dizer "intocado desde a importação", e essa ordem tiraria da pauta os negócios
+    --     trabalhados depois dela.
+    --   · `c.id` no fim só desempata: sem ele, dois negócios de mesmo valor e mesmos dias parados
+    --     na borda do corte podiam trocar de lugar entre uma recarga e outra.
     -- Os FEITOS continuam aqui dentro: eles ocupam o lugar deles na lista do dia, e é o que faz
     -- a vaga aberta ficar aberta.
     select c.* from candidatos c
     where c.dias_parado >= v_dias
-    order by c.e_meu desc, c.dias_parado desc, c.valor desc
+    order by c.e_meu desc, c.valor desc, c.dias_parado desc, c.id
     limit v_vagas
   ),
   compromissos as (
@@ -273,9 +325,11 @@ begin
   select 'negocio_parado'::text, n.id, 'Orçamento parado'::text, n.titulo,
          'Em ' || n.etapa_label || ' desde ' || to_char(n.data_pedido,'DD/MM/YYYY'),
          n.valor, null::timestamptz, n.dias_parado,
-         -- 🔴 MUDOU: a ordem na tela também põe os do dono na frente.
-         (1000 + row_number() over (order by n.e_meu desc, n.valor desc))::integer,
+         -- 🔴 MUDOU: a ordem na tela também põe os do dono na frente; dias parados e `id` só
+         -- desempatam, pelo mesmo motivo do `do_dia`.
+         (1000 + row_number() over (order by n.e_meu desc, n.valor desc, n.dias_parado desc, n.id))::integer,
          case when n.e_meu then null else n.dono end
+  -- 🔴 MUDOU: era `from negocios n`. Os feitos saem daqui e vão para o bloco de baixo.
   from do_dia n where not n.feito_hoje
   union all
   -- 🔴 NOVO: os já feitos, atrás de tudo. A tela não os desenha — ela os CONTA, para dizer
@@ -283,7 +337,7 @@ begin
   select 'negocio_feito'::text, n.id, 'Feito hoje'::text, n.titulo,
          'Em ' || n.etapa_label || ' desde ' || to_char(n.data_pedido,'DD/MM/YYYY'),
          n.valor, null::timestamptz, n.dias_parado,
-         (2000 + row_number() over (order by n.valor desc))::integer,
+         (2000 + row_number() over (order by n.valor desc, n.id))::integer,
          case when n.e_meu then null else n.dono end
   from do_dia n where n.feito_hoje
   order by 9;
