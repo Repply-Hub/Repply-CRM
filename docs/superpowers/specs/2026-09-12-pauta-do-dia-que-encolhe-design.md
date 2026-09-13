@@ -114,8 +114,9 @@ Em termos de implementação, três coisas passam a ser medidas **no começo do 
 1. **Há quantos dias o negócio está parado** — conta só o histórico anterior à virada do dia. É o
    que congela a lista: um negócio que recebeu ação hoje continua sendo o mesmo candidato que era
    de manhã, e por isso o lugar dele não é ocupado por outro.
-2. **Quantas vagas os compromissos ocupam** — conta os compromissos do dia que já existiam na
-   virada, **concluídos ou não**. Sem isso, concluir uma tarefa abriria vaga e puxaria um negócio
+2. **Quantas vagas os compromissos ocupam** — conta os compromissos do dia que já existiam **em
+   aberto** na virada, concluídos hoje ou não. (Tarefa concluída antes da virada não ocupa vaga:
+   ela já estava feita quando o dia começou.) Sem isso, concluir uma tarefa abriria vaga e puxaria um negócio
    novo para dentro (recomposição), e criar uma tarefa às 10h derrubaria um negócio da lista.
 3. **A escolha e a ordem** — os do próprio dono primeiro (§3.3) e, depois deles, os da equipe;
    entre os parados, **os de maior valor entram primeiro**, cortando no teto. É a regra que a pauta
@@ -344,6 +345,11 @@ silêncio). O valor de `pauta_min_itens` continua no banco, então a volta é co
 | Mudar o prazo ou apagar um compromisso de hoje abre vaga, e um negócio entra | Raro | Aceito: o compromisso da virada é contado pelo prazo atual |
 | Reabrir ou editar tarefa pode esconder o negócio sem dar crédito | Raro | Aceito: erra para o lado de não inventar trabalho |
 | Importação que mude a etapa no dia mexe na lista | Raro | Aceito: importação grava etapa anterior nula e não conta como retorno |
+| Apagar, adiar ou trocar de negócio a tarefa que escondia o negócio na virada | Raro | Aceito: o negócio reaparece e pode entrar; se a tarefa também era compromisso de hoje (o "Retomar depois" no dia do retorno), podem entrar dois. **Concluir** a tarefa não tem esse efeito |
+| Excluir um negócio da lista do dia | Raro | Aceito: `pedidos` não tem exclusão reversível, e o próximo da fila entra |
+| Desativar alguém da equipe no meio do dia | Raro | Aceito: muda a pauta de quem vê a equipe |
+| Com o corte de dias em 1, negócio criado depois das 21h com próximo contato sai como feito no dia seguinte | Nenhuma empresa usa (o padrão é 3) | Aceito e registrado: `data_contato` gravada com `now()` cai no dia seguinte em UTC |
+| Editar hoje uma tarefa com prazo hoje que já estava concluída antes da virada | Raro | Aceito: ela volta a ocupar vaga sem aparecer na tela — o mesmo efeito da tarefa concluída antes da virada, por outro caminho (editar tarefa já concluída) |
 
 ⚠️ **Armadilha de fuso já medida nesta base:** `historico_contatos.data_contato` guarda valores
 gravados de duas formas — meia-noite em UTC (o que o "Retomar depois" grava) e meio-dia em UTC (o
