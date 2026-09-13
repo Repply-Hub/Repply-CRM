@@ -19,7 +19,9 @@ import {
  * 2. Reserva até 50 itens da fila sem repetir (`reservar_avisos_de_evento`, SKIP LOCKED).
  * 3. Para cada item, cumpre os canais que faltam — sininho sempre; mensagem direta e e-mail
  *    quando quem criou ligou "avisar participantes". Cada canal tem sua marca: se o e-mail
- *    falhar e o chat não, a próxima tentativa manda só o e-mail. Desiste em 5 tentativas.
+ *    falhar e o chat não, a próxima tentativa manda só o e-mail. Desiste em 5 tentativas —
+ *    exceto quando a ÚNICA falha da passada foi o 429 do Resend: aí a tentativa é devolvida
+ *    (não é o item que atrasou demais, é o robô).
  *
  * 🔴 Nenhum erro guardado leva segredo. O corpo da resposta do Resend é cortado em 300.
  */
@@ -41,6 +43,9 @@ interface LinhaDoAviso {
   sininho_em: string | null;
   chat_em: string | null;
   email_em: string | null;
+  // Já chega somada por `reservar_avisos_de_evento` (a reserva soma 1 ao reservar). Serve
+  // para devolver a tentativa quando a única falha da passada foi o 429 do Resend (achado D).
+  tentativas: number;
 }
 
 const NOME_CANONICO = "RESEND_API_KEY";
@@ -101,11 +106,20 @@ Deno.serve(async (req) => {
     const remetente = Deno.env.get("EMAIL_REMETENTE") ?? "Repply <nao-responda@repplyhub.com.br>";
     const appUrl = Deno.env.get("APP_URL") ?? "https://crm.repplyhub.com.br";
 
+    // Achado D da revisão final: o Resend aceita só 2 pedidos por segundo por padrão, e um
+    // salvamento de quem organiza gera até 3 comandos no banco — cada um chama o robô, e as
+    // chamadas rodavam em paralelo mandando e-mail sem pausa nenhuma. 600ms entre um envio e
+    // o seguinte, NESTA execução, cobre a folga (2 req/s = 1 a cada 500ms) sem esticar o lote
+    // todo: só espera quem de fato vai mandar e-mail nesta passada.
+    const ESPACAMENTO_ENTRE_EMAILS_MS = 600;
+    let ultimoEnvioEmailEm: number | null = null;
+
     for (const a of lista) {
       resultado.avisos++;
       const aviso: AvisoDeEvento = { tipo: a.tipo, minutos: a.minutos, dados: a.dados };
       const marcas: Record<string, string> = {};
       const erros: string[] = [];
+      let foiRateLimit = false;
       const agora = () => new Date().toISOString();
 
       // Cada canal é contido no próprio try/catch, não só o do Resend (achado 2 da
@@ -151,6 +165,17 @@ Deno.serve(async (req) => {
         if (!apiKey) {
           erros.push("email: chave do Resend ausente");
         } else {
+          // Espaçamento entre envios (achado D): espera até completar 600ms desde o último
+          // envio desta execução — só quem de fato vai mandar e-mail entra na fila de espera,
+          // e o primeiro envio do lote nunca espera (não há "último" ainda).
+          if (ultimoEnvioEmailEm !== null) {
+            const decorrido = Date.now() - ultimoEnvioEmailEm;
+            if (decorrido < ESPACAMENTO_ENTRE_EMAILS_MS) {
+              await new Promise((r) => setTimeout(r, ESPACAMENTO_ENTRE_EMAILS_MS - decorrido));
+            }
+          }
+          ultimoEnvioEmailEm = Date.now();
+
           // Teto de tempo para o Resend (achado 3): sem isto, uma chamada travada prende
           // o loop sequencial pelo resto do lote — os itens seguintes nem chegam a ser
           // tentados dentro da janela do cron. Tempo esgotado conta como qualquer outra
@@ -194,6 +219,11 @@ Deno.serve(async (req) => {
             marcas.email_em = agora();
           } catch (e) {
             const foiTempoLimite = e instanceof Error && e.name === "AbortError";
+            // 429 é "pedidos demais por segundo" do Resend — não é recusa de conteúdo nem
+            // falha de rede, é o robô tentando rápido demais. Marca aqui para a devolução de
+            // tentativa logo abaixo (achado D): esbarrar só nisso não pode custar uma das 5
+            // chances do item.
+            foiRateLimit = e instanceof Error && /^Resend 429:/.test(e.message);
             erros.push(`email: ${foiTempoLimite ? `tempo limite (${TEMPO_LIMITE_RESEND_MS}ms)` : (e instanceof Error ? e.message : String(e))}`);
           } finally {
             clearTimeout(disparoDoLimite);
@@ -211,6 +241,11 @@ Deno.serve(async (req) => {
       const concluidoNestaPassada = !faltaSininho && !faltaChat && !faltaEmail;
       const erroDosCanais = erros.length ? erros.join(" | ").slice(0, 500) : null;
 
+      // Achado D: se a ÚNICA falha desta passada foi o 429 do e-mail, devolve a tentativa —
+      // sem isto, um item que só esbarrou no próprio limite do robô perderia uma das 5
+      // chances por um motivo que não é dele.
+      const devolveTentativa = foiRateLimit && erros.length === 1;
+
       try {
         const { error: eMarcar } = await supabase
           .from("evento_avisos")
@@ -219,6 +254,10 @@ Deno.serve(async (req) => {
             processando_desde: null,
             ultimo_erro: erroDosCanais,
             concluido_em: concluidoNestaPassada ? agora() : null,
+            // `a.tentativas` já chegou somada por `reservar_avisos_de_evento`; devolver é
+            // gravar um a menos, para a próxima reserva poder pegar este item de novo —
+            // mesmo que esta fosse a quinta chance.
+            ...(devolveTentativa ? { tentativas: a.tentativas - 1 } : {}),
           })
           .eq("id", a.id);
 
