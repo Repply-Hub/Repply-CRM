@@ -20,7 +20,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { SeletorMarcadorObra } from '@/components/obras/SeletorMarcadorObra';
 import { CampoCnpj } from '@/components/shared/CampoCnpj';
 import { validarCnpjDaObra } from '@/lib/obra-cnpj';
-import type { CnpjData } from '@/lib/cnpj';
+import {
+  unmaskCnpj,
+  formatarDocumento,
+  classificarDocumento,
+  resultadoPermiteSalvar,
+  mensagemDoDocumento,
+  type CnpjData,
+  type ResultadoDoDocumento,
+} from '@/lib/cnpj';
 import { contatosDoCliente, contatosForaDoCliente } from '@/lib/vinculo-contato-cliente';
 import { BotaoVerConversa } from '@/components/whatsapp/BotaoVerConversa';
 import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
@@ -292,7 +300,7 @@ const ClienteDetalhe = () => {
       // (ela é por empresa, tabela clientes_tipos), e o Select de edição lidaria com um
       // valor que nenhuma opção representa.
       tipo: cliente.tipo ?? '',
-      cnpj: cliente.cnpj ?? '',
+      cnpj: formatarDocumento(cliente.cnpj),
       email: cliente.email ?? '',
       telefone: cliente.telefone ?? '',
       nome_contato: cliente.nome_contato ?? '',
@@ -326,6 +334,21 @@ const ClienteDetalhe = () => {
         return;
       }
     }
+    // 🔴 Só confere o documento se a pessoa MEXEU nele. Medido em 11/09/2026: 325 clientes têm
+    // documento com 5, 9, 10, 12 ou 13 dígitos (a maioria com cara de zero à esquerda comido pelo
+    // Excel na importação). Conferir sempre travaria a edição deles até para trocar o telefone.
+    const documentoMudou = editData.cnpj !== formatarDocumento(cliente.cnpj);
+    if (documentoMudou) {
+      // O cast é seguro: `resultadoPermiteSalvar`/`mensagemDoDocumento` não reconhecem o caso
+      // 'cnpj' (que só existe ANTES da consulta à Receita) e caem no comportamento padrão —
+      // permitir salvar, sem mensagem — que é exatamente o que um CNPJ com dígitos válidos
+      // deve fazer aqui, já que esta tela não espera a consulta.
+      const documento = classificarDocumento(editData.cnpj, { aceitaCpf: true, valorJaGravado: cliente.cnpj }) as ResultadoDoDocumento;
+      if (!resultadoPermiteSalvar(documento, 'avisar')) {
+        toast.error(mensagemDoDocumento(documento, { seNaoExistir: 'avisar', aceitaCpf: true })!.texto);
+        return;
+      }
+    }
     const enderecoStr = enderecoToString(editEndereco);
     try {
       await updateCliente.mutateAsync({
@@ -333,7 +356,10 @@ const ClienteDetalhe = () => {
         empresa: editData.empresa,
         razao_social: editData.razao_social || undefined,
         tipo: editData.tipo,
-        cnpj: editData.cnpj || undefined,
+        // `undefined` = ninguém mexeu, o banco fica exatamente como estava (inclusive o formato
+        // antigo). `null` = a pessoa apagou de propósito: `undefined` sumiria do pedido e o
+        // documento antigo continuaria gravado.
+        cnpj: documentoMudou ? (unmaskCnpj(editData.cnpj) || null) : undefined,
         email: editData.email || undefined,
         telefone: editData.telefone || undefined,
         endereco: enderecoStr || undefined,
@@ -444,10 +470,13 @@ const ClienteDetalhe = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>{ehPessoaFisica(editData.tipo) ? 'CPF' : 'CNPJ'}</Label>
-                <Input value={editData.cnpj} onChange={e => setEditData(d => ({ ...d, cnpj: e.target.value }))} placeholder={ehPessoaFisica(editData.tipo) ? '000.000.000-00' : '00.000.000/0000-00'} />
-              </div>
+              <CampoCnpj
+                aceitaCpf
+                value={editData.cnpj}
+                onChange={v => setEditData(d => ({ ...d, cnpj: v }))}
+                valorJaGravado={cliente.cnpj}
+                onDadosEncontrados={dados => setEditData(d => ({ ...d, razao_social: d.razao_social || dados.razao_social || '' }))}
+              />
               <div>
                 <Label>Nome</Label>
                 <Input value={editData.empresa} onChange={e => setEditData(d => ({ ...d, empresa: e.target.value }))} required placeholder="Nome fantasia ou nome" />
@@ -530,7 +559,7 @@ const ClienteDetalhe = () => {
                  <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
                  <div className="min-w-0">
                    <p className="text-xs text-muted-foreground">{ehPessoaFisica(cliente.tipo) ? 'CPF' : 'CNPJ'}</p>
-                   <p className="text-sm font-medium text-foreground break-all">{cliente.cnpj}</p>
+                   <p className="text-sm font-medium text-foreground break-all">{formatarDocumento(cliente.cnpj)}</p>
                  </div>
               </CardContent>
             </Card>

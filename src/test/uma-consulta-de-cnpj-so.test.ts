@@ -35,4 +35,15 @@ describe('uma consulta de CNPJ só', () => {
       expect(codigo, arquivo).not.toMatch(/fetchCnpjData\s*\(/);
     }
   });
+
+  it('as três portas de cadastrar cliente aceitam CPF e nunca bloqueiam pela Receita', () => {
+    for (const arquivo of ['pages/Clientes.tsx', 'pages/ClienteDetalhe.tsx', 'components/shared/EmpresaSelector.tsx']) {
+      const codigo = ler(arquivo);
+      // `ClienteDetalhe` tem um segundo <CampoCnpj>, o da SPE da obra nova — esse é só CNPJ.
+      const usosComCpf = usosDoCampoCnpj(codigo).filter((u) => /\baceitaCpf\b/.test(u));
+      expect(usosComCpf, arquivo).toHaveLength(1);
+      expect(usosComCpf[0], arquivo).not.toContain('bloquear');
+      expect(codigo, arquivo).not.toMatch(/fetchCnpjData\s*\(/);
+    }
+  });
 });

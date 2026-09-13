@@ -15,13 +15,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Dialog, DialogTitle } from '@/components/ui/dialog';
+import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,7 +26,16 @@ import { useAuth } from '@/hooks/use-auth';
 import { useClientesTipos } from '@/hooks/use-clientes-tipos';
 import { tipoPadrao } from '@/lib/tipos-de-cliente';
 import { toast } from 'sonner';
-import { maskCnpj, unmaskCnpj, isValidCnpjDigits } from '@/lib/cnpj';
+import {
+  unmaskCnpj,
+  classificarDocumento,
+  resultadoPermiteSalvar,
+  mensagemDoDocumento,
+  formatarDocumento,
+  telefoneDaReceita,
+  type ResultadoDoDocumento,
+} from '@/lib/cnpj';
+import { CampoCnpj } from '@/components/shared/CampoCnpj';
 import { correspondeBusca } from '@/lib/texto-busca';
 
 interface EmpresaSelectorProps {
@@ -78,10 +82,14 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
     if (!searchTerm) return clientes;
     // Busca sem acento e sem caixa: "jeronimo" acha "Jerônimo". O CNPJ casa pelos dígitos
     // crus, que não têm acento.
+    // Documento casa DÍGITO COM DÍGITO: a lista mostra com máscara, e quem copia da tela cola
+    // com pontos. Só entra na conta quando a busca é um número.
+    const buscaEhNumero = /^[\d./\-\s]+$/.test(searchTerm.trim());
+    const digitosDaBusca = searchTerm.replace(/\D/g, '');
     return clientes.filter((c) =>
       correspondeBusca(c.empresa, searchTerm) ||
       correspondeBusca(c.razao_social, searchTerm) ||
-      c.cnpj?.includes(searchTerm.trim())
+      (buscaEhNumero && digitosDaBusca.length > 0 && (c.cnpj ?? '').replace(/\D/g, '').includes(digitosDaBusca))
     );
   }, [clientes, searchTerm]);
 
@@ -94,12 +102,18 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
       toast.error('O nome da empresa é obrigatório');
       return;
     }
-    if (unmaskCnpj(newEmpresa.cnpj).length !== 14) {
-      toast.error('Informe um CNPJ válido');
+    // CPF ou CNPJ pelos dígitos: este atalho exigia 14 dígitos até de pessoa física.
+    // O cast é seguro: `resultadoPermiteSalvar`/`mensagemDoDocumento` não reconhecem o caso
+    // 'cnpj' (que só existe ANTES da consulta à Receita) e caem no comportamento padrão —
+    // permitir salvar, sem mensagem — que é exatamente o que um CNPJ com dígitos válidos deve
+    // fazer aqui, já que este atalho não espera a consulta.
+    const documento = classificarDocumento(newEmpresa.cnpj, { aceitaCpf: true }) as ResultadoDoDocumento;
+    if (documento === 'vazio') {
+      toast.error('Informe o CPF ou CNPJ');
       return;
     }
-    if (!isValidCnpjDigits(unmaskCnpj(newEmpresa.cnpj))) {
-      toast.error('CNPJ inválido');
+    if (!resultadoPermiteSalvar(documento, 'avisar')) {
+      toast.error(mensagemDoDocumento(documento, { seNaoExistir: 'avisar', aceitaCpf: true })!.texto);
       return;
     }
     if (!newEmpresa.email.trim()) {
@@ -181,7 +195,7 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
                     <div className="flex flex-col">
                       <span>{cliente.empresa}</span>
                       {cliente.cnpj && (
-                        <span className="text-[10px] text-muted-foreground">{cliente.cnpj}</span>
+                        <span className="text-[10px] text-muted-foreground">{formatarDocumento(cliente.cnpj)}</span>
                       )}
                     </div>
                   </CommandItem>
@@ -226,11 +240,11 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
       </Popover>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
+        <ConteudoDialogo className="sm:max-w-[425px]">
+          <CabecalhoDialogo>
             <DialogTitle>Cadastrar Nova Empresa</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
+          </CabecalhoDialogo>
+          <CorpoDialogo className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="name">Nome da Empresa *</Label>
               <Input
@@ -242,8 +256,8 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
             </div>
             <div className="grid gap-2">
               <Label htmlFor="tipo">Tipo</Label>
-              <Select 
-                value={newEmpresa.tipo} 
+              <Select
+                value={newEmpresa.tipo}
                 onValueChange={(v) => setNewEmpresa({ ...newEmpresa, tipo: v })}
               >
                 <SelectTrigger>
@@ -256,15 +270,20 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="cnpj">CNPJ *</Label>
-              <Input
-                id="cnpj"
-                value={newEmpresa.cnpj}
-                onChange={(e) => setNewEmpresa({ ...newEmpresa, cnpj: maskCnpj(e.target.value) })}
-                placeholder="00.000.000/0000-00"
-              />
-            </div>
+            <CampoCnpj
+              id="cnpj"
+              aceitaCpf
+              obrigatorio
+              value={newEmpresa.cnpj}
+              onChange={(v) => setNewEmpresa((e) => ({ ...e, cnpj: v }))}
+              onDadosEncontrados={(dados) =>
+                setNewEmpresa((e) => ({
+                  ...e,
+                  empresa: e.empresa || dados.razao_social || '',
+                  telefone: e.telefone || telefoneDaReceita(dados),
+                }))
+              }
+            />
             <div className="grid gap-2">
               <Label htmlFor="email">E-mail *</Label>
               <Input
@@ -284,14 +303,14 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
                 placeholder="(00) 00000-0000"
               />
             </div>
-          </div>
-          <DialogFooter>
+          </CorpoDialogo>
+          <RodapeDialogo>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleCreate} disabled={createCliente.isPending}>
               {createCliente.isPending ? 'Salvando...' : 'Cadastrar e Selecionar'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
+          </RodapeDialogo>
+        </ConteudoDialogo>
       </Dialog>
     </>
   );
