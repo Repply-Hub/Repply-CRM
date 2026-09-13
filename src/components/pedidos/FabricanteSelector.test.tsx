@@ -102,4 +102,29 @@ describe('FabricanteSelector — fechar o modal durante a conferência de CNPJ',
     expect(criarFabricanteFalso).not.toHaveBeenCalled();
     expect(onValueChange).not.toHaveBeenCalled();
   });
+
+  it('🔴 fechar com a conferência pendurada e reabrir não deixa o botão preso em "Conferindo o CNPJ..."', async () => {
+    // Nunca resolve nesta prova: o ponto do teste é o estado do botão ANTES de qualquer
+    // resposta chegar, então a promessa fica pendurada de propósito.
+    consultarCnpjFalsa.mockReturnValue(new Promise(() => {}));
+
+    desenhar();
+    await abrirModalDeCadastro();
+
+    fireEvent.click(screen.getByRole('button', { name: /cadastrar e selecionar/i }));
+    // A conferência da primeira sessão disparou e travou o botão.
+    expect(await screen.findByRole('button', { name: /conferindo o cnpj/i })).toBeDisabled();
+
+    // A pessoa desiste e fecha pelo "Cancelar" — a conferência antiga fica pendurada, sem
+    // nunca responder (é a mesma promessa que nunca resolve).
+    fireEvent.click(screen.getByRole('button', { name: /^cancelar$/i }));
+
+    // Reabre o mesmo modal — sessão nova, sem clicar em "Cadastrar e Selecionar" de novo.
+    await abrirModalDeCadastro();
+
+    // A sessão nova não disparou conferência nenhuma: o botão tem de nascer destravado, com o
+    // texto normal — não preso em "Conferindo o CNPJ..." da sessão anterior, abandonada.
+    const botao = screen.getByRole('button', { name: /cadastrar e selecionar/i });
+    expect(botao).toBeEnabled();
+  });
 });

@@ -149,7 +149,11 @@ function FabricanteForm({
     const sessaoDoEnvio = sessaoRef.current;
     setConferindo(true);
     const conferencia = await campoCnpjRef.current?.conferir();
-    setConferindo(false);
+    // Só zera o cadeado desta MESMA sessão: se a pessoa fechou, reabriu e clicou em Salvar de
+    // novo, esta promessa velha (que só volta agora) não pode destravar a conferência NOVA que
+    // ainda está rodando — senão os dois cliques em Salvar criam a fábrica duas vezes. Fechar
+    // o modal já zera `conferindo` sozinho (no onOpenChange, ao lado do `sessaoRef.current += 1`).
+    if (sessaoDoEnvio === sessaoRef.current) setConferindo(false);
     // A pessoa pode ter fechado o modal pelo "X" enquanto a Receita ainda respondia: sem esta
     // guarda, o salvamento seguia sozinho e gravava a fábrica que ela desistiu de cadastrar.
     if (sessaoDoEnvio !== sessaoRef.current) return;
@@ -237,6 +241,10 @@ function FabricanteForm({
         onOpenChange(o);
         if (!o) {
           sessaoRef.current += 1;
+          // Sem isto o botão reabria preso em "Conferindo o CNPJ...": a promessa velha do
+          // handleSubmit só zera `conferindo` se a sessão ainda bater, e como acabamos de
+          // trocá-la, ela nunca mais vai bater. Reabrir precisa nascer destravado.
+          setConferindo(false);
           reset();
         }
       }}

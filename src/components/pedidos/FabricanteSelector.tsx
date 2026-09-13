@@ -54,7 +54,13 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
   const sessaoRef = useRef(0);
 
   const fecharDialogo = (aberto: boolean) => {
-    if (!aberto) sessaoRef.current += 1;
+    if (!aberto) {
+      sessaoRef.current += 1;
+      // Sem isto o botão reabria preso em "Conferindo o CNPJ...": a promessa velha do
+      // handleCreate só zera `conferindo` se a sessão ainda bater, e como acabamos de
+      // trocá-la, ela nunca mais vai bater. Reabrir precisa nascer destravado.
+      setConferindo(false);
+    }
     setDialogOpen(aberto);
   };
 
@@ -90,7 +96,11 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
     const sessaoDoEnvio = sessaoRef.current;
     setConferindo(true);
     const conferencia = await campoCnpjRef.current?.conferir();
-    setConferindo(false);
+    // Só zera o cadeado desta MESMA sessão: se a pessoa fechou, reabriu e clicou em "Cadastrar"
+    // de novo, esta promessa velha (que só volta agora) não pode destravar a conferência NOVA
+    // que ainda está rodando — senão os dois cliques criam a fábrica duas vezes. Fechar o modal
+    // já zera `conferindo` sozinho (em `fecharDialogo`, ao lado do `sessaoRef.current += 1`).
+    if (sessaoDoEnvio === sessaoRef.current) setConferindo(false);
     // Fechar o modal (o "X" ou "Cancelar") durante a espera não cancela nada sozinho — sem esta
     // guarda a gravação seguia até o fim e trocava a fábrica selecionada no negócio em silêncio.
     if (sessaoDoEnvio !== sessaoRef.current) return;
