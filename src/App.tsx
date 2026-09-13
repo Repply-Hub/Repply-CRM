@@ -184,7 +184,18 @@ function ProtectedRoute({
         Carregando...
       </div>
     );
-  if (!session) return <Navigate to="/login" replace />;
+  // 🔴 Bloco 3, item E. `state={{ from }}` leva a rota de origem para o login — sem isso,
+  // quem clicava em "Abrir na agenda" com a sessão expirada caía sempre em /login e, depois
+  // de entrar, ia para a tela inicial de sempre em vez de voltar para `/calendario?data=...`.
+  // `Login.tsx` é quem lê este `from` (via `destinoDepoisDoLogin`) depois do login com sucesso.
+  if (!session)
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location.pathname + location.search + location.hash }}
+      />
+    );
 
   // Usuário soft-deletado: perfil existe mas foi suspenso pelo admin
   if (profileAttempted && session && profile && profile.deleted_at) {

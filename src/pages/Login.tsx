@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { AuthShell } from "@/components/auth/AuthShell";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { traduzirErroAuth } from "@/lib/erros-auth";
+import { destinoDepoisDoLogin } from "@/lib/destino-depois-do-login";
 import { toast } from "sonner";
 
 export default function Login() {
@@ -15,6 +16,8 @@ export default function Login() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const idEmail = useId();
   const idSenha = useId();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -25,8 +28,19 @@ export default function Login() {
         form.get("email") as string,
         form.get("password") as string,
       );
-      if (error) toast.error(traduzirErroAuth(error.message));
-      // Em caso de sucesso quem redireciona é o AuthRoute, ao ver a sessão.
+      if (error) {
+        toast.error(traduzirErroAuth(error.message));
+      } else {
+        // 🔴 Bloco 3, item E. Quando a sessão expirou NO MEIO de uma rota — ex.: clicou em
+        // "Abrir na agenda" de um e-mail —, `ProtectedRoute` guardou o caminho de origem em
+        // `state.from` antes de mandar para cá (App.tsx). Só navegamos explicitamente quando
+        // esse destino é um caminho interno válido; quando `destinoDepoisDoLogin` devolve
+        // `null` (sem `from`, ou algo suspeito), não fazemos nada aqui — quem redireciona
+        // continua sendo o AuthRoute, ao ver a sessão, exatamente como antes deste conserto.
+        const from = (location.state as { from?: unknown } | null)?.from;
+        const destino = destinoDepoisDoLogin(from);
+        if (destino) navigate(destino, { replace: true });
+      }
     } catch (err) {
       toast.error(
         traduzirErroAuth(err instanceof Error ? err.message : "Erro inesperado. Tente novamente."),
