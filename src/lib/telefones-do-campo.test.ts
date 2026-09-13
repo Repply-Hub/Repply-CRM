@@ -119,4 +119,20 @@ describe('limitarTelefoneDigitado — enquanto a pessoa digita', () => {
   it('apagar tudo deixa vazio', () => {
     expect(limitarTelefoneDigitado('', '(8')).toBe('');
   });
+
+  it('🔴 celular de DDD 55 digitado: o 12º dígito não entra', () => {
+    expect(limitarTelefoneDigitado('559912345678', '55991234567')).toBe('55991234567');
+  });
+
+  it('fixo de DDD 55 chegando a 11 dígitos continua podendo', () => {
+    expect(limitarTelefoneDigitado('55322111111', '5532211111')).toBe('55322111111');
+  });
+
+  it('🔴 fixo de DDD 55 digitado também barra no 12º dígito', () => {
+    expect(limitarTelefoneDigitado('553221111112', '55322111111')).toBe('55322111111');
+  });
+
+  it('quem digita com "+" pode escrever o código do país tecla a tecla', () => {
+    expect(limitarTelefoneDigitado('+55 84 99999-8888', '+55 84 99999-888')).toBe('+55 84 99999-8888');
+  });
 });

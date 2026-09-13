@@ -66,6 +66,23 @@ export function ehTelefoneLivre(parte: string): boolean {
 export function limitarTelefoneDigitado(novo: string, anterior = ''): string {
   if (ehTelefoneLivre(novo) || ehTelefoneLivre(anterior)) return novo;
   if (digitosNacionais(anterior).length > 11) return novo;
+  // DDD 55 (Rio Grande do Sul) é onde a leitura de número pronto engana quem está digitando:
+  // um celular de 11 dígitos com esse DDD, ao ganhar mais um dígito, fica indistinguível de
+  // "código do país 55" + outro DDD de 9 dígitos — `digitosNacionais` desconta o 55 nos dois
+  // casos, então contar por ela aqui deixaria passar o 12º e 13º dígito sem barrar.
+  //
+  // Por isso a digitação usa outra régua, e a leitura de número JÁ GRAVADO não muda: 999
+  // telefones da base guardam o 55 grudado sem "+", e é assim que `digitosNacionais` e
+  // `formatarTelefoneGuardado` continuam lendo — só o limite de tecla é diferente.
+  const digitosNovos = novo.replace(/\D/g, '').length;
+  const digitosAnteriores = anterior.replace(/\D/g, '').length;
+  // Com "+" na frente a pessoa está escrevendo o código do país de propósito: vale a leitura
+  // de número completo, que desconta o 55.
+  const comCodigoDePais = novo.trim().startsWith('+');
+  // Um dígito a mais que antes é TECLA. Um salto maior é COLAR — e colar número com o 55
+  // grudado é como 999 telefones já estão gravados na base.
+  const ehTecla = digitosNovos - digitosAnteriores <= 1;
+  if (!comCodigoDePais && ehTecla) return digitosNovos > 11 ? anterior : novo;
   return digitosNacionais(novo).length > 11 ? anterior : novo;
 }
 
