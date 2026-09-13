@@ -59,9 +59,9 @@ describe('uma consulta de CNPJ só', () => {
     }
   });
 
-  // 60 s: a primeira varredura do arquivo lê o projeto inteiro do disco e levou 23,7 s com
-  // a suíte disputando a máquina, estourando os 20 s de antes. Uma trava por lentidão vira
-  // falso alarme do qual a equipe aprende a ignorá-la — é assim que o teste dura 60 s.
+  // 60 s: a primeira varredura do arquivo lê o projeto inteiro do disco, e com a suíte
+  // disputando a máquina levou 23,7 s — estourando os 20 s de antes. Trava que falha por
+  // lentidão vira falso alarme, e falso alarme a equipe aprende a ignorar; por isso o prazo folgado.
   it('🔴 só src/lib/cnpj.ts fala com o BrasilAPI de CNPJ', { timeout: 60_000 }, () => {
     const infratores = arquivosDeCodigo(RAIZ)
       .filter((c) => /brasilapi\.com\.br\/api\/cnpj/.test(readFileSync(c, 'utf8')))
