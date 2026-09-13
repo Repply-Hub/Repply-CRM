@@ -152,9 +152,9 @@ export function AutomacaoTab({ empresaId }: Props) {
             <div className="min-w-0">
               <p className="text-sm font-medium text-card-foreground">Até quantos itens por dia</p>
               <p className="text-xs text-muted-foreground">
-                O teto da pauta. Entra o que está parado além do prazo acima, do maior valor
-                para o menor, até esse limite. Compromisso da agenda ocupa vaga: reunião marcada
-                não se corta por teto.
+                O teto da pauta. Entra o que está parado além do prazo acima: primeiro os negócios
+                da própria pessoa, depois os da equipe para quem vê a equipe, do maior valor para o
+                menor, até esse limite. Compromisso marcado até a véspera ocupa vaga.
               </p>
             </div>
             <Input
