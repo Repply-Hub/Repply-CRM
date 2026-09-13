@@ -27,16 +27,28 @@ alter table public.eventos
 -- convite dá para conferir na hora (a sessão ainda existe), mas o do LEMBRETE é anotado
 -- depois, pelo robô, quando já não há sessão nenhuma para conferir. Sem este carimbo, quem
 -- gravasse o evento com o `criado_por` de um colega faria o lembrete sair assinado por ele.
--- `on delete set null`: excluir uma pessoa não pode travar no evento antigo dela.
+-- `on delete set null`: excluir uma pessoa não pode travar no evento antigo dela. (Este
+-- sistema exclui marcando `deleted_at`, e aí o `on delete` nunca dispara — quem foi excluído
+-- assim é tratado na leitura do carimbo, §4 e §5.)
 
 -- O preenchimento abaixo não pode mexer em `updated_at` nem disparar gatilho antigo:
 -- é cópia de estrutura, não edição de evento.
 alter table public.eventos disable trigger user;
 
+-- 🔴 `lembretes_valem_desde is null` é o que faz esta cópia ser segura numa SEGUNDA rodada
+-- do arquivo. Sem ele, uma segunda rodada ressuscitaria o lembrete de quem, na tela nova,
+-- tirou todos os lembretes (lista vazia) de um evento antigo que ainda tem `lembrete_minutos`.
+-- Por que esta marca prova "só antes da primeira rodada":
+--   - antes da primeira rodada a coluna nem existe, então nasce nula em TODA linha;
+--   - o `update` logo abaixo, na mesma rodada, preenche TODA linha que ficou nula;
+--   - depois disso, nada grava nulo nela: no INSERT o gatilho da §5 carimba `now()`, e no
+--     UPDATE ele carimba `now()` ou devolve o valor antigo — o que o cliente mandar é ignorado.
+-- Só uma gravação feita com os gatilhos desligados por um administrador escaparia disso.
 update public.eventos
    set lembretes_minutos = array[lembrete_minutos]
  where lembrete_minutos is not null
-   and lembretes_minutos = '{}';
+   and lembretes_minutos = '{}'
+   and lembretes_valem_desde is null;
 
 -- Eventos que já existem: só valem lembretes cujo momento ainda vai chegar. Os que já
 -- passaram, o robô antigo mandou.
@@ -78,12 +90,66 @@ create table if not exists public.evento_lembretes_enviados (
   primary key (evento_id, minutos)
 );
 alter table public.evento_lembretes_enviados enable row level security;
--- Sem política: só o servidor e as funções do sistema leem e gravam.
+-- Só o servidor e as funções do sistema leem e gravam.
 -- 🔴 Ligar a RLS não basta para que a frase acima seja verdade. Neste banco o padrão do
 -- Postgres (`pg_default_acl`) já entrega toda tabela nova do schema `public` inteira a
 -- `anon` e a `authenticated` — a RLS filtra as linhas, mas o privilégio de ler e gravar
 -- nasce concedido. Sem o revoke, "só o servidor" ficaria valendo só no comentário.
 revoke all on table public.evento_lembretes_enviados from anon, authenticated;
+-- E a intenção fica ESCRITA no banco, não deduzida da falta de política: uma política que
+-- recusa tudo. Quem precisa passar passa por cima dela — `service_role` (o robô) e `postgres`
+-- (dono das funções `security definer` deste arquivo) têm `bypassrls`.
+drop policy if exists evento_lembretes_enviados_recusa_tudo on public.evento_lembretes_enviados;
+create policy evento_lembretes_enviados_recusa_tudo
+  on public.evento_lembretes_enviados
+  for all
+  using (false)
+  with check (false);
+
+-- Ponte com o robô ANTIGO durante a publicação. Entre aplicar esta migration e publicar o
+-- robô novo, o antigo continua rodando a cada 5 min e marca o que manda SÓ em
+-- `eventos.lembrete_enviado`. Sem esta ponte, o robô novo não veria essas marcas e mandaria
+-- de novo os mesmos lembretes. Com ela, não há ordem de publicação a respeitar.
+-- A chave é exatamente a que o gerador (§8) confere — `(evento_id, minutos)` — com o mesmo
+-- `minutos` que o preenchimento logo abaixo usa: `lembrete_minutos`, que o preenchimento da
+-- §1 copiou para `lembretes_minutos` como `array[lembrete_minutos]`.
+-- Só vale SEM sessão: o robô antigo usa a chave de servidor. Nenhuma tela grava
+-- `lembrete_enviado`; se um cliente o ligasse na mão, não seria um lembrete que saiu, e
+-- registrá-lo calaria o lembrete de verdade.
+-- 🔴 A POSIÇÃO importa. Criado aqui — depois do par `disable/enable trigger user` da §1 e
+-- ANTES do preenchimento logo abaixo — ele não pega o preenchimento de estrutura (que, além
+-- de rodar com os gatilhos desligados, nem toca `lembrete_enviado`), e não deixa fresta: a
+-- marca que o robô antigo gravou antes daqui é lida pelo preenchimento; a que ele gravar
+-- depois é pega por este gatilho. `search_path` com `pg_temp` por último: ver a §4.
+create or replace function public.eventos_registra_lembrete_do_robo_antigo()
+returns trigger
+language plpgsql
+security definer   -- grava em evento_lembretes_enviados, que só o servidor alcança
+set search_path = public, pg_temp
+as $$
+begin
+  if auth.uid() is null and new.lembrete_minutos is not null then
+    insert into evento_lembretes_enviados (evento_id, minutos)
+    values (new.id, new.lembrete_minutos)
+    on conflict do nothing;
+  end if;
+  return null;
+exception when others then
+  -- Nunca pode derrubar a marca do robô antigo: se ela falhasse, ele reenviaria o mesmo
+  -- lembrete a cada 5 min. Perder o registro custa, no pior caso, UM lembrete repetido.
+  raise warning '[agenda] lembrete do robô antigo não registrado (evento %): %', new.id, sqlerrm;
+  return null;
+end;
+$$;
+revoke all on function public.eventos_registra_lembrete_do_robo_antigo()
+  from public, anon, authenticated;
+
+drop trigger if exists eventos_registra_lembrete_do_robo_antigo on public.eventos;
+create trigger eventos_registra_lembrete_do_robo_antigo
+  after update on public.eventos
+  for each row
+  when (new.lembrete_enviado and not old.lembrete_enviado)
+  execute function public.eventos_registra_lembrete_do_robo_antigo();
 
 -- O que o robô antigo já mandou não sai de novo.
 insert into public.evento_lembretes_enviados (evento_id, minutos)
@@ -116,14 +182,20 @@ create table if not exists public.evento_avisos (
 create index if not exists evento_avisos_pendentes
   on public.evento_avisos (criado_em) where concluido_em is null;
 alter table public.evento_avisos enable row level security;
--- Sem política: só o servidor lê e grava — e, pelo mesmo motivo da tabela acima, o
--- privilégio precisa ser retirado na mão. Aqui pesa mais: `dados` guarda título,
--- descrição, obra e os nomes dos participantes de todo evento avisado.
+-- Só o servidor lê e grava — e, pelo mesmo motivo da tabela acima, o privilégio precisa ser
+-- retirado na mão e a recusa, escrita. Aqui pesa mais: `dados` guarda título, descrição,
+-- obra e os nomes dos participantes de todo evento avisado.
 revoke all on table public.evento_avisos from anon, authenticated;
+drop policy if exists evento_avisos_recusa_tudo on public.evento_avisos;
+create policy evento_avisos_recusa_tudo
+  on public.evento_avisos
+  for all
+  using (false)
+  with check (false);
 
 -- 4. Anotar um aviso a partir de uma linha de evento -------------------------------
 --
--- 🔴 `search_path = public, pg_temp` em TODAS as funções daqui para baixo, nunca só
+-- 🔴 `search_path = public, pg_temp` em TODAS as funções deste arquivo, nunca só
 --    `public`: quando `pg_temp` não é listado, o Postgres o procura PRIMEIRO assim mesmo.
 --    Um usuário logado que criasse uma tabela temporária chamada `usuarios` faria estas
 --    funções — que rodam com os poderes do dono, sem RLS — lerem a tabela dele.
@@ -151,6 +223,30 @@ begin
   -- Empresa com o Calendário desligado: nada sai (mesma regra do robô de hoje).
   if not empresa_tem_secao_de(v_dest.empresa_id, 'calendario') then return; end if;
 
+  -- 🔴 FRONTEIRA DE EMPRESA PELA ORIGEM DO EVENTO. `eventos.user_id` não tem chave
+  -- estrangeira e a política de UPDATE não conhece empresa: quem pode editar a linha pode
+  -- trocar o destinatário por um login de OUTRA empresa. O gatilho da §6 recusa isso quando
+  -- há sessão, mas o LEMBRETE é anotado pelo robô, sem sessão — e sem esta trava sairiam
+  -- sininho e e-mail, com título e descrição escritos por quem trocou, para gente de fora.
+  -- A origem é quem gravou a linha (o carimbo da §5); só linha sem carimbo — anterior a
+  -- esta migration e nunca mais salva — cai em `criado_por`. Aqui NÃO se filtra
+  -- `deleted_at`: a pergunta é "de que empresa veio", e quem saiu continua tendo vindo dela.
+  -- Uma troca de destinatário feita por gravação não consegue escapar: o UPDATE que troca
+  -- `user_id` passa pela §5 e sai dela com carimbo — o do autor original, que ele não
+  -- consegue trocar, ou, se a linha ainda não tinha, o de quem está trocando. Nos dois casos
+  -- é gente da empresa de onde o evento veio, e não da empresa do novo destinatário.
+  if p_evento.avisos_remetente_id is not null then
+    if not exists (select 1 from usuarios o
+                    where o.id = p_evento.avisos_remetente_id
+                      and o.empresa_id = v_dest.empresa_id) then
+      return;
+    end if;
+  elsif not exists (select 1 from usuarios o
+                     where o.user_id = p_evento.criado_por
+                       and o.empresa_id = v_dest.empresa_id) then
+    return;
+  end if;
+
   -- 🔴 QUEM ASSINA O AVISO SAI DO CARIMBO DA §1, não do `criado_por` que veio junto.
   -- `remetente_id` vira o autor da mensagem direta (`chat_mensagens.usuario_id`) e o
   -- "Organizado por" do e-mail — assinar por outra pessoa não é detalhe.
@@ -158,15 +254,28 @@ begin
   -- escreveu a linha, então serve aos DOIS caminhos: o convite, anotado na hora, e o
   -- lembrete, anotado depois pelo robô, quando já não há sessão para conferir nada.
   --
-  -- A fronteira de empresa continua valendo por cima do carimbo: um remetente de fora não
-  -- entra nem por engano, e não cai no caminho de baixo — só o carimbo NULO cai lá.
-  -- Sem candidato válido, `v_rem` fica vazio, o chat não sai e o e-mail vai sem o
-  -- "Organizado por". Falha fechada.
+  -- Quem foi excluído (`deleted_at`) não assina nada. Sem candidato válido, `v_rem` fica
+  -- vazio, o chat não sai e o e-mail vai sem o "Organizado por". Falha fechada.
   if p_evento.avisos_remetente_id is not null then
     select * into v_rem
       from usuarios
      where id = p_evento.avisos_remetente_id
-       and empresa_id = v_dest.empresa_id;
+       and empresa_id = v_dest.empresa_id
+       and deleted_at is null;
+    -- Chegar aqui vazio só pode ser uma coisa: a trava de origem acima já provou que o
+    -- carimbo é desta empresa, então a pessoa carimbada foi EXCLUÍDA. Com sessão, faz-se o
+    -- que se faz com o carimbo nulo: assina quem está agindo agora.
+    -- 🔴 SEM sessão (o robô) NÃO se cai em `criado_por`, ao contrário do carimbo nulo. Esta
+    -- linha tem carimbo, então não é evento antigo; e o `criado_por` dela pode ter sido
+    -- trocado por qualquer um que a editou depois — cair nele devolveria ao robô exatamente a
+    -- assinatura forjada que o carimbo existe para impedir.
+    if v_rem.id is null and auth.uid() is not null then
+      select * into v_rem
+        from usuarios
+       where user_id = auth.uid()
+         and empresa_id = v_dest.empresa_id
+         and deleted_at is null;
+    end if;
   else
     -- Evento gravado ANTES desta migration: não tem carimbo, e ninguém vai reescrever a
     -- linha só para ganhá-lo. Vale a regra antiga — quem está na sessão, ou o organizador
@@ -174,7 +283,8 @@ begin
     select * into v_rem
       from usuarios
      where user_id = coalesce(auth.uid(), p_evento.criado_por)
-       and empresa_id = v_dest.empresa_id;
+       and empresa_id = v_dest.empresa_id
+       and deleted_at is null;
   end if;
 
   if p_evento.obra_id is not null then
@@ -183,6 +293,12 @@ begin
   -- `grupo_id` vem do cliente e não tem amarra nenhuma; como esta função roda sem RLS,
   -- um grupo forjado listaria gente de outra empresa em `participantes`. E quem foi
   -- excluído não entra na lista, igual à busca do destinatário logo acima.
+  -- No CANCELAMENTO esta lista sai sempre vazia, e está certo assim: o gatilho de exclusão
+  -- roda no fim do comando, quando as linhas do grupo já saíram. O e-mail esconde a linha
+  -- "Participantes" quando a lista é vazia (`htmlDoEmail`), e para um evento que deixou de
+  -- existir quem mais iria é informação dispensável. Reconstruir a lista pediria as linhas
+  -- apagadas do comando inteiro (tabela de transição), que o Postgres não entrega num
+  -- gatilho de três eventos como o da §6 — seria um gatilho a mais só para isso.
   select coalesce(array_agg(coalesce(u.nome, u.email) order by u.nome), '{}')
     into v_nomes
     from eventos e
@@ -228,35 +344,76 @@ language plpgsql
 security definer   -- apaga em evento_lembretes_enviados, que não tem política
 set search_path = public, pg_temp
 as $$
+declare
+  v_quem           uuid := auth.uid();
+  v_carimbo_antigo uuid;   -- fica nulo no INSERT: `old` só é tocado no UPDATE
 begin
+  if tg_op = 'UPDATE' then v_carimbo_antigo := old.avisos_remetente_id; end if;
+
   -- 🔴 CARIMBO DE QUEM ASSINA. Quem assina os avisos deste evento é quem está GRAVANDO a
   -- linha, e não o `criado_por` que veio no corpo do pedido. O que o cliente mandar nesta
-  -- coluna é ignorado: no INSERT ela é sempre reescrita, e no UPDATE o dono já carimbado
-  -- prevalece — não há por onde forjar, nem criando nem editando.
-  -- Sem sessão (gravação feita pelo servidor) não há quem carimbar: aí vale o id interno de
-  -- `criado_por`, exatamente como era antes. Nesse caminho não existe usuário logado para
-  -- forjar coisa nenhuma, e é o melhor dado disponível.
-  -- No UPDATE, carimbo nulo significa linha gravada ANTES desta migration: ela ganha o dono
-  -- agora, na primeira vez que alguém a salvar.
-  if tg_op = 'INSERT' then
+  -- coluna é ignorado: os três ramos abaixo sempre a reescrevem.
+  --
+  -- (a) Carimbo que já existe prevalece — uma linha carimbada não muda de dono editando.
+  --     Exceção: com sessão, se a pessoa carimbada foi EXCLUÍDA (`deleted_at`), a linha é
+  --     tratada como sem carimbo e vai para (b). Sem sessão o carimbo nunca muda: o servidor
+  --     não tem quem pôr no lugar, e (c) usaria um `criado_por` que alguém pode ter trocado.
+  if v_carimbo_antigo is not null
+     and (v_quem is null
+          or exists (select 1 from usuarios u
+                      where u.id = v_carimbo_antigo and u.deleted_at is null)) then
+    new.avisos_remetente_id := v_carimbo_antigo;
+
+  -- (b) Com sessão: quem está logado, e NUNCA `criado_por` — nem quando a pessoa logada não
+  --     é achada. A ordem do `coalesce`:
+  --       1. quem grava, se está ativo;
+  --       2. o carimbo antigo (só chega aqui excluído): quem saiu não é trocado por ninguém
+  --          que não esteja ativo;
+  --       3. quem grava mesmo EXCLUÍDO, como marca de autoria. Ela não assina nada (a §4
+  --          ignora quem tem `deleted_at`), mas mantém o carimbo não nulo — e carimbo nulo
+  --          faria o robô assinar com o `criado_por` que a própria sessão escreveu.
+  elsif v_quem is not null then
     new.avisos_remetente_id := coalesce(
-      get_my_usuario_id(),
-      (select u.id from usuarios u where u.user_id = new.criado_por)
+      (select u.id from usuarios u where u.user_id = v_quem and u.deleted_at is null),
+      v_carimbo_antigo,
+      (select u.id from usuarios u where u.user_id = v_quem)
     );
+
+  -- (c) Sem sessão (gravação feita pelo servidor) e sem carimbo: vale o id interno de
+  --     `criado_por`, exatamente como era antes. Nesse caminho não existe usuário logado
+  --     para forjar coisa nenhuma, e é o melhor dado disponível. No UPDATE, é a linha
+  --     gravada ANTES desta migration ganhando dono na primeira vez que alguém a salva.
   else
-    new.avisos_remetente_id := coalesce(
-      old.avisos_remetente_id,
-      get_my_usuario_id(),
-      (select u.id from usuarios u where u.user_id = new.criado_por)
-    );
+    new.avisos_remetente_id :=
+      (select u.id from usuarios u where u.user_id = new.criado_por and u.deleted_at is null);
   end if;
 
   -- Ponte: uma aba aberta antes da publicação ainda grava só `lembrete_minutos`.
-  if new.lembretes_minutos = '{}' and new.lembrete_minutos is not null
-     and (tg_op = 'INSERT' or new.lembrete_minutos is distinct from old.lembrete_minutos) then
-    new.lembretes_minutos := array[new.lembrete_minutos];
+  -- No INSERT, a lista nova vazia herda o lembrete único. As rotas de visita mandam
+  -- `lembrete_minutos: null` explícito, e só em INSERT — por isso o nulo não mexe em nada.
+  if tg_op = 'INSERT' then
+    if new.lembretes_minutos = '{}' and new.lembrete_minutos is not null then
+      new.lembretes_minutos := array[new.lembrete_minutos];
+    end if;
+  -- No UPDATE a ponte NÃO pode depender da lista nova estar vazia: depois do preenchimento
+  -- da §1, todo evento antigo que tinha lembrete tem a lista preenchida, e a aba antiga que
+  -- trocasse 60 por 30 teria a troca jogada fora em silêncio. Vale sempre que a coluna
+  -- antiga MUDOU — nenhuma tela nova a grava em UPDATE (`src/hooks/use-eventos.ts`), então
+  -- mudança nela só pode vir da aba antiga. Tirar o lembrete na aba antiga (nulo) esvazia a
+  -- lista. A aba antiga só enxerga um lembrete; a troca explícita dela ganha, inclusive dos
+  -- itens que ela não vê.
+  -- A segunda condição protege quem grava as DUAS colunas no mesmo pedido: aí a lista nova
+  -- veio escrita de propósito, e a ponte não a atropela.
+  elsif new.lembrete_minutos is distinct from old.lembrete_minutos
+        and new.lembretes_minutos is not distinct from old.lembretes_minutos then
+    new.lembretes_minutos := case
+      when new.lembrete_minutos is null then '{}'::integer[]
+      else array[new.lembrete_minutos]
+    end;
   end if;
 
+  -- A ponte roda ANTES desta comparação de propósito: a lista que ela reescreveu conta como
+  -- lista mudada, e o piso é recarimbado pela decisão B logo abaixo.
   if tg_op = 'INSERT' then
     new.lembretes_valem_desde := now();
   elsif new.inicio is distinct from old.inicio then
@@ -272,13 +429,22 @@ begin
     -- 🔴 Aqui NÃO se apaga `evento_lembretes_enviados` — só a mudança de horário faz isso.
     -- Mexer na lista não pode fazer o que já foi enviado sair de novo.
     new.lembretes_valem_desde := now();
+  else
+    -- Nada que mexa em lembrete mudou: o piso fica onde estava, venha o que vier do cliente.
+    -- Sem isto, uma gravação fora da tela poderia recuar o piso (e fazer sair atrasado o que
+    -- a decisão B manda calar) ou anulá-lo (e quebrar a marca de "segunda rodada" da §1).
+    new.lembretes_valem_desde := old.lembretes_valem_desde;
   end if;
-  -- Os dois ramos acima não brigam quando horário e lista mudam no mesmo salvamento: o
-  -- carimbo é o mesmo `now()`, e quem decide é o do horário, que além de carimbar limpa os
+  -- Os dois ramos de recarimbo não brigam quando horário e lista mudam no mesmo salvamento:
+  -- o carimbo é o mesmo `now()`, e quem decide é o do horário, que além de carimbar limpa os
   -- enviados — que é justamente o que a mudança de horário exige.
   return new;
 end;
 $$;
+-- Função de gatilho não é chamável direto, mas o `execute` sobra concedido por padrão; fica
+-- retirado como nas outras. O Postgres confere esse privilégio ao CRIAR o gatilho (quem cria
+-- é o dono), não a cada disparo — a gravação de quem está logado continua passando.
+revoke all on function public.eventos_prepara_lembretes() from public, anon, authenticated;
 
 drop trigger if exists eventos_prepara_lembretes on public.eventos;
 create trigger eventos_prepara_lembretes
@@ -293,22 +459,28 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_quem  uuid := auth.uid();
-  v_resta boolean;
-  v_tipo  text;   -- só para a mensagem de erro lá embaixo saber o que se perdeu
-  v_grupo uuid;   -- idem. `new` não existe no DELETE, por isso o if e não um coalesce
+  v_quem         uuid := auth.uid();
+  v_resta        boolean;
+  v_tipo         text;   -- também para a mensagem de erro lá embaixo saber o que se perdeu
+  v_grupo        uuid;   -- idem. `new` não existe no DELETE, por isso o if e não um coalesce
+  v_linha        public.eventos;
+  v_inicio_antes timestamptz;
+  v_fim_antes    timestamptz;
+  v_empresa_ator uuid;
 begin
   -- Sem sessão = o próprio sistema (limpeza, exclusão de conta): nunca avisa.
   if v_quem is null then return null; end if;
 
   if tg_op = 'DELETE' then v_grupo := old.grupo_id; else v_grupo := new.grupo_id; end if;
 
+  -- Primeiro decide SE e QUAL aviso; a fronteira de empresa e a anotação vêm depois, num
+  -- lugar só, para valerem igual para os três caminhos.
   if tg_op = 'INSERT' then
     -- Convite: evento novo ou participante incluído depois. Quem grava a própria linha
     -- (o organizador) não se convida.
     if new.avisar_participantes and new.user_id <> v_quem and new.inicio > now() then
-      v_tipo := 'convite';
-      perform anotar_aviso_de_evento(new, v_tipo, null, null, null);
+      v_tipo  := 'convite';
+      v_linha := new;
     end if;
 
   elsif tg_op = 'UPDATE' then
@@ -322,15 +494,17 @@ begin
     -- já leva o evento inteiro, e as duas mensagens juntas seriam uma a mais.
     if new.avisar_participantes and not old.avisar_participantes
        and new.user_id <> v_quem and new.inicio > now() then
-      v_tipo := 'convite';
-      perform anotar_aviso_de_evento(new, v_tipo, null, null, null);
+      v_tipo  := 'convite';
+      v_linha := new;
 
     -- Mudança de data/hora feita por outra pessoa (o organizador). Título e descrição não avisam.
     elsif new.avisar_participantes and new.user_id <> v_quem
        and (new.inicio is distinct from old.inicio or new.fim is distinct from old.fim)
        and greatest(new.inicio, old.inicio) > now() then
-      v_tipo := 'alteracao';
-      perform anotar_aviso_de_evento(new, v_tipo, null, old.inicio, old.fim);
+      v_tipo         := 'alteracao';
+      v_linha        := new;
+      v_inicio_antes := old.inicio;
+      v_fim_antes    := old.fim;
     end if;
 
   elsif tg_op = 'DELETE' then
@@ -339,10 +513,37 @@ begin
       -- Gatilho AFTER ROW roda no fim do comando: se o grupo inteiro foi apagado, não resta
       -- ninguém = cancelamento; se ainda resta alguém, esta pessoa foi retirada.
       select exists (select 1 from eventos where grupo_id = old.grupo_id) into v_resta;
-      v_tipo := case when v_resta then 'retirado' else 'cancelamento' end;
-      perform anotar_aviso_de_evento(old, v_tipo, null, null, null);
+      v_tipo  := case when v_resta then 'retirado' else 'cancelamento' end;
+      v_linha := old;
     end if;
   end if;
+
+  if v_tipo is null then return null; end if;
+
+  -- 🔴 FRONTEIRA DE EMPRESA PELA SESSÃO. `eventos.user_id` não tem chave estrangeira, e a
+  -- política `eventos_update` só pergunta se quem grava é o `user_id` ou o `criado_por` da
+  -- linha — não pergunta empresa. Então quem criou um evento pode trocar o `user_id` pelo
+  -- login de alguém de OUTRA empresa e ligar a chave: sem esta trava, a pessoa de fora
+  -- receberia sininho e e-mail com título e descrição escritos por quem trocou.
+  -- A empresa de quem age é resolvida uma vez, aqui, e só se chega aqui quando há aviso a
+  -- anotar. Não é `get_my_empresa_id()` porque ela não olha `deleted_at`: quem foi excluído
+  -- e ainda tem sessão válida não avisa ninguém. Sem empresa, nada sai — falha fechada.
+  select u.empresa_id into v_empresa_ator
+    from usuarios u
+   where u.user_id = v_quem
+     and u.deleted_at is null;
+
+  if v_empresa_ator is null
+     or not exists (select 1 from usuarios d
+                     where d.user_id = v_linha.user_id
+                       and d.deleted_at is null
+                       and d.empresa_id = v_empresa_ator) then
+    raise warning '[agenda] aviso recusado: destinatário fora da empresa de quem gravou (tipo %, grupo %)',
+      v_tipo, v_grupo;
+    return null;
+  end if;
+
+  perform anotar_aviso_de_evento(v_linha, v_tipo, null, v_inicio_antes, v_fim_antes);
   return null;
 exception when others then
   -- 🔴 Aviso é consequência: NUNCA pode impedir salvar ou apagar o evento.
@@ -354,6 +555,7 @@ exception when others then
   return null;
 end;
 $$;
+revoke all on function public.eventos_anota_aviso() from public, anon, authenticated;
 
 drop trigger if exists eventos_anota_aviso on public.eventos;
 create trigger eventos_anota_aviso
@@ -379,6 +581,7 @@ exception when others then
   return null;
 end;
 $$;
+revoke all on function public.eventos_chama_envio() from public, anon, authenticated;
 
 drop trigger if exists eventos_chama_envio on public.eventos;
 create trigger eventos_chama_envio
@@ -440,9 +643,10 @@ as $$
         and tentativas < 5
         and (processando_desde is null or processando_desde < now() - interval '10 minutes')
       order by criado_em
-      -- `limit null` em SQL significa "sem limite": chamar sem argumento usa o padrão de
-      -- 50, mas chamar com nulo explícito reservaria a fila inteira de uma vez.
-      limit coalesce(p_limite, 50)
+      -- Lote entre 1 e 50, sempre. `limit null` em SQL significa "sem limite": chamar com
+      -- nulo explícito reservaria a fila inteira de uma vez (por isso o `coalesce`). E
+      -- `limit` negativo é erro — o robô inteiro pararia por causa de um número.
+      limit greatest(1, least(coalesce(p_limite, 50), 50))
       for update skip locked
    )
   returning a.*;
