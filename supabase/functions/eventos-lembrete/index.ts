@@ -22,6 +22,8 @@ import {
  *    falhar e o chat não, a próxima tentativa manda só o e-mail. Desiste em 5 tentativas —
  *    exceto quando a ÚNICA falha da passada foi o 429 do Resend: aí a tentativa é devolvida
  *    (não é o item que atrasou demais, é o robô).
+ * 4. Quem desistiu de vez nesta passada (achado G) vira UM alerta por execução — sininho de
+ *    quem administra a plataforma e e-mail para os donos da Repply — nunca um por item.
  *
  * 🔴 Nenhum erro guardado leva segredo. O corpo da resposta do Resend é cortado em 300.
  */
@@ -63,10 +65,124 @@ function json(corpo: unknown, status = 200) {
   });
 }
 
+async function hashDosIds(ids: string[]): Promise<string> {
+  const bytes = new TextEncoder().encode([...ids].sort().join(","));
+  const buffer = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Achado G da revisão final: nenhuma falha de aviso chegava a alguém — ficava só no
+ * `raise warning` do banco, no `ultimo_erro` da fila e no JSON de resposta, que o
+ * agendamento descarta. Um item que DESISTE (chegou a 5 tentativas e continua sem
+ * concluir) entra na lista que o chamador monta; esta função junta tudo num alerta só por
+ * execução — nunca um por item — e manda pelo sininho de quem administra a plataforma e
+ * por e-mail para os donos da Repply.
+ *
+ * Falha do próprio alerta NUNCA derruba a execução: quem chama decide o que fazer com
+ * `erros`. O sininho não depende do e-mail — se a falha for a cota do Resend, o sininho
+ * ainda precisa sair.
+ */
+async function alertarFalhasDaAgenda(
+  supabase: ReturnType<typeof createClient>,
+  itens: { id: string; tipo: TipoDeAviso; erro: string }[],
+  remetente: string,
+  apiKey: string | undefined,
+): Promise<{ erros: string[] }> {
+  const erros: string[] = [];
+
+  // Agrupa por tipo: quantidade e o ÚLTIMO erro visto daquele tipo nesta passada, cortado
+  // em 200 caracteres — a regra pede isso para sininho e e-mail, os dois.
+  const porTipo = new Map<TipoDeAviso, { quantidade: number; ultimoErro: string }>();
+  for (const item of itens) {
+    porTipo.set(item.tipo, {
+      quantidade: (porTipo.get(item.tipo)?.quantidade ?? 0) + 1,
+      ultimoErro: item.erro.slice(0, 200),
+    });
+  }
+  const resumoPorTipo = [...porTipo.entries()]
+    .map(([tipo, r]) => `${tipo}: ${r.quantidade} item(ns) — último erro: ${r.ultimoErro}`)
+    .join("\n");
+  // Só contagem e erro — nunca título nem descrição de evento de cliente (a regra exige).
+  const mensagem = `${itens.length} aviso(s) da agenda não saíram nesta passada.\n\n${resumoPorTipo}`;
+
+  // Sininho: administrador da plataforma é `usuarios.role = 'admin'` — o mesmo critério que
+  // `is_admin()` usa em toda função administrativa do banco (conferido em produção, só
+  // leitura: hoje existe UM administrador, com `empresa_id` nulo — mas o critério de verdade
+  // é o `role`, não a empresa vazia, que é consequência e não regra). Filtra `deleted_at`
+  // porque `is_admin()` não filtra (ela só confere quem está logado agora, e aqui não há
+  // sessão nenhuma para essa pergunta responder sozinha) — sem isto um administrador que
+  // saiu da equipe continuaria recebendo o alerta.
+  try {
+    const { data: admins, error: eAdmins } = await supabase
+      .from("usuarios")
+      .select("id")
+      .eq("role", "admin")
+      .is("deleted_at", null);
+    if (eAdmins) throw new Error(eAdmins.message);
+    for (const admin of admins ?? []) {
+      const { error } = await supabase.from("notificacoes").insert({
+        usuario_id: (admin as { id: string }).id,
+        tipo: "agenda_falha",
+        titulo: "⚠️ Avisos da agenda não saíram",
+        mensagem,
+      });
+      if (error) throw new Error(error.message);
+    }
+  } catch (e) {
+    erros.push(`alerta (sininho): ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  // E-mail: só os donos da Repply, vindos da variável de ambiente — nunca escrito no
+  // código, em teste ou em comentário (o repositório é público). Ausente ou vazia não é
+  // erro: é a configuração normal de quem ainda não ligou o alerta.
+  try {
+    const destinatarios = (Deno.env.get("ALERTA_AGENDA_EMAILS") ?? "")
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+    if (destinatarios.length > 0) {
+      if (!apiKey) throw new Error("chave do Resend ausente");
+      // Mesmo teto de tempo do envio normal (achado 3 do bloco anterior).
+      const TEMPO_LIMITE_RESEND_MS = 10_000;
+      const controle = new AbortController();
+      const disparoDoLimite = setTimeout(() => controle.abort(), TEMPO_LIMITE_RESEND_MS);
+      try {
+        // Idempotência estável para ESTE lote de itens desistentes: hash dos ids em ordem.
+        // Não existe id de lote gravado no banco (a regra pediu para não precisar de
+        // coluna nova) — o conjunto de ids É o lote.
+        const chaveDoLote = await hashDosIds(itens.map((i) => i.id));
+        const resp = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "Idempotency-Key": `evento-alerta-agenda-${chaveDoLote}`,
+          },
+          body: JSON.stringify({
+            from: remetente,
+            to: destinatarios,
+            subject: "Repply CRM: avisos da agenda não saíram",
+            html: `<pre style="font-family:inherit;white-space:pre-wrap">${mensagem}</pre>`,
+          }),
+          signal: controle.signal,
+        });
+        if (!resp.ok) throw new Error(`Resend ${resp.status}: ${(await resp.text()).slice(0, 300)}`);
+      } finally {
+        clearTimeout(disparoDoLimite);
+      }
+    }
+  } catch (e) {
+    erros.push(`alerta (e-mail): ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  return { erros };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const resultado = { lembretes_gerados: 0, avisos: 0, concluidos: 0, erros: [] as string[] };
+  const resultado = { lembretes_gerados: 0, avisos: 0, concluidos: 0, alertas: 0, erros: [] as string[] };
 
   try {
     const supabase = createClient(
@@ -113,6 +229,10 @@ Deno.serve(async (req) => {
     // todo: só espera quem de fato vai mandar e-mail nesta passada.
     const ESPACAMENTO_ENTRE_EMAILS_MS = 600;
     let ultimoEnvioEmailEm: number | null = null;
+
+    // Achado G: itens que desistem NESTA passada (5ª tentativa, ainda sem concluir) juntam
+    // aqui para virar UM alerta só no fim da execução — nunca um por item.
+    const itensDesistentes: { id: string; tipo: TipoDeAviso; erro: string }[] = [];
 
     for (const a of lista) {
       resultado.avisos++;
@@ -274,7 +394,16 @@ Deno.serve(async (req) => {
           resultado.erros.push(`${a.id}: ${detalhe.slice(0, 500)}`);
         } else {
           if (erroDosCanais) resultado.erros.push(`${a.id}: ${erroDosCanais}`);
-          if (concluidoNestaPassada) resultado.concluidos++;
+          if (concluidoNestaPassada) {
+            resultado.concluidos++;
+          } else if (a.tentativas >= 5 && !devolveTentativa) {
+            // Desistiu de verdade: a linha reservada já chegou a 5 e não foi devolvida
+            // (achado D) — a próxima reserva não pega mais este item (`tentativas < 5` no
+            // filtro), então este é o único momento em que ele pode alertar. Só existe uma
+            // quinta tentativa por item, e ela só passa por aqui uma vez — daí o alerta sair
+            // uma única vez por item, sem precisar de coluna nova para marcar "já alertei".
+            itensDesistentes.push({ id: a.id, tipo: a.tipo, erro: erroDosCanais ?? "(sem erro registrado)" });
+          }
         }
       } catch (e) {
         // A própria gravação pode lançar em vez de devolver {error} — mesma classe de
@@ -284,6 +413,12 @@ Deno.serve(async (req) => {
         const detalhe = erroDosCanais ? `${erroDosCanais} | marcar: ${msg}` : `marcar: ${msg}`;
         resultado.erros.push(`${a.id}: ${detalhe.slice(0, 500)}`);
       }
+    }
+
+    if (itensDesistentes.length > 0) {
+      resultado.alertas = itensDesistentes.length;
+      const { erros: errosDoAlerta } = await alertarFalhasDaAgenda(supabase, itensDesistentes, remetente, apiKey);
+      resultado.erros.push(...errosDoAlerta);
     }
 
     return json(resultado);
