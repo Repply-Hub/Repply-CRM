@@ -97,10 +97,11 @@ estreitam o "qualquer ação":
   exceção é a tarefa **vencida**, e aí sim concluí-la conta como retorno. Fora desse caso,
   concluir a tarefa não faz o negócio aparecer como "feito" hoje: ele volta amanhã, se continuar
   parado.
-- **Negócio ganho ou perdido hoje sai da conta do dia.** Ele deixa de ser candidato pelo filtro de
-  etapa aberta, e não aparece como "feito" — o contador diz "3 de 6" em vez de "3 de 7". A lista
-  continua chegando a zero; o que se perde é o crédito. Tratar esse caso pediria descobrir em que
-  etapa o negócio estava na virada do dia, e não vale a regra a mais.
+- **Negócio ganho ou perdido hoje conta como feito.** A etapa que decide se ele é candidato é a da
+  virada do dia, lida da primeira mudança de etapa de hoje. Uma versão anterior deste desenho
+  deixava o negócio ganho sair da conta; a revisão da implementação mostrou que, com a etapa lida
+  ao vivo, o próximo da fila **entrava na vaga dele** — a recomposição que o pedido derruba. Por
+  isso a etapa passou a ser a da virada.
 
 ### 3.2 A lista do dia
 
@@ -116,8 +117,12 @@ Em termos de implementação, três coisas passam a ser medidas **no começo do 
 2. **Quantas vagas os compromissos ocupam** — conta os compromissos do dia que já existiam na
    virada, **concluídos ou não**. Sem isso, concluir uma tarefa abriria vaga e puxaria um negócio
    novo para dentro (recomposição), e criar uma tarefa às 10h derrubaria um negócio da lista.
-3. **A escolha e a ordem** — os do próprio dono primeiro (§3.3) e, depois deles, os mais parados
-   da equipe, cortando no teto.
+3. **A escolha e a ordem** — os do próprio dono primeiro (§3.3) e, depois deles, os da equipe;
+   entre os parados, **os de maior valor entram primeiro**, cortando no teto. É a regra que a pauta
+   já usa hoje, mantida por decisão do dono do produto em 13/09/2026. A alternativa, "os parados
+   há mais tempo", foi descartada por um motivo medido: na MD, hoje, isso quer dizer "intocado desde
+   a importação do Bitrix" — todos empatam em 12 dias — e tiraria da pauta os negócios trabalhados
+   depois da importação que pararam de novo.
 
 **Exceção deliberada: compromissos da agenda continuam ao vivo.** Reunião marcada às 10h para as
 15h **aparece** na pauta. Esconder um compromisso do dia até amanhã seria defeito, não regra. A
@@ -129,7 +134,7 @@ negócios, e "reunião marcada não se corta por teto" já é a promessa da tela
 Para quem tem a chave `pauta_de_todos` (todo gestor, por padrão):
 
 - os negócios **no nome dele** ocupam as primeiras vagas, em ordem de valor;
-- o resto do teto é preenchido pelos mais parados da equipe;
+- o resto do teto é preenchido pelos negócios parados da equipe, os de maior valor primeiro;
 - cada item de colega mostra **de quem é** — a etiqueta de dono existia na tela e saiu em 09/09,
   quando a fila virou pessoal. Ela volta. O e-mail já sabe mostrar o nome (`montarItens` em
   `supabase/functions/pauta-resumo-diario/corpo.ts` nunca deixou de tratar o campo).
@@ -334,6 +339,11 @@ silêncio). O valor de `pauta_min_itens` continua no banco, então a volta é co
 | Gestor com muitos negócios próprios não vendo a equipe | Zero hoje | Nenhum gestor da base tem mais de 3 negócios abertos; se um dia tiver, o teto é dele mesmo |
 | Tarefa concluída hoje contar como "ação" sem ser follow-up | Pequeno | Aceito: concluir tarefa do negócio é trabalho no negócio |
 | Contato registrado com data retroativa não contar | Pequeno | Aceito: erra para o lado de manter na fila |
+| Editar o valor de um negócio na borda do corte troca um negócio por outro na lista | Raro | Aceito: a conta continua a mesma; selar exigiria reconstruir o valor da virada pelo histórico |
+| Trocar o dono move o negócio de uma pauta para outra no meio do dia | Raro | Aceito, pelo mesmo motivo |
+| Mudar o prazo ou apagar um compromisso de hoje abre vaga, e um negócio entra | Raro | Aceito: o compromisso da virada é contado pelo prazo atual |
+| Reabrir ou editar tarefa pode esconder o negócio sem dar crédito | Raro | Aceito: erra para o lado de não inventar trabalho |
+| Importação que mude a etapa no dia mexe na lista | Raro | Aceito: importação grava etapa anterior nula e não conta como retorno |
 
 ⚠️ **Armadilha de fuso já medida nesta base:** `historico_contatos.data_contato` guarda valores
 gravados de duas formas — meia-noite em UTC (o que o "Retomar depois" grava) e meio-dia em UTC (o
