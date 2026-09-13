@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertTriangle, CalendarDays, Trash2, Users, Check, ChevronDown, HardHat } from 'lucide-react';
@@ -116,10 +117,14 @@ export function EventDialog({
   const [conflitos, setConflitos] = useState<ConflitoVisita[]>([]);
   const [verificandoConflito, setVerificandoConflito] = useState(false);
   const { user } = useAuth();
+  const qc = useQueryClient();
   const { data: usuarios, refetch: refetchUsuarios } = useVendedores();
-  const { data: participantesExistentes } = useEventoParticipantes(
-    open && editingEvent ? editingEvent.grupoId : null,
-  );
+  const {
+    data: participantesExistentes,
+    isLoading: carregandoParticipantes,
+    isError: participantesComErro,
+    refetch: refetchParticipantes,
+  } = useEventoParticipantes(open && editingEvent ? editingEvent.grupoId : null);
 
   // Funcionários da empresa, incluindo o próprio usuário logado (aparece como "Você", no topo)
   const funcionariosDisponiveis = useMemo(() => {
@@ -138,6 +143,16 @@ export function EventDialog({
     // já que a página de calendário fica montada e o cache pode estar desatualizado
     // (ex.: usuário novo criado em outra sessão/aba).
     refetchUsuarios();
+
+    // 🔴 Bloco 3, item A — "variante" do bug: `useEventoParticipantes` usa `staleTime:
+    // Infinity` de propósito (evita sobrescrever seleção em foco de janela), mas isso também
+    // significa que reabrir o MESMO evento poderia reaproveitar uma lista velha do cache —
+    // convidando de novo quem já tinha saído entre uma abertura e outra. Invalidar aqui, ao
+    // abrir, força ir ao banco de novo sem mudar o `staleTime` da consulta (que outra tela,
+    // `NovaRotaVisitaDialog`, também usa e não deve ser afetada).
+    if (editingEvent?.grupoId) {
+      qc.invalidateQueries({ queryKey: ['evento-participantes', editingEvent.grupoId] });
+    }
 
     // Voltando da rota de visita: o que a pessoa já tinha preenchido continua na tela.
     // Este efeito é o ÚNICO lugar que apaga o rascunho, então sair aqui é o que faz o
@@ -160,9 +175,15 @@ export function EventDialog({
         diaInteiro: editingEvent.diaInteiro,
         tipoCalendario: editingEvent.tipoCalendario,
         cor: editingEvent.cor,
-        // A lista real de participantes chega depois, pela query de
-        // participantes existentes (useEventoParticipantes) — ver efeito abaixo.
-        participantes: [],
+        // 🔴 `undefined`, e não `[]`. A lista real chega depois, pela consulta de
+        // participantes existentes (useEventoParticipantes) — ver efeito abaixo. Até lá,
+        // "ainda não sei quem são os participantes" (undefined) tem de ficar visualmente
+        // distinto de "a pessoa esvaziou a seleção de propósito" ([]) — é essa distinção que
+        // `useUpdateEvento` usa para recusar salvar em cima de uma lista que não carregou
+        // (Bloco 3, item A). Os dois casos SE PARECEM na tela (nenhum badge aparece), mas o
+        // botão Salvar fica desabilitado enquanto for o primeiro (ver `aguardandoParticipantes`
+        // abaixo), então a diferença nunca chega a ser salva por engano.
+        participantes: undefined,
         // `normalizarLembretes` de novo aqui, e não só na gravação: o `LembretesField` confia
         // que `value` chega ordenado e sem repetição (ver seu comentário), e este é o único
         // ponto em que um dado vindo do banco alimenta esse `value` diretamente.
@@ -179,7 +200,7 @@ export function EventDialog({
         ...initialData,
       });
     }
-  }, [open, editingEvent, initialData, retomandoRascunho, user?.id]);
+  }, [open, editingEvent, initialData, retomandoRascunho, user?.id, qc]);
 
   // Preenche os participantes do evento assim que a busca resolve (chega
   // depois da abertura do modal, por isso é um efeito separado do de cima).
@@ -228,6 +249,15 @@ export function EventDialog({
   // Evento "empresa" visível pra empresa inteira, mas cujo usuário logado não
   // é participante nem organizador: pode abrir e ler, não pode salvar/excluir.
   const somenteLeitura = isEditing && editingEvent?.podeEditar === false;
+
+  // 🔴 Bloco 3, item A (CRÍTICO). Salvar antes de a lista de participantes voltar do banco
+  // fazia `useUpdateEvento` tratar "ainda não chegou" como "esvaziei de propósito" — e ele
+  // apaga quem não está na lista, disparando "Evento cancelado para você" por chat e e-mail
+  // para todo mundo. Só se aplica a QUEM PODE GERENCIAR participantes de um evento JÁ
+  // existente: criar evento novo não consulta participantes existentes, e quem só participa
+  // nunca atualiza o grupo inteiro (ver `useUpdateEvento`).
+  const aguardandoParticipantes =
+    isEditing && podeGerenciarParticipantes && (carregandoParticipantes || participantesComErro);
 
   const salvarDeFato = () => {
     onSave(form);
@@ -614,11 +644,31 @@ export function EventDialog({
                   Excluir
                 </Button>
               )}
+              {/* Perto do botão Salvar, de propósito — é ele quem fica desabilitado enquanto
+                  isto aparece. Ver `aguardandoParticipantes` acima. */}
+              {carregandoParticipantes && podeGerenciarParticipantes && (
+                <span className="text-xs text-muted-foreground">Carregando participantes…</span>
+              )}
+              {participantesComErro && podeGerenciarParticipantes && (
+                <>
+                  <span className="text-xs text-destructive">
+                    Não foi possível carregar os participantes.
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => refetchParticipantes()}
+                  >
+                    Tentar de novo
+                  </Button>
+                </>
+              )}
               <Button variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
               <Button
                 size="sm"
                 onClick={handleSubmit}
-                disabled={!form.titulo.trim() || verificandoConflito}
+                disabled={!form.titulo.trim() || verificandoConflito || aguardandoParticipantes}
               >
                 {verificandoConflito ? 'Verificando agenda...' : isEditing ? 'Salvar' : 'Criar'}
               </Button>

@@ -744,6 +744,22 @@ export function useUpdateEvento() {
         return;
       }
 
+      // 🔴 DEFESA (Bloco 3, item A). `form.participantes === undefined` só acontece quando a
+      // tela salvou ANTES de a consulta de participantes existentes voltar — `EventDialog`
+      // preenche o campo com `undefined` até lá, e só troca para um array (mesmo vazio) depois
+      // que a consulta resolve. Ou seja, aqui dá para distinguir os dois casos que a tela
+      // representava do MESMO jeito antes deste conserto:
+      //   participantes === undefined  -> "não sei quem são" (não carregou)
+      //   participantes === []         -> "ninguém, além de mim" (a pessoa esvaziou a seleção
+      //                                    de propósito — é assim que a tela grava "ficou só
+      //                                    quem organiza", ver `toggleTodosParticipantes`)
+      // Sem esta trava, a primeira situação cairia no mesmo `selecionados.length > 0 ? ... :
+      // [criadoPor!]` de baixo e apagaria todo mundo — é a causa raiz do bug: o banco manda
+      // "Evento cancelado para você" por chat e e-mail para quem nunca pediu para sair.
+      if (form.participantes === undefined) {
+        throw new Error('A lista de participantes não carregou; nada foi alterado.');
+      }
+
       // Organizador: propaga os campos comuns para todas as linhas do grupo
       // e reconcilia os participantes (adiciona/remove linhas).
       const { data: existentes, error: fetchError } = await supabase
