@@ -48,6 +48,15 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
   const createFabricante = useCreateFabricanteCompleto();
   const campoCnpjRef = useRef<CampoCnpjHandle>(null);
   const [conferindo, setConferindo] = useState(false);
+  // Sessão do modal: incrementa quando ele FECHA (pelo "X" ou pelo "Cancelar") — nenhum dos dois
+  // desmonta este componente, então sem isto o cadastro em andamento seguia até o fim mesmo com a
+  // pessoa já tendo desistido. `fecharDialogo` é o único caminho que fecha o modal.
+  const sessaoRef = useRef(0);
+
+  const fecharDialogo = (aberto: boolean) => {
+    if (!aberto) sessaoRef.current += 1;
+    setDialogOpen(aberto);
+  };
 
   // A lista chega do hook já com as marcas inativas por último (`useFabricantes`), e este
   // filtro preserva a ordem — `Array.prototype.filter` não reordena nada.
@@ -78,9 +87,13 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
 
     // Mesma regra da tela de Fabricantes: CNPJ que a Receita CONFIRMA não existir não entra, e o
     // cadastro espera a consulta de quem digitou e clicou direto. Serviço fora do ar não trava.
+    const sessaoDoEnvio = sessaoRef.current;
     setConferindo(true);
     const conferencia = await campoCnpjRef.current?.conferir();
     setConferindo(false);
+    // Fechar o modal (o "X" ou "Cancelar") durante a espera não cancela nada sozinho — sem esta
+    // guarda a gravação seguia até o fim e trocava a fábrica selecionada no negócio em silêncio.
+    if (sessaoDoEnvio !== sessaoRef.current) return;
     if (conferencia && !resultadoPermiteSalvar(conferencia, 'bloquear')) return;
 
     try {
@@ -208,7 +221,7 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
         </PopoverContent>
       </Popover>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={fecharDialogo}>
         <ConteudoDialogo className="sm:max-w-[425px]">
           <CabecalhoDialogo>
             <DialogTitle>Cadastrar Novo Fabricante</DialogTitle>
@@ -235,7 +248,7 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
             />
           </CorpoDialogo>
           <RodapeDialogo>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => fecharDialogo(false)}>Cancelar</Button>
             <Button onClick={handleCreate} disabled={createFabricante.isPending || conferindo}>
               {conferindo ? 'Conferindo o CNPJ...' : createFabricante.isPending ? 'Salvando...' : 'Cadastrar e Selecionar'}
             </Button>

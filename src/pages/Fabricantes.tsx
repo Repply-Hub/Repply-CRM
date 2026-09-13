@@ -47,7 +47,7 @@ import {
   fabricanteEstaAtivo,
 } from "@/lib/ordem-de-fabricantes";
 
-import { Plus, Loader2, CheckCircle2, Pencil, Trash2, Factory, Phone, User, ArrowLeft, Hash, X } from "lucide-react";
+import { Plus, Loader2, Pencil, Trash2, Factory, Phone, User, ArrowLeft, Hash, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -96,6 +96,11 @@ function FabricanteForm({
   // a fábrica duas vezes.
   const [conferindo, setConferindo] = useState(false);
   const campoCnpjRef = useRef<CampoCnpjHandle>(null);
+  // Sessão do modal: incrementa quando ele FECHA. Fechar (o "X") durante os até 10 s da
+  // conferência não desmonta este componente — o <Dialog> só esconde —, então sem isto o
+  // handleSubmit em andamento seguia até o fim mesmo com a pessoa já tendo desistido. Captura-se
+  // o número ANTES de esperar a Receita; se ele mudou depois, o modal fechou nesse meio-tempo.
+  const sessaoRef = useRef(0);
   const [nome, setNome] = useState(editData?.nome ?? "");
   const [telefone, setTelefone] = useState(editData?.telefone ?? "");
   // Fabricante novo nasce Ativa: quem cadastra uma marca é porque acabou de passar a
@@ -141,9 +146,13 @@ function FabricanteForm({
     // 🔴 A regra da fábrica (decisão do dono do produto, 11/09/2026): CNPJ que a Receita CONFIRMA
     // não existir não entra. Quem digita e clica em Salvar sem sair do campo não escapa — a
     // consulta roda agora e o salvamento espera por ela. Serviço fora do ar não trava.
+    const sessaoDoEnvio = sessaoRef.current;
     setConferindo(true);
     const conferencia = await campoCnpjRef.current?.conferir();
     setConferindo(false);
+    // A pessoa pode ter fechado o modal pelo "X" enquanto a Receita ainda respondia: sem esta
+    // guarda, o salvamento seguia sozinho e gravava a fábrica que ela desistiu de cadastrar.
+    if (sessaoDoEnvio !== sessaoRef.current) return;
     if (conferencia && !resultadoPermiteSalvar(conferencia, "bloquear")) return;
     const cnpjDigitos = unmaskCnpj(cnpj);
     try {
@@ -226,7 +235,10 @@ function FabricanteForm({
       open={open}
       onOpenChange={(o) => {
         onOpenChange(o);
-        if (!o) reset();
+        if (!o) {
+          sessaoRef.current += 1;
+          reset();
+        }
       }}
     >
       <ConteudoDialogo className="sm:max-w-[425px]">
