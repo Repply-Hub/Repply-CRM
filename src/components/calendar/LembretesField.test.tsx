@@ -44,4 +44,57 @@ describe('LembretesField', () => {
     render(<LembretesField value={[]} onChange={() => {}} />);
     expect(screen.getByText('Sem lembrete')).toBeTruthy();
   });
+
+  describe('personalizado — valor que não vale (Bloco 3, item C)', () => {
+    const MENSAGEM = 'Não deu para usar esse tempo. Use um número de minutos inteiro, até 30 dias.';
+
+    it('"1,5" minutos mostra o erro, não chama onChange e o formulário continua aberto', () => {
+      const onChange = vi.fn();
+      render(<LembretesField value={[]} onChange={onChange} />);
+      fireEvent.change(screen.getByLabelText('Adicionar lembrete'), { target: { value: 'personalizado' } });
+      fireEvent.change(screen.getByLabelText('Quanto tempo antes'), { target: { value: '1,5' } });
+      fireEvent.change(screen.getByLabelText('Unidade'), { target: { value: 'minutos' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.getByText(MENSAGEM)).toBeTruthy();
+      // Continua aberto: o campo "Quanto tempo antes" ainda está na tela.
+      expect(screen.getByLabelText('Quanto tempo antes')).toBeTruthy();
+    });
+
+    it('"abc" mostra o erro', () => {
+      const onChange = vi.fn();
+      render(<LembretesField value={[]} onChange={onChange} />);
+      fireEvent.change(screen.getByLabelText('Adicionar lembrete'), { target: { value: 'personalizado' } });
+      fireEvent.change(screen.getByLabelText('Quanto tempo antes'), { target: { value: 'abc' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.getByText(MENSAGEM)).toBeTruthy();
+    });
+
+    it('campo vazio mostra o erro', () => {
+      const onChange = vi.fn();
+      render(<LembretesField value={[]} onChange={onChange} />);
+      fireEvent.change(screen.getByLabelText('Adicionar lembrete'), { target: { value: 'personalizado' } });
+      fireEvent.change(screen.getByLabelText('Quanto tempo antes'), { target: { value: '' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.getByText(MENSAGEM)).toBeTruthy();
+    });
+
+    it('"1,5" horas vale, vira 90 e fecha o formulário (aceita vírgula)', () => {
+      const onChange = vi.fn();
+      render(<LembretesField value={[]} onChange={onChange} />);
+      fireEvent.change(screen.getByLabelText('Adicionar lembrete'), { target: { value: 'personalizado' } });
+      fireEvent.change(screen.getByLabelText('Quanto tempo antes'), { target: { value: '1,5' } });
+      fireEvent.change(screen.getByLabelText('Unidade'), { target: { value: 'horas' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+
+      expect(onChange).toHaveBeenCalledWith([90]);
+      // Fechou: o campo "Quanto tempo antes" não está mais na tela.
+      expect(screen.queryByLabelText('Quanto tempo antes')).toBeNull();
+    });
+  });
 });

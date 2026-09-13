@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import {
   LIMITE_DE_LEMBRETES,
   OPCOES_DE_LEMBRETE,
-  UNIDADE_EM_MINUTOS,
+  minutosPersonalizados,
   normalizarLembretes,
   rotuloDoLembrete,
   type UnidadeDeLembrete,
@@ -27,8 +27,15 @@ export function LembretesField({ value, onChange, disabled }: Props) {
   const [personalizando, setPersonalizando] = useState(false);
   const [quanto, setQuanto] = useState('30');
   const [unidade, setUnidade] = useState<UnidadeDeLembrete>('minutos');
+  // 🔴 Bloco 3, item C. `null` = "ainda não tentou" (esconde a frase); string = o erro a mostrar.
+  const [erro, setErro] = useState<string | null>(null);
 
   const acrescentar = (minutos: number) => onChange(normalizarLembretes([...value, minutos]));
+  const cancelarPersonalizado = () => {
+    setPersonalizando(false);
+    setErro(null);
+    setQuanto('30');
+  };
   const disponiveis = OPCOES_DE_LEMBRETE.filter((m) => !value.includes(m));
   const podeAcrescentar = !disabled && value.length < LIMITE_DE_LEMBRETES;
 
@@ -79,19 +86,29 @@ export function LembretesField({ value, onChange, disabled }: Props) {
 
       {podeAcrescentar && personalizando && (
         <div className="flex flex-wrap items-center gap-2">
+          {/* 🔴 `type="text" inputMode="decimal"`, não `type="number"` — CLAUDE.md §7.10. O
+              navegador devolve string vazia para "1,5" num campo `number` (vírgula não é
+              dígito para ele), e o formulário fechava como se o lembrete tivesse entrado,
+              sem avisar nada. `inputMode="decimal"` só troca o teclado no celular. */}
           <Input
             aria-label="Quanto tempo antes"
-            type="number"
-            min={1}
+            type="text"
+            inputMode="decimal"
             value={quanto}
-            onChange={(e) => setQuanto(e.target.value)}
+            onChange={(e) => {
+              setQuanto(e.target.value);
+              setErro(null);
+            }}
             className="h-9 w-20"
           />
           <select
             aria-label="Unidade"
             className={SELECT}
             value={unidade}
-            onChange={(e) => setUnidade(e.target.value as UnidadeDeLembrete)}
+            onChange={(e) => {
+              setUnidade(e.target.value as UnidadeDeLembrete);
+              setErro(null);
+            }}
           >
             <option value="minutos">minutos</option>
             <option value="horas">horas</option>
@@ -101,16 +118,21 @@ export function LembretesField({ value, onChange, disabled }: Props) {
             type="button"
             size="sm"
             onClick={() => {
-              const minutos = Number(quanto) * UNIDADE_EM_MINUTOS[unidade];
-              if (Number.isInteger(minutos) && minutos > 0) acrescentar(minutos);
-              setPersonalizando(false);
+              const minutos = minutosPersonalizados(quanto, unidade);
+              if (minutos === null) {
+                setErro('Não deu para usar esse tempo. Use um número de minutos inteiro, até 30 dias.');
+                return;
+              }
+              acrescentar(minutos);
+              cancelarPersonalizado();
             }}
           >
             Adicionar
           </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setPersonalizando(false)}>
+          <Button type="button" size="sm" variant="ghost" onClick={cancelarPersonalizado}>
             Cancelar
           </Button>
+          {erro && <p className="w-full text-xs text-destructive">{erro}</p>}
         </div>
       )}
     </div>
