@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Check, ChevronDown, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { correspondeBusca } from '@/lib/texto-busca';
@@ -16,13 +16,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Dialog, DialogTitle } from '@/components/ui/dialog';
+import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
+import { CampoCnpj, type CampoCnpjHandle } from '@/components/shared/CampoCnpj';
+import { unmaskCnpj, formatarDocumento, resultadoPermiteSalvar } from '@/lib/cnpj';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFabricantes } from '@/hooks/use-clientes';
@@ -48,16 +46,23 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
 
   const { data: fabricantes, isLoading } = useFabricantes();
   const createFabricante = useCreateFabricanteCompleto();
+  const campoCnpjRef = useRef<CampoCnpjHandle>(null);
+  const [conferindo, setConferindo] = useState(false);
 
   // A lista chega do hook já com as marcas inativas por último (`useFabricantes`), e este
   // filtro preserva a ordem — `Array.prototype.filter` não reordena nada.
   const filteredFabricantes = useMemo(() => {
     if (!fabricantes) return [];
     if (!searchTerm) return fabricantes;
-    // Sem acento e sem caixa: "acos" acha "Aços". O CNPJ casa pelos dígitos crus.
+    // Sem acento e sem caixa: "acos" acha "Aços". O CNPJ casa DÍGITO COM DÍGITO, dos dois lados:
+    // as fábricas antigas guardam com máscara e as novas só com dígitos, e comparar o texto cru
+    // não achava nenhuma das antigas. Só entra na conta quando a busca é um número — senão
+    // "Tigre 2" traria toda fábrica com um 2 no CNPJ.
+    const buscaEhNumero = /^[\d./\-\s]+$/.test(searchTerm.trim());
+    const digitosDaBusca = searchTerm.replace(/\D/g, '');
     return fabricantes.filter((f) =>
       correspondeBusca(f.nome, searchTerm) ||
-      f.cnpj?.includes(searchTerm.trim())
+      (buscaEhNumero && digitosDaBusca.length > 0 && (f.cnpj ?? '').replace(/\D/g, '').includes(digitosDaBusca))
     );
   }, [fabricantes, searchTerm]);
 
@@ -71,16 +76,26 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
       return;
     }
 
+    // Mesma regra da tela de Fabricantes: CNPJ que a Receita CONFIRMA não existir não entra, e o
+    // cadastro espera a consulta de quem digitou e clicou direto. Serviço fora do ar não trava.
+    setConferindo(true);
+    const conferencia = await campoCnpjRef.current?.conferir();
+    setConferindo(false);
+    if (conferencia && !resultadoPermiteSalvar(conferencia, 'bloquear')) return;
+
     try {
-      const result = await createFabricante.mutateAsync(newFab);
+      const result = await createFabricante.mutateAsync({
+        nome: newFab.nome,
+        cnpj: unmaskCnpj(newFab.cnpj) || undefined,
+      });
       toast.success('Fabricante cadastrado com sucesso!');
       setDialogOpen(false);
       if (result?.id) {
         onValueChange(result.id);
       }
       setNewFab({ nome: '', cnpj: '' });
-    } catch (error: any) {
-      toast.error('Erro ao cadastrar fabricante: ' + error.message);
+    } catch (error) {
+      toast.error('Erro ao cadastrar fabricante: ' + mensagemDeErro(error));
     }
   };
 
@@ -165,7 +180,7 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
                         )}
                       </span>
                       {fab.cnpj && (
-                        <span className="text-[10px] text-muted-foreground">{fab.cnpj}</span>
+                        <span className="text-[10px] text-muted-foreground">{formatarDocumento(fab.cnpj)}</span>
                       )}
                     </div>
                   </CommandItem>
@@ -194,11 +209,11 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
       </Popover>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
+        <ConteudoDialogo className="sm:max-w-[425px]">
+          <CabecalhoDialogo>
             <DialogTitle>Cadastrar Novo Fabricante</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
+          </CabecalhoDialogo>
+          <CorpoDialogo className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="fab-name">Nome do Fabricante *</Label>
               <Input
@@ -208,23 +223,24 @@ export function FabricanteSelector({ value, onValueChange, placeholder = "Seleci
                 placeholder="Ex: Tigre, Deca"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="fab-cnpj">CNPJ</Label>
-              <Input
-                id="fab-cnpj"
-                value={newFab.cnpj}
-                onChange={(e) => setNewFab({ ...newFab, cnpj: e.target.value })}
-                placeholder="00.000.000/0000-00"
-              />
-            </div>
-          </div>
-          <DialogFooter>
+            <CampoCnpj
+              ref={campoCnpjRef}
+              id="fab-cnpj"
+              value={newFab.cnpj}
+              onChange={(v) => setNewFab((f) => ({ ...f, cnpj: v }))}
+              onDadosEncontrados={(dados) =>
+                setNewFab((f) => ({ ...f, nome: f.nome || dados.razao_social || '' }))
+              }
+              seNaoExistir="bloquear"
+            />
+          </CorpoDialogo>
+          <RodapeDialogo>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCreate} disabled={createFabricante.isPending}>
-              {createFabricante.isPending ? 'Salvando...' : 'Cadastrar e Selecionar'}
+            <Button onClick={handleCreate} disabled={createFabricante.isPending || conferindo}>
+              {conferindo ? 'Conferindo o CNPJ...' : createFabricante.isPending ? 'Salvando...' : 'Cadastrar e Selecionar'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
+          </RodapeDialogo>
+        </ConteudoDialogo>
       </Dialog>
     </>
   );
