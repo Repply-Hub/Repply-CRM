@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 
 /**
  * Uma consulta de CNPJ só — e a regra de cada tela presa no lugar.
@@ -21,6 +21,18 @@ const ler = (relativo: string) => readFileSync(join(RAIZ, relativo), 'utf8');
  * comentário que cita "o <CampoCnpj>" não é uso, e com `\b` ele casaria até o próximo `/>`.
  */
 const usosDoCampoCnpj = (codigo: string) => codigo.match(/<CampoCnpj\s[\s\S]*?\/>/g) ?? [];
+
+function arquivosDeCodigo(dir: string, achados: string[] = []): string[] {
+  for (const item of readdirSync(dir)) {
+    if (item === 'node_modules' || item === 'dist') continue;
+    const caminho = join(dir, item);
+    if (statSync(caminho).isDirectory()) arquivosDeCodigo(caminho, achados);
+    else if (/\.(ts|tsx)$/.test(item) && !/\.test\.(ts|tsx)$/.test(item)) achados.push(caminho);
+  }
+  return achados;
+}
+// `sep`, e não uma barra escrita à mão: no Windows o caminho vem com contrabarra.
+const relativo = (caminho: string) => relative(RAIZ, caminho).split(sep).join('/');
 
 describe('uma consulta de CNPJ só', () => {
   it('🔴 as duas portas de criar fábrica bloqueiam CNPJ que a Receita diz não existir', () => {
@@ -45,5 +57,29 @@ describe('uma consulta de CNPJ só', () => {
       expect(usosComCpf[0], arquivo).not.toContain('bloquear');
       expect(codigo, arquivo).not.toMatch(/fetchCnpjData\s*\(/);
     }
+  });
+
+  // 60 s: a primeira varredura do arquivo levou 23,7 s com a suíte disputando a máquina;
+  // uma trava por lentidão se torna falso alarme da qual a equipe aprende a ignorar (CLAUDE.md §7.15).
+  it('🔴 só src/lib/cnpj.ts fala com o BrasilAPI de CNPJ', { timeout: 60_000 }, () => {
+    const infratores = arquivosDeCodigo(RAIZ)
+      .filter((c) => /brasilapi\.com\.br\/api\/cnpj/.test(readFileSync(c, 'utf8')))
+      .map(relativo)
+      .filter((r) => r !== 'lib/cnpj.ts');
+    expect(infratores).toEqual([]);
+  });
+
+  it('🔴 só o <CampoCnpj> chama consultarCnpj — tela nenhuma monta a sua consulta', { timeout: 60_000 }, () => {
+    const podem = new Set(['lib/cnpj.ts', 'components/shared/CampoCnpj.tsx']);
+    const infratores = arquivosDeCodigo(RAIZ)
+      .filter((c) => /\bconsultarCnpj\s*\(/.test(readFileSync(c, 'utf8')))
+      .map(relativo)
+      .filter((r) => !podem.has(r));
+    expect(infratores).toEqual([]);
+  });
+
+  it('a porta antiga, fetchCnpjData, não existe mais', async () => {
+    const modulo = await import('@/lib/cnpj');
+    expect('fetchCnpjData' in modulo).toBe(false);
   });
 });
