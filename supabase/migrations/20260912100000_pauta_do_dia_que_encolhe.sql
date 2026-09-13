@@ -54,11 +54,18 @@
 --
 -- Quando esta régua errar, ela erra para o lado seguro: o negócio CONTINUA na fila.
 --
--- 🔴 FUSO — `historico_contatos.data_contato` é comparada EM UTC. Medido: a coluna guarda
--- meia-noite UTC (o que `registrar_retorno` grava, `(now() at time zone 'America/Sao_Paulo')::date`
--- convertido para timestamptz) e meio-dia UTC (o que as telas de contato gravam). Converter
--- para São Paulo joga o primeiro grupo para o dia ANTERIOR, e o retorno registrado hoje contaria
--- como de ontem. É a armadilha do CLAUDE.md §7.12 vista do lado do banco.
+-- 🔴 FUSO — `historico_contatos.data_contato` é comparada EM UTC. Medido em 13/09/2026, quem grava
+-- a coluna e em que formato:
+--   · meia-noite UTC — `registrar_retorno` (o "Retomar depois") grava
+--     `(now() at time zone 'America/Sao_Paulo')::date`, uma data convertida para timestamptz. São as
+--     linhas novas. Converter para São Paulo as jogaria para o dia ANTERIOR, e o retorno registrado
+--     hoje contaria como de ontem — a armadilha do CLAUDE.md §7.12 vista do lado do banco;
+--   · meio-dia UTC — linhas ANTIGAS, a última de 17/08/2026. Nenhum gravador vivo escreve assim;
+--   · o instante real — `src/hooks/use-novo-pedido.ts`, o único gravador de tela, insere o contato
+--     agendado na criação do negócio SEM `data_contato`, e a coluna cai no padrão `now()`.
+-- Para o que existe no banco hoje, a data em UTC é a certa: meia-noite e meio-dia UTC caem no dia
+-- que quem registrou quis dizer. O instante real só erra entre 21h e meia-noite, quando a data UTC
+-- já é a de amanhã — ver a borda no bloco RAROS.
 --
 -- ----------------------------------------------------------------------------
 -- O QUE CONGELA NA VIRADA DO DIA, E POR QUÊ
@@ -74,8 +81,8 @@
 --   3. A tarefa que esconde o negócio — vale a que existia na virada. Tarefa criada hoje não
 --      esconde (o negócio sai como feito); tarefa concluída hoje não revela (ela escondia o
 --      negócio na virada, então ele não era da lista de hoje).
---   4. `v_compromissos`, que desconta vaga — conta os compromissos do dia que já existiam na
---      virada, concluídos ou não. Sem isso, concluir uma tarefa abriria vaga e puxaria um
+--   4. `v_compromissos`, que desconta vaga — conta os compromissos do dia que existiam em aberto na
+--      virada, concluídos hoje ou não. Sem isso, concluir uma tarefa abriria vaga e puxaria um
 --      negócio novo, e criar uma tarefa às 10h derrubaria um negócio da lista.
 --   5. `etapa_na_virada` — negócio GANHO OU PERDIDO hoje continua candidato pela etapa em que
 --      estava na virada: a primeira mudança de etapa do dia guarda de onde ele saiu. Ele segura a
@@ -92,19 +99,30 @@
 -- RAROS, ACEITOS, e para que lado erram
 -- ----------------------------------------------------------------------------
 -- Estas entradas continuam lidas AO VIVO e podem mexer na lista durante o dia. São raras, e selar
--- qualquer uma delas exigiria reconstruir o estado da virada a partir do histórico, campo por
--- campo — não vale agora. Regra geral: quando uma delas tira um negócio dos candidatos e há mais
--- parados que vagas, o próximo da fila entra no lugar.
+-- qualquer uma delas exigiria reconstruir o estado da virada lendo o registro de auditoria, campo
+-- por campo — não vale agora. Regra geral: quando uma delas tira um negócio dos candidatos e há
+-- mais parados que vagas, o próximo da fila entra no lugar.
 --
 --   · Editar o VALOR de um negócio perto do corte pode trocar um negócio por outro: a escolha é
 --     por valor, e o valor lido é o de agora. Um sai sem crédito, outro entra.
 --   · Trocar o DONO move o negócio entre pautas: ele sai da de um (e a vaga abre) e pode entrar
 --     na do outro no mesmo dia.
+--   · Desativar alguém da equipe no meio do dia (`usuarios.deleted_at`) tira os negócios dessa
+--     pessoa da pauta de quem tem a chave `pauta_de_todos`, e os próximos da fila entram.
+--   · Excluir um negócio da lista: `pedidos` não tem exclusão reversível, a linha some e o próximo
+--     da fila entra no lugar.
 --   · Levar para outro dia, ou apagar, um compromisso que existia na virada ABRE vaga: entra um
 --     negócio a mais. O contrário — trazer para hoje um compromisso antigo — FECHA uma: um
 --     negócio sai sem crédito.
+--   · Apagar a tarefa que escondia o negócio na virada, levar o prazo dela para antes de hoje ou
+--     trocá-la de negócio faz o negócio REAPARECER, e ele pode entrar na lista. Se essa tarefa
+--     também era compromisso de hoje — é o caso do "Retomar depois" no dia do retorno —, apagá-la
+--     ou levar o prazo para antes de hoje abre vaga junto, e podem entrar até dois. Concluir a
+--     tarefa NÃO tem esse efeito: concluída hoje, ela continua escondendo o negócio e ocupando a
+--     vaga.
 --   · Reabrir uma tarefa concluída, estender o prazo de uma tarefa vencida ou editar hoje uma
---     tarefa concluída antes da virada ESCONDE o negócio sem crédito.
+--     tarefa concluída antes da virada ESCONDE o negócio sem crédito. Se o prazo dessa tarefa é
+--     hoje, ela também passa a ocupar vaga — a editada, sem aparecer na tela.
 --   · Importação que mude a etapa no dia (linha com `status_anterior` nulo) não conta como
 --     retorno e não entra em `etapa_na_virada`: se ela fechar o negócio, ele sai pela etapa ao
 --     vivo; se reabrir um fechado, ele pode entrar.
@@ -112,6 +130,11 @@
 --     tarefas SEM mexer em `updated_at`: a tarefa que ele leva para "concluida" deixa de esconder
 --     o negócio na hora, sem dar crédito; a concluída que ele leva para uma coluna aberta passa a
 --     esconder o negócio.
+--   · Contato gravado no instante real, no fim do dia: `use-novo-pedido.ts` deixa `data_contato`
+--     no padrão `now()`, e entre 21h e meia-noite a data UTC já é a de amanhã. Com o corte de dias
+--     parados em 1 (a tela aceita de 1 a 365; nenhuma empresa usa, o padrão é 3), um negócio criado
+--     depois das 21h com próximo contato marcado sairia como FEITO no dia seguinte. Com o padrão,
+--     ele nem é candidato nesse dia.
 -- ============================================================================
 
 BEGIN;
@@ -151,8 +174,10 @@ begin
   -- UTC, três horas antes, e o trabalho feito entre 21h e meia-noite cairia no dia errado.
   v_inicio := (v_hoje::timestamp at time zone 'America/Sao_Paulo');
 
-  -- 🔴 MUDOU: conta os compromissos que já existiam NA VIRADA, concluídos ou não. Antes eram os
-  -- abertos agora — e aí concluir uma tarefa abria vaga para um negócio novo entrar.
+  -- 🔴 MUDOU: conta os compromissos que existiam em aberto na virada, concluídos hoje ou não. Antes
+  -- eram os abertos agora — e aí concluir uma tarefa abria vaga para um negócio novo entrar. Tarefa
+  -- concluída ANTES da virada não conta: é a mesma régua da tarefa que esconde o negócio, e sem ela
+  -- uma tarefa com prazo hoje concluída ontem ocuparia vaga sem aparecer na tela.
   select count(*) into v_compromissos
   from (
     select 1 from eventos e
@@ -163,6 +188,7 @@ begin
      where t.usuario_id = p_usuario_id and t.prazo_final is not null
        and (t.prazo_final at time zone 'America/Sao_Paulo')::date = v_hoje
        and t.created_at < v_inicio
+       and not (coalesce(t.status,'') = 'concluida' and t.updated_at < v_inicio)
   ) q;
 
   v_vagas := greatest(v_max - v_compromissos, 0);
