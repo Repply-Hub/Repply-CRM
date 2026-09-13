@@ -921,6 +921,16 @@ Mesmo cuidado com `types.ts` do Bloco 2: conferir `git diff` antes; se houver mu
 
 ### Task 5: O banco — colunas, fila, gatilhos e funções
 
+> ⚠️ **O SQL abaixo é o rascunho. A versão que vale é a do repositório** (`supabase/migrations/20260911130000_agenda_avisos_e_lembretes.sql`), refeita em três rodadas de revisão antes de ir ao banco. O que mudou e por quê:
+> - **Fronteira de empresa.** O rascunho tirava quem assina de `criado_por`, que o cliente escolhe, e montava a lista de participantes sem conferir empresa. Com isso dava para mandar aviso em nome de outra pessoa e para gente de outra empresa. Agora quem assina é carimbado na gravação (`avisos_remetente_id`), e o aviso só sai se origem, quem grava e destinatário forem da mesma empresa.
+> - **Acesso.** As duas tabelas novas ganham `revoke` e uma política que recusa tudo, escrita. Sem isso, o padrão do banco entrega a tabela nova a `anon`/`authenticated`.
+> - **Teto de 5 lembretes no banco**, e não só na tela.
+> - **Robô antigo durante a troca.** Ele marca o que manda só em `lembrete_enviado`; um gatilho passa essa marca para `evento_lembretes_enviados`, para o robô novo não repetir.
+> - **Decisões do dono do produto de 12/09.** Ligar a chave depois convida. Lembrete cujo momento já passou quando a lista foi salva não sai.
+> - **Ordem de publicação:** banco → robô novo → site, em seguida.
+> - Ensaiado no banco de produção em 13/09, num único comando desfeito no fim. O relatório das rodadas e do ensaio fica fora do repositório.
+
+
 **Files:**
 - Create: `supabase/migrations/20260911130000_agenda_avisos_e_lembretes.sql`
 
@@ -1302,6 +1312,9 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>" -- supabase/migrations/20
 ---
 
 ### Task 6: O robô — gera lembretes e esvazia a fila
+
+> ⚠️ **O código abaixo é o rascunho. A versão que vale é a do repositório** (`supabase/functions/eventos-lembrete/index.ts`). A revisão achou um defeito que vinha deste texto: o resultado era calculado antes de gravar as marcas de envio. Se a gravação falhasse, o item contava como concluído e saía de novo no giro seguinte. Agora a ordem é gravar primeiro e depois contar e relatar pelo resultado da gravação. Também entraram: falha de um item não derruba o lote, tempo limite no envio de e-mail e `Idempotency-Key` no Resend, para que um envio que estourou o tempo não vire e-mail duplicado.
+
 
 **Files:**
 - Modify (reescrita): `supabase/functions/eventos-lembrete/index.ts`
