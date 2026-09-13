@@ -59,11 +59,31 @@ function pontual(iso: string, diaInteiro: boolean): string {
   return diaInteiro ? `${dia(iso)}, o dia todo` : `${dia(iso)}, às ${hora(iso)}`;
 }
 
+// `fimExplicito` decide o que fazer quando início e fim caem em dias diferentes: `false`
+// cai para o ponto de início (comportamento de sempre, usado no convite); `true` escreve o
+// fim por extenso — "quarta, 17/09, às 14:00 até quinta, 18/09, às 10:00" — necessário para
+// comparar "era" e "agora" de uma alteração (achado F): sem o fim explícito, um fim que
+// passasse a cair no dia seguinte desapareceria do aviso sempre que o início não mudasse, e
+// os dois lados ficariam com o mesmo texto — mudança de horário virando aviso mudo.
+function faixaEntre(inicio: string, fim: string, diaInteiro: boolean, fimExplicito: boolean): string {
+  if (diaInteiro) return `${dia(inicio)}, o dia todo`;
+  if (!mesmoDia(inicio, fim)) {
+    return fimExplicito ? `${dia(inicio)}, às ${hora(inicio)} até ${dia(fim)}, às ${hora(fim)}` : pontual(inicio, false);
+  }
+  return `${dia(inicio)}, das ${hora(inicio)} às ${hora(fim)}`;
+}
+
 /** "quarta, 16/09, das 14:00 às 15:00" — cai para `pontual` se termina noutro dia. */
 function faixa(d: DadosDoEvento): string {
-  if (d.dia_inteiro) return `${dia(d.inicio)}, o dia todo`;
-  if (!mesmoDia(d.inicio, d.fim)) return pontual(d.inicio, false);
-  return `${dia(d.inicio)}, das ${hora(d.inicio)} às ${hora(d.fim)}`;
+  return faixaEntre(d.inicio, d.fim, d.dia_inteiro, false);
+}
+
+/** A faixa (início–fim) de um dos lados — "era" ou "agora" — de um aviso de alteração.
+ * Decisão do dono do produto (13/09/2026): "Avisa, mostrando início e fim" — mudou só o
+ * início, só o fim, ou os dois, o aviso mostra a faixa inteira dos dois lados, nunca só o
+ * início (que é o que `faixa`/`pontual` fariam sozinhos). */
+function faixaDaAlteracao(inicio: string, fim: string, diaInteiro: boolean): string {
+  return faixaEntre(inicio, fim, diaInteiro, true);
 }
 
 export function antecedencia(minutos: number): string {
@@ -84,7 +104,12 @@ export function textoDoChat(a: AvisoDeEvento): string {
     case 'convite':
       return `📅 Convite automático: ${d.titulo} — ${faixa(d)}.${d.obra ? ` Obra: ${d.obra}.` : ''}`;
     case 'alteracao':
-      return `📅 Evento alterado: ${d.titulo} — era ${pontual(d.inicio_antes ?? d.inicio, d.dia_inteiro)}; agora é ${pontual(d.inicio, d.dia_inteiro)}.`;
+      // Decisão do dono do produto (13/09/2026): mostra a FAIXA (início e fim) dos dois
+      // lados, não só o início — mudar só o horário de término também precisa dar um aviso
+      // que faça sentido. `dia_inteiro` não tem versão "antes" guardada no banco (o `dados`
+      // só traz `fim_antes`); usa-se o valor ATUAL nos dois lados, como já era feito com
+      // `inicio_antes` — em 60 dias não houve nenhum evento de dia inteiro para este aviso.
+      return `📅 Evento alterado: ${d.titulo} — era ${faixaDaAlteracao(d.inicio_antes ?? d.inicio, d.fim_antes ?? d.fim, d.dia_inteiro)}; agora é ${faixaDaAlteracao(d.inicio, d.fim, d.dia_inteiro)}.`;
     case 'cancelamento':
       return `📅 Evento cancelado: ${d.titulo} — ${pontual(d.inicio, d.dia_inteiro)}.`;
     case 'retirado':
@@ -111,7 +136,8 @@ export function mensagemDoSininho(a: AvisoDeEvento): string {
     case 'convite':
       return `${faixa(d)}.${d.organizador ? ` Organizado por ${d.organizador}.` : ''}`;
     case 'alteracao':
-      return `Era ${pontual(d.inicio_antes ?? d.inicio, d.dia_inteiro)}; agora é ${pontual(d.inicio, d.dia_inteiro)}.`;
+      // Mesma decisão de `textoDoChat`: faixa (início–fim) dos dois lados.
+      return `Era ${faixaDaAlteracao(d.inicio_antes ?? d.inicio, d.fim_antes ?? d.fim, d.dia_inteiro)}; agora é ${faixaDaAlteracao(d.inicio, d.fim, d.dia_inteiro)}.`;
     case 'cancelamento':
     case 'retirado':
       return `${pontual(d.inicio, d.dia_inteiro)}.`;
@@ -156,9 +182,12 @@ function linha(rotulo: string, valorHtml: string): string {
 
 export function htmlDoEmail(a: AvisoDeEvento, link: string): string {
   const d = a.dados;
-  const quandoAgora = esc(a.tipo === 'convite' ? faixa(d) : pontual(d.inicio, d.dia_inteiro));
+  // Mesma decisão de `textoDoChat`: alteração mostra a faixa (início–fim) dos dois lados.
+  const quandoAgora = esc(
+    a.tipo === 'convite' ? faixa(d) : a.tipo === 'alteracao' ? faixaDaAlteracao(d.inicio, d.fim, d.dia_inteiro) : pontual(d.inicio, d.dia_inteiro),
+  );
   const quando = a.tipo === 'alteracao' && d.inicio_antes
-    ? `<span style="text-decoration:line-through;color:#9ca3af">${esc(pontual(d.inicio_antes, d.dia_inteiro))}</span><br>${quandoAgora}`
+    ? `<span style="text-decoration:line-through;color:#9ca3af">${esc(faixaDaAlteracao(d.inicio_antes, d.fim_antes ?? d.fim, d.dia_inteiro))}</span><br>${quandoAgora}`
     : quandoAgora;
   const detalhe = a.tipo === 'lembrete' ? `Começa em ${esc(antecedencia(a.minutos ?? 0))}.` : '';
 

@@ -44,13 +44,62 @@ describe('textoDoChat', () => {
     );
   });
 
-  it('mudança mostra o antes e o agora', () => {
+  // Decisão do dono do produto (13/09/2026): "Avisa, mostrando início e fim" — mudar só o
+  // horário de término (ou só o início, ou os dois) mostra a FAIXA inteira dos dois lados,
+  // nunca só o ponto de início. O teste antigo ("mudança mostra o antes e o agora") cobria
+  // só a mudança de início, mostrando um único horário de cada lado — foi substituído pelos
+  // quatro casos abaixo, que é o que a revisão final pediu.
+  it('alteração: só o fim mudou', () => {
     expect(
       textoDoChat(aviso({
         tipo: 'alteracao',
-        dados: { inicio: '2026-09-17T13:00:00.000Z', fim: '2026-09-17T14:00:00.000Z', inicio_antes: '2026-09-16T17:00:00.000Z' },
+        dados: {
+          fim: '2026-09-16T19:00:00.000Z',
+          inicio_antes: '2026-09-16T17:00:00.000Z',
+          fim_antes: '2026-09-16T18:00:00.000Z',
+        },
       })),
-    ).toBe('📅 Evento alterado: Reunião com a Construtora Alfa — era quarta, 16/09, às 14:00; agora é quinta, 17/09, às 10:00.');
+    ).toBe('📅 Evento alterado: Reunião com a Construtora Alfa — era quarta, 16/09, das 14:00 às 15:00; agora é quarta, 16/09, das 14:00 às 16:00.');
+  });
+
+  it('alteração: só o início mudou', () => {
+    expect(
+      textoDoChat(aviso({
+        tipo: 'alteracao',
+        dados: {
+          inicio: '2026-09-16T16:00:00.000Z',
+          inicio_antes: '2026-09-16T17:00:00.000Z',
+          fim_antes: '2026-09-16T18:00:00.000Z',
+        },
+      })),
+    ).toBe('📅 Evento alterado: Reunião com a Construtora Alfa — era quarta, 16/09, das 14:00 às 15:00; agora é quarta, 16/09, das 13:00 às 15:00.');
+  });
+
+  it('alteração: início e fim mudaram', () => {
+    expect(
+      textoDoChat(aviso({
+        tipo: 'alteracao',
+        dados: {
+          inicio: '2026-09-16T18:00:00.000Z',
+          fim: '2026-09-16T19:30:00.000Z',
+          inicio_antes: '2026-09-16T17:00:00.000Z',
+          fim_antes: '2026-09-16T18:00:00.000Z',
+        },
+      })),
+    ).toBe('📅 Evento alterado: Reunião com a Construtora Alfa — era quarta, 16/09, das 14:00 às 15:00; agora é quarta, 16/09, das 15:00 às 16:30.');
+  });
+
+  it('alteração: o fim passou para o dia seguinte — mostra o fim por extenso', () => {
+    expect(
+      textoDoChat(aviso({
+        tipo: 'alteracao',
+        dados: {
+          fim: '2026-09-17T13:00:00.000Z',
+          inicio_antes: '2026-09-16T17:00:00.000Z',
+          fim_antes: '2026-09-16T18:00:00.000Z',
+        },
+      })),
+    ).toBe('📅 Evento alterado: Reunião com a Construtora Alfa — era quarta, 16/09, das 14:00 às 15:00; agora é quarta, 16/09, às 14:00 até quinta, 17/09, às 10:00.');
   });
 
   it('cancelamento e retirada', () => {
@@ -92,6 +141,19 @@ describe('sininho e assunto', () => {
     expect(mensagemDoSininho(aviso({ tipo: 'lembrete', minutos: 1440 }))).toBe('Começa quarta, 16/09, às 14:00 (em 1 dia).');
   });
 
+  it('mensagem do sininho de alteração mostra a faixa dos dois lados', () => {
+    expect(
+      mensagemDoSininho(aviso({
+        tipo: 'alteracao',
+        dados: {
+          fim: '2026-09-16T19:00:00.000Z',
+          inicio_antes: '2026-09-16T17:00:00.000Z',
+          fim_antes: '2026-09-16T18:00:00.000Z',
+        },
+      })),
+    ).toBe('Era quarta, 16/09, das 14:00 às 15:00; agora é quarta, 16/09, das 14:00 às 16:00.');
+  });
+
   it('assunto do e-mail usa o dia curto', () => {
     expect(assuntoDoEmail(aviso())).toBe('Convite: Reunião com a Construtora Alfa — qua 16/09, 14:00');
     expect(assuntoDoEmail(aviso({ tipo: 'lembrete', minutos: 60 }))).toBe('Lembrete: Reunião com a Construtora Alfa — em 1 hora');
@@ -114,6 +176,19 @@ describe('htmlDoEmail', () => {
 
   it('não diz "Bom dia" — o e-mail sai a qualquer hora', () => {
     expect(htmlDoEmail(aviso(), 'https://x')).not.toMatch(/bom dia/i);
+  });
+
+  it('alteração mostra a faixa dos dois lados (era riscado, agora normal)', () => {
+    const html = htmlDoEmail(aviso({
+      tipo: 'alteracao',
+      dados: {
+        fim: '2026-09-16T19:00:00.000Z',
+        inicio_antes: '2026-09-16T17:00:00.000Z',
+        fim_antes: '2026-09-16T18:00:00.000Z',
+      },
+    }), 'https://x');
+    expect(html).toContain('quarta, 16/09, das 14:00 às 15:00'); // era
+    expect(html).toContain('quarta, 16/09, das 14:00 às 16:00'); // agora
   });
 });
 
