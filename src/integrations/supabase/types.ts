@@ -415,8 +415,8 @@ export type Database = {
           id: string
           lida: boolean
           lida_em: string | null
-          menciona_todos: boolean
-          mencionados: string[]
+          menciona_todos: boolean | null
+          mencionados: string[] | null
           quoted_arquivo_nome: string | null
           quoted_arquivo_tipo: string | null
           quoted_conteudo: string | null
@@ -436,8 +436,8 @@ export type Database = {
           id?: string
           lida?: boolean
           lida_em?: string | null
-          menciona_todos?: boolean
-          mencionados?: string[]
+          menciona_todos?: boolean | null
+          mencionados?: string[] | null
           quoted_arquivo_nome?: string | null
           quoted_arquivo_tipo?: string | null
           quoted_conteudo?: string | null
@@ -457,8 +457,8 @@ export type Database = {
           id?: string
           lida?: boolean
           lida_em?: string | null
-          menciona_todos?: boolean
-          mencionados?: string[]
+          menciona_todos?: boolean | null
+          mencionados?: string[] | null
           quoted_arquivo_nome?: string | null
           quoted_arquivo_tipo?: string | null
           quoted_conteudo?: string | null
@@ -4406,8 +4406,8 @@ export type Database = {
           lida: boolean
           media_mime: string | null
           media_url: string | null
-          menciona_todos: boolean
-          mencionados: string[]
+          menciona_todos: boolean | null
+          mencionados: string[] | null
           quoted_conteudo: string | null
           quoted_remetente_nome: string | null
           quoted_tipo: string | null
@@ -4437,8 +4437,8 @@ export type Database = {
           lida?: boolean
           media_mime?: string | null
           media_url?: string | null
-          menciona_todos?: boolean
-          mencionados?: string[]
+          menciona_todos?: boolean | null
+          mencionados?: string[] | null
           quoted_conteudo?: string | null
           quoted_remetente_nome?: string | null
           quoted_tipo?: string | null
@@ -4468,8 +4468,8 @@ export type Database = {
           lida?: boolean
           media_mime?: string | null
           media_url?: string | null
-          menciona_todos?: boolean
-          mencionados?: string[]
+          menciona_todos?: boolean | null
+          mencionados?: string[] | null
           quoted_conteudo?: string | null
           quoted_remetente_nome?: string | null
           quoted_tipo?: string | null

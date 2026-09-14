@@ -1,3 +1,15 @@
+-- 🔴 TEMPO LIMITE DE TRAVA, antes de qualquer outra coisa.
+-- `alter table … add column` em `chat_mensagens`, `whatsapp_mensagens` e `notificacoes` —
+-- e também `add constraint`, `create policy` e `create trigger` nessas tabelas — pede a
+-- trava exclusiva da tabela. Se houver uma leitura longa em andamento, o pedido entra na fila
+-- atrás dela, e TODA gravação que chegar depois entra na fila atrás do pedido: a mensagem que
+-- o webhook do WhatsApp recebe, a que a pessoa manda do chat, o registro do sininho. Sem
+-- limite, as mensagens ficam paradas enquanto durar a leitura que ninguém vê.
+-- Com 3 segundos, o pior caso é segurar as gravações por 3 segundos e a migration FALHAR com
+-- erro visível (55P03, `lock_not_available`) — e aí ela é rodada de novo num momento calmo.
+-- Rodada numa transação só, a falha desfaz tudo: nada fica pela metade.
+set lock_timeout = '3s';
+
 -- Menções (@) no chat interno (Geral e grupos) e nas notas internas do WhatsApp.
 -- Spec: docs/superpowers/specs/2026-09-11-busca-config-agenda-mencoes-design.md, Bloco 4.
 --
@@ -33,15 +45,22 @@
 -- 1. Colunas -----------------------------------------------------------------------
 -- Default constante no Postgres 17 é só metadado: as dezenas de milhares de mensagens de
 -- WhatsApp não são reescritas, e toda linha antiga lê "ninguém mencionado".
--- ⚠️ Quem grava manda a lista ou omite a coluna, nunca `null` explícito: o `not null`
--- recusaria a MENSAGEM inteira — e essa recusa seria da tela, não do gatilho.
+-- 🔴 SEM `not null`, de propósito. O supabase-js, ao gravar várias linhas num pedido só,
+-- preenche com `null` a coluna que falta em alguma delas (`defaultToNull`). Com `not null`,
+-- essa gravação recusaria a MENSAGEM inteira (erro 23502) por causa da menção — justamente
+-- o que este arquivo promete nunca fazer.
+-- Nulo vale "ninguém mencionado" em todo lugar que lê estas colunas:
+--   · no `when` dos gatilhos (§5 e §6): `cardinality(null) > 0` é nulo, `null or null` é
+--     nulo, e `when` nulo não dispara;
+--   · dentro das funções: `coalesce` para `'{}'` e `false` antes de qualquer uso;
+--   · e mesmo sem o `coalesce`, `u.id = any (null)` dá nulo, que o `where` descarta.
 alter table public.chat_mensagens
-  add column if not exists mencionados    uuid[]  not null default '{}',
-  add column if not exists menciona_todos boolean not null default false;
+  add column if not exists mencionados    uuid[]  default '{}',
+  add column if not exists menciona_todos boolean default false;
 
 alter table public.whatsapp_mensagens
-  add column if not exists mencionados    uuid[]  not null default '{}',
-  add column if not exists menciona_todos boolean not null default false;
+  add column if not exists mencionados    uuid[]  default '{}',
+  add column if not exists menciona_todos boolean default false;
 
 -- Para onde o registro do sininho leva. Até aqui o sininho só sabia abrir negócio.
 alter table public.notificacoes add column if not exists link text;
@@ -66,6 +85,53 @@ begin
       check (link is null or link ~ '^/[^/\\]');
   end if;
 end $$;
+
+-- O registro de menção no sininho é só de quem foi mencionado.
+-- Decisão do dono do produto (14/09/2026): "Menção só para quem foi mencionado".
+-- Por que é preciso: `notificacoes_select`, `notificacoes_update` e `notificacoes_delete`
+-- deixam qualquer gestor da empresa ler, mexer e apagar os registros dos colegas, e o sininho
+-- dele os lista (`useNotificacoes` não filtra por dono). O registro de menção leva o lugar
+-- ("no grupo X", "numa nota da conversa com Y") e o trecho da mensagem: sem estas travas, o
+-- gestor leria trecho de grupo de que não é membro e de nota de número que não atende.
+-- Por que RESTRITIVAS: somam com AND às políticas de hoje. Nenhuma permissiva — de hoje,
+-- futura ou criada à mão pelo painel — abre o registro de menção de outra pessoa.
+-- Por que só `tipo = 'mencao'`: todo outro registro do sininho continua com a visibilidade
+-- de hoje, e o gestor segue acompanhando os avisos da equipe.
+-- `tipo` é `not null` (conferido em 14/09/2026, zero linhas nulas): `tipo <> 'mencao'` nunca
+-- dá nulo, e nenhum registro antigo some da vista de ninguém.
+-- Quem grava não passa por elas: os gatilhos deste arquivo rodam como `postgres` e as
+-- funções de servidor como `service_role`, os dois com `bypassrls`.
+-- ⚠️ Gestor que tentar apagar a menção de um colega recebe ZERO LINHAS e nenhum erro
+-- (CLAUDE.md §4.6).
+drop policy if exists notificacoes_mencao_so_do_dono_select on public.notificacoes;
+create policy notificacoes_mencao_so_do_dono_select on public.notificacoes
+  as restrictive
+  for select to authenticated
+  using (tipo <> 'mencao' or usuario_id = (select public.get_my_usuario_id()));
+
+-- O `with check` também impede virar um registro alheio em menção: trocar o `tipo` de um
+-- aviso de colega para 'mencao' é recusado.
+drop policy if exists notificacoes_mencao_so_do_dono_update on public.notificacoes;
+create policy notificacoes_mencao_so_do_dono_update on public.notificacoes
+  as restrictive
+  for update to authenticated
+  using (tipo <> 'mencao' or usuario_id = (select public.get_my_usuario_id()))
+  with check (tipo <> 'mencao' or usuario_id = (select public.get_my_usuario_id()));
+
+drop policy if exists notificacoes_mencao_so_do_dono_delete on public.notificacoes;
+create policy notificacoes_mencao_so_do_dono_delete on public.notificacoes
+  as restrictive
+  for delete to authenticated
+  using (tipo <> 'mencao' or usuario_id = (select public.get_my_usuario_id()));
+
+-- Ninguém do lado de fora cria registro de menção — nem o gestor, que hoje pode criar
+-- registro para um colega (`notificacoes_insert`). Sem isto, ele forjaria "Fulano te
+-- mencionou", com o trecho que quisesse.
+drop policy if exists notificacoes_mencao_so_o_sistema_cria on public.notificacoes;
+create policy notificacoes_mencao_so_o_sistema_cria on public.notificacoes
+  as restrictive
+  for insert to authenticated
+  with check (tipo <> 'mencao');
 
 -- 2. A tabela de menções ------------------------------------------------------------
 -- `chat_mensagens.lida` é UM booleano por mensagem, compartilhado: no Geral, o primeiro
@@ -277,18 +343,32 @@ as $$
 declare
   v_autor       public.usuarios;
   v_grupo       public.chat_grupos;
+  v_escolhidos  uuid[];
+  v_todos       boolean;
   v_chave       text;
   v_lugar       text;
-  v_lugar_sino  text;
   v_previa      text;
-  v_previa_sino text;
   v_link        text;
   v_alvos       uuid[];
   v_descartados integer;
 begin
+  -- Coluna nula é "ninguém mencionado" (§1). Daqui em diante só estas duas são lidas.
+  v_escolhidos := coalesce(new.mencionados, '{}');
+  v_todos      := coalesce(new.menciona_todos, false);
+
   -- Repete o `when` do gatilho de propósito: a função não pode depender de quem a liga.
   if new.recipient_id is not null then return null; end if;  -- conversa direta: sem menção
-  if cardinality(new.mencionados) = 0 and not new.menciona_todos then return null; end if;
+  if cardinality(v_escolhidos) = 0 and not v_todos then return null; end if;
+
+  -- 🔴 TETO DE 50 ESCOLHIDOS. A tela nunca chega perto: a maior equipe tem hoje 13 pessoas
+  -- com login, e o @todos viaja em `menciona_todos`, nunca expandido nesta lista
+  -- (`mencionadosNoTexto`, src/lib/mencao.ts). Lista maior só vem de gravação feita fora da
+  -- tela, e cada id custa comparação com cada pessoa da empresa. Passou do teto: nenhuma
+  -- menção, a mensagem grava normalmente e fica o aviso.
+  if cardinality(v_escolhidos) > 50 then
+    raise warning '[mencao] chat %: recusada — % pessoas escolhidas, acima do teto de 50', new.id, cardinality(v_escolhidos);
+    return null;
+  end if;
 
   -- 🔴 QUEM ESCREVEU. `chat_insert` amarra `usuario_id` e `empresa_id` a quem está logado,
   -- mas gravação feita pelo servidor não passa por ela. Com sessão, o autor TEM de ser a
@@ -336,7 +416,7 @@ begin
      and u.deleted_at is null
      and u.user_id is not null
      and u.id <> v_autor.id
-     and (new.menciona_todos or u.id = any (new.mencionados))
+     and (v_todos or u.id = any (v_escolhidos))
      and (new.grupo_id is null
           or exists (select 1 from chat_grupo_membros gm
                       where gm.grupo_id = new.grupo_id and gm.usuario_id = u.id));
@@ -346,20 +426,9 @@ begin
   v_previa := nullif(left(btrim(regexp_replace(new.conteudo, '\s+', ' ', 'g')), 140), '');
   v_link   := '/chat?conversa=' || v_chave;
 
-  -- 🔴 O SININHO NÃO É SÓ DE QUEM FOI MENCIONADO. `notificacoes_select` deixa qualquer gestor
-  -- da empresa ler os registros dos colegas, e o sininho dele os lista (`useNotificacoes`
-  -- não filtra por dono). Um gestor que não é membro do grupo leria ali o nome do grupo e o
-  -- trecho da conversa. Por isso:
-  --   · Geral: lugar e prévia vão ao sininho — todo gestor da empresa já lê o Geral;
-  --   · grupo: "num grupo do chat", sem prévia.
-  -- O aviso na tela sai de `mencoes`, que só o mencionado lê, e esse leva lugar e prévia.
-  if new.grupo_id is null then
-    v_lugar_sino  := v_lugar;
-    v_previa_sino := v_previa;
-  else
-    v_lugar_sino  := 'num grupo do chat';
-    v_previa_sino := null;
-  end if;
+  -- O sininho leva o mesmo texto e a mesma prévia do aviso na tela ("te mencionou no Geral",
+  -- "te mencionou no grupo X"). Quem o lê é só o mencionado: as políticas restritivas da §1
+  -- tiram o registro de menção da vista do gestor (decisão de 14/09/2026).
 
   with gravadas as (
     insert into mencoes (empresa_id, mencionado_id, autor_id, autor_nome, origem,
@@ -372,15 +441,15 @@ begin
   )
   insert into notificacoes (usuario_id, tipo, titulo, mensagem, link)
   select g.mencionado_id, 'mencao',
-         coalesce(v_autor.nome, v_autor.email) || ' te mencionou ' || v_lugar_sino,
-         v_previa_sino, v_link
+         coalesce(v_autor.nome, v_autor.email) || ' te mencionou ' || v_lugar,
+         v_previa, v_link
     from gravadas g;
 
   -- Id escolhido que não virou menção. A lista da tela só oferece quem pode, então isso é
   -- lista desatualizada (alguém saiu do grupo com a tela aberta) ou gravação feita fora da
   -- tela. Não bloqueia nada; deixa rastro. Mencionar a si mesmo não conta.
   select count(*) into v_descartados
-    from (select distinct m from unnest(new.mencionados) as m) x
+    from (select distinct m from unnest(v_escolhidos) as m) x
    where x.m is not null
      and x.m <> v_autor.id
      and not (x.m = any (v_alvos));
@@ -403,6 +472,9 @@ revoke all on function public.chat_anota_mencoes() from public, anon, authentica
 
 -- O `when` decide ANTES de entrar na função: mensagem sem menção, que é quase toda, nem abre
 -- o bloco de exceção — que no plpgsql custa uma subtransação por linha.
+-- Coluna nula não dispara (§1): `cardinality(null) > 0` é nulo, `null or null` é nulo, e
+-- `when` nulo é falso. `menciona_todos` nulo com alguém escolhido dá `null or true`, que é
+-- verdadeiro, e a função trata o nulo como falso.
 drop trigger if exists chat_anota_mencoes on public.chat_mensagens;
 create trigger chat_anota_mencoes
   after insert on public.chat_mensagens
@@ -422,16 +494,28 @@ as $$
 declare
   v_conversa    public.whatsapp_conversas;
   v_autor       public.usuarios;
+  v_escolhidos  uuid[];
+  v_todos       boolean;
   v_lugar       text;
   v_previa      text;
   v_link        text;
   v_alvos       uuid[];
   v_descartados integer;
 begin
+  -- Coluna nula é "ninguém mencionado" (§1). Daqui em diante só estas duas são lidas.
+  v_escolhidos := coalesce(new.mencionados, '{}');
+  v_todos      := coalesce(new.menciona_todos, false);
+
   -- Repete o `when` do gatilho de propósito. O webhook grava muito nesta tabela.
   if not new.is_nota_interna then return null; end if;
   if new.usuario_id is null then return null; end if;
-  if cardinality(new.mencionados) = 0 and not new.menciona_todos then return null; end if;
+  if cardinality(v_escolhidos) = 0 and not v_todos then return null; end if;
+
+  -- Mesmo teto de 50 escolhidos do chat, pelo mesmo motivo (§5).
+  if cardinality(v_escolhidos) > 50 then
+    raise warning '[mencao] nota %: recusada — % pessoas escolhidas, acima do teto de 50', new.id, cardinality(v_escolhidos);
+    return null;
+  end if;
 
   -- 🔴 A EMPRESA É A DA CONVERSA, não a que veio na linha. `wa_mensagens_access` só pergunta
   -- se quem grava alcança `conversa_id`; `empresa_id` e `usuario_id` da nota vêm do cliente
@@ -468,7 +552,7 @@ begin
     from usuarios u
    where u.empresa_id = v_conversa.empresa_id
      and u.id <> v_autor.id
-     and (new.menciona_todos or u.id = any (new.mencionados))
+     and (v_todos or u.id = any (v_escolhidos))
      and usuario_alcanca_wa_conversa(u.id, v_conversa.id);
 
   v_lugar  := 'numa nota da conversa com '
@@ -476,10 +560,9 @@ begin
   v_previa := nullif(left(btrim(regexp_replace(new.conteudo, '\s+', ' ', 'g')), 140), '');
   v_link   := '/whatsapp?conversaId=' || v_conversa.id || '&mensagemId=' || new.id;
 
-  -- 🔴 SININHO NEUTRO. Um gestor da empresa lê os registros de sininho dos colegas
-  -- (`notificacoes_select`), inclusive de número que ele não atende — e aí não pode ler o
-  -- nome do contato nem o trecho da nota. O aviso na tela sai de `mencoes`, que só o
-  -- mencionado lê, e esse leva os dois.
+  -- O sininho leva o mesmo texto e a mesma prévia do aviso na tela ("te mencionou numa nota
+  -- da conversa com Y"). Quem o lê é só o mencionado: as políticas restritivas da §1 tiram o
+  -- registro de menção da vista do gestor, inclusive do gestor que não atende este número.
   with gravadas as (
     insert into mencoes (empresa_id, mencionado_id, autor_id, autor_nome, origem,
                          wa_mensagem_id, conversa_chave, lugar, previa, link)
@@ -491,13 +574,13 @@ begin
   )
   insert into notificacoes (usuario_id, tipo, titulo, mensagem, link)
   select g.mencionado_id, 'mencao',
-         coalesce(v_autor.nome, v_autor.email) || ' te mencionou numa nota do WhatsApp',
-         null, v_link
+         coalesce(v_autor.nome, v_autor.email) || ' te mencionou ' || v_lugar,
+         v_previa, v_link
     from gravadas g;
 
   -- Mesmo rastro do chat (§5): escolhido que não atende o número ficou de fora.
   select count(*) into v_descartados
-    from (select distinct m from unnest(new.mencionados) as m) x
+    from (select distinct m from unnest(v_escolhidos) as m) x
    where x.m is not null
      and x.m <> v_autor.id
      and not (x.m = any (v_alvos));
@@ -516,7 +599,8 @@ $$;
 revoke all on function public.wa_anota_mencoes() from public, anon, authenticated;
 
 -- O `when` é o que protege o webhook: mensagem de cliente, que é quase tudo o que entra
--- nesta tabela, não chega a entrar na função.
+-- nesta tabela, não chega a entrar na função. Coluna nula se comporta como no chat (§5):
+-- `when` nulo não dispara.
 drop trigger if exists wa_anota_mencoes on public.whatsapp_mensagens;
 create trigger wa_anota_mencoes
   after insert on public.whatsapp_mensagens
