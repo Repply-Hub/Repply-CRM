@@ -60,6 +60,13 @@ describe('inserirMencao', () => {
       cursor: 22,
     });
   });
+
+  it('quando a consulta está no fim do texto, não sobra nada depois do espaço', () => {
+    expect(inserirMencao('bom dia @ang', { consulta: 'ang', inicio: 8 }, 'Ângela Souza')).toEqual({
+      texto: 'bom dia @Ângela Souza ',
+      cursor: 22,
+    });
+  });
 });
 
 describe('mencionadosNoTexto', () => {
@@ -76,6 +83,58 @@ describe('mencionadosNoTexto', () => {
 
   it('"@todoscontente" não é @todos', () => {
     expect(mencionadosNoTexto('@todoscontente', new Map()).todos).toBe(false);
+  });
+
+  it('@todos seguido de pontuação sem espaço também marca todos', () => {
+    expect(mencionadosNoTexto('cc @todos)', new Map()).todos).toBe(true);
+  });
+
+  it('"@todosjuntos" não é @todos', () => {
+    expect(mencionadosNoTexto('@todosjuntos', new Map()).todos).toBe(false);
+  });
+
+  it('não conta pedaço de nome: "@Anabela" não é quem escolheu "Ana"', () => {
+    expect(mencionadosNoTexto('oi @Anabela, tudo bem?', new Map([['u1', 'Ana']]))).toEqual({
+      ids: [],
+      todos: false,
+    });
+  });
+
+  it('nome mais longo escrito não conta também para quem escolheu o mais curto', () => {
+    const doisEscolhidos = new Map([['u1', 'Ana'], ['u2', 'Ana Souza']]);
+    expect(mencionadosNoTexto('reunião com @Ana Souza amanhã', doisEscolhidos)).toEqual({
+      ids: ['u2'],
+      todos: false,
+    });
+  });
+
+  it('conta os dois quando os dois nomes aparecem escritos', () => {
+    const doisEscolhidos = new Map([['u1', 'Ana'], ['u2', 'Ana Souza']]);
+    expect(mencionadosNoTexto('chama @Ana e @Ana Souza', doisEscolhidos)).toEqual({
+      ids: ['u1', 'u2'],
+      todos: false,
+    });
+  });
+
+  it('nome com caractere especial de regex não quebra a busca', () => {
+    expect(mencionadosNoTexto('avisa @Ana (RH) por favor', new Map([['u1', 'Ana (RH)']]))).toEqual({
+      ids: ['u1'],
+      todos: false,
+    });
+  });
+
+  it('conta o nome quando ele termina o texto', () => {
+    expect(mencionadosNoTexto('já pode falar com @Carlos Lima', new Map([['u3', 'Carlos Lima']]))).toEqual({
+      ids: ['u3'],
+      todos: false,
+    });
+  });
+
+  it('conta o nome seguido de pontuação', () => {
+    expect(mencionadosNoTexto('fala com @Carlos Lima, por favor.', new Map([['u3', 'Carlos Lima']]))).toEqual({
+      ids: ['u3'],
+      todos: false,
+    });
   });
 });
 
