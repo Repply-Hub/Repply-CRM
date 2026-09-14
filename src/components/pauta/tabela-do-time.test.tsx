@@ -280,3 +280,63 @@ describe('a tabela do time', () => {
     });
   });
 });
+
+describe('as larguras da tabela do time', () => {
+  const CHAVE_COM = 'repply_hoje_larguras_tabela_do_time_com_responsavel_v1';
+  const alca = (rotulo: string) =>
+    screen.getByRole('separator', { name: `Ajustar a largura da coluna ${rotulo}` });
+
+  beforeEach(() => localStorage.clear());
+
+  async function colunas(container: HTMLElement) {
+    await screen.findByText('Negócio 0');
+    return Array.from(container.querySelectorAll('col')) as HTMLElement[];
+  }
+
+  it('🔴 por padrão a soma cabe no espaço da tabela na página: 926 px, com e sem a coluna Responsável', async () => {
+    const com = montar({}, true);
+    expect(await colunas(com.container)).toHaveLength(7);
+    expect((com.container.querySelector('table') as HTMLElement).style.width).toBe('926px');
+
+    cleanup();
+    const sem = montar({}, false);
+    expect(await colunas(sem.container)).toHaveLength(6);
+    expect((sem.container.querySelector('table') as HTMLElement).style.width).toBe('926px');
+  });
+
+  it('a largura guardada neste navegador é a que aparece; o que não foi guardado nasce no padrão', async () => {
+    localStorage.setItem(CHAVE_COM, JSON.stringify({ negocio: 333 }));
+    const { container } = montar();
+    const cols = await colunas(container);
+    expect(cols[0].style.width).toBe('333px');
+    expect(cols[1].style.width).toBe('76px');
+  });
+
+  it('as setas do teclado ajustam a coluna, e o ajuste fica guardado', async () => {
+    const { container } = montar();
+    const cols = await colunas(container);
+    expect(cols[0].style.width).toBe('154px');
+
+    fireEvent.keyDown(alca('Negócio'), { key: 'ArrowRight' });
+
+    await waitFor(() => expect(cols[0].style.width).toBe('170px'));
+    expect(JSON.parse(localStorage.getItem(CHAVE_COM) as string).negocio).toBe(170);
+  });
+
+  it('dois cliques na alça voltam a coluna à largura-padrão', async () => {
+    localStorage.setItem(CHAVE_COM, JSON.stringify({ negocio: 333 }));
+    const { container } = montar();
+    const cols = await colunas(container);
+
+    fireEvent.doubleClick(alca('Negócio'));
+
+    await waitFor(() => expect(cols[0].style.width).toBe('154px'));
+    expect(JSON.parse(localStorage.getItem(CHAVE_COM) as string).negocio).toBe(154);
+  });
+
+  it('o título da coluna continua com o nome dela, e não com o texto da alça', async () => {
+    montar();
+    await screen.findByText('Negócio 0');
+    expect(screen.getByRole('columnheader', { name: 'Responsável' })).toBeInTheDocument();
+  });
+});

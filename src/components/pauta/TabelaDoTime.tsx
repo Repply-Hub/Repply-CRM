@@ -1,7 +1,15 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { iniciais } from '@/lib/iniciais';
+import {
+  ajustarLargura,
+  gravarLarguras,
+  lerLarguras,
+  restaurarColuna,
+  somaDasLarguras,
+  type ColunaAjustavel,
+} from '@/lib/larguras-de-colunas';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MOLDURA_DA_PAUTA } from '@/components/pauta/moldura-da-pauta';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -45,6 +53,113 @@ const PAGINA = 10;
  */
 const TETO_DO_SERVIDOR = 100;
 
+/**
+ * AS LARGURAS-PADRÃO, EM PIXELS — pedido de 14/09/2026: por padrão, tudo cabe.
+ *
+ * O espaço é o da PÁGINA, não o da tela: "Hoje" tem no máximo 1.024 px (`max-w-5xl`), e tirando o
+ * respiro da página (24 px de cada lado), a borda e o respiro do cartão (1 + 24 px de cada lado)
+ * sobram 926 px — em notebook 1366x768 e em monitor grande, igual. As duas listas somam isso.
+ *
+ * MEDIDO no navegador em 14/09/2026, e não chutado (com Satoshi e com a fonte do sistema, a
+ * diferença foi de 1 a 2 px):
+ *   · "Abrir negócio" 111 px + 8 px de espaço + "Retomar depois" 125 px → ações com 260 px;
+ *   · "R$ 9.999.999,99" 126 px → valor com 144 px. Acima de R$ 10 milhões o texto corta com "…" e
+ *     o valor inteiro aparece ao passar o mouse;
+ *   · "999 dias" 68 px → 84 px.
+ * Cada célula tem 8 px de respiro de cada lado (`px-2`). O que sobra vai para negócio, fabricante
+ * e etapa; fabricante e etapa cortam com "…" e mostram o texto inteiro ao passar o mouse.
+ *
+ * `chave` é o nome no guardado do navegador: mudar uma chave apaga o ajuste que as pessoas fizeram
+ * naquela coluna. A coluna das ações não tem alça — a largura dela é a dos dois botões.
+ */
+const COLUNAS_COM_RESPONSAVEL: ColunaAjustavel[] = [
+  { chave: 'negocio', padrao: 154, minima: 120 },
+  { chave: 'fabricante', padrao: 76, minima: 56 },
+  { chave: 'etapa', padrao: 76, minima: 56 },
+  { chave: 'responsavel', padrao: 132, minima: 96 },
+  { chave: 'valor', padrao: 144, minima: 110 },
+  { chave: 'dias', padrao: 84, minima: 70 },
+  { chave: 'acoes', padrao: 260, minima: 260 },
+];
+
+const COLUNAS_SEM_RESPONSAVEL: ColunaAjustavel[] = [
+  { chave: 'negocio', padrao: 238, minima: 120 },
+  { chave: 'fabricante', padrao: 100, minima: 56 },
+  { chave: 'etapa', padrao: 100, minima: 56 },
+  { chave: 'valor', padrao: 144, minima: 110 },
+  { chave: 'dias', padrao: 84, minima: 70 },
+  { chave: 'acoes', padrao: 260, minima: 260 },
+];
+
+/** Uma chave por forma da tabela: as larguras de uma não servem na outra. */
+const CHAVE_COM_RESPONSAVEL = 'repply_hoje_larguras_tabela_do_time_com_responsavel_v1';
+const CHAVE_SEM_RESPONSAVEL = 'repply_hoje_larguras_tabela_do_time_sem_responsavel_v1';
+
+/** Quanto cada toque de seta anda, para quem ajusta pelo teclado. */
+const PASSO_DO_TECLADO = 16;
+
+/**
+ * A ALÇA NA BORDA DIREITA DO TÍTULO DE UMA COLUNA. Arrastar muda a largura; dois cliques voltam ao
+ * padrão; as setas ←/→ ajustam pelo teclado, para quem não usa mouse.
+ *
+ * Durante o arraste só a tela muda (`onMudar`); o fim do gesto grava (`onSoltar`). Gravar a cada
+ * movimento do ponteiro escreveria no navegador dezenas de vezes por segundo.
+ *
+ * `setPointerCapture` mantém o arraste vivo quando o ponteiro sai da alça — sem ele, arrastar
+ * rápido "solta" a coluna no meio do gesto.
+ */
+function AlcaDeLargura({
+  rotulo,
+  largura,
+  onMudar,
+  onSoltar,
+  onRestaurar,
+}: {
+  rotulo: string;
+  largura: number;
+  onMudar: (novaLargura: number) => void;
+  onSoltar: (novaLargura: number) => void;
+  onRestaurar: () => void;
+}) {
+  const arraste = useRef<{ x: number; largura: number; ultima: number } | null>(null);
+
+  const terminar = () => {
+    if (!arraste.current) return;
+    const final = arraste.current.ultima;
+    arraste.current = null;
+    onSoltar(final);
+  };
+
+  return (
+    <span
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={`Ajustar a largura da coluna ${rotulo}`}
+      aria-valuenow={largura}
+      tabIndex={0}
+      className="absolute right-0 top-0 h-full w-2 cursor-col-resize touch-none select-none border-r-2 border-border hover:border-primary focus-visible:border-primary focus-visible:outline-none"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        arraste.current = { x: e.clientX, largura, ultima: largura };
+      }}
+      onPointerMove={(e) => {
+        if (!arraste.current) return;
+        arraste.current.ultima = arraste.current.largura + e.clientX - arraste.current.x;
+        onMudar(arraste.current.ultima);
+      }}
+      onPointerUp={terminar}
+      onPointerCancel={terminar}
+      onDoubleClick={onRestaurar}
+      onKeyDown={(e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        onSoltar(largura + (e.key === 'ArrowRight' ? PASSO_DO_TECLADO : -PASSO_DO_TECLADO));
+      }}
+    />
+  );
+}
+
 interface Props {
   empresaId?: string;
   /** O recorte, já traduzido para os nomes da consulta — ver `recorteParaOServidor`. */
@@ -65,6 +180,65 @@ interface Props {
 
 export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRetomar }: Props) {
   const [quantos, setQuantos] = useState(PAGINA);
+
+  // As larguras das colunas: uma lista para cada forma da tabela, e o ajuste guardado neste
+  // navegador. Ver `COLUNAS_COM_RESPONSAVEL` e `src/lib/larguras-de-colunas.ts`.
+  const colunas = podeVerDeTodos ? COLUNAS_COM_RESPONSAVEL : COLUNAS_SEM_RESPONSAVEL;
+  const chaveGuardada = podeVerDeTodos ? CHAVE_COM_RESPONSAVEL : CHAVE_SEM_RESPONSAVEL;
+  const [larguras, setLarguras] = useState(() => lerLarguras(chaveGuardada, colunas));
+
+  // A forma da tabela muda quando a chave `pauta_de_todos` chega depois da primeira pintura ou
+  // muda com a tela aberta: as larguras são relidas do guardado da outra forma. Ajuste DURANTE a
+  // renderização, pelo mesmo motivo do `recorteMostrado` logo abaixo — um efeito pintaria uma vez
+  // a tabela nova com as larguras da forma antiga.
+  const [chaveMostrada, setChaveMostrada] = useState(chaveGuardada);
+  if (chaveMostrada !== chaveGuardada) {
+    setChaveMostrada(chaveGuardada);
+    setLarguras(lerLarguras(chaveGuardada, colunas));
+  }
+
+  const mudarLargura = (coluna: ColunaAjustavel, nova: number) =>
+    setLarguras((atual) => ajustarLargura(atual, coluna, nova));
+
+  // O fim do gesto muda e grava. A conta parte das larguras DESTA renderização, e isso é seguro:
+  // durante um arraste só a coluna arrastada muda, e o valor final dela vem do ponteiro, não do
+  // estado.
+  const soltarLargura = (coluna: ColunaAjustavel, nova: number) => {
+    const final = ajustarLargura(larguras, coluna, nova);
+    setLarguras(final);
+    gravarLarguras(chaveGuardada, final);
+  };
+
+  const restaurarLargura = (coluna: ColunaAjustavel) => {
+    const final = restaurarColuna(larguras, coluna);
+    setLarguras(final);
+    gravarLarguras(chaveGuardada, final);
+  };
+
+  const coluna = (chave: string) => colunas.find((c) => c.chave === chave) as ColunaAjustavel;
+
+  /**
+   * Um título de coluna com a alça na borda direita.
+   *
+   * 🔴 `aria-label` NO `<th>`: sem ele, o nome acessível do título viraria "Responsável Ajustar a
+   * largura da coluna Responsável" — o leitor de tela repetiria a frase da alça a cada célula, e o
+   * teste que procura a coluna pelo nome deixaria de achá-la.
+   */
+  const titulo = (c: ColunaAjustavel, rotulo: string, alinhamento: 'left' | 'right') => (
+    <th
+      aria-label={rotulo}
+      className={`relative px-2 py-2 font-semibold ${alinhamento === 'right' ? 'text-right' : 'text-left'}`}
+    >
+      {rotulo}
+      <AlcaDeLargura
+        rotulo={rotulo}
+        largura={larguras[c.chave]}
+        onMudar={(nova) => mudarLargura(c, nova)}
+        onSoltar={(nova) => soltarLargura(c, nova)}
+        onRestaurar={() => restaurarLargura(c)}
+      />
+    </th>
+  );
 
   /**
    * 🔴 MEXER EM QUALQUER FILTRO VOLTA PARA 10.
@@ -176,28 +350,39 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
           <p className="py-4 text-sm text-muted-foreground">Nenhum negócio pedindo atenção agora.</p>
         ) : (
           <>
-            {/* 🔴 A ROLAGEM HORIZONTAL É DESTA CAIXA, NUNCA DA PÁGINA. São sete colunas e duas
-                ações; em notebook 1366x768 elas não cabem. Sem o `min-w`, o navegador espreme as
-                colunas até o texto virar uma letra por linha; com ele, a caixa rola por dentro e
-                o resto da tela fica onde está (parente do CLAUDE.md §7.11 — transbordo é o que
-                prende o usuário). */}
+            {/* 🔴 A ROLAGEM HORIZONTAL É DESTA CAIXA, NUNCA DA PÁGINA. Desde 14/09/2026 cada coluna
+                tem largura própria (`table-layout: fixed`, larguras em `COLUNAS_COM_RESPONSAVEL` e
+                `COLUNAS_SEM_RESPONSAVEL`), escolhidas para a soma caber no espaço da tabela na
+                página. A caixa só rola quando a pessoa alarga colunas além desse espaço — e rola por
+                dentro, com o resto da tela parado (parente do CLAUDE.md §7.11: transbordo é o que
+                prende o usuário). Antes, com a largura automática, o navegador repartia o espaço
+                pelo tamanho do texto, e um nome de negócio comprido espremia as outras colunas. */}
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[880px] text-sm">
+              <table
+                className="min-w-full text-sm"
+                // A soma das larguras, e não `w-full`: é o que faz alargar uma coluna alargar a
+                // tabela (e a caixa rolar) em vez de espremer as vizinhas. `min-w-full` estica as
+                // colunas na proporção quando sobra espaço.
+                style={{ tableLayout: 'fixed', width: somaDasLarguras(larguras, colunas) }}
+              >
+                <colgroup>
+                  {colunas.map((c) => (
+                    <col key={c.chave} style={{ width: `${larguras[c.chave]}px` }} />
+                  ))}
+                </colgroup>
                 <thead>
                   {/* A faixa do título das colunas, com o contraste do dashboard de referência
                       (pedido de 14/09/2026): mais escura que o fundo, texto forte e sem caixa-alta.
                       `foreground` com transparência escurece no tema claro e clareia no escuro, sem
                       regra por tema. */}
                   <tr className="bg-foreground/[0.06] text-xs text-card-foreground">
-                    <th className="px-3 py-2 text-left font-semibold">Negócio</th>
-                    <th className="px-3 py-2 text-left font-semibold">Fabricante</th>
-                    <th className="px-3 py-2 text-left font-semibold">Etapa</th>
-                    {podeVerDeTodos && (
-                      <th className="px-3 py-2 text-left font-semibold">Responsável</th>
-                    )}
-                    <th className="px-3 py-2 text-right font-semibold">Valor</th>
-                    <th className="px-3 py-2 text-right font-semibold">Sem mexer há</th>
-                    <th className="px-3 py-2 text-right font-semibold">
+                    {titulo(coluna('negocio'), 'Negócio', 'left')}
+                    {titulo(coluna('fabricante'), 'Fabricante', 'left')}
+                    {titulo(coluna('etapa'), 'Etapa', 'left')}
+                    {podeVerDeTodos && titulo(coluna('responsavel'), 'Responsável', 'left')}
+                    {titulo(coluna('valor'), 'Valor', 'right')}
+                    {titulo(coluna('dias'), 'Sem mexer há', 'right')}
+                    <th className="px-2 py-2 text-right font-semibold">
                       <span className="sr-only">Ações</span>
                     </th>
                   </tr>
@@ -209,11 +394,21 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
                       className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/50"
                       onClick={() => onAbrir(n.id)}
                     >
-                      <td className="px-3 py-2 font-medium text-card-foreground">{n.nome}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{n.fabrica ?? '—'}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{n.etapa ?? '—'}</td>
+                      <td className="px-2 py-2 font-medium text-card-foreground">
+                        {/* Até duas linhas: o nome é o que se lê primeiro, e cortar na primeira
+                            esconderia a fabricante nos nomes montados como "Cliente | Fabricante". */}
+                        <span className="line-clamp-2" title={n.nome}>
+                          {n.nome}
+                        </span>
+                      </td>
+                      <td className="truncate px-2 py-2 text-muted-foreground" title={n.fabrica ?? undefined}>
+                        {n.fabrica ?? '—'}
+                      </td>
+                      <td className="truncate px-2 py-2 text-muted-foreground" title={n.etapa ?? undefined}>
+                        {n.etapa ?? '—'}
+                      </td>
                       {podeVerDeTodos && (
-                        <td className="px-3 py-2 text-card-foreground">
+                        <td className="px-2 py-2 text-card-foreground">
                           {/* O rosto do dono; sem foto, as iniciais — o mesmo círculo do campo de
                               responsáveis do negócio (`CampoDeResponsaveis`). `AvatarFallback`
                               também cobre a foto que demora ou falha ao carregar. */}
@@ -232,10 +427,13 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
                           </span>
                         </td>
                       )}
-                      <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums text-card-foreground">
+                      <td
+                        className="truncate px-2 py-2 text-right font-mono font-semibold tabular-nums text-card-foreground"
+                        title={n.valor === null ? undefined : formatarMoedaBRL(n.valor)}
+                      >
                         {n.valor === null ? '—' : formatarMoedaBRL(n.valor)}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums text-card-foreground">
+                      <td className="truncate px-2 py-2 text-right font-mono font-semibold tabular-nums text-card-foreground">
                         {n.dias_parado === null
                           ? '—'
                           : `${n.dias_parado} ${n.dias_parado === 1 ? 'dia' : 'dias'}`}
@@ -245,7 +443,7 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
                           seria regressão silenciosa para quem se acostumou. Sem o
                           `stopPropagation`, "Retomar depois" abriria o painel do negócio ao mesmo
                           tempo em que abre o diálogo. */}
-                      <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-2">
                           {/* O botão principal, laranja como o da pauta logo acima (pedido de
                               14/09/2026): abrir o negócio é a ação desta tabela. */}
