@@ -36,6 +36,7 @@ import {
   type ResultadoDoDocumento,
 } from '@/lib/cnpj';
 import { CampoCnpj } from '@/components/shared/CampoCnpj';
+import { CampoTelefones } from '@/components/shared/CampoTelefones';
 import { correspondeBusca } from '@/lib/texto-busca';
 
 interface EmpresaSelectorProps {
@@ -296,11 +297,10 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
             </div>
             <div className="grid gap-2">
               <Label htmlFor="telefone">Telefone *</Label>
-              <Input
+              <CampoTelefones
                 id="telefone"
                 value={newEmpresa.telefone}
-                onChange={(e) => setNewEmpresa({ ...newEmpresa, telefone: e.target.value })}
-                placeholder="(00) 00000-0000"
+                onChange={(v) => setNewEmpresa((e) => ({ ...e, telefone: v }))}
               />
             </div>
           </CorpoDialogo>

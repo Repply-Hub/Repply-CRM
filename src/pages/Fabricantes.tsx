@@ -29,7 +29,6 @@ import {
   useCriarContatosEmLote,
 } from "@/hooks/use-fabricante-contatos";
 import { rotuloDoCartao, type ContatoDaFabrica, type FuncaoDaFabrica } from "@/lib/contatos-da-fabrica";
-import { telefoneParaCadastro } from "@/lib/contato-da-conversa";
 import { useAuth } from "@/hooks/use-auth";
 // Criar, editar e excluir fabricante vêm todos do arquivo do domínio (CLAUDE.md §5.3).
 // `use-mutations.ts` teve um `useCreateFabricante` até 28/08/2026; ele foi removido de lá
@@ -58,6 +57,7 @@ import {
   type CnpjData,
 } from "@/lib/cnpj";
 import { CampoCnpj, type CampoCnpjHandle } from "@/components/shared/CampoCnpj";
+import { CampoTelefones } from "@/components/shared/CampoTelefones";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -274,15 +274,9 @@ function FabricanteForm({
           </div>
           <div>
             <Label>Telefone</Label>
-            {/* Mesmo formatador dos contatos, ao SAIR do campo. Aqui o número é o da
-                FÁBRICA — a mesa da empresa, que a consulta de CNPJ preenche —, não a
-                linha de uma pessoa. */}
-            <Input
-              value={telefone}
-              onChange={(e) => setTelefone(e.target.value)}
-              onBlur={(e) => setTelefone(telefoneParaCadastro(e.target.value))}
-              placeholder="(00) 0000-0000"
-            />
+            {/* O número da FÁBRICA — a mesa da empresa, que a consulta de CNPJ preenche —, não a
+                linha de uma pessoa. Formata ao sair do campo, como todo telefone de cadastro. */}
+            <CampoTelefones value={telefone} onChange={setTelefone} placeholder="(00) 0000-0000" />
           </div>
           {/* Status Ativa/Inativa. É um interruptor e não uma lista de duas opções porque
               a pergunta é um fato do mundo — "eu represento esta marca?" —, tem resposta

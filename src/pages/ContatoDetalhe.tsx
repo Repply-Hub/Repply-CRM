@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { ConteudoDialogo } from "@/components/shared/DialogoResponsivo";
 import { EmpresaSelector } from "@/components/shared/EmpresaSelector";
+import { CampoTelefones } from "@/components/shared/CampoTelefones";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,7 +59,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { slugify } from "@/lib/utils";
-import { formatarTelefone } from "@/lib/telefone";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { usePedidosPorCliente } from "@/hooks/use-pedidos";
@@ -809,16 +809,11 @@ const ContatoDetalhe = () => {
               </div>
               <div>
                 <Label>Telefone</Label>
-                <Input
-                  inputMode="tel"
-                  placeholder="+55 (99) 99999-9999"
-                  value={formatarTelefone(editData.telefone)}
-                  onChange={(e) =>
-                    setEditData((d) => ({
-                      ...d,
-                      telefone: formatarTelefone(e.target.value),
-                    }))
-                  }
+                {/* 🔴 Era `formatarTelefone`, que escreve `+55` e CORTA tudo depois do 11º dígito:
+                    abrir e salvar a ficha de quem tem dois números apagava o segundo. */}
+                <CampoTelefones
+                  value={editData.telefone}
+                  onChange={(v) => setEditData((d) => ({ ...d, telefone: v }))}
                 />
               </div>
               <div>

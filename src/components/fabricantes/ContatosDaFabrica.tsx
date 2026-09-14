@@ -13,7 +13,7 @@ import {
   useRemoverContato, useMarcarPrincipal,
 } from '@/hooks/use-fabricante-contatos';
 import { ordenarContatos, aoMarcarPrincipal } from '@/lib/contatos-da-fabrica';
-import { telefoneParaCadastro } from '@/lib/contato-da-conversa';
+import { CampoTelefones } from '@/components/shared/CampoTelefones';
 
 /**
  * A lista de contatos de uma fábrica — gerente, logística, assistência técnica.
@@ -286,21 +286,14 @@ export function ContatosDaFabrica({
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Telefone</Label>
-              {/* 🔴 Formata AO SAIR do campo, não a cada tecla. Reformatar enquanto a
-                  pessoa digita move o cursor no meio do número e faz ela redigitar — é
-                  onde o erro nasce (CLAUDE.md §7.10: brigar com quem está digitando é pior
-                  que a diferença).
-
-                  `telefoneParaCadastro` é o formatador que já existe na casa, e ele carrega
-                  três armadilhas resolvidas: não força o nono dígito (enfiá-lo em número de
-                  10 dígitos quebra os FIXOS que têm WhatsApp, e isso já respondeu por 100%
-                  das falhas de envio deste sistema), deixa número estrangeiro passar
-                  inteiro, e não confunde o DDD 55 do Rio Grande do Sul com código de país. */}
-              <Input
+              {/* 🔴 Formata AO SAIR do campo, não a cada tecla (CLAUDE.md §7.10) — e o
+                  <CampoTelefones> faz isso com `telefoneParaCadastro`, o formatador da casa:
+                  não força o nono dígito (enfiá-lo em número de 10 dígitos quebra os FIXOS que
+                  têm WhatsApp), deixa número estrangeiro passar inteiro e não confunde o DDD 55
+                  do Rio Grande do Sul com código de país. */}
+              <CampoTelefones
                 value={form.telefone}
-                onChange={(e) => setForm({ ...form, telefone: e.target.value })}
-                onBlur={(e) => setForm({ ...form, telefone: telefoneParaCadastro(e.target.value) })}
-                placeholder="(00) 00000-0000"
+                onChange={(v) => setForm({ ...form, telefone: v })}
                 className="h-8 text-sm"
               />
             </div>

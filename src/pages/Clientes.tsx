@@ -26,6 +26,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Search, Building2, Store, User, MapPin, Loader2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ChevronDown, Briefcase, Tag, UserCheck } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/clientes/ImportClientesDialog';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
+import { CampoTelefones } from '@/components/shared/CampoTelefones';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { CargoSelect } from '@/components/shared/CargoSelect';
 import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
@@ -1225,7 +1226,7 @@ const Clientes = () => {
                     {step === 2 && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><Label>Email{empresaObrigatorio('email', true) && ' *'}</Label><Input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="email@exemplo.com" required={empresaObrigatorio('email', true)} /></div>
-                        <div><Label>Telefone{empresaObrigatorio('telefone', true) && ' *'}</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" required={empresaObrigatorio('telefone', true)} /></div>
+                        <div><Label>Telefone{empresaObrigatorio('telefone', true) && ' *'}</Label><CampoTelefones value={telefone} onChange={setTelefone} obrigatorio={empresaObrigatorio('telefone', true)} /></div>
                       </div>
                     )}
 
@@ -1269,7 +1270,7 @@ const Clientes = () => {
                             <Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder={`Nome do contato${contatoObrigatorio('nome_contato', true) ? ' *' : ''}`} required={contatoObrigatorio('nome_contato', true)} />
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <CargoSelect value={cargo} onValueChange={setCargo} />
-                              <Input value={contatoTelefone} onChange={e => setContatoTelefone(e.target.value)} placeholder={`Telefone do contato${contatoObrigatorio('telefone', true) ? ' *' : ''}`} required={contatoObrigatorio('telefone', true)} />
+                              <CampoTelefones value={contatoTelefone} onChange={setContatoTelefone} placeholder={`Telefone do contato${contatoObrigatorio('telefone', true) ? ' *' : ''}`} obrigatorio={contatoObrigatorio('telefone', true)} />
                             </div>
                             <Input value={contatoEmail} onChange={e => setContatoEmail(e.target.value)} type="email" placeholder={`Email do contato${contatoObrigatorio('email', true) ? ' *' : ''}`} required={contatoObrigatorio('email', true)} />
                             {(camposConfigContatos ?? []).filter(c => c.origem === 'customizado').map(campo => (
@@ -1295,7 +1296,7 @@ const Clientes = () => {
                     <div><Label>Cargo{contatoObrigatorio('cargo', false) && ' *'}</Label><CargoSelect value={cargo} onValueChange={setCargo} /></div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div><Label>Email{contatoObrigatorio('email', true) && ' *'}</Label><Input name="email" type="email" placeholder="email@exemplo.com" required={contatoObrigatorio('email', true)} /></div>
-                      <div><Label>Telefone{contatoObrigatorio('telefone', true) && ' *'}</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" required={contatoObrigatorio('telefone', true)} /></div>
+                      <div><Label>Telefone{contatoObrigatorio('telefone', true) && ' *'}</Label><CampoTelefones value={telefone} onChange={setTelefone} obrigatorio={contatoObrigatorio('telefone', true)} /></div>
                     </div>
                     {(camposConfigContatos ?? []).filter(c => c.origem === 'customizado').map(campo => (
                       <div key={campo.id}>

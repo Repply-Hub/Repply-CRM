@@ -50,6 +50,7 @@ import { ContatoSelector } from '@/components/clientes/ContatoSelector';
 import { emptyEndereco, enderecoToString, stringToEndereco, type EnderecoFields } from '@/lib/cep';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { CargoSelect } from '@/components/shared/CargoSelect';
+import { CampoTelefones } from '@/components/shared/CampoTelefones';
 import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEmailDialog';
 import { slugify } from '@/lib/utils';
 import { formatarDataBR } from '@/lib/data-local';
@@ -496,7 +497,7 @@ const ClienteDetalhe = () => {
                 </div>
                 <div>
                   <Label>Telefone</Label>
-                  <Input value={editData.telefone} onChange={e => setEditData(d => ({ ...d, telefone: e.target.value }))} />
+                  <CampoTelefones value={editData.telefone} onChange={v => setEditData(d => ({ ...d, telefone: v }))} />
                 </div>
               </div>
               <EnderecoForm value={editEndereco} onChange={setEditEndereco} />
@@ -1105,11 +1106,10 @@ const ClienteDetalhe = () => {
                     </div>
                     <div className="space-y-2">
                       <Label>Telefone *</Label>
-                      <Input
+                      <CampoTelefones
                         value={novoContato.telefone}
-                        onChange={e => setNovoContato(c => ({ ...c, telefone: e.target.value }))}
-                        placeholder="(00) 00000-0000"
-                        required
+                        onChange={v => setNovoContato(c => ({ ...c, telefone: v }))}
+                        obrigatorio
                       />
                     </div>
                     {(camposConfigContatos ?? []).filter(c => c.origem === 'customizado').map(campo => (
