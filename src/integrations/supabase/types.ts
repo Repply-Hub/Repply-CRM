@@ -4804,6 +4804,8 @@ export type Database = {
           id: string
           nome: string
           responsavel: string | null
+          responsavel_avatar: string | null
+          responsavel_id: string
           total_geral: number
           valor: number
         }[]

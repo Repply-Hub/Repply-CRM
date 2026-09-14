@@ -213,7 +213,7 @@ export function useDashboardNegociosRisco(
   });
 }
 
-// Uma linha da tabela do time. Espelha `negocios_em_risco` (migration 20260909130000), coluna
+// Uma linha da tabela do time. Espelha `negocios_em_risco` (migrations 20260909130000 e 20260914153000), coluna
 // por coluna. `fabrica` e `responsavel` vêm de LEFT JOIN e podem ser nulos; `nome` nunca vem
 // vazio — a função já resolve a cadeia de alternativas antes de devolver.
 //
@@ -225,6 +225,15 @@ export type NegocioEmRisco = {
   fabrica: string | null;
   etapa: string | null;
   responsavel: string | null;
+  /**
+   * O `usuarios.id` do dono (migration 20260914153000). É com ele que a tela decide "é meu?" —
+   * comparar nome confundia homônimos (item 69 da dívida técnica, resolvido em 14/09/2026).
+   * Opcional porque some quando o site novo fala com o banco anterior à migration; aí a tela volta
+   * a comparar o nome.
+   */
+  responsavel_id?: string | null;
+  /** A foto do dono (`usuarios.avatar_url`). Sem foto, a tela desenha as iniciais. */
+  responsavel_avatar?: string | null;
   valor: number | null;
   dias_parado: number | null;
   total_geral: number;
