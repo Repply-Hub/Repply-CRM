@@ -1,4 +1,4 @@
--- 🔴 TRAVAS: TODAS AQUI NO COMEÇO, DA TABELA MAIS FRIA PARA A MAIS QUENTE, 3 s DE ESPERA CADA.
+-- 🔴 TRAVAS: TODAS AQUI NO COMEÇO, DA TABELA MAIS FRIA PARA A MAIS QUENTE, 2 s DE ESPERA CADA.
 --
 -- O PROBLEMA. `add column`, `add constraint`, `create policy` e `create trigger` pedem a trava
 -- exclusiva da tabela (ACCESS EXCLUSIVE), que barra leitura e gravação. A chave estrangeira de
@@ -11,8 +11,8 @@
 -- `statement_timeout=8s`). Passou disso, a gravação do chat e a do webhook do WhatsApp FALHAM —
 -- não esperam.
 --
--- POR QUE TUDO AQUI. Com as travas espalhadas pelo arquivo, cada uma esperaria até 3 s com as
--- anteriores já presas: uns 15 s com o chat bloqueado. Pegando todas aqui, depois da última só
+-- POR QUE TUDO AQUI. Com as travas espalhadas pelo arquivo, cada uma esperaria até 2 s com as
+-- anteriores já presas: uns 10 s com o chat bloqueado. Pegando todas aqui, depois da última só
 -- sobra trabalho de catálogo, em milissegundos: as colunas novas têm default constante, `mencoes`
 -- nasce vazia, e a conferência do `link` lê as poucas linhas do sininho. Cada tabela fica
 -- bloqueada, no pior caso, pela própria espera somada à espera de cada trava pedida DEPOIS dela.
@@ -30,19 +30,24 @@
 --   4. `chat_mensagens`: centenas de gravações.
 --   5. `whatsapp_mensagens`: dezenas de milhares — o webhook. A MAIS QUENTE, por último.
 --
--- PIOR CASO, com cada espera batendo os 3 s:
---   · `whatsapp_mensagens`: bloqueada até 3 s (só a própria espera);
---   · `chat_mensagens`: até 6 s (a própria + a do WhatsApp);
---   · `notificacoes`: até 9 s. A leitura do sininho pode passar dos 8 s e é refeita pela tela;
---   · `usuarios` e `empresas`: gravação parada até 12 s e 15 s. São as de dezenas de gravações.
--- O chat e o WhatsApp ficam abaixo dos 8 s. Esse pior caso pede uma trava longa em cada tabela no
--- mesmo instante; o normal é esperar milissegundos.
--- Espera que passar de 3 s derruba a migration com erro visível (55P03, `lock_not_available`): a
--- transação desfaz tudo, e roda-se de novo num momento calmo.
+-- PIOR CASO, com cada espera batendo os 2 s:
+--   · `whatsapp_mensagens`: bloqueada até 2 s (só a própria espera);
+--   · `chat_mensagens`: até 4 s (a própria + a do WhatsApp);
+--   · `notificacoes`: até 6 s (a própria + a do chat + a do WhatsApp), leitura do sininho inclusive;
+--   · `usuarios`: gravação parada até 8 s (a própria + as três de cima), no limite dos papéis da
+--     API. Leitura e checagem de chave estrangeira não param;
+--   · `empresas`: gravação parada até 10 s (a própria + a de `usuarios` + as três de cima).
+--     Leitura não para. `usuarios` e `empresas` tiveram só dezenas de gravações no período medido;
+--   · as três em ACCESS SHARE não param ninguém.
+-- Mensagem do chat, mensagem do WhatsApp e sininho ficam abaixo dos 8 s. Esse pior caso pede uma
+-- trava longa em cada tabela no mesmo instante; o normal é esperar milissegundos.
+-- 🔴 QUEM FALHA É A MIGRATION, NUNCA A MENSAGEM. Espera que passar de 2 s derruba a MIGRATION com
+-- erro visível (55P03, `lock_not_available`): a transação desfaz tudo, as gravações que estavam na
+-- fila atrás dela seguem na hora, e a migration é rodada de novo.
 --
 -- `set local`: vale só nesta transação e some no COMMIT, sem ficar grudado na conexão que a
 -- aplicou.
-set local lock_timeout = '3s';
+set local lock_timeout = '2s';
 
 lock table public.whatsapp_conversas, public.wapi_instancia_usuarios, public.whatsapp_conversa_responsaveis
   in access share mode;
@@ -142,6 +147,9 @@ end $$;
 -- dá nulo, e nenhum registro antigo some da vista de ninguém.
 -- Quem grava não passa por elas: os gatilhos deste arquivo rodam como `postgres` e as
 -- funções de servidor como `service_role`, os dois com `bypassrls`.
+-- Vale também para o tempo real, de propósito: o tempo real respeita a RLS de quem ouve, e com
+-- `notificacoes` em `supabase_realtime` (20260914120000_religa_tempo_real_do_chat.sql) o gestor
+-- não recebe o evento da menção de um colega.
 -- ⚠️ Gestor que tentar apagar a menção de um colega recebe ZERO LINHAS e nenhum erro
 -- (CLAUDE.md §4.6).
 drop policy if exists notificacoes_mencao_so_do_dono_select on public.notificacoes;
