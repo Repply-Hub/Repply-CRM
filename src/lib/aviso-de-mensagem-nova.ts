@@ -91,11 +91,11 @@ function seloDaOrigem(origem: OrigemDoAviso): ReactNode {
   );
 }
 
-function tituloDoAviso(de: string, origem: OrigemDoAviso): ReactNode {
+function tituloDoAviso(de: string, acao: string, origem: OrigemDoAviso): ReactNode {
   return createElement(
     'span',
     { className: 'inline-flex flex-wrap items-center gap-x-1.5 gap-y-1' },
-    createElement('span', null, createElement('b', null, de), ' enviou uma mensagem'),
+    createElement('span', null, createElement('b', null, de), ` ${acao}`),
     seloDaOrigem(origem),
   );
 }
@@ -108,6 +108,8 @@ export interface AvisoDeMensagemNova {
   origem: OrigemDoAviso;
   /** Quem mandou — vai em negrito. */
   de: string;
+  /** O que a pessoa fez. Padrão: "enviou uma mensagem". Menção: "te mencionou no Geral". */
+  acao?: string;
   /** A prévia, ou o ícone+rótulo quando não é texto. */
   previa: React.ReactNode;
   /** Para onde levar ao clicar. Sem isto o aviso não ganha botão. */
@@ -122,6 +124,7 @@ export interface AvisoDeMensagemNova {
 export function avisarMensagemNova({
   origem,
   de,
+  acao = 'enviou uma mensagem',
   previa,
   aoAbrir,
   conversaId,
@@ -130,7 +133,7 @@ export function avisarMensagemNova({
 
   const { estilo, botao } = ORIGENS[origem];
 
-  toast(() => tituloDoAviso(de, origem), {
+  toast(() => tituloDoAviso(de, acao, origem), {
     description: previa,
     // Fundo cheio nos dois — é o que faz o aviso ser visto por cima de
     // qualquer tela, e é o único toast do sistema assim.

@@ -87,4 +87,19 @@ describe('avisarMensagemNova', () => {
     expect(typeof arg.ligado).toBe('boolean');
     expect(typeof arg.somId).toBe('string');
   });
+
+  it('sem "acao", o título continua "enviou uma mensagem"', () => {
+    avisarMensagemNova({ origem: 'chat', de: 'Carlos', previa: 'oi' });
+
+    renderizarTitulo();
+    expect(screen.getByText(/enviou uma mensagem/)).toBeInTheDocument();
+  });
+
+  it('com "acao", o título troca por ela — é assim que a menção vira "te mencionou no Geral"', () => {
+    avisarMensagemNova({ origem: 'chat', de: 'Carlos', acao: 'te mencionou no Geral', previa: 'oi' });
+
+    renderizarTitulo();
+    expect(screen.getByText(/te mencionou no Geral/)).toBeInTheDocument();
+    expect(screen.queryByText(/enviou uma mensagem/)).toBeNull();
+  });
 });

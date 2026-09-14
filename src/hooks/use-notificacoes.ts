@@ -15,6 +15,7 @@ export interface Notificacao {
   usuario_id: string;
   pedido_id: string | null;
   cliente_id: string | null;
+  link?: string | null;
   tipo: string;
   titulo: string;
   mensagem: string | null;
@@ -152,6 +153,11 @@ export function useUnreadChatMessages() {
         qc.invalidateQueries({ queryKey: ['unread_chat_count'] });
 
         if (payload.eventType === 'INSERT' && meId && payload.new.usuario_id !== meId) {
+          // Menção a mim: quem avisa é useAvisoDeMencao ("te mencionou"). Avisar aqui também
+          // daria dois avisos pela mesma mensagem.
+          const mencionados: string[] = Array.isArray(payload.new.mencionados) ? payload.new.mencionados : [];
+          if (!payload.new.recipient_id && (mencionados.includes(meId) || payload.new.menciona_todos)) return;
+
           const members = qc.getQueryData<any[]>(['chat-members']) || [];
           let sender = members.find((m) => m.id === payload.new.usuario_id);
 
