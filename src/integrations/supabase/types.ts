@@ -415,6 +415,8 @@ export type Database = {
           id: string
           lida: boolean
           lida_em: string | null
+          menciona_todos: boolean
+          mencionados: string[]
           quoted_arquivo_nome: string | null
           quoted_arquivo_tipo: string | null
           quoted_conteudo: string | null
@@ -434,6 +436,8 @@ export type Database = {
           id?: string
           lida?: boolean
           lida_em?: string | null
+          menciona_todos?: boolean
+          mencionados?: string[]
           quoted_arquivo_nome?: string | null
           quoted_arquivo_tipo?: string | null
           quoted_conteudo?: string | null
@@ -453,6 +457,8 @@ export type Database = {
           id?: string
           lida?: boolean
           lida_em?: string | null
+          menciona_todos?: boolean
+          mencionados?: string[]
           quoted_arquivo_nome?: string | null
           quoted_arquivo_tipo?: string | null
           quoted_conteudo?: string | null
@@ -2762,12 +2768,51 @@ export type Database = {
           },
         ]
       }
+      mencoes: {
+        Row: {
+          autor_id: string | null
+          autor_nome: string | null
+          chat_mensagem_id: string | null
+          conversa_chave: string
+          created_at: string
+          empresa_id: string
+          id: string
+          lida_em: string | null
+          link: string
+          lugar: string
+          mencionado_id: string
+          origem: string
+          previa: string | null
+          wa_mensagem_id: string | null
+        }
+        Insert: {
+          autor_id?: string | null
+          autor_nome?: string | null
+          chat_mensagem_id?: string | null
+          conversa_chave: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          lida_em?: string | null
+          link: string
+          lugar: string
+          mencionado_id: string
+          origem: string
+          previa?: string | null
+          wa_mensagem_id?: string | null
+        }
+        Update: {
+          lida_em?: string | null
+        }
+        Relationships: []
+      }
       notificacoes: {
         Row: {
           cliente_id: string | null
           created_at: string
           id: string
           lida: boolean
+          link: string | null
           mensagem: string | null
           pedido_id: string | null
           tipo: string
@@ -2779,6 +2824,7 @@ export type Database = {
           created_at?: string
           id?: string
           lida?: boolean
+          link?: string | null
           mensagem?: string | null
           pedido_id?: string | null
           tipo?: string
@@ -2790,6 +2836,7 @@ export type Database = {
           created_at?: string
           id?: string
           lida?: boolean
+          link?: string | null
           mensagem?: string | null
           pedido_id?: string | null
           tipo?: string
@@ -4359,6 +4406,8 @@ export type Database = {
           lida: boolean
           media_mime: string | null
           media_url: string | null
+          menciona_todos: boolean
+          mencionados: string[]
           quoted_conteudo: string | null
           quoted_remetente_nome: string | null
           quoted_tipo: string | null
@@ -4388,6 +4437,8 @@ export type Database = {
           lida?: boolean
           media_mime?: string | null
           media_url?: string | null
+          menciona_todos?: boolean
+          mencionados?: string[]
           quoted_conteudo?: string | null
           quoted_remetente_nome?: string | null
           quoted_tipo?: string | null
@@ -4417,6 +4468,8 @@ export type Database = {
           lida?: boolean
           media_mime?: string | null
           media_url?: string | null
+          menciona_todos?: boolean
+          mencionados?: string[]
           quoted_conteudo?: string | null
           quoted_remetente_nome?: string | null
           quoted_tipo?: string | null
@@ -4781,6 +4834,14 @@ export type Database = {
           logradouro: string
           numero: string
           uf: string
+        }[]
+      }
+      pessoas_mencionaveis_na_conversa: {
+        Args: { p_conversa_id: string }
+        Returns: {
+          avatar_url: string | null
+          id: string
+          nome: string
         }[]
       }
       plano_vendas_progresso: {
