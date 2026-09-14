@@ -26,9 +26,12 @@ import {
   classificarDocumento,
   resultadoPermiteSalvar,
   mensagemDoDocumento,
+  ehDocumentoDuplicado,
+  MENSAGEM_DOCUMENTO_DUPLICADO,
   type CnpjData,
   type ResultadoDoDocumento,
 } from '@/lib/cnpj';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { contatosDoCliente, contatosForaDoCliente } from '@/lib/vinculo-contato-cliente';
 import { BotaoVerConversa } from '@/components/whatsapp/BotaoVerConversa';
 import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
@@ -369,8 +372,10 @@ const ClienteDetalhe = () => {
       });
       toast.success('Cliente atualizado com sucesso!');
       setEditOpen(false);
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err) {
+      // A trava de duplicidade (`clientes_empresa_id_cnpj_key`) devolve o erro cru do banco,
+      // em inglês; `ehDocumentoDuplicado` reconhece esse caso e troca pela frase em português.
+      toast.error(ehDocumentoDuplicado(err) ? MENSAGEM_DOCUMENTO_DUPLICADO : mensagemDeErro(err));
     }
   };
 

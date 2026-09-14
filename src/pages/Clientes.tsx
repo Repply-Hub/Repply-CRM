@@ -40,9 +40,12 @@ import {
   classificarDocumento,
   resultadoPermiteSalvar,
   mensagemDoDocumento,
+  ehDocumentoDuplicado,
+  MENSAGEM_DOCUMENTO_DUPLICADO,
   type CnpjData,
   type ResultadoDoDocumento,
 } from '@/lib/cnpj';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { CampoCnpj } from '@/components/shared/CampoCnpj';
 import { EnderecoForm } from '@/components/clientes/EnderecoForm';
 import { ContatoSelector } from '@/components/clientes/ContatoSelector';
@@ -803,8 +806,10 @@ const Clientes = () => {
       toast.success('Empresa cadastrada com sucesso!');
       resetForm();
       setDialogOpen(false);
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err) {
+      // A trava de duplicidade (`clientes_empresa_id_cnpj_key`) devolve o erro cru do banco,
+      // em inglês; `ehDocumentoDuplicado` reconhece esse caso e troca pela frase em português.
+      toast.error(ehDocumentoDuplicado(err) ? MENSAGEM_DOCUMENTO_DUPLICADO : mensagemDeErro(err));
     }
   };
 

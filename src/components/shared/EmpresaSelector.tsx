@@ -33,8 +33,11 @@ import {
   mensagemDoDocumento,
   formatarDocumento,
   telefoneDaReceita,
+  ehDocumentoDuplicado,
+  MENSAGEM_DOCUMENTO_DUPLICADO,
   type ResultadoDoDocumento,
 } from '@/lib/cnpj';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { CampoCnpj } from '@/components/shared/CampoCnpj';
 import { CampoTelefones } from '@/components/shared/CampoTelefones';
 import { correspondeBusca } from '@/lib/texto-busca';
@@ -146,8 +149,10 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
         onValueChange(result.id);
       }
       setNewEmpresa({ empresa: '', tipo: tipoPadrao(tipos), cnpj: '', email: '', telefone: '' });
-    } catch (error: any) {
-      toast.error('Erro ao cadastrar empresa: ' + error.message);
+    } catch (error) {
+      // A trava de duplicidade (`clientes_empresa_id_cnpj_key`) devolve o erro cru do banco,
+      // em inglês; `ehDocumentoDuplicado` reconhece esse caso e troca pela frase em português.
+      toast.error(ehDocumentoDuplicado(error) ? MENSAGEM_DOCUMENTO_DUPLICADO : mensagemDeErro(error));
     }
   };
 

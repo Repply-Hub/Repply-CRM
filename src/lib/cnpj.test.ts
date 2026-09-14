@@ -9,6 +9,7 @@ import {
   classificarDocumento,
   resultadoPermiteSalvar,
   mensagemDoDocumento,
+  ehDocumentoDuplicado,
 } from './cnpj';
 
 /**
@@ -244,5 +245,34 @@ describe('mensagemDoDocumento — as frases da §4.1 do desenho', () => {
   });
   it.each(['encontrado', 'cpf', 'vazio', 'inalterado'] as const)('%s: nada a dizer', (r) => {
     expect(mensagemDoDocumento(r, { seNaoExistir: 'avisar' })).toBeNull();
+  });
+});
+
+describe('ehDocumentoDuplicado — a trava de CPF/CNPJ repetido na mesma empresa', () => {
+  it('código 23505 com o nome da trava de documento é duplicado', () => {
+    expect(
+      ehDocumentoDuplicado({
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "clientes_empresa_id_cnpj_key"',
+        details: 'Key (empresa_id, cnpj)=(...) already exists.',
+      }),
+    ).toBe(true);
+  });
+  it('código 23505 de OUTRA trava não é documento duplicado', () => {
+    expect(
+      ehDocumentoDuplicado({
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "outra_trava_qualquer_key"',
+      }),
+    ).toBe(false);
+  });
+  it('outro código não é duplicado', () => {
+    expect(ehDocumentoDuplicado({ code: '23503', message: 'violates foreign key constraint' })).toBe(false);
+  });
+  it('null não é duplicado', () => {
+    expect(ehDocumentoDuplicado(null)).toBe(false);
+  });
+  it('um Error comum não é duplicado — erro do Supabase não é Error (CLAUDE.md §4.6)', () => {
+    expect(ehDocumentoDuplicado(new Error('falha ao salvar'))).toBe(false);
   });
 });

@@ -161,12 +161,18 @@ function FabricanteForm({
     const cnpjDigitos = unmaskCnpj(cnpj);
     try {
       if (editData) {
+        // Só grava o CNPJ quando a pessoa MEXEU nele — mesmo critério de `documentoMudou` em
+        // ClienteDetalhe.tsx (compara o texto mostrado, com máscara, não os dígitos). Sem isto,
+        // toda edição regravava `cnpjDigitos || null` mesmo sem tocar no campo, e as 11 fábricas
+        // com máscara perdiam a máscara só por trocar Ativa/Inativa.
+        const documentoMudou = cnpj !== formatarDocumento(editData.cnpj);
         await updateFabricante.mutateAsync({
           id: editData.id,
           nome,
-          // `null`, e não `undefined`: `undefined` some do pedido e o banco guardaria o CNPJ
-          // antigo — "cadastrar sem CNPJ" numa fábrica que já existe não apagaria nada.
-          cnpj: cnpjDigitos || null,
+          // `undefined` = ninguém mexeu, o banco fica como estava (inclusive o formato antigo).
+          // `null` = a pessoa apagou de propósito: `undefined` sumiria do pedido e o CNPJ antigo
+          // continuaria gravado.
+          cnpj: documentoMudou ? (cnpjDigitos || null) : undefined,
           // `nome_contato` NÃO vai mais: quem guarda pessoa agora é `fabricante_contatos`.
           // Não mandar preserva o que a coluna já tinha — apagá-la é o passo 2, em arquivo
           // próprio, depois deste site publicado.

@@ -227,3 +227,26 @@ export function mensagemDoDocumento(
       return null;
   }
 }
+
+// ─── Documento repetido na mesma empresa ───────────────────────────────
+
+/** A trava de unicidade de `clientes` (migration `20260709174302_clientes_cnpj_unique_por_empresa.sql`). */
+const TRAVA_DOCUMENTO_DUPLICADO = 'clientes_empresa_id_cnpj_key';
+
+export const MENSAGEM_DOCUMENTO_DUPLICADO = 'Já existe um cliente com este CPF ou CNPJ.';
+
+/**
+ * A gravação em `clientes` caiu na trava de documento repetido na mesma empresa?
+ *
+ * 🔴 Erro do Supabase NÃO é um `Error` (CLAUDE.md §4.6): é objeto simples com `code`, `message`,
+ * `details`. `23505` é violação de unicidade em geral — hoje `clientes` só tem esta trava, então
+ * o código já bastaria —, mas conferir também o nome da trava mantém a função certa se um dia
+ * nascer outra trava de unicidade na tabela, sem precisar mexer em quem chama.
+ */
+export function ehDocumentoDuplicado(erro: unknown): boolean {
+  if (!erro || typeof erro !== 'object') return false;
+  const o = erro as { code?: unknown; message?: unknown; details?: unknown };
+  if (o.code !== '23505') return false;
+  const texto = [o.message, o.details].filter((p): p is string => typeof p === 'string').join(' ');
+  return texto.includes(TRAVA_DOCUMENTO_DUPLICADO);
+}
