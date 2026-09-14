@@ -154,7 +154,8 @@ export function AutomacaoTab({ empresaId }: Props) {
               <p className="text-xs text-muted-foreground">
                 O teto da pauta. Entra o que está parado além do prazo acima: primeiro os negócios
                 da própria pessoa, depois os da equipe para quem vê a equipe, do maior valor para o
-                menor, até esse limite. Compromisso marcado até a véspera ocupa vaga.
+                menor, até esse limite. Compromisso marcado até a véspera ocupa vaga; o marcado no
+                próprio dia aparece além do teto.
               </p>
             </div>
             <Input
