@@ -235,4 +235,52 @@ describe('useCampoComMencao', () => {
     expect(campo.value).toBe('oi @ang'); // nada foi escolhido
     expect(screen.queryByRole('listbox')).toBeNull(); // mas a lista fechou
   });
+
+  // (k) — fechar a lista sem trocar de conversa (Esc ou Shift+Enter) não é a mesma coisa
+  // que trocar de conversa ou desligar o @: quem já tinha sido escolhido continua valendo
+  // na apuração do envio.
+  it('Esc fecha a lista sem apagar quem já tinha sido escolhido antes', () => {
+    render(<Campo />);
+    const campo = digitar('oi @ang');
+    fireEvent.keyDown(campo, { key: 'Enter' }); // escolhe Ângela Souza
+    expect(campo.value).toBe('oi @Ângela Souza ');
+
+    digitar('oi @Ângela Souza @car'); // abre de novo, buscando "car"
+    fireEvent.keyDown(campo, { key: 'Escape' }); // fecha sem escolher mais ninguém
+    expect(screen.queryByRole('listbox')).toBeNull();
+
+    fireEvent.keyDown(campo, { key: 'Enter' }); // sem @ em curso: apura
+    expect(apurado).toEqual({ ids: ['u1'], todos: false }); // Ângela continua contando
+  });
+
+  it('Shift+Enter fecha a lista sem apagar quem já tinha sido escolhido antes', () => {
+    render(<Campo />);
+    const campo = digitar('oi @ang');
+    fireEvent.keyDown(campo, { key: 'Enter' }); // escolhe Ângela Souza
+    expect(campo.value).toBe('oi @Ângela Souza ');
+
+    digitar('oi @Ângela Souza @car'); // abre de novo, buscando "car"
+    fireEvent.keyDown(campo, { key: 'Enter', shiftKey: true }); // fecha sem escolher mais ninguém
+    expect(screen.queryByRole('listbox')).toBeNull();
+
+    fireEvent.keyDown(campo, { key: 'Enter' }); // sem @ em curso: apura
+    expect(apurado).toEqual({ ids: ['u1'], todos: false }); // Ângela continua contando
+  });
+
+  // (l) — a guarda de composição de IME não é exclusividade do Enter: Tab e as setas
+  // também pertencem à composição enquanto ela dura.
+  it('Tab durante composição de IME não é consumido', () => {
+    render(<Campo />);
+    const campo = digitar('oi @ang');
+    fireEvent.keyDown(campo, { key: 'Tab', isComposing: true });
+    expect(campo.value).toBe('oi @ang'); // nada foi escolhido
+    expect(screen.queryByRole('listbox')).not.toBeNull(); // lista continua aberta
+  });
+
+  it('ArrowDown durante composição de IME não é consumido', () => {
+    render(<Campo />);
+    const campo = digitar('oi @'); // 3 opções, começa com a primeira ativa
+    fireEvent.keyDown(campo, { key: 'ArrowDown', isComposing: true });
+    expect(indiceDaOpcaoAtiva()).toBe(0); // não moveu
+  });
 });

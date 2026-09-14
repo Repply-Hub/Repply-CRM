@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import {
   consultaCasaComTodos,
@@ -54,9 +54,14 @@ export function useCampoComMencao({
   // Troca de conversa (mesma instância do componente, conversa diferente) ou desligar o @
   // (virou campo de conversa direta) apagam o "@" em curso e quem já tinha sido escolhido —
   // senão a próxima apuração no envio carrega gente de outra conversa.
+  //
+  // `useLayoutEffect`, não `useEffect`: ele corre depois do render mas ANTES do navegador
+  // pintar a tela. Com `useEffect` (que corre depois da pintura), por um quadro a lista da
+  // conversa antiga aparece na tela nova, antes de fechar sozinha — some rápido demais pra
+  // reparar, mas é a lista errada por um instante.
   const conversaAnterior = useRef(conversaChave);
   const ativoAnterior = useRef(ativo);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const trocouDeConversa = conversaChave !== conversaAnterior.current;
     const foiDesligado = ativoAnterior.current && !ativo;
     if (trocouDeConversa || foiDesligado) {
