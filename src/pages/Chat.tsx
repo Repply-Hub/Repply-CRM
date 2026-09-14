@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
 import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, useDeleteChatMessage, useAddChatGrupoMembros, ChatGrupo, ChatMessage, QuotedMessage, useMarkChatAsRead, useMarkGroupMessagesRead, useMessageReadReceipts, useChatGeralConfig, useUpdateChatGeralConfig, useChatLastActivity, ChatLastActivity } from '@/hooks/use-chat';
 import { useOnlineUsers } from '@/hooks/use-presence';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
+import { alvoInicialDaUrl } from '@/lib/alvo-do-chat';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
@@ -634,6 +636,10 @@ const Chat = () => {
   const canManageGrupos = isAdminEmpresa || profile?.role === 'gestor';
   const onlineIds = useOnlineUsers();
   const [target, setTarget] = useState<ChatTarget>({ type: 'geral' });
+  // `?conversa=<chave>` chega do aviso de mensagem nova (ver
+  // `alvo-do-chat.ts` e `use-notificacoes.ts`) — o efeito logo abaixo de
+  // `handleSelectTarget` é quem lê isto e troca de alvo.
+  const [searchParams, setSearchParams] = useSearchParams();
   // Abaixo de `md`: false = mostra a lista, true = mostra a conversa (uma coisa
   // por vez — decisão do dono do produto em 11/09/2026). Começa em `false` mesmo
   // o alvo padrão sendo o Geral (regra 1 do brief b1-chat-celular). De `md` para
@@ -990,6 +996,33 @@ const Chat = () => {
     setTarget(t);
     setMostrarConversaNoCelular(true);
   };
+
+  // Abre a conversa exata que o aviso de mensagem nova mandou pelo parâmetro
+  // `?conversa=` — antes disso o clique só levava para `/chat` genérico, e a
+  // pessoa tinha de procurar a conversa (dono do produto, 14/09/2026). Reage
+  // à mudança do parâmetro mesmo com a tela já montada: clicar num segundo
+  // aviso enquanto já se está em `/chat` troca de novo, pelo mesmo caminho de
+  // quem clica na lista (`handleSelectTarget`, que no celular também troca
+  // para a visão de conversa). Chave inválida ou ausente: não faz nada, fica
+  // no Geral.
+  useEffect(() => {
+    const conversa = searchParams.get('conversa');
+    if (!conversa) return;
+    const alvo = alvoInicialDaUrl(conversa);
+    if (alvo) handleSelectTarget(alvo);
+    // Tira o parâmetro da URL para não forçar o mesmo alvo de novo num clique
+    // manual na lista ou num back/forward do navegador.
+    setSearchParams(
+      (prev) => {
+        prev.delete('conversa');
+        return prev;
+      },
+      { replace: true },
+    );
+    // `handleSelectTarget` é recriada a cada render e entrar aqui reabriria o
+    // efeito sem parar — só o parâmetro importa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handleSend = async () => {
     const trimmed = text.trim();

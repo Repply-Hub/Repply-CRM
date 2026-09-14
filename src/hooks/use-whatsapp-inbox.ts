@@ -1472,6 +1472,7 @@ export function useUnreadWaMessages() {
             // sempre. O som sai de lá dentro e cala sozinho quando a pessoa já
             // está com esta conversa aberta (ver definirConversaEmFoco).
             avisarMensagemNova({
+              origem: 'whatsapp',
               de: nomeConversa,
               previa: descricao,
               conversaId: row.id,
