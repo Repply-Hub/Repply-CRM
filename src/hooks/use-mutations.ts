@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './use-auth';
 import { useRegistrarAtividade } from './use-historico-alteracoes';
+import { hojeLocal } from '@/lib/data-local';
 
 export function useCreateCliente() {
   const qc = useQueryClient();
@@ -20,7 +21,7 @@ export function useCreateCliente() {
       const { data: vid } = await supabase.rpc('get_my_vendedor_id');
       const { data: created, error } = await supabase.from('clientes').insert({
         ...insertData,
-        data_criacao: new Date().toISOString().slice(0, 10),
+        data_criacao: hojeLocal(),
         usuario_id: vid,
         criado_por_usuario_id: vid,
       }).select('id').single();
@@ -55,7 +56,7 @@ export function useCreateContato() {
         .from('contatos')
         .insert({
           ...data,
-          data_criacao: new Date().toISOString().slice(0, 10),
+          data_criacao: hojeLocal(),
           usuario_id: vid,
           criado_por_usuario_id: vid,
         })

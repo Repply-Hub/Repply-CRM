@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { toast } from 'sonner';
 import { tocarNotificacao } from '@/lib/som';
 import { somLigado } from '@/hooks/use-som-ligado';
+import { somEscolhido } from '@/hooks/use-som-escolhido';
 
 /**
  * O aviso que salta na tela quando chega mensagem — de WhatsApp ou do chat
@@ -53,7 +54,7 @@ export function avisarMensagemNova({
   aoAbrir,
   conversaId,
 }: AvisoDeMensagemNova): void {
-  tocarNotificacao({ ligado: somLigado(), conversaId });
+  tocarNotificacao({ ligado: somLigado(), conversaId, somId: somEscolhido() });
 
   toast(
     () => createElement('span', null, createElement('b', null, de), ' enviou uma mensagem'),

@@ -1864,8 +1864,19 @@ const Emails = () => {
               busca não cediam espaço, a linha estourava para a direita e o
               "Escrever" — que é o ÚNICO caminho para um e-mail novo — sumia por
               inteiro entre ~768 e ~917px de janela, sem barra de rolagem em lugar
-              nenhum para alcançá-lo. Mesmo padrão de Negocios.tsx:1862. */}
-          <div className="flex items-center gap-4 flex-1 min-w-0 overflow-x-auto custom-scrollbar">
+              nenhum para alcançá-lo. Mesmo padrão de Negocios.tsx:1862.
+              `flex-wrap` até `xl` (exclusive): no celular, no tablet E no notebook
+              pequeno deixa a busca (que passou a aparecer ali) e o filtro
+              "Todas/Não lidas" quebrarem para a própria linha em vez de vazar
+              para fora da tela sem barra visível. Foi `md` (768px) até
+              11/09/2026 de manhã, depois `lg` (1024px) à tarde — mas o
+              levantamento no navegador real de 11/09/2026 mediu 1024×768 de
+              verdade e achou a busca ainda vazando: em `nowrap` a fileira pede
+              840px (`scrollWidth`) e só há 802px (`clientWidth`) — 38px
+              faltando, sem barra visível para alcançá-la. A 1280px a fileira
+              cabe exata (1058 = 1058). De `xl` (1280px) para cima volta a ser
+              `nowrap`. */}
+          <div className="flex flex-wrap xl:flex-nowrap items-center gap-4 flex-1 min-w-0 overflow-x-auto custom-scrollbar">
             {selectedIds.length > 0 ? (
               <div className="flex shrink-0 items-center gap-4 bg-primary/5 px-3 py-1 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-left-2 duration-200">
                 <div className="flex items-center gap-2">
@@ -1962,10 +1973,12 @@ const Emails = () => {
 
             {/* Somente não lidas.
                 Fica FORA do bloco que a barra de seleção em massa substitui, e
-                fora do contêiner `hidden md:flex` da busca — senão sumiria no
-                celular, que é justamente onde triar o que falta ler importa
-                mais. Só na aba Recebidos: "não lida" não quer dizer nada em
-                Enviados. Mesmo padrão de botão do filtro do WhatsApp Inbox. */}
+                fora do bloco de busca — visibilidade independente da busca, que
+                desde 11/09/2026 também aparece no celular (numa linha própria,
+                ver comentário no bloco abaixo), que é justamente onde triar o
+                que falta ler importa mais. Só na aba Recebidos: "não lida" não
+                quer dizer nada em Enviados. Mesmo padrão de botão do filtro do
+                WhatsApp Inbox. */}
             {activeTab === "received" && selectedIds.length === 0 && (
               <div className={cn(TOGGLE_LIST_CLASS, "w-fit shrink-0")}>
                 {[
@@ -1994,7 +2007,14 @@ const Emails = () => {
               </div>
             )}
 
-            <div className="flex items-center gap-2 flex-1 min-w-[14rem] max-w-md hidden md:flex">
+            {/* Mesmo ponto de quebra da fileira acima (`xl`, 1280px — ver o
+                comentário no início do bloco): os dois mudam juntos porque são
+                a mesma fileira, e o campo de busca é o que mais precisa de
+                espaço nela. Ficar em `lg` deixaria a busca espremida contra o
+                filtro "Todas/Não lidas" bem no ponto que o levantamento de
+                11/09/2026 mediu como insuficiente (1024×768: 840px pedidos,
+                802px disponíveis). */}
+            <div className="flex items-center gap-2 w-full xl:w-auto xl:flex-1 xl:min-w-[14rem] xl:max-w-md">
               {/* Marcador só filtra Recebidos (ver `escolherPasta`) — o chip só
                   existe onde há filtro de verdade para limpar. Clicar de novo
                   no marcador ativo na barra lateral não desmarca (o clique

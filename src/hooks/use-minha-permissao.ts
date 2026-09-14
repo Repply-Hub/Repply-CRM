@@ -75,17 +75,20 @@ export function useMinhaPermissao(modulo: string, acao: AcaoPermissao): {
  * "EU vejo os negócios de toda a equipe na tela 'Hoje'?" — o espelho de
  * `public.ve_pauta_de_todos(uuid)` no banco.
  *
- * 🔴 A CHAVE MUDOU DE DONO EM 09/09/2026, E O NOME DELA FICOU PARA TRÁS. Ela NÃO governa mais a
- * FILA da tela "Hoje": desde a migration 20260909120000 a fila é sempre pessoal, para todo mundo
- * — gestor inclusive. O que a chave `pauta_de_todos` libera hoje é o painel "No geral" de baixo:
- * a TABELA DO TIME (`negocios_em_risco`), o gráfico "Risco por Vendedor" e o filtro de
- * Responsável. Quem tem a chave vê a carteira da equipe ali; quem não tem vê a própria.
+ * 🔴 A CHAVE MUDOU DE DONO EM 09/09/2026 E VOLTOU EM 12/09/2026 — O NOME DELA É QUE FICOU PARA
+ * TRÁS. Ela governa de novo a FILA da tela "Hoje" (migration
+ * 20260912100000_pauta_do_dia_que_encolhe.sql): quem tem `pauta_de_todos` recebe primeiro os
+ * negócios do próprio nome e, depois deles, os da equipe. Ela TAMBÉM continua liberando o painel
+ * "No geral" de baixo: a TABELA DO TIME (`negocios_em_risco`), o gráfico "Risco por Vendedor" e o
+ * filtro de Responsável — e, desde 20260912110000_risco_segue_a_chave.sql, os cartões de risco e
+ * o "Resumo por fabricante" também. Quem tem a chave vê a equipe, na fila e no painel; quem não
+ * tem vê só a própria carteira nos dois.
  *
- * 🔴 ISTO NÃO PROTEGE NADA. Quem decide são `negocios_em_risco` (quais negócios entram na tabela)
- * e `dashboard_negocios_risco` (se a lista nominal por responsável vem preenchida), as duas no
- * servidor, pelo mesmo `eu_vejo_pauta_de_todos()`. Aqui serve para não oferecer um filtro de
- * "Responsável" que voltaria vazio, e para não desenhar uma coluna de dono que repetiria o mesmo
- * nome em todas as linhas.
+ * 🔴 ISTO NÃO PROTEGE NADA. Quem decide de verdade é `pauta_do_dia_de` (a fila), `negocios_em_risco`
+ * (quais negócios entram na tabela) e `dashboard_negocios_risco` (os cartões e o resumo por
+ * fabricante) — as três no servidor, pela mesma leitura da chave. Aqui serve para não oferecer um
+ * filtro de "Responsável" que voltaria vazio, e para não desenhar uma coluna de dono que
+ * repetiria o mesmo nome em todas as linhas.
  *
  * 🔴 POR QUE ELE NÃO USA `usePodeFazer('pedidos', 'ver', 'pauta_de_todos')`, que já existe:
  * aquele hook começa com `if (ehGestor) return true` — **sem olhar a linha de permissão**. É o

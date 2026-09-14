@@ -1,5 +1,6 @@
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { hojeLocal } from '@/lib/data-local';
 
 type ExportType = 'empresas' | 'contatos';
 type ExportFormat = 'xlsx' | 'csv';
@@ -43,7 +44,7 @@ export function exportarClientes(data: any[], type: ExportType, format: ExportFo
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, type === 'empresas' ? 'Empresas' : 'Contatos');
 
-    const fileName = `${type}_${new Date().toISOString().slice(0, 10)}.${format}`;
+    const fileName = `${type}_${hojeLocal()}.${format}`;
     if (format === 'csv') {
       XLSX.writeFile(wb, fileName, { bookType: 'csv' });
     } else {

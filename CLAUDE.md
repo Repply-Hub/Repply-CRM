@@ -159,6 +159,58 @@ traduza para inglês**, a consistência vale mais que a preferência.
    e instanceof Error ? e.message : 'Não foi possível salvar'   // ❌ esconde erro de banco
    ```
 
+   ---
+
+   🔴 **E a recusa pior é a que não chega como erro nenhum: ZERO LINHAS NÃO É SUCESSO.**
+
+   Acima, o erro existe e o `instanceof` o esconde. Aqui **não há erro para esconder.** Quando
+   a regra de acesso barra um `UPDATE` ou um `DELETE`, o banco não reclama: a cláusula `USING`
+   da política simplesmente não encontra a linha, o comando mexe em **zero registros** e a
+   resposta volta com `error: null`. O `catch` nunca dispara, e a tela comemora.
+
+   É o contrário do `INSERT`, cuja regra é `WITH CHECK` — essa viola e o banco grita 42501. Por
+   isso **a mesma trava sai barulhenta na tela que cria e muda na tela que apaga**, e quem
+   consertou uma acha que consertou as duas.
+
+   Medido em 09/09/2026, na empresa de demonstração, com um `vendedor` sem a funcionalidade
+   `tarefas.excluir` (`tarefas_delete` exige gestor ou essa permissão; `tarefas_update` exige
+   ser o dono da tarefa ou gestor):
+
+   | o que a pessoa fez | o que a tela disse | o que o banco fez |
+   |---|---|---|
+   | Excluir tarefa | "Tarefa excluída" | nada — a tarefa continua lá depois de recarregar |
+   | Excluir N marcadas | "N tarefa(s) removida(s)!" | nada |
+   | Mudar a etapa de uma tarefa de outra pessoa | "Etapa atualizada." | nada — `updated_at` parado em 31/08 |
+
+   **Peça a contagem e trate zero como recusa.** `{ count: 'exact' }` é a forma documentada do
+   cliente instalado (`@supabase/supabase-js` 2.98), e já era usada na exclusão em massa de
+   negócios muito antes disto:
+
+   ```ts
+   const { error, count } = await supabase.from('tarefas').delete({ count: 'exact' }).eq('id', id);
+   if (error) throw error;
+   if (count === 0) throw new Error(recusaSemErro('A tarefa NÃO foi excluída: ela continua na lista.', …));
+   ```
+
+   Três coisas que não são detalhe:
+
+   - 🔴 **`count === 0`, nunca `!count`.** `count` vem `null` quando a resposta não traz o
+     cabeçalho de contagem, e tratar `null` como recusa grita "não excluiu" em cima de uma
+     exclusão que funcionou — a mesma mentira, virada do avesso, e mais cara: a pessoa apaga
+     de novo o que já saiu.
+   - **A frase tem de dizer o que aconteceu E o que fazer.** "Erro ao excluir" não serve: quem
+     lê continua sem saber se a tarefa saiu. `recusaSemErro` (`src/lib/recusa-do-banco.ts`)
+     monta a frase e escolhe entre as duas saídas possíveis — falta de permissão (pedir a um
+     gestor) e empresa bloqueada (regularizar) —, que zeram as linhas do mesmo jeito.
+   - **Não é privilégio das tabelas com permissão granular.** As políticas
+     `<tabela>_exige_plano_delete` são RESTRICTIVE e usam `USING`: com a empresa bloqueada por
+     cobrança, **todo** `DELETE` do sistema volta com zero linhas e sem erro.
+
+   Varredura de 10/09/2026: das **49** chamadas de `.delete()` e **80** de `.update()` em
+   `src/`, só **8** conferiam o efeito. O módulo de Tarefas foi consertado e tem teste
+   (`src/hooks/zero-linhas-nao-e-sucesso.test.tsx`); os **118** restantes estão listados, com
+   ordem de conserto, em [`docs/divida-tecnica.md` §68](docs/divida-tecnica.md).
+
 ### Termos do ramo
 
 | Termo | Significado |
@@ -240,6 +292,22 @@ Detalhe métrica a métrica em [`docs/modulos/dashboard.md`](docs/modulos/dashbo
 8. **`src/integrations/supabase/types.ts` é gerado**, mas não há banco local neste
    ambiente. Ao criar RPC ou mudar tabela, **atualize o arquivo à mão** para bater.
 
+
+### Dado de cliente
+
+9. 🔴 **Dado real não entra em teste, plano, desenho, comentário nem migration.** O repositório é
+   **público** (§16): nome de pessoa da equipe, nome ou valor de negócio de cliente, e-mail,
+   telefone e código interno de conta (`usuarios.id`, `auth.users.id`) ficam à vista de
+   qualquer um. Use nomes e valores inventados ("Ana Souza", "Obra Exemplo", 180000) — o teste
+   prova a regra do mesmo jeito. Ao medir no banco, relate o número na conversa; não copie o dado
+   para dentro do arquivo.
+
+   Achado em 11/09/2026: 15 arquivos publicados tinham dado real da MD. Os de quem registrou esta
+   regra foram limpos. Ainda têm, e quem mexer neles limpa junto:
+   `docs/operacao/plano-multi-responsavel.md`,
+   `src/lib/assinatura-email.test.ts` e
+   `src/lib/historico-legivel.test.ts`. As 5 migrations com dado real ficam como estão (a regra 3
+   acima proíbe editar migration existente), e o histórico do git guarda as versões antigas de tudo.
 ---
 
 ## 7. Armadilhas medidas neste código
@@ -419,6 +487,12 @@ Ler do banco sempre esteve certo e é o padrão a copiar: âncora de meio-dia,
 
 Passou dois anos sem ninguém notar porque só **4 negócios** nasceram dentro do CRM — os
 outros 11.903 vieram da importação, que monta a data por outro caminho.
+
+**"Hoje" como texto é `hojeLocal()`, e data ou carimbo na tela é `formatarDataBR()`** — os dois
+em `src/lib/data-local.ts`. `new Date().toISOString().slice(0, 10)` parece "hoje" e é a data em
+UTC: das 21h à meia-noite já é amanhã. Foi assim que o cadastro de cliente e de contato gravou a
+data de criação do dia seguinte e dez exportações saíram com a data de amanhã no nome (medido em
+11/09/2026). `src/test/hoje-no-fuso-local.test.ts` falha se o idioma voltar.
 
 ### 7.13 Calendário abre no mês de hoje, não no mês da data escolhida
 
@@ -639,10 +713,13 @@ Além disso, conforme o que mudou:
 - ❌ Conferir tipo com `npx tsc --noEmit` sem o `-p tsconfig.app.json` (§9) — a raiz não olha arquivo nenhum e devolve sucesso sempre
 - ❌ Puxar coleção inteira para o navegador só para contar ou somar
 - ❌ Confiar em verificação de permissão feita só no frontend
+- ❌ `.delete()` ou `.update()` sem pedir a contagem de linhas (§4.6) — a recusa da regra de acesso volta **sem erro**, e a tela anuncia que gravou
+- ❌ `e instanceof Error ? e.message : '...'` em gravação de tabela (§4.6) — use `mensagemDeErro`
 - ❌ `React.lazy` direto em página (use `lazyComRetry`)
 - ❌ `type="number"` ou `parseFloat` em campo de dinheiro (use `CampoMoeda` / `parseMoedaBRL`)
 - ❌ `<DialogContent>` cru em modal com formulário (use `ConteudoDialogo`)
 - ❌ Converter fuso na data que veio do calendário (§7.12) — a conversão recua um dia
+- ❌ `new Date().toISOString().slice(0, 10)` como "hoje" (§7.12) — é a data em UTC, e depois das 21h já é amanhã; use `hojeLocal()`
 - ❌ `<Calendar>` sem `defaultMonth` (§7.13) — abre no mês de hoje e ignora a data escolhida
 - ❌ Parâmetro que escolhe entre duas colunas de data dentro de uma RPC (§7.9)
 - ❌ Tratar `prazo_resposta` como prazo (§4.4) — é a data de fechamento, e o nome mente
@@ -654,6 +731,7 @@ Além disso, conforme o que mudou:
 - ❌ Painel que atribua culpa — ver o princípio "registra, não interpreta" (`SPEC.md` §3.5)
 - ❌ Transformar prática da MD em regra do sistema (`SPEC.md` §4)
 - ❌ Chamar este produto de "Imob"
+- ❌ Dado real de cliente ou da equipe em teste, plano ou comentário (§6.9) — o repositório é público
 - ❌ Commitar ou enviar qualquer coisa **sem autorização do Lucas** (ver §13)
 - ❌ Commitar sem antes rodar `git fetch` e conferir se entrou commit de outra pessoa
 - ❌ `git add -A` (§13) — outra sessão trabalha nesta pasta; liste os arquivos um a um

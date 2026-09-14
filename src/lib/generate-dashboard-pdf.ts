@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { desenharMarca, encurtar, type MarcaDaEmpresa } from '@/lib/marca-do-pdf';
+import { hojeLocal } from '@/lib/data-local';
 
 const BRAND_ORANGE: [number, number, number] = [240, 106, 0];
 
@@ -100,5 +101,5 @@ export async function generateDashboardPdf(
     page += 1;
   }
 
-  doc.save(`dashboard-${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.save(`dashboard-${hojeLocal()}.pdf`);
 }

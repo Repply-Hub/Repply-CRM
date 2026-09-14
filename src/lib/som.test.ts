@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { devoTocarNotificacao } from './som';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { devoTocarNotificacao, ouvirAmostra, tocarNotificacao } from './som';
 
 describe('devoTocarNotificacao', () => {
   const base = {
@@ -43,5 +43,37 @@ describe('devoTocarNotificacao', () => {
 
   it('libera o toque depois de dois segundos', () => {
     expect(devoTocarNotificacao({ ...base, ultimoToqueEm: 97_500 })).toBe(true);
+  });
+});
+
+describe('qual arquivo toca', () => {
+  const criados: string[] = [];
+  beforeEach(() => {
+    criados.length = 0;
+    vi.stubGlobal(
+      'Audio',
+      class {
+        preload = '';
+        currentTime = 0;
+        constructor(src: string) { criados.push(src); }
+        play() { return Promise.resolve(); }
+      },
+    );
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('a amostra toca o som pedido', () => {
+    ouvirAmostra('marimba');
+    expect(criados).toContain('/sons/opcoes/marimba.mp3');
+  });
+
+  it('a amostra de um id desconhecido toca o padrão', () => {
+    ouvirAmostra('nao-existe');
+    expect(criados).toContain('/sons/notificacao.mp3');
+  });
+
+  it('a notificação toca o som escolhido', () => {
+    tocarNotificacao({ ligado: true, somId: 'gota' });
+    expect(criados).toContain('/sons/opcoes/gota.mp3');
   });
 });

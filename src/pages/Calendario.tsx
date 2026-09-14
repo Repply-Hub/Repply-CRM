@@ -1,4 +1,5 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Search, HardHat } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { periodoDoCalendario } from '@/lib/periodo-do-calendario';
+import { dataDoEndereco } from '@/lib/data-do-endereco';
 import { useAuth } from '@/hooks/use-auth';
 import { useSecaoLigada } from '@/hooks/use-secoes';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -102,7 +104,7 @@ function parseICS(content: string, calendarType: CalendarType = "empresa"): Even
       diaInteiro: allDay,
       tipoCalendario: calendarType,
       cor: CALENDAR_COLORS[calendarType],
-      lembreteMinutos: null,
+      lembretes: [],
     });
   }
   return events;
@@ -122,6 +124,27 @@ export default function Calendario() {
   const [viewMode, setViewMode] = useState<ViewMode>("semana");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [month, setMonth] = useState(new Date());
+
+  // Vindo do e-mail da agenda ("Abrir na agenda"): abre no dia do evento e limpa o
+  // endereço, para um F5 depois não voltar ao mesmo dia sem a pessoa pedir. Só define o dia
+  // inicial — não mexe em como CalendarHeader/CalendarMonthView/TimeGridView navegam depois
+  // (CLAUDE.md §7.13: essas telas continuam abrindo no mês que a pessoa está olhando).
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const alvo = dataDoEndereco(searchParams.get('data'));
+    if (!alvo) return;
+    setCurrentDate(alvo);
+    setMonth(alvo);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('data');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
+
   const [visibleCalendars, setVisibleCalendars] = useState<Set<CalendarType>>(new Set(["pessoal", "empresa"]));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [initialSlot, setInitialSlot] = useState<Partial<EventoForm>>({});

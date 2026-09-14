@@ -15,8 +15,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
  * As três consultas da tela "Hoje" usam "tem tarefa aberta" como critério, e é isso que as
  * amarra a uma tabela que não é a delas:
  *
- *   · a FILA (`pauta_do_dia_de`) põe a tarefa com prazo hoje na lista como compromisso E desconta
- *     uma vaga (`v_vagas = v_max - v_compromissos`), então um negócio parado sai no mesmo gesto;
+ *   · a FILA (`pauta_do_dia_de`) põe a tarefa com prazo hoje na lista como compromisso, AO VIVO —
+ *     e é só isso que este arquivo prende: desde 12/09/2026 uma tarefa criada agora não desconta
+ *     mais vaga nem empurra negócio parado para fora (só o compromisso que já existia na virada
+ *     do dia faz isso); ela aparece além do teto, e é por isso que a fila precisa ser invalidada;
  *   · os CARTÕES de risco (`dashboard_negocios_risco`) calculam `sem_proxima_acao` como
  *     `NOT EXISTS (tarefas do negócio com status <> 'concluida')`;
  *   · a TABELA DO TIME (`negocios_em_risco`) usa a MESMA condição, e desde 09/09/2026 tem chave
@@ -76,6 +78,14 @@ const TABELA_DO_TIME = ['negocios_em_risco', 'emp-1', null, null, null, 7, null,
 
 const TAREFAS_DO_NEGOCIO = ['tarefas_por_pedido', 'ped-1'];
 
+/**
+ * A chave da TELA DE TAREFAS (`useTarefas`, em `use-tarefas.ts`). Curta e sem cauda — é a lista
+ * inteira, sem recorte. Ela não casa com `TAREFAS_DO_NEGOCIO`: `invalidateQueries` compara
+ * elemento a elemento, e `'tarefas_por_pedido'` não é `'tarefas'`. Por isso as duas precisam ser
+ * invalidadas, e não uma só.
+ */
+const TELA_DE_TAREFAS = ['tarefas'];
+
 function envolver() {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -86,6 +96,7 @@ function envolver() {
   qc.setQueryData(RISCO, {});
   qc.setQueryData(TABELA_DO_TIME, { linhas: [], total: 0 });
   qc.setQueryData(TAREFAS_DO_NEGOCIO, []);
+  qc.setQueryData(TELA_DE_TAREFAS, []);
   qc.setQueryData(['pedidos_stats'], {});
   qc.setQueryData(['vw_faturamento_mensal'], []);
   const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -102,7 +113,7 @@ afterEach(() => {
 });
 
 describe('criar tarefa', () => {
-  it('🔴 recarrega a fila da tela "Hoje" — a tarefa entra nela e empurra um negócio para fora', async () => {
+  it('🔴 recarrega a fila da tela "Hoje" — a tarefa entra nela como compromisso, ao vivo', async () => {
     const { wrapper, qc } = envolver();
     const { result } = renderHook(() => useCreateTarefa(), { wrapper });
 
@@ -190,12 +201,35 @@ describe('retomar depois', () => {
     const { result } = renderHook(() => useRegistrarRetorno(), { wrapper });
 
     await act(async () => {
-      await result.current.mutateAsync({ pedidoId: 'ped-1', motivo: 'cliente decide em outubro', retornoEm: '2026-10-01' });
+      await result.current.mutateAsync({ pedidoId: 'ped-1', motivo: 'cliente decide em outubro', retornoEm: '2026-10-01', criarTarefa: true });
     });
 
     expect(velha(qc, FILA)).toBe(true);
     expect(velha(qc, RISCO)).toBe(true);
     expect(velha(qc, TABELA_DO_TIME)).toBe(true);
+  });
+
+  /**
+   * Desde a caixinha "Criar tarefa para o responsável", adiar um negócio CRIA UMA TAREFA no
+   * mesmo gesto — a primeira do sistema em que quem cria e quem recebe podem ser pessoas
+   * diferentes. Ela nasce no servidor, dentro de `registrar_retorno`, então nenhuma das duas
+   * telas que a mostram fica sabendo sozinha:
+   *
+   *   · a TELA DE TAREFAS (`['tarefas']`) já tem a lista em mãos e não refaz a consulta;
+   *   · a lista de tarefas DENTRO DO PAINEL DO NEGÓCIO (`['tarefas_por_pedido', pedidoId]`) —
+   *     e a tela "Hoje" abre esse painel por cima da própria pauta, então dá para adiar e
+   *     abrir o mesmo negócio sem trocar de tela.
+   */
+  it('🔴 recarrega a tela de Tarefas e a lista do painel do negócio — a tarefa nasce no servidor', async () => {
+    const { wrapper, qc } = envolver();
+    const { result } = renderHook(() => useRegistrarRetorno(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ pedidoId: 'ped-1', motivo: 'cliente decide em outubro', retornoEm: '2026-10-01', criarTarefa: true });
+    });
+
+    expect(velha(qc, TELA_DE_TAREFAS)).toBe(true);
+    expect(velha(qc, TAREFAS_DO_NEGOCIO)).toBe(true);
   });
 });
 

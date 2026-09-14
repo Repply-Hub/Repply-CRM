@@ -620,11 +620,22 @@ export default function Obras() {
             Assim a lista filtrada continua visível e utilizável enquanto a rota é montada —
             que é o motivo de o Lucas ter pedido menu suspenso em vez de pop-up em 27/08/2026.
             Por isso esta div virou `flex` em linha: o `min-w-0` no filho é o que permite ao
-            conteúdo encolher quando o painel abre, em vez de empurrar tudo para fora. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-6 min-h-0">
+            conteúdo encolher quando o painel abre, em vez de empurrar tudo para fora.
+
+            No celular não há onde encolher para: com os dois lado a lado, o painel some por
+            baixo do conteúdo e a busca da lista fica por cima do título do painel (achado do
+            levantamento de 11/09/2026). Abaixo de `md` (768px), com o painel aberto, esta
+            coluna some inteira (`hidden md:flex`) e só o painel aparece — igual ao Chat. De
+            `md` para cima nada muda: os dois continuam lado a lado. */}
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 flex-col gap-6 min-h-0",
+            rotaVisitaDialogOpen && "hidden md:flex"
+          )}
+        >
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 flex-1 flex flex-col min-h-0">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex flex-1 items-center gap-3">
+            <div className="flex flex-1 flex-wrap items-center gap-3">
               <TabsList className={cn(TOGGLE_LIST_CLASS, 'shrink-0')}>
                 {/* Ordem pedida pelo Lucas em 27/08/2026: Mapa primeiro, Lista por último.
                     O mapa é onde a obra faz sentido — endereço no espaço, não linha de tabela.
@@ -647,6 +658,14 @@ export default function Obras() {
                 onValueChange={setSearch}
                 storageKey="obras_recent_searches"
                 showAddressSuggestions={true}
+                // `SearchWithRecent` já nasce com `flex-1` embutido (raiz do próprio
+                // componente) — e `flex-1` é `flex: 1 1 0%`, cuja base de 0% vence o
+                // `w-full` daqui, porque as duas classes não se cancelam (nenhuma das
+                // duas é exatamente `flex-1` sem variante, então o tailwind-merge não
+                // as considera do mesmo grupo). Sem o `flex-none` abaixo o input
+                // continuava com ~78px a 375px mesmo com `w-full` escrito. `flex-none`
+                // some com a base 0% embutida e deixa o `w-full` decidir a largura.
+                className="w-full min-w-0 flex-none sm:w-auto sm:flex-1"
               />
             </div>
 

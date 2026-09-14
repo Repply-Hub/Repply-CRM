@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertTriangle, CalendarDays, Trash2, Users, Check, ChevronDown, HardHat } from 'lucide-react';
@@ -36,7 +37,9 @@ import { useEventoParticipantes, buscarConflitosDeVisita, type ConflitoVisita } 
 import type { CalendarEvent, EventoForm, CalendarType } from './types';
 import { EVENT_PRESET_COLORS, CALENDAR_COLORS } from './types';
 import { EventDateTimeField } from './EventDateTimeField';
-import { LembreteField } from './LembreteField';
+import { LembretesField } from './LembretesField';
+import { LEMBRETES_PADRAO, normalizarLembretes } from '@/lib/lembretes-do-evento';
+import { ajustarCicloDeAberturaEProntidao } from '@/lib/prontidao-de-participantes';
 
 interface EventDialogProps {
   open: boolean;
@@ -92,7 +95,8 @@ const defaultForm = (): EventoForm => {
     tipoCalendario: 'empresa',
     cor: CALENDAR_COLORS.empresa,
     participantes: [],
-    lembreteMinutos: null,
+    lembretes: [...LEMBRETES_PADRAO],
+    avisarParticipantes: true,
     obraId: null,
     visitaRealizada: false,
     visitaObservacao: '',
@@ -114,10 +118,64 @@ export function EventDialog({
   const [conflitos, setConflitos] = useState<ConflitoVisita[]>([]);
   const [verificandoConflito, setVerificandoConflito] = useState(false);
   const { user } = useAuth();
+  const qc = useQueryClient();
   const { data: usuarios, refetch: refetchUsuarios } = useVendedores();
-  const { data: participantesExistentes } = useEventoParticipantes(
-    open && editingEvent ? editingEvent.grupoId : null,
+  const {
+    data: participantesExistentes,
+    // 🔴 Bloco 3, item A (revisão da revisão). `isFetching`, NÃO `isLoading`. Em React
+    // Query v5, `isLoading = isPending && isFetching`, e `isPending` já nasce falso
+    // assim que existe QUALQUER dado em cache para a chave — inclusive o de uma
+    // abertura anterior deste MESMO evento. Reabrir com o cache quente disparava o
+    // refetch forçado (efeito abaixo) com `isLoading` já falso o tempo todo: a trava
+    // de Salvar nunca via "carregando" nenhum. `isFetching` continua `true` durante
+    // QUALQUER busca, inclusive esse refetch em segundo plano.
+    isFetching: carregandoParticipantes,
+    isSuccess: participantesCarregaramComSucesso,
+    isError: participantesComErro,
+    // Quando esta consulta atualizou pela última vez COM SUCESSO — usado para provar que
+    // um resultado é de uma busca mais nova que o pedido de invalidação que este diálogo
+    // disparou ao abrir (ver os dois efeitos abaixo). `isFetching` sozinho não bastava:
+    // ele só reflete a busca já em andamento NUM RENDER SEGUINTE ao `invalidateQueries`,
+    // não no mesmo lote de efeitos em que ele é chamado — e é exatamente nesse intervalo
+    // que uma lista velha do cache podia ser copiada para o formulário.
+    dataUpdatedAt: participantesAtualizadoEm,
+    refetch: refetchParticipantes,
+  } = useEventoParticipantes(open && editingEvent ? editingEvent.grupoId : null);
+
+  // 🔴 Bloco 3, item A (segundo conserto da revisão). `cicloRef` guarda o que
+  // `ajustarCicloDeAberturaEProntidao` (função pura, `src/lib/prontidao-de-participantes.ts`)
+  // já sabia antes desta renderização; a chamada abaixo devolve o que passa a valer AGORA.
+  //
+  // 🔴 POR QUE ISTO NÃO PODE VIVER SÓ NUM `useEffect`. Um `useEffect` só roda DEPOIS que o
+  // navegador já teve chance de pintar a tela (é passivo, ao contrário de `useLayoutEffect`)
+  // — então, no PRIMEIRO render depois de abrir (reabrindo o MESMO evento com cache quente,
+  // ou trocando de evento), uma marca corrigida só dentro do efeito ainda estaria com o
+  // valor de um ciclo anterior por essa renderização inteira, e `dataUpdatedAt` do cache já
+  // podia ser maior que ela — "pronto" leria `true` com dado VELHO, e chegaria a PINTAR
+  // assim num navegador de verdade. Testes com `act()` não veem essa janela (ele esvazia os
+  // efeitos antes de qualquer asserção), o que já escondeu esse exato bug uma vez — por isso
+  // a lógica em si mora numa função PURA (testável fora do React) e só o "ler o ref, chamar
+  // a função, gravar o ref de volta" fica aqui.
+  //
+  // A correção, então, acontece SÍNCRONA, na mesma passada de render que detecta a mudança
+  // — é o padrão "ajustar durante a renderização" da documentação do React. Mutar o ref aqui
+  // (não um estado) é seguro e não pede um render extra: o valor já fica visível para o
+  // cálculo de `participantesProntos`, usado mais abaixo nesta mesma função.
+  const cicloRef = useRef<{ cicloAberto: string | null; marcaAntesDeBuscarDeNovo: number }>({
+    cicloAberto: null,
+    marcaAntesDeBuscarDeNovo: 0,
+  });
+  const { cicloAberto, marcaAntesDeBuscarDeNovo, participantesProntos } = ajustarCicloDeAberturaEProntidao(
+    open,
+    editingEvent?.grupoId,
+    {
+      isFetching: carregandoParticipantes,
+      isSuccess: participantesCarregaramComSucesso,
+      dataUpdatedAt: participantesAtualizadoEm,
+    },
+    cicloRef.current,
   );
+  cicloRef.current = { cicloAberto, marcaAntesDeBuscarDeNovo };
 
   // Funcionários da empresa, incluindo o próprio usuário logado (aparece como "Você", no topo)
   const funcionariosDisponiveis = useMemo(() => {
@@ -136,6 +194,20 @@ export function EventDialog({
     // já que a página de calendário fica montada e o cache pode estar desatualizado
     // (ex.: usuário novo criado em outra sessão/aba).
     refetchUsuarios();
+
+    // 🔴 Bloco 3, item A — "variante" do bug: `useEventoParticipantes` usa `staleTime:
+    // Infinity` de propósito (evita sobrescrever seleção em foco de janela), mas isso também
+    // significa que reabrir o MESMO evento poderia reaproveitar uma lista velha do cache —
+    // convidando de novo quem já tinha saído entre uma abertura e outra. Invalidar aqui, ao
+    // abrir, força ir ao banco de novo sem mudar o `staleTime` da consulta (que outra tela,
+    // `NovaRotaVisitaDialog`, também usa e não deve ser afetada).
+    //
+    // A marca (`marcaAntesDeBuscarDeNovo`) já foi capturada ACIMA, durante a própria
+    // renderização (`ajustarCicloDeAberturaEProntidao`) — aqui só falta pedir a busca de
+    // verdade.
+    if (editingEvent?.grupoId) {
+      qc.invalidateQueries({ queryKey: ['evento-participantes', editingEvent.grupoId] });
+    }
 
     // Voltando da rota de visita: o que a pessoa já tinha preenchido continua na tela.
     // Este efeito é o ÚNICO lugar que apaga o rascunho, então sair aqui é o que faz o
@@ -158,10 +230,20 @@ export function EventDialog({
         diaInteiro: editingEvent.diaInteiro,
         tipoCalendario: editingEvent.tipoCalendario,
         cor: editingEvent.cor,
-        // A lista real de participantes chega depois, pela query de
-        // participantes existentes (useEventoParticipantes) — ver efeito abaixo.
-        participantes: [],
-        lembreteMinutos: editingEvent.lembreteMinutos ?? null,
+        // 🔴 `undefined`, e não `[]`. A lista real chega depois, pela consulta de
+        // participantes existentes (useEventoParticipantes) — ver efeito abaixo. Até lá,
+        // "ainda não sei quem são os participantes" (undefined) tem de ficar visualmente
+        // distinto de "a pessoa esvaziou a seleção de propósito" ([]) — é essa distinção que
+        // `useUpdateEvento` usa para recusar salvar em cima de uma lista que não carregou
+        // (Bloco 3, item A). Os dois casos SE PARECEM na tela (nenhum badge aparece), mas o
+        // botão Salvar fica desabilitado enquanto for o primeiro (ver `aguardandoParticipantes`
+        // abaixo), então a diferença nunca chega a ser salva por engano.
+        participantes: undefined,
+        // `normalizarLembretes` de novo aqui, e não só na gravação: o `LembretesField` confia
+        // que `value` chega ordenado e sem repetição (ver seu comentário), e este é o único
+        // ponto em que um dado vindo do banco alimenta esse `value` diretamente.
+        lembretes: normalizarLembretes(editingEvent.lembretes ?? []),
+        avisarParticipantes: editingEvent.avisarParticipantes ?? false,
         obraId: editingEvent.obraId ?? null,
         visitaRealizada: editingEvent.visitaRealizada ?? false,
         visitaObservacao: editingEvent.visitaObservacao ?? '',
@@ -173,15 +255,46 @@ export function EventDialog({
         ...initialData,
       });
     }
-  }, [open, editingEvent, initialData, retomandoRascunho, user?.id]);
+  }, [open, editingEvent, initialData, retomandoRascunho, user?.id, qc]);
 
-  // Preenche os participantes do evento assim que a busca resolve (chega
-  // depois da abertura do modal, por isso é um efeito separado do de cima).
+  // Preenche os participantes do evento assim que a busca resolve (chega depois da
+  // abertura do modal, por isso é um efeito separado do de cima).
+  //
+  // 🔴 Bloco 3, item A (revisão da revisão) — NÃO BASTA `participantesExistentes` existir.
+  // Com o cache quente (reabrir o MESMO evento), `data` já vem preenchido com a lista
+  // VELHA desde o primeiro render depois de abrir — antes mesmo do refetch forçado (efeito
+  // acima) aparecer como "buscando" para este hook. Copiar direto daria exatamente o bug
+  // que este bloco existe para consertar: a tela mostraria (e salvaria, se o usuário fosse
+  // rápido) uma lista que já pode estar desatualizada.
+  //
+  // `participantesProntos` (de `ajustarCicloDeAberturaEProntidao`, calculado acima) já
+  // exige TODAS estas coisas ao mesmo tempo:
+  //   - sucesso (nunca copia em cima de erro, mesmo com dado velho ainda em cache);
+  //   - não estar buscando agora (nem a busca inicial, nem um refetch em segundo plano);
+  //   - `dataUpdatedAt` MAIOR que a marca capturada no início deste ciclo de abertura —
+  //     prova que ESTE resultado é de uma busca mais nova que aquele pedido, e não apenas
+  //     o dado que já estava no cache antes dele.
+  // Até isso ser verdade, `form.participantes` continua `undefined` — o que mantém a
+  // defesa de `useUpdateEvento` significativa mesmo neste caminho.
+  //
+  // 🔴 SÓ NA PRIMEIRA VEZ por ciclo de abertura — `prev.participantes === undefined` é a
+  // trava (segundo conserto da revisão). `participantesProntos` pode voltar a ficar
+  // verdadeiro mais de uma vez no MESMO ciclo — um refetch por foco de janela, ou outra
+  // tela invalidando a mesma chave (`NovaRotaVisitaDialog` também usa
+  // `useEventoParticipantes`), dispararia este efeito de novo. Sem a trava, isso
+  // reescreveria por cima de qualquer toggle que a pessoa já tivesse feito no seletor
+  // enquanto o diálogo continuasse aberto. Fechar e reabrir volta a valer: o efeito de
+  // abertura reseta `participantes` para `undefined` a cada abertura, então a "primeira
+  // vez" se renova a cada ciclo.
   useEffect(() => {
-    if (open && editingEvent && participantesExistentes) {
-      setForm((prev) => ({ ...prev, participantes: participantesExistentes }));
+    if (open && editingEvent && participantesProntos && participantesExistentes) {
+      setForm((prev) =>
+        prev.participantes === undefined
+          ? { ...prev, participantes: participantesExistentes }
+          : prev,
+      );
     }
-  }, [open, editingEvent, participantesExistentes]);
+  }, [open, editingEvent, participantesExistentes, participantesProntos]);
 
   const set = <K extends keyof EventoForm>(key: K, value: EventoForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -222,6 +335,19 @@ export function EventDialog({
   // Evento "empresa" visível pra empresa inteira, mas cujo usuário logado não
   // é participante nem organizador: pode abrir e ler, não pode salvar/excluir.
   const somenteLeitura = isEditing && editingEvent?.podeEditar === false;
+
+  // 🔴 Bloco 3, item A (CRÍTICO, revisado). Salvar antes de a lista de participantes voltar
+  // do banco fazia `useUpdateEvento` tratar "ainda não chegou" como "esvaziei de propósito"
+  // — e ele apaga quem não está na lista, disparando "Evento cancelado para você" por chat e
+  // e-mail para todo mundo. Só se aplica a QUEM PODE GERENCIAR participantes de um evento JÁ
+  // existente: criar evento novo não consulta participantes existentes, e quem só participa
+  // nunca atualiza o grupo inteiro (ver `useUpdateEvento`).
+  //
+  // `participantesProntos` já vem de `ajustarCicloDeAberturaEProntidao` (calculado no topo
+  // da função, síncrono com a renderização) — não basta ter sucesso e não estar buscando:
+  // com cache quente, isso já era verdade na PRÓPRIA renderização em que se decide reabrir.
+  // Só conta como pronto um sucesso mais novo que a marca capturada para ESTE ciclo.
+  const aguardandoParticipantes = isEditing && podeGerenciarParticipantes && !participantesProntos;
 
   const salvarDeFato = () => {
     onSave(form);
@@ -440,7 +566,10 @@ export function EventDialog({
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={!podeGerenciarParticipantes}
+                    // 🔴 Bloco 3, item A (revisão). Também trava enquanto a lista está sendo
+                    // (re)buscada — sem isso, o organizador podia editar uma seleção que está
+                    // prestes a ser substituída pelo resultado do refetch em andamento.
+                    disabled={!podeGerenciarParticipantes || aguardandoParticipantes}
                     className="w-full justify-between font-normal h-10"
                   >
                     <span className="flex items-center gap-2 min-w-0">
@@ -472,7 +601,7 @@ export function EventDialog({
                         {todosParticipantesSelecionados ? 'Limpar seleção' : 'Selecionar todos'}
                       </button>
                     </div>
-                    <CommandList className="max-h-[240px] overflow-y-auto overflow-x-hidden">
+                    <CommandList className="max-h-[min(240px,calc(var(--radix-popover-content-available-height,100vh)-3.5rem))] overflow-y-auto overflow-x-hidden">
                       <CommandEmpty className="py-6 text-center text-sm">
                         Nenhum funcionário encontrado.
                       </CommandEmpty>
@@ -511,7 +640,11 @@ export function EventDialog({
                     return (
                       <Badge key={uid} variant="secondary" className="gap-1">
                         {isSelf ? 'Você' : u.nome}
-                        {podeGerenciarParticipantes && (
+                        {/* 🔴 Bloco 3, item A (revisão): também trava enquanto busca/refetch —
+                            este "×" fica fora do popover, então travar só o gatilho principal
+                            não bastaria para impedir remover alguém da lista que já está prestes
+                            a ser substituída. */}
+                        {podeGerenciarParticipantes && !aguardandoParticipantes && (
                           <button
                             type="button"
                             className="ml-1 hover:text-destructive"
@@ -533,10 +666,31 @@ export function EventDialog({
             </div>
           )}
 
-          {/* Lembrete */}
-          <LembreteField
-            value={form.lembreteMinutos}
-            onChange={(v) => set('lembreteMinutos', v)}
+          {/* Aviso aos participantes — só em evento comum. Rota de visita não avisa ninguém
+              (decisão de 11/09/2026). Só quem organizou muda: a chave vale para o grupo inteiro. */}
+          {!isVisita && (
+            <div className="flex items-center justify-between gap-4 rounded-md border border-border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="avisar-participantes" className="text-sm">
+                  Avisar participantes por chat e e-mail
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  No convite, na mudança de horário, no cancelamento e em cada lembrete.
+                </p>
+              </div>
+              <Switch
+                id="avisar-participantes"
+                checked={form.avisarParticipantes ?? false}
+                onCheckedChange={(v) => set('avisarParticipantes', v)}
+                disabled={somenteLeitura || !podeGerenciarParticipantes}
+              />
+            </div>
+          )}
+
+          <LembretesField
+            value={form.lembretes}
+            onChange={(v) => set('lembretes', v)}
+            disabled={somenteLeitura}
           />
 
           {/* Cor */}
@@ -587,11 +741,31 @@ export function EventDialog({
                   Excluir
                 </Button>
               )}
+              {/* Perto do botão Salvar, de propósito — é ele quem fica desabilitado enquanto
+                  isto aparece. Ver `aguardandoParticipantes` acima. */}
+              {carregandoParticipantes && podeGerenciarParticipantes && (
+                <span className="text-xs text-muted-foreground">Carregando participantes…</span>
+              )}
+              {participantesComErro && podeGerenciarParticipantes && (
+                <>
+                  <span className="text-xs text-destructive">
+                    Não foi possível carregar os participantes.
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => refetchParticipantes()}
+                  >
+                    Tentar de novo
+                  </Button>
+                </>
+              )}
               <Button variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
               <Button
                 size="sm"
                 onClick={handleSubmit}
-                disabled={!form.titulo.trim() || verificandoConflito}
+                disabled={!form.titulo.trim() || verificandoConflito || aguardandoParticipantes}
               >
                 {verificandoConflito ? 'Verificando agenda...' : isEditing ? 'Salvar' : 'Criar'}
               </Button>

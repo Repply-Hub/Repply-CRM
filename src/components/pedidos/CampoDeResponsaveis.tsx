@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Star, X, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   Command,
@@ -118,7 +118,7 @@ export function CampoDeResponsaveis({ pessoas, value, onChange, disabled }: Prop
             >
               <Avatar className="h-7 w-7 shrink-0">
                 {pessoa?.avatarUrl && (
-                  <img src={pessoa.avatarUrl} alt="" className="h-full w-full object-cover" />
+                  <AvatarImage src={pessoa.avatarUrl} alt="" className="h-full w-full object-cover" />
                 )}
                 <AvatarFallback className="bg-muted text-[10px] font-medium text-muted-foreground">
                   {iniciais(nome)}
@@ -188,7 +188,7 @@ export function CampoDeResponsaveis({ pessoas, value, onChange, disabled }: Prop
                   <CommandItem key={p.id} value={p.nome} onSelect={() => acrescentar(p.id)}>
                     <Avatar className="mr-2 h-6 w-6">
                       {p.avatarUrl && (
-                        <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" />
+                        <AvatarImage src={p.avatarUrl} alt="" className="h-full w-full object-cover" />
                       )}
                       <AvatarFallback className="bg-muted text-[10px] text-muted-foreground">
                         {iniciais(p.nome)}

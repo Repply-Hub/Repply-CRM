@@ -2,8 +2,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   assuntoDaPauta,
   assuntoDoPulso,
+  diasParadoPorEmpresa,
   montarEmail,
   montarPulsoDaEquipe,
+  soOsPendentes,
   type ItemDaPauta,
   type NegocioDaEquipe,
 } from "./corpo.ts";
@@ -24,20 +26,26 @@ import {
  * tipo de divergência leva meses até alguém notar.
  *
  * ────────────────────────────────────────────────────────────────────────────
- * DOIS E-MAILS, E A REGRA QUE ESCOLHE ENTRE ELES (decisão do dono do produto, 09/09/2026)
+ * DOIS E-MAILS, E A REGRA QUE ESCOLHE ENTRE ELES (decisão do dono do produto, 09/09 e 12/09/2026)
  * ────────────────────────────────────────────────────────────────────────────
- * Desde a migration 20260909120000 a fila da tela "Hoje" voltou a ser SEMPRE pessoal. Quem tem
- * a chave `pauta_de_todos` e nenhum negócio próprio passou a ter fila vazia — e fila vazia não
- * gerava e-mail. Na MD isso é a Fabiola, o Gabriel Medeiros e o Gabriel Pereira: três gestoras
- * parariam de receber o e-mail das 7h em silêncio, uma delas a principal usuária do cliente.
+ * Desde 12/09/2026 (migration 20260912100000_pauta_do_dia_que_encolhe.sql) a fila de quem tem a
+ * chave `pauta_de_todos` volta a trazer a equipe: primeiro os negócios do próprio nome, depois
+ * os da equipe. Isso já resolve por conta própria o problema que o PULSO DA EQUIPE nasceu para
+ * cobrir em 09/09/2026 (gestor sem negócio próprio ficando com a fila sempre vazia) — hoje ela só
+ * vem vazia quando NEM a pessoa NEM a equipe têm negócio parado ou compromisso hoje, ou quando o
+ * envio roda de novo depois de a fila do dia já ter zerado (ela só encolhe — ver `soOsPendentes`
+ * em `corpo.ts`).
  *
- * Em vez de sumir, o e-mail MUDA DE ASSUNTO. A regra tem DUAS condições, e as duas contam:
+ * Por isso o e-mail continua sem sumir nesse caso raro: em vez de nada, ele MUDA DE ASSUNTO. A
+ * regra tem DUAS condições, e as duas contam:
  *
- *   fila pessoal vazia   +  TEM a chave  →  o PULSO DA EQUIPE (os 5 maiores da tabela do time)
- *   fila pessoal vazia   +  não tem      →  não sai nada, como sempre
- *   fila pessoal com item                →  a fila pessoal, como sempre — inclusive para quem
- *                                           tem a chave. Não se troca o e-mail de quem já
- *                                           tinha um útil.
+ *   fila (própria + equipe) vazia   +  TEM a chave  →  o PULSO DA EQUIPE (os 5 maiores da
+ *                                                       tabela do time, um recorte mais largo
+ *                                                       que a fila)
+ *   fila (própria + equipe) vazia   +  não tem       →  não sai nada, como sempre
+ *   fila com item                                    →  a fila normal, como sempre — inclusive
+ *                                                        para quem tem a chave. Não se troca o
+ *                                                        e-mail de quem já tinha um útil.
  *
  * 🔴 O CASO DE BORDA — chave, fila vazia E a equipe sem nada em risco: NÃO SAI E-MAIL, e conta
  * como `pulso_vazio` no registro. Três motivos:
@@ -189,6 +197,24 @@ Deno.serve(async (req) => {
       });
     }
 
+    // O AJUSTE "DIAS PARADO" DE CADA EMPRESA — UMA consulta por execução, não uma por pessoa.
+    //
+    // A frase do topo da fila pessoal (`vozDaPauta`, via `corpo.ts`) diz que um negócio "está há
+    // N dias sem mexer" medindo com a régua da empresa — a MESMA com que `pauta_do_dia_de` montou
+    // a fila. Com um 3 cravado, a empresa que mudasse o ajuste receberia a fila medida com uma
+    // régua e a frase com outra. `pauta_resumo_destinatarios` já devolve a empresa de cada
+    // pessoa, então uma leitura cobre todas.
+    //
+    // Se a leitura falhar, o e-mail sai assim mesmo, medindo com o padrão (3), e o registro diz
+    // por quê: o ajuste só muda a frase do topo, e ela não vale deixar a equipe sem o resumo.
+    const empresas = [...new Set((destinatarios ?? []).map((d: { empresa_id: string | null }) => d.empresa_id).filter(Boolean))];
+    const { data: ajustes, error: erroAjuste } = await supabase
+      .from("configuracoes_automacao")
+      .select("empresa_id, valor")
+      .eq("chave", "pauta_dias_parado")
+      .in("empresa_id", empresas);
+    const diasParadoDe = diasParadoPorEmpresa(erroAjuste ? [] : ajustes ?? []);
+
     for (const pessoa of destinatarios ?? []) {
       try {
         const { data: pauta, error: erroPauta } = await supabase.rpc("pauta_do_dia_de", {
@@ -196,15 +222,19 @@ Deno.serve(async (req) => {
         });
         if (erroPauta) throw erroPauta;
 
-        const itens = (pauta ?? []) as ItemDaPauta[];
+        // 🔴 FILTRA ANTES DE DECIDIR. A fila devolve os negócios já feitos hoje junto com os
+        // pendentes; sem esta linha, uma pauta zerada contaria como cheia no `if` logo abaixo e
+        // a pessoa receberia um e-mail listando o que ela já resolveu, com selo de "parado".
+        const itens = soOsPendentes((pauta ?? []) as ItemDaPauta[]);
 
         let html: string;
         let assunto: string;
         let ehPulso = false;
 
         if (itens.length > 0) {
-          html = montarEmail(pessoa.nome ?? "", itens, linkDaPauta);
-          assunto = assuntoDaPauta(itens);
+          const diasParado = diasParadoDe(pessoa.empresa_id);
+          html = montarEmail(pessoa.nome ?? "", itens, linkDaPauta, diasParado);
+          assunto = assuntoDaPauta(itens, diasParado);
         } else {
           // Primeira condição: a chave. Sem ela, nada muda — a pessoa continua sem receber.
           // A leitura é a MESMA da tela (`ve_pauta_de_todos`), e não uma terceira cópia da
@@ -293,6 +323,14 @@ Deno.serve(async (req) => {
                 `"${NOME_CANONICO}". Crie um novo com o nome certo em Project Settings → ` +
                 `Edge Functions → Secrets (NÃO no Vault) e apague o antigo — o painel do ` +
                 `Supabase não renomeia no lugar.`,
+            }
+          : {}),
+        // Só aparece quando a leitura do ajuste falhou — ver a consulta antes do laço.
+        ...(erroAjuste
+          ? {
+              aviso_ajuste_dias_parado:
+                `não foi possível ler o ajuste "dias parado" das empresas (${erroAjuste.message}); ` +
+                `a frase do topo mediu com o padrão, 3 dias.`,
             }
           : {}),
       },

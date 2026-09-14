@@ -1,3 +1,5 @@
+import { telefoneParaCadastro } from './contato-da-conversa';
+
 // Mask: 00.000.000/0000-00
 export function maskCnpj(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 14);
@@ -70,4 +72,20 @@ export async function fetchCnpjData(cnpj: string): Promise<CnpjData> {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * O telefone da Receita, pronto para o campo do formulário.
+ *
+ * 🔴 O BrasilAPI devolve o telefone só em dígitos, com o DDD grudado no número: a Petrobras
+ * volta como `"2121660000"` (medido em 11/09/2026). Jogar isso direto no campo — o que Clientes
+ * e Fabricantes faziam — mostrava um número que ninguém reconhece como telefone.
+ *
+ * Reaproveita `telefoneParaCadastro`, o formatador que o campo de telefone de Fabricantes já usa
+ * ao sair do campo: assim o número que a consulta preenche sai no mesmo formato do que a pessoa
+ * digita. Formato que não é telefone brasileiro volta como veio — a própria Receita guarda lixo
+ * em alguns cadastros, e inventar um número a partir dele seria pior que mostrar o original.
+ */
+export function telefoneDaReceita(dados: Pick<CnpjData, 'ddd_telefone_1'>): string {
+  return telefoneParaCadastro(dados?.ddd_telefone_1);
 }

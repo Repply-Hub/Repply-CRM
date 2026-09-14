@@ -7,11 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks, CreditCard, Volume2 } from 'lucide-react';
-import { useSomLigado } from '@/hooks/use-som-ligado';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks, CreditCard } from 'lucide-react';
+import { CardDeSom } from '@/components/configuracoes/CardDeSom';
 import { PagamentosTab } from '@/components/configuracoes/PagamentosTab';
 import { podeGerenciarAssinatura } from '@/lib/plano-gate';
 import { SidebarHistoricoDialog } from '@/components/configuracoes/SidebarHistoricoDialog';
@@ -133,45 +132,6 @@ function CustomizeTab() {
   );
 }
 
-/**
- * Liga e desliga o aviso sonoro.
- *
- * Fica no Perfil, e não em Empresa, porque é preferência de PESSOA: numa sala
- * com cinco atendentes, quem senta ao lado do telefone quer o som e quem está em
- * reunião não. Vive no navegador dela (ver use-som-ligado), como as outras
- * preferências pessoais do sistema.
- */
-function CardDeSom() {
-  const { ligado, definir } = useSomLigado();
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <Volume2 className="h-4 w-4 text-primary" /> Aviso sonoro
-        </CardTitle>
-        <CardDescription>Vale só para você, neste computador</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-between gap-4">
-          <div className="space-y-0.5">
-            <p className="text-sm font-medium">Tocar som nas notificações</p>
-            <p className="text-xs text-muted-foreground">
-              Avisa quando chega mensagem de WhatsApp, e-mail ou chat interno
-              enquanto você está em outra tela. Não toca na conversa que você já
-              está lendo.
-            </p>
-          </div>
-          <Switch
-            checked={ligado}
-            onCheckedChange={definir}
-            aria-label="Tocar som nas notificações"
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 function ProfileTab() {
   const { user, profile, signOut } = useAuth();
   // A mesma marca que vai no topo dos PDFs exportados. Uma logo só, um lugar só para trocar
@@ -180,7 +140,12 @@ function ProfileTab() {
   const marcaDaMinhaEmpresa = marcaDaEmpresa(profile);
   // A assinatura (e a logo do rodapé) só existem para serem anexadas ao e-mail
   // que o módulo de E-mail envia. Sem o módulo, é configuração sem efeito.
-  const { ligada: temEmails } = useSecaoLigada('emails');
+  const { ligada: temEmails, carregando: carregandoSecoes } = useSecaoLigada('emails');
+  // O cartão Personalizar muda de coluna conforme a empresa tenha o módulo de e-mail:
+  // com ele, o editor de assinatura deixa Informações Pessoais alto, e Personalizar
+  // vai para a direita equilibrar. Enquanto a resposta não chega, o cartão espera —
+  // aparecer num lado e pular para o outro é pior que demorar um instante.
+  const personalizarNaDireita = temEmails === true;
   const qc = useQueryClient();
   const [isUploading, setIsUploading] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
@@ -559,7 +524,7 @@ function ProfileTab() {
 
         <CardDeSom />
 
-        <CustomizeTab />
+        {!carregandoSecoes && !personalizarNaDireita && <CustomizeTab />}
         {/* GmailSettings sai daqui: a conexão de e-mail passou a ser da EMPRESA,
             via Nylas, e mora na própria aba de E-mails. Deixar os dois caminhos
             visíveis daria duas portas para conectar e-mail fazendo coisas
@@ -569,6 +534,7 @@ function ProfileTab() {
       </div>
 
       <div className="space-y-6">
+        {!carregandoSecoes && personalizarNaDireita && <CustomizeTab />}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">

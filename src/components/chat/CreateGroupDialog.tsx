@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Plus, Loader2, Users2, Camera, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -169,7 +169,7 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
               title="Adicionar foto do grupo"
             >
               <Avatar className="h-16 w-16">
-                {fotoPreview && <img src={fotoPreview} alt="Foto do grupo" className="h-full w-full object-cover" />}
+                {fotoPreview && <AvatarImage src={fotoPreview} alt="Foto do grupo" className="h-full w-full object-cover" />}
                 <AvatarFallback className="bg-primary text-primary-foreground">
                   <Users2 className="h-6 w-6" />
                 </AvatarFallback>

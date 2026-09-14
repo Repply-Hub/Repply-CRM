@@ -33,7 +33,7 @@ import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition, ColumnSettingsItem, ColumnSettingsPopover } from '@/components/shared/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
-import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData } from '@/lib/cnpj';
+import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData, telefoneDaReceita } from '@/lib/cnpj';
 import { EnderecoForm } from '@/components/clientes/EnderecoForm';
 import { ContatoSelector } from '@/components/clientes/ContatoSelector';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
@@ -587,7 +587,10 @@ const Clientes = () => {
           cep: data.cep || prev.cep,
         }));
       }
-      if (data.ddd_telefone_1 && !telefone) setTelefone(data.ddd_telefone_1);
+      // A Receita manda o telefone só em dígitos, com o DDD grudado ("2121660000"). Sem passar
+      // pelo formatador ele entrava cru no campo — ver `telefoneDaReceita` em src/lib/cnpj.ts.
+      const telefoneReceita = telefoneDaReceita(data);
+      if (telefoneReceita && !telefone) setTelefone(telefoneReceita);
       toast.success('CNPJ validado! Dados preenchidos automaticamente.');
     } catch {
       setCnpjStatus('invalid');
@@ -1260,7 +1263,7 @@ const Clientes = () => {
                     {step === 4 && (
                       <div className="space-y-2">
                         <Label className="text-xs font-semibold uppercase text-muted-foreground">Vincular Contato</Label>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <Button type="button" size="sm" variant={contatoMode === 'nenhum' ? 'default' : 'outline'} onClick={() => setContatoMode('nenhum')}>Nenhum</Button>
                           <Button type="button" size="sm" variant={contatoMode === 'existente' ? 'default' : 'outline'} onClick={() => setContatoMode('existente')}>Selecionar existente</Button>
                           <Button type="button" size="sm" variant={contatoMode === 'novo' ? 'default' : 'outline'} onClick={() => setContatoMode('novo')}>Novo contato</Button>

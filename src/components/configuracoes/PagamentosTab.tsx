@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/use-auth';
 import { useAssinatura } from '@/hooks/use-assinatura';
 import { usePlanos } from '@/hooks/use-planos';
-import { extrairAssinatura, situacaoDoMeuPlano } from '@/lib/plano-gate';
+import { extrairAssinatura, extrairEmpresa, situacaoDoMeuPlano } from '@/lib/plano-gate';
+import { inicioDaAssinatura } from '@/lib/inicio-da-assinatura';
 import { ROTULO_SITUACAO, diasDeTrial, type SituacaoCS } from '@/lib/situacao-empresa';
 import { formatarMoedaBRL } from '@/lib/moeda';
 import { CancelarAssinaturaDialog } from './CancelarAssinaturaDialog';
@@ -98,6 +99,12 @@ export function PagamentosTab() {
 
   const { titulo, explica } = TEXTO[situacao];
   const renovaEm = porExtenso(assinatura?.current_period_end);
+  const inicio = inicioDaAssinatura({
+    situacao,
+    assinaturaIniciadaEm: assinatura?.assinatura_iniciada_em,
+    empresaCriadaEm: extrairEmpresa(profile)?.created_at,
+  });
+  const inicioPorExtenso = inicio ? porExtenso(inicio.em) : null;
   const diasRestantes = diasDeTrial({
     plan_status: typeof assinatura?.plan_status === 'string' ? assinatura.plan_status : null,
     origem: null,
@@ -131,6 +138,13 @@ export function PagamentosTab() {
 
         <CardContent className="space-y-4">
           <p className="max-w-[65ch] text-sm text-muted-foreground">{explica}</p>
+
+          {inicio && inicioPorExtenso && (
+            <p className="text-sm">
+              <span className="text-muted-foreground">{inicio.rotulo} </span>
+              <span className="font-medium">{inicioPorExtenso}</span>
+            </p>
+          )}
 
           {temCobranca && renovaEm && (
             <p className="text-sm">

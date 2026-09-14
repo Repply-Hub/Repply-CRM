@@ -58,13 +58,11 @@ export function AutomacaoTab({ empresaId }: Props) {
   // a pessoa apaga para redigitar. Converter a cada tecla faria "" virar 0 e o cursor
   // saltar (a mesma armadilha do CLAUDE.md §7.10, do lado da quantidade).
   const [dias, setDias] = useState('');
-  const [minimo, setMinimo] = useState('');
   const [maximo, setMaximo] = useState('');
 
   useEffect(() => {
     if (!config) return;
     setDias(String(config.pauta_dias_parado));
-    setMinimo(String(config.pauta_min_itens));
     setMaximo(String(config.pauta_max_itens));
   }, [config]);
 
@@ -152,40 +150,24 @@ export function AutomacaoTab({ empresaId }: Props) {
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-card-foreground">Quantos itens por dia</p>
+              <p className="text-sm font-medium text-card-foreground">Até quantos itens por dia</p>
               <p className="text-xs text-muted-foreground">
-                A pauta varia entre esses dois números conforme o que está parado. Compromisso
-                da agenda ocupa vaga: reunião marcada não se corta por teto.
+                O teto da pauta. Entra o que está parado além do prazo acima: primeiro os negócios
+                da própria pessoa, depois os da equipe para quem vê a equipe, do maior valor para o
+                menor, até esse limite. Compromisso marcado até a véspera ocupa vaga; o marcado no
+                próprio dia aparece além do teto.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Input
-                type="text"
-                inputMode="numeric"
-                aria-label="Mínimo de itens"
-                className="w-16 text-center"
-                value={minimo}
-                onChange={(e) => setMinimo(e.target.value)}
-                onBlur={() => gravarNumero('pauta_min_itens', minimo, 1, 20, setMinimo)}
-              />
-              <span className="text-sm text-muted-foreground">a</span>
-              <Input
-                type="text"
-                inputMode="numeric"
-                aria-label="Máximo de itens"
-                className="w-16 text-center"
-                value={maximo}
-                onChange={(e) => setMaximo(e.target.value)}
-                onBlur={() => gravarNumero('pauta_max_itens', maximo, 1, 20, setMaximo)}
-              />
-            </div>
+            <Input
+              type="text"
+              inputMode="numeric"
+              aria-label="Máximo de itens"
+              className="w-16 text-center"
+              value={maximo}
+              onChange={(e) => setMaximo(e.target.value)}
+              onBlur={() => gravarNumero('pauta_max_itens', maximo, 1, 20, setMaximo)}
+            />
           </div>
-
-          {Number(minimo) > Number(maximo) && (
-            <p className="text-xs text-destructive">
-              O mínimo está maior que o máximo — a pauta vai respeitar o máximo.
-            </p>
-          )}
         </CardContent>
       </Card>
 

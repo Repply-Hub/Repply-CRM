@@ -161,7 +161,7 @@ export function EmpresaSelector({ value, onValueChange, placeholder = "Seleciona
               value={searchTerm}
               onValueChange={setSearchTerm}
             />
-            <CommandList className="max-h-[300px]">
+            <CommandList>
               <CommandGroup>
                 {filteredClientes.map((cliente) => (
                   <CommandItem

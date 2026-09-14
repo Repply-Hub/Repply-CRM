@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { hojeLocal } from '@/lib/data-local';
 
 /**
  * Abrir um contato no CRM a partir de uma conversa de WhatsApp, e amarrar os dois.
@@ -76,7 +77,9 @@ export function useCriarContatoDaConversa() {
           cargo: dados.cargo?.trim() || null,
           cliente_id: dados.clienteId || null,
           empresa: empresaNome,
-          data_criacao: new Date().toISOString(),
+          // Só a data, no fuso de quem usa — como os outros cadastros. Ia o carimbo UTC inteiro,
+          // que a lista de Clientes recorta: depois das 21h, o contato nascia com o dia seguinte.
+          data_criacao: hojeLocal(),
           usuario_id: usuarioId,
           criado_por_usuario_id: usuarioId,
         })

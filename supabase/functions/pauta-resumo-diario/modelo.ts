@@ -15,6 +15,12 @@
  * equipe. No pulso, um botão dizendo "Abrir minha pauta" mandaria a pessoa para uma pauta que
  * está VAZIA — é justamente por ela estar vazia que aquele e-mail existe —, e o rodapé dizendo
  * "é a mesma pauta que aparece na tela Hoje" apontaria para o lugar errado da mesma tela.
+ *
+ * 🔴 A LINHA DE BAIXO DA MANCHETE (`{{PAUTA_VALOR}}`) É O PARÁGRAFO INTEIRO, OU NADA (11/09/2026).
+ * Desde que a fila pessoal fala com a voz da pauta, essa linha só existe num degrau — o comum é
+ * não ter. Um `<p>` vazio no lugar somava a margem dele ao espaço acima dos itens, e o Outlook de
+ * computador desenha parágrafo vazio como linha em branco. Por isso o `<p>` mora em
+ * `MODELO_LINHA`, e `corpo.ts` só o coloca quando há texto.
  */
 
 export const MODELO_RESUMO = String.raw`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:0;background:#f5f5f4;">
@@ -36,9 +42,7 @@ export const MODELO_RESUMO = String.raw`<table role="presentation" width="100%" 
             <h1 style="margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:25px;font-weight:600;line-height:1.25;letter-spacing:-0.02em;color:#0a0a0a;">
               {{PAUTA_MANCHETE}}<span style="color:#FF5A1F;">.</span>
             </h1>
-            <p style="margin:6px 0 0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;color:#78716c;">
-              {{PAUTA_VALOR}}
-            </p>
+            {{PAUTA_VALOR}}
           </td>
         </tr>
 
@@ -87,6 +91,11 @@ export const MODELO_RESUMO = String.raw`<table role="presentation" width="100%" 
     </td>
   </tr>
 </table>`;
+
+/** A linha de baixo da manchete. Só entra em `{{PAUTA_VALOR}}` quando há texto — ver o topo. */
+export const MODELO_LINHA = String.raw`<p style="margin:6px 0 0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;color:#78716c;">
+              LINHA_TEXTO
+            </p>`;
 
 /** Um item da pauta. A função repete isto e junta em `{{PAUTA_ITENS}}`. */
 export const MODELO_ITEM = String.raw`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;border:1px solid #e7e5e4;border-radius:10px;">

@@ -123,7 +123,7 @@ export function SeletorComBusca({
             value={termo}
             onValueChange={mudarTermo}
           />
-          <CommandList className="max-h-[240px]">
+          <CommandList className="max-h-[min(240px,calc(var(--radix-popover-content-available-height,100vh)-3.5rem))]">
             {carregando ? (
               <div className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Procurando...

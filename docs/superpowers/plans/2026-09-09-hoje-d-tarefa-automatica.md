@@ -340,17 +340,17 @@ desfazendo tudo no fim — é o método que o controlador usou em 08/09 e que fu
 
 Prove os quatro caminhos, e escreva o resultado de cada um no relatório:
 
-1. Gestora adia negócio da Érika **com** a caixinha → grava o retorno, cria o aviso, **e** cria a
-   tarefa com `usuario_id` = Érika, `responsavel` = "Érika Marques", `criado_por` = "Fabiola",
+1. Gestora adia negócio da Ana **com** a caixinha → grava o retorno, cria o aviso, **e** cria a
+   tarefa com `usuario_id` = Ana, `responsavel` = "Ana Souza", `criado_por` = "Carla",
    `prazo_final` = o dia do retorno, `titulo` começando com "Retomar contato ".
 2. A mesma coisa **sem** a caixinha (`p_criar_tarefa := false`) → retorno e aviso sim, tarefa
    **não**.
 3. Negócio **sem dono** → sem tarefa, sem estouro.
-4. A fila da Érika no dia do retorno → **uma** linha (a tarefa), não duas.
+4. A fila da Ana no dia do retorno → **uma** linha (a tarefa), não duas.
 
-Identificadores: Érika `aa4b1d0f-fe58-4a9f-89a5-ce5ae2993c1e` (login
-`93ef1364-318b-4e9e-8412-ce3ab902f32a`); Fabiola `fb5cb820-63e0-452e-9536-788d0ed55146` (login
-`41ccd5c5-6b9e-4f82-af96-b7e52d92d1a4`).
+Identificadores: Ana `<id-da-vendedora>` (login
+`<login-da-vendedora>`); Carla `<id-da-gestora>` (login
+`<login-da-gestora>`).
 
 Ao fim, confira que o `rollback` desfez tudo: `select count(*) from tarefas where titulo like 'Retomar contato %'` → **0**.
 
@@ -411,7 +411,7 @@ Abaixo dele, uma linha de ajuda que diga o que vai acontecer, com o nome de quem
 quando o negócio for de outra pessoa — o diálogo já sabe disso, porque a Etapa 3 fez o texto
 mudar quando o item tem `responsavel`:
 
-> *A tarefa vai para Érika Marques, com prazo em 15/09 e o motivo acima na descrição.*
+> *A tarefa vai para Ana Souza, com prazo em 15/09 e o motivo acima na descrição.*
 
 Quando o negócio é da própria pessoa, a mesma linha diz *"A tarefa fica com você…"*.
 

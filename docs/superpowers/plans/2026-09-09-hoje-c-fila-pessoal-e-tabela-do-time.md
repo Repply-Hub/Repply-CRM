@@ -124,13 +124,13 @@ Cabeçalho do arquivo, em comentário, dizendo o porquê:
 
 - [ ] **Passo 3: provar por simulação, sem aplicar**
 
-Você não aplica. Reescreva a consulta como SELECT puro e rode como a Fabiola
-(`usuarios.id` `fb5cb820-63e0-452e-9536-788d0ed55146`, login
-`41ccd5c5-6b9e-4f82-af96-b7e52d92d1a4`) e como a Érika (`aa4b1d0f-fe58-4a9f-89a5-ce5ae2993c1e`,
-login `93ef1364-318b-4e9e-8412-ce3ab902f32a`).
+Você não aplica. Reescreva a consulta como SELECT puro e rode como a Carla
+(`usuarios.id` `<id-da-gestora>`, login
+`<login-da-gestora>`) e como a Ana (`<id-da-vendedora>`,
+login `<login-da-vendedora>`).
 
-Esperado, medido em 08/09/2026 antes da mudança: a Fabiola tem **7 itens, os 7 de colegas**
-(ela tem 0 negócios próprios). Depois: **0 itens de colega**. A Érika: sem mudança nenhuma.
+Esperado, medido em 08/09/2026 antes da mudança: a Carla tem **7 itens, os 7 de colegas**
+(ela tem 0 negócios próprios). Depois: **0 itens de colega**. A Ana: sem mudança nenhuma.
 
 Escreva no relatório os dois números, antes e depois, para cada uma.
 
@@ -316,8 +316,8 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>" --only -- supabase/migrat
 
 ### 🔴 Dois requisitos herdados da revisão da Tarefa 1 — não são opcionais
 
-A Tarefa 1 fez a fila voltar a ser pessoal, e três gestoras da MD (Fabiola, Gabriel Medeiros,
-Gabriel Pereira) **não têm negócio próprio nenhum**. A fila delas fica em zero, e isso descobre
+A Tarefa 1 fez a fila voltar a ser pessoal, e três gestoras da MD (Carla, Beatriz Lima,
+Denise Rocha) **não têm negócio próprio nenhum**. A fila delas fica em zero, e isso descobre
 dois problemas na tela que existem **no estado final**, não só entre uma tarefa e outra:
 
 **(a) A tela passa a dizer uma coisa falsa.** O ramo `total === 0` de `Hoje.tsx` substitui a área
@@ -481,7 +481,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>" --only -- src/components/
 
 | | Prova |
 |---|---|
-| A fila é pessoal | A Fabiola passa de **7 itens, 7 de colegas** para **0 de colegas**; a Érika não muda |
+| A fila é pessoal | A Carla passa de **7 itens, 7 de colegas** para **0 de colegas**; a Ana não muda |
 | A revogação sobreviveu | `pauta_do_dia_de(uuid)` continua `postgres | service_role`, sem `authenticated` |
 | A concessão do painel voltou | `proacl` de `dashboard_negocios_risco` idêntica antes e depois do DROP |
 | A tabela pagina | 10 → "Ver mais" → 20; filtro reinicia em 10; total confere com um `count(*)` independente |

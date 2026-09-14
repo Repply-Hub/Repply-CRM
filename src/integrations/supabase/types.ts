@@ -1692,6 +1692,7 @@ export type Database = {
       empresa_assinaturas: {
         Row: {
           ativado_em: string | null
+          assinatura_iniciada_em: string | null
           cancel_at_period_end: boolean
           current_period_end: string | null
           empresa_id: string
@@ -1706,6 +1707,7 @@ export type Database = {
         }
         Insert: {
           ativado_em?: string | null
+          assinatura_iniciada_em?: string | null
           cancel_at_period_end?: boolean
           current_period_end?: string | null
           empresa_id: string
@@ -1720,6 +1722,7 @@ export type Database = {
         }
         Update: {
           ativado_em?: string | null
+          assinatura_iniciada_em?: string | null
           cancel_at_period_end?: boolean
           current_period_end?: string | null
           empresa_id?: string
@@ -1799,6 +1802,8 @@ export type Database = {
       }
       eventos: {
         Row: {
+          avisar_participantes: boolean
+          avisos_remetente_id: string | null
           cor: string
           created_at: string
           criado_por: string
@@ -1810,6 +1815,8 @@ export type Database = {
           inicio: string
           lembrete_enviado: boolean
           lembrete_minutos: number | null
+          lembretes_minutos: number[]
+          lembretes_valem_desde: string | null
           obra_id: string | null
           rota_id: string | null
           rota_titulo: string | null
@@ -1821,6 +1828,8 @@ export type Database = {
           visita_realizada: boolean
         }
         Insert: {
+          avisar_participantes?: boolean
+          avisos_remetente_id?: string | null
           cor?: string
           created_at?: string
           criado_por: string
@@ -1832,6 +1841,8 @@ export type Database = {
           inicio: string
           lembrete_enviado?: boolean
           lembrete_minutos?: number | null
+          lembretes_minutos?: number[]
+          lembretes_valem_desde?: string | null
           obra_id?: string | null
           rota_id?: string | null
           rota_titulo?: string | null
@@ -1843,6 +1854,8 @@ export type Database = {
           visita_realizada?: boolean
         }
         Update: {
+          avisar_participantes?: boolean
+          avisos_remetente_id?: string | null
           cor?: string
           created_at?: string
           criado_por?: string
@@ -1854,6 +1867,8 @@ export type Database = {
           inicio?: string
           lembrete_enviado?: boolean
           lembrete_minutos?: number | null
+          lembretes_minutos?: number[]
+          lembretes_valem_desde?: string | null
           obra_id?: string | null
           rota_id?: string | null
           rota_titulo?: string | null
@@ -4858,7 +4873,12 @@ export type Database = {
         }[]
       }
       registrar_retorno: {
-        Args: { p_motivo: string; p_pedido_id: string; p_retorno_em: string }
+        Args: {
+          p_criar_tarefa?: boolean
+          p_motivo: string
+          p_pedido_id: string
+          p_retorno_em: string
+        }
         Returns: undefined
       }
       restaurar_usuario_por_email: {

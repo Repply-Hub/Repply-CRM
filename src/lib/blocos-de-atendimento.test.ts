@@ -32,7 +32,7 @@ describe('blocosDeAtendimento', () => {
     const b = blocosDeAtendimento([
       msg('m1', '2026-08-01T10:00:00Z'),
       msg('m2', '2026-08-01T11:00:00Z'),
-      nota('n1', '2026-08-01T12:00:00Z', 'Érika Marques fechou a conversa'),
+      nota('n1', '2026-08-01T12:00:00Z', 'Ana Souza fechou a conversa'),
       msg('m3', '2026-08-10T10:00:00Z'),
     ]);
     expect(b).toHaveLength(2);
@@ -49,7 +49,7 @@ describe('blocosDeAtendimento', () => {
     const b = blocosDeAtendimento([
       msg('m1', '2026-08-01T10:00:00Z'),
       nota('n1', '2026-08-01T12:00:00Z',
-        'Pricila Azevedo fechou a conversa e removeu Pricila Azevedo dos responsáveis'),
+        'Bruno Reis fechou a conversa e removeu Bruno Reis dos responsáveis'),
       msg('m2', '2026-08-02T10:00:00Z'),
     ]);
     expect(b).toHaveLength(2);
@@ -57,34 +57,34 @@ describe('blocosDeAtendimento', () => {
 
   it('guarda quem assumiu o atendimento', () => {
     const b = blocosDeAtendimento([
-      nota('n0', '2026-08-01T09:00:00Z', 'Érika Marques assumiu esta conversa'),
+      nota('n0', '2026-08-01T09:00:00Z', 'Ana Souza assumiu esta conversa'),
       msg('m1', '2026-08-01T10:00:00Z'),
-      nota('n1', '2026-08-01T12:00:00Z', 'Érika Marques fechou a conversa'),
+      nota('n1', '2026-08-01T12:00:00Z', 'Ana Souza fechou a conversa'),
     ]);
-    expect(b[0].atendentes).toEqual(['Érika Marques']);
+    expect(b[0].atendentes).toEqual(['Ana Souza']);
   });
 
   it('não repete o mesmo atendente', () => {
     const b = blocosDeAtendimento([
-      nota('n0', '2026-08-01T09:00:00Z', 'Érika Marques assumiu esta conversa'),
-      nota('n1', '2026-08-01T09:30:00Z', 'Érika Marques assumiu esta conversa'),
+      nota('n0', '2026-08-01T09:00:00Z', 'Ana Souza assumiu esta conversa'),
+      nota('n1', '2026-08-01T09:30:00Z', 'Ana Souza assumiu esta conversa'),
       msg('m1', '2026-08-01T10:00:00Z'),
     ]);
-    expect(b[0].atendentes).toEqual(['Érika Marques']);
+    expect(b[0].atendentes).toEqual(['Ana Souza']);
   });
 
   it('dois fechamentos seguidos, sem mensagem no meio, não criam bloco vazio', () => {
     const b = blocosDeAtendimento([
       msg('m1', '2026-08-01T10:00:00Z'),
-      nota('n1', '2026-08-01T12:00:00Z', 'Érika Marques fechou a conversa'),
-      nota('n2', '2026-08-01T13:00:00Z', 'Daniel Nóbrega fechou a conversa'),
+      nota('n1', '2026-08-01T12:00:00Z', 'Ana Souza fechou a conversa'),
+      nota('n2', '2026-08-01T13:00:00Z', 'Carla Nunes fechou a conversa'),
     ]);
     expect(b).toHaveLength(1);
   });
 
   it('nota nunca conta como mensagem', () => {
     const b = blocosDeAtendimento([
-      nota('n0', '2026-08-01T09:00:00Z', 'Érika Marques assumiu esta conversa'),
+      nota('n0', '2026-08-01T09:00:00Z', 'Ana Souza assumiu esta conversa'),
       msg('m1', '2026-08-01T10:00:00Z'),
     ]);
     expect(b[0].mensagens).toBe(1);
@@ -95,9 +95,9 @@ describe('blocosDeAtendimento', () => {
     // "direcionou", "adicionou", "saiu" — todas existem no histórico da MD.
     const b = blocosDeAtendimento([
       msg('m1', '2026-08-01T10:00:00Z'),
-      nota('n1', '2026-08-01T10:30:00Z', 'Pricila Azevedo direcionou esta conversa para Daniel Nóbrega'),
-      nota('n2', '2026-08-01T10:40:00Z', 'Pricila Azevedo adicionou Érika Marques como responsável'),
-      nota('n3', '2026-08-01T10:50:00Z', 'Érika Marques saiu dos responsáveis desta conversa'),
+      nota('n1', '2026-08-01T10:30:00Z', 'Bruno Reis direcionou esta conversa para Carla Nunes'),
+      nota('n2', '2026-08-01T10:40:00Z', 'Bruno Reis adicionou Ana Souza como responsável'),
+      nota('n3', '2026-08-01T10:50:00Z', 'Ana Souza saiu dos responsáveis desta conversa'),
       msg('m2', '2026-08-01T11:00:00Z'),
     ]);
     expect(b).toHaveLength(1);
@@ -108,8 +108,8 @@ describe('blocosDeAtendimento', () => {
   it('a nota de reabertura não corta nem vira atendente', () => {
     const b = blocosDeAtendimento([
       msg('m1', '2026-08-01T10:00:00Z'),
-      nota('n1', '2026-08-01T12:00:00Z', 'Érika Marques fechou a conversa'),
-      nota('n2', '2026-08-02T09:00:00Z', 'Érika Marques reabriu a conversa'),
+      nota('n1', '2026-08-01T12:00:00Z', 'Ana Souza fechou a conversa'),
+      nota('n2', '2026-08-02T09:00:00Z', 'Ana Souza reabriu a conversa'),
       msg('m2', '2026-08-02T10:00:00Z'),
     ]);
     expect(b).toHaveLength(2);
@@ -121,7 +121,7 @@ describe('blocosDeAtendimento', () => {
     // O realtime insere no começo da lista; o chamador pode entregar assim.
     const b = blocosDeAtendimento([
       msg('m2', '2026-08-10T10:00:00Z'),
-      nota('n1', '2026-08-01T12:00:00Z', 'Érika Marques fechou a conversa'),
+      nota('n1', '2026-08-01T12:00:00Z', 'Ana Souza fechou a conversa'),
       msg('m1', '2026-08-01T10:00:00Z'),
     ]);
     expect(b).toHaveLength(2);
@@ -134,8 +134,8 @@ describe('blocosDeAtendimento', () => {
 
   it('conversa só com notas não vira bloco nenhum', () => {
     expect(blocosDeAtendimento([
-      nota('n0', '2026-08-01T09:00:00Z', 'Érika Marques assumiu esta conversa'),
-      nota('n1', '2026-08-01T12:00:00Z', 'Érika Marques fechou a conversa'),
+      nota('n0', '2026-08-01T09:00:00Z', 'Ana Souza assumiu esta conversa'),
+      nota('n1', '2026-08-01T12:00:00Z', 'Ana Souza fechou a conversa'),
     ])).toEqual([]);
   });
 });
@@ -143,9 +143,9 @@ describe('blocosDeAtendimento', () => {
 describe('blocosNaJanela', () => {
   const blocos = blocosDeAtendimento([
     msg('m1', '2026-05-01T10:00:00Z'),
-    nota('n1', '2026-05-02T10:00:00Z', 'Érika Marques fechou a conversa'),
+    nota('n1', '2026-05-02T10:00:00Z', 'Ana Souza fechou a conversa'),
     msg('m2', '2026-07-01T10:00:00Z'),
-    nota('n2', '2026-07-02T10:00:00Z', 'Érika Marques fechou a conversa'),
+    nota('n2', '2026-07-02T10:00:00Z', 'Ana Souza fechou a conversa'),
     msg('m3', '2026-09-01T10:00:00Z'),
   ]);
 

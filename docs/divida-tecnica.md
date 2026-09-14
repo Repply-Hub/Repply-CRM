@@ -82,6 +82,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 65 | [As duas telas mais delicadas do calendário não têm teste](#65-as-duas-telas-mais-delicadas-do-calendário-não-têm-teste-nenhum) | Baixa | Não |
 | 66 | [A grade de figurinhas usa endereço público cru](#66-a-grade-de-figurinhas-usa-endereço-público-cru-e-para-quando-o-balde-fechar) | Média | Não hoje — **sim** no dia em que `whatsapp-media` fechar |
 | 67 | [Falta a contagem distinta de negócios em risco](#67-falta-a-contagem-distinta-de-negócios-em-risco) | Baixa | Não — só limita o cartão "Valor em Risco" a mostrar valor sem quantidade |
+| 70 | [Datas que mudam de dia fora do banco](#70-datas-que-mudam-de-dia-fora-do-banco-o-que-sobrou-da-varredura-de-1109) | Baixa | Não — código consertado em 11/09; sobram os cadastros antigos feitos depois das 21h (dado, pede conversa) e o Calendário (item 51) |
 
 > ⚠️ Os itens **61 e 62** existem no corpo deste documento mas não têm linha aqui — quem os
 > escreveu esqueceu a tabela. Vale acrescentar ao passar por perto.
@@ -2646,6 +2647,214 @@ função `dashboard_negocios_risco`, contando `DISTINCT` sobre a união das duas
 o mesmo cálculo que já produz `valor_risco_total`, trocando `sum(valor)` por `count(*)`.
 Não é urgente: o valor em reais já está certo, e "parado" e "sem próxima ação" continuam
 visíveis (com contagem) nos dois cartões ao lado.
+
+---
+
+## 68. Gravação que não confere as linhas afetadas — 118 pontos que podem comemorar sem ter gravado
+
+> Levantado em 10/09/2026, ao consertar a exclusão de tarefas. Explicação da armadilha em
+> [`CLAUDE.md`](../CLAUDE.md) §4.6, sob "zero linhas não é sucesso".
+
+**O que acontece.** Quando a regra de acesso do banco barra um `UPDATE` ou um `DELETE`, ela
+não devolve erro: a cláusula `USING` da política simplesmente não encontra a linha, o comando
+mexe em zero registros e a resposta volta com `error: null`. A tela vê "não deu erro" e
+anuncia sucesso. O usuário só descobre ao recarregar — se recarregar.
+
+É diferente do `INSERT`, cuja regra é `WITH CHECK`: essa viola e o banco grita 42501, o
+`catch` dispara e a tela mostra a recusa. **A mesma trava é barulhenta na tela que cria e muda
+na tela que apaga.**
+
+**Medido em 09 e 10/09/2026, na empresa de demonstração, com um `vendedor` sem a
+funcionalidade `tarefas.excluir`:**
+
+| gesto | o que a tela disse | o que o banco fez |
+|---|---|---|
+| Excluir tarefa | "Tarefa excluída" | nada — a tarefa continua lá depois de recarregar |
+| Excluir N marcadas | "N tarefa(s) removida(s)!" | nada |
+| Mudar a etapa de uma tarefa de outra pessoa | "Etapa atualizada." | nada — `updated_at` parado em 31/08 |
+
+**O tamanho.** Varredura de `src/` em 10/09/2026, no commit `62c8af16`:
+
+| | pontos | conferem o efeito |
+|---|---|---|
+| `.delete()` em tabela | 49 | 5 |
+| `.update()` em tabela | 80 | 3 |
+
+Os 8 que conferiam já existiam antes desta varredura e são o padrão a copiar:
+`useBulkDeletePedidos` / `useBulkUpdatePedidos` (`src/hooks/use-pedidos.ts`, por
+`{ count: 'exact' }`), `useDeleteChatMessage` (`src/hooks/use-chat.ts:803`) e a exclusão em
+massa de clientes (`src/pages/Clientes.tsx:888`), as duas últimas por `.select('id')` com
+teste de tamanho. **A exclusão em massa de clientes até distingue os três casos** — tudo,
+parte, nada — e o comentário dela descreve a armadilha inteira desde antes; ela nunca subiu
+para o `CLAUDE.md`, e por isso o resto do sistema nasceu sem.
+
+**Toda tabela alcançada está exposta, não só as de permissão granular.** Lido em `pg_policies`
+em 10/09/2026: as políticas `<tabela>_exige_plano_delete` são RESTRICTIVE e usam `USING`.
+Quando a empresa está **bloqueada por cobrança**, portanto, **todo** `DELETE` do sistema volta
+com zero linhas e sem erro — e a tela comemora. (A de `UPDATE` é `WITH CHECK`, então essa
+grita; mais uma vez, a mesma trava sai barulhenta de um lado e muda do outro.)
+
+**O que já foi consertado (10/09/2026):** o módulo de Tarefas — exclusão avulsa, exclusão em
+massa e alteração (`src/hooks/use-tarefas.ts`, `src/pages/Tarefas.tsx`), com o teste
+`src/hooks/zero-linhas-nao-e-sucesso.test.tsx`. Restam **118**.
+
+**Como consertar cada um** (cinco linhas, e o teste do módulo é o que segura):
+
+```ts
+const { error, count } = await supabase.from('x').delete({ count: 'exact' }).eq('id', id);
+if (error) throw error;
+if (count === 0) throw new Error(recusaSemErro('O registro NÃO foi excluído…', '…'));
+```
+
+🔴 **`count === 0`, nunca `!count`.** `count` vem `null` quando a resposta não traz o cabeçalho
+de contagem; tratar `null` como recusa grita "não excluiu" em cima de uma exclusão que
+funcionou — a mesma mentira, virada do avesso, e mais cara, porque a pessoa apaga de novo.
+
+**Por onde começar, se alguém pegar o resto.** A ordem é por quanto o usuário perde ao
+acreditar na tela, não por número de arquivos:
+
+1. **Clientes, contatos e obras** (`src/hooks/use-mutations.ts:103, 126, 287`) — as políticas
+   `clientes_delete` / `contatos_delete` / `obras_delete` exigem a permissão `excluir` do
+   módulo, exatamente como a de tarefas. O de obras é o mais enganoso: **já faz `.select()` e
+   não olha o que voltou** — só imprime no console. Parece conferido e não é.
+2. **Eventos da agenda** (`src/hooks/use-eventos.ts:818-819`) — `eventos_delete` só deixa o
+   dono apagar; apagar evento de outra pessoa é gesto comum numa agenda de equipe.
+3. **Configuração da empresa** (`funis`, `kanban_colunas`, `marcadores`, `marcadores_obras`,
+   `origens_pedido`, `clientes_tipos`, `cargos_contato`, `tarefas_kanban_colunas`,
+   `metas_vendas`, `perfis_customizados`) — todas são `is_admin() OR is_gestor()`. Um vendedor
+   que alcance essas telas apaga no vazio.
+4. **O resto dos `.update()`**, que é o grosso dos 118 e o de menor consequência individual —
+   mas é onde mora o caso do Kanban: o cartão pula de coluna na tela e volta ao recarregar.
+
+**Por que não foi tudo de uma vez.** Cada ponto precisa de uma frase própria — "peça a um
+gestor" muda conforme a permissão que falta —, e nenhum deles tem teste de tela hoje. Trocar
+118 chamadas no escuro, num sistema com cliente pagante, troca uma mentira conhecida por um
+risco não medido. O caminho é módulo a módulo, cada um com o seu teste, como o de Tarefas.
+
+---
+
+## 69. "É meu?" decidido pelo NOME na tabela do time — com homônimos, a tela diz uma coisa e o banco faz outra
+
+**Gravidade: baixa hoje (zero casos), e nada impede que apareça amanhã.**
+
+Na tela "Hoje", "Retomar depois" clicado na **tabela do time** decide se o negócio é de quem
+está olhando comparando **o nome** do dono com o nome de quem está logado, em minúsculas e sem
+espaços (`aoRetomarDaTabela`, `src/pages/Hoje.tsx`). Compara nome porque `negocios_em_risco`
+devolve só o nome (`responsavel text`), não o identificador.
+
+Com duas pessoas de mesmo nome na mesma empresa, o mesmo gesto erra três frases de uma vez — "O
+negócio volta para a sua pauta", o rótulo "Criar uma tarefa para mim" e o aviso "Uma tarefa foi
+criada no seu nome" — enquanto o banco, corretamente, manda a tarefa **e** o aviso com o motivo
+para a homônima. Desde a caixinha "Criar tarefa" (Plano D, 10/09/2026) o erro deixou de ser só
+de texto: a tela **afirma** que uma tarefa ficou com a pessoa, e ela não ficou.
+
+Medido na revisão de 10/09/2026:
+
+```sql
+select empresa_id, lower(trim(nome)), count(*) from usuarios group by 1, 2 having count(*) > 1;
+-- 0 linhas, sobre 38 usuários vivos
+```
+
+E nada segura o zero: `usuarios` tem só `pkey(id)`, `unique(user_id)` e a chave de `empresa_id`.
+Não há restrição nem índice único sobre `nome`.
+
+**A fila de cima não tem o problema:** `pauta_do_dia_de` já decide por identificador
+(`case when n.e_meu then null else n.dono end`) e manda o nome só quando o negócio é de outra
+pessoa.
+
+**O conserto é de banco:** `negocios_em_risco_de` passar a devolver o mesmo `e_meu` (ou o
+`usuario_id` do dono), e a tela comparar isso em vez do nome. É mudança de assinatura
+(`RETURNS TABLE`) — DROP + CREATE, com as concessões repostas no mesmo arquivo.
+
+---
+## 70. Datas que mudam de dia fora do banco: o que sobrou da varredura de 11/09
+
+**Gravidade: baixa.** Nenhuma exportação que o cliente usa hoje escreve data errada, e o código dos
+três defeitos achados foi consertado no mesmo dia (abaixo). O que sobra é dado já gravado e o
+Calendário, que já é o item 51.
+
+Varredura de 11/09/2026, feita depois que o gerador `src/lib/generate-excel.ts` foi flagrado
+escrevendo cada data um dia antes (`CLAUDE.md` §7.12). Procurou-se `new Date(<coluna date>)`
+seguido de `toLocaleDateString` ou `format` nos caminhos de exportação e de exibição — e, de
+quebra, o idioma vizinho `new Date().toISOString().slice(0, 10)`, que calcula "hoje" em UTC:
+depois das 21h, em Brasília, já é amanhã.
+
+As colunas `date` de verdade, conferidas nas mudanças do banco: `pedidos.data_pedido`,
+`pedidos.prazo_resposta`, `licencas_idema.data_formacao`, `dom_licencas.data_edicao` e
+`pauta_adiamentos.adiado_ate`. `clientes.data_criacao` e `contatos.data_criacao` são **texto**. As
+demais datas do sistema são carimbo com fuso, e para elas `new Date(...)` está certo.
+
+### O que ficou em aberto
+
+| onde | o que acontece | conserto |
+|---|---|---|
+| Clientes e contatos **já cadastrados** depois das 21h, antes do conserto de 11/09 | A "Data de Criação" continua gravada com o dia seguinte — o código novo só vale para cadastro novo | Dá para achar comparando `data_criacao` com `created_at` no horário de Brasília. Corrigir é mudança em dado de produção e pede conversa antes (`CLAUDE.md` §11) |
+| Calendário, `use-eventos.ts:184` | Desenha o fechamento um dia antes | Já é o [item 51](#51-o-calendário-mostra-menos-de-10-dos-prazos-e-desenha-um-dia-antes), que cita a linha de antes (164) |
+
+✅ **Consertado em 11/09/2026**, com `src/lib/data-local.ts` (`hojeLocal` e `formatarDataBR`, com
+teste) e um guarda estrutural, `src/test/hoje-no-fuso-local.test.ts`, que falha se o idioma voltar:
+
+- **Data de criação:** os três cadastros — cliente e contato em `use-mutations.ts`, e o contato
+  criado da conversa em `use-criar-contato-da-conversa.ts` — gravam `hojeLocal()`, a data no fuso
+  de quem usa. O da conversa gravava o carimbo UTC inteiro; agora grava só a data, como os outros.
+- **A ficha do cliente** (`ClienteDetalhe.tsx`, "Data de criação"): `formatarDataBR` reescreve a
+  data seca e leva o carimbo `created_at` ao fuso de quem olha, em vez de recortar o texto UTC.
+- **O nome dos arquivos** das 10 exportações — PDF de Negócios, Dashboard, conversas em PDF, Excel
+  e Markdown, Clientes e o CSV do Portal — sai com `hojeLocal()`.
+
+✅ **O gerador que originou a varredura, `src/lib/generate-excel.ts`, foi apagado em 11/09/2026**,
+junto com o teste. Escrevia cada data um dia antes — o 1º de janeiro, no **ano** anterior —, mas
+nenhuma tela o chamava desde 22/08/2026 (`3ecc6b8c`), e ele já tinha enganado duas vezes: em 23/08
+ganhou a opção `comObra` (`59d4aee0`), um dia depois de perder a única chamada; e o pedido de 11/09
+mirou nele achando que era a planilha do cliente. Saiu consertado e com teste: quem precisar dele de
+volta acha a versão consertada com `git log -- src/lib/generate-excel.ts`, no commit anterior ao que
+o apagou. **A planilha de Negócios é montada em `handleExportExcel`, dentro de `Negocios.tsx`**: é
+lá que se mexe.
+
+### Conferidos e certos — não precisa varrer de novo
+
+- **A planilha que o cliente baixa** (`handleExportExcel`, em `Negocios.tsx`): grava a data crua,
+  como texto. Medido com o xlsx do projeto: célula de texto, idêntica ao banco, em Fortaleza, São
+  Paulo e UTC.
+- **O PDF de Negócios** (`generate-pdf.ts:98`): recorta o texto. As três origens de `data` em
+  `buildExportRows` são `data_pedido` — inclusive o `createdAt` do funil (`pedido-to-order.ts:18`),
+  que parece carimbo pelo nome e não é.
+- Recortam o texto ou ancoram ao meio-dia: a lista de Negócios (`PainelDeNegocios.tsx:515` e `:517`),
+  o cartão do funil (`KanbanCard.tsx:18`), a edição do negócio (`EditarPedido.tsx:164`), a prévia da
+  importação (a coluna de criação, em `ImportPedidosDialog.tsx`) e as licenças do Portal (a coluna
+  "Data Emissão" e `formatDataEdicao`, em `Portal.tsx`).
+- A conversão de número de série do Excel na importação (`MappingStep.tsx:197` e `:247`) faz a
+  conta e a leitura em UTC — está certa.
+- Os outros `format(new Date(...))` — são 42 no projeto — e os `toLocaleDateString` de Usuários,
+  Pagamentos, Admin, faixa de cobrança e histórico do negócio recebem carimbo com fuso
+  (`created_at`, início de evento, `tarefas.prazo_final`, `current_period_end`, o `quando` da
+  pauta) ou o próprio agora.
+
+---
+
+## 71. A voz da pauta: o que as revisões de 11/09 deixaram para depois
+
+**Gravidade: baixa nos quatro — nenhum morde hoje, e cada um tem o gatilho descrito.**
+
+A frase que muda com o dia (`vozDaPauta`, em `src/lib/voz-da-pauta.ts`, com a cópia do e-mail em
+`supabase/functions/_shared/voz-da-pauta.ts`) foi publicada em 11/09/2026 na tela "Hoje" e no
+e-mail das 7h. As revisões acharam quatro pontas soltas, nenhuma por defeito de código:
+
+1. **Nenhum teste prende a ligação do ajuste no e-mail.** `index.ts` lê o ajuste "dias parado"
+   de cada empresa e o passa a `montarEmail`; um erro de digitação em `"pauta_dias_parado"` ou em
+   `empresa_id` devolve lista vazia SEM erro, e todo mundo passa a ser medido com 3 — calado. Hoje
+   não aparece porque nenhuma empresa salvou o ajuste. **Gatilho:** a próxima edição do
+   `index.ts`. O teste que falta: montar o `index.ts` com o banco e o envio simulados e conferir a
+   frase de quem recebe — a revisão fez esse ensaio uma vez, à mão. **Atualização de 14/09/2026:** o gatilho disparou — a Tarefa 3 da pauta que encolhe editou o `index.ts` (o filtro `soOsPendentes` passou a rodar antes da decisão de enviar), e o teste continua faltando; agora ele prenderia também essa ordem.
+2. ~~**"Parados" sobre negócio que não está parado.**~~ **Resolvido em 14/09/2026:** a migration `20260912100000_pauta_do_dia_que_encolhe.sql` acabou com o enchimento até o mínimo de itens. Só entra na fila o que está parado além do corte, então "R$ X parados" passou a ser verdade por construção.
+3. **Tela e e-mail podem ler o ajuste de jeitos diferentes.** O gancho da tela
+   (`src/hooks/use-configuracoes-automacao.ts`) só aceita número; o banco e o e-mail aceitam
+   também número guardado como texto ("7"). **Gatilho:** alguém gravar o ajuste à mão no painel
+   do Supabase — a tela de Automação sempre grava número.
+4. **A tarefa vencida volta à fila, mas não ao cartão.** Desde a migration `20260911090000`, a
+   tarefa vencida deixa de esconder o negócio da pauta; o cartão "Sem Próxima Ação" e a tabela do
+   time ainda contam tarefa aberta — vencida ou não — como próxima ação. **Gatilho:** já vale; hoje
+   só se nota comparando os três. Alinhar é outra decisão, anotada na própria migration.
 
 ---
 

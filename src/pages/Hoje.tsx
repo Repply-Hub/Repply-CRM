@@ -8,7 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatarMoedaBRL } from '@/lib/moeda';
 import { cn } from '@/lib/utils';
+import { vozDaPauta } from '@/lib/voz-da-pauta';
+import { separarAPauta } from '@/lib/pauta-do-dia';
 import { useAuth } from '@/hooks/use-auth';
+import { useConfiguracoesAutomacao, PADROES_DA_PAUTA } from '@/hooks/use-configuracoes-automacao';
 import { usePossoVerPautaDeTodos } from '@/hooks/use-minha-permissao';
 import { usePauta, type ItemDaPauta } from '@/hooks/use-pauta';
 import { DialogoRetorno } from '@/components/pauta/DialogoRetorno';
@@ -83,9 +86,15 @@ function ItemPauta({
               {format(new Date(item.quando), 'HH:mm')}
             </span>
           )}
-          {/* A fila é sempre pessoal desde 09/09/2026, então `item.responsavel` vem sempre nulo e
-              a etiqueta de dono saiu daqui. O campo fica no banco: é o que a tabela do time e o
-              e-mail leem. */}
+          {/* 🔴 A ETIQUETA VOLTOU em 12/09/2026, junto com a pauta do gestor. `responsavel` só
+              vem preenchido quando o negócio é DE OUTRA PESSOA — a função de banco resolve
+              isso —, então para o próprio dono nada é desenhado aqui. Sem ela, o gestor recebe
+              negócio de colega sem saber de quem é, e cobra a pessoa errada. */}
+          {item.responsavel && (
+            <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              {item.responsavel}
+            </span>
+          )}
         </div>
 
         <h3 className="mb-1 text-base font-semibold leading-snug text-card-foreground sm:text-[17px]">
@@ -157,12 +166,16 @@ const Hoje = () => {
   // recebeu e só mexe nas três chaves dele, então mexer num filtro com o painel aberto preserva
   // `negocio=` — e `comNegocio` faz o simétrico, preservando os filtros ao abrir e ao fechar.
   const { negocioAberto, abrirNegocio, fecharNegocio } = useNegocioNoEndereco();
-  // 🔴 A CHAVE, NÃO O PAPEL, e desde 09/09/2026 ela NÃO governa mais a fila. A fila é sempre
-  // pessoal, para todo mundo (migration 20260909120000): a chave passou a liberar a TABELA DO
-  // TIME, o gráfico por vendedor e o filtro de responsável, todos no painel "No geral" de baixo.
-  // Continua sendo a chave e não o papel: um gestor com o interruptor `pauta_de_todos` desligado
-  // à mão vê a tabela só com os próprios negócios, porque é assim que o servidor responde
-  // (ver `usePossoVerPautaDeTodos` e `eu_vejo_pauta_de_todos()`).
+  // 🔴 A CHAVE, NÃO O PAPEL — e desde 12/09/2026 (migration
+  // 20260912100000_pauta_do_dia_que_encolhe.sql) ela volta a governar a FILA: quem tem
+  // `pauta_de_todos` recebe primeiro os negócios do próprio nome e, depois deles, os da equipe
+  // (com o nome do colega em cada item deles); quem não tem, só os seus. A MESMA chave continua
+  // liberando a TABELA DO TIME, o gráfico por vendedor e o filtro de responsável no painel "No
+  // geral" de baixo — e, desde 20260912110000_risco_segue_a_chave.sql, também os três cartões de
+  // risco e o "Resumo por fabricante" ali. Continua sendo a chave e não o papel: um gestor com o
+  // interruptor `pauta_de_todos` desligado à mão vê a fila e a tabela só com os próprios
+  // negócios, porque é assim que o servidor responde
+  // (ver `usePossoVerPautaDeTodos` e `eu_vejo_pauta_de_todos()`/`ve_pauta_de_todos()`).
   const podeVerDeTodos = usePossoVerPautaDeTodos();
 
   // O MESMO recorte que o painel de baixo manda ao servidor — uma tradução só, para os números
@@ -234,13 +247,42 @@ const Hoje = () => {
     });
   }
 
-  const { total, valorEmJogo } = useMemo(() => {
-    const itens = pauta ?? [];
-    return {
-      total: itens.length,
-      valorEmJogo: itens.reduce((soma, i) => soma + (i.valor ?? 0), 0),
-    };
-  }, [pauta]);
+  // 🔴 A FILA DEVOLVE DOIS TIPOS DE NEGÓCIO desde 12/09/2026: o que ainda espera retorno e o
+  // que já recebeu um hoje. `ItemPauta` desenha qualquer item que receba, então quem separa é
+  // esta linha — sem ela, o negócio resolvido às 9h continuaria na tela às 17h com o botão
+  // "Retomar depois" do lado.
+  const { naTela, feitos, negociosDoDia } = separarAPauta(pauta ?? []);
+  const total = naTela.length;
+
+  // 🔴 A RÉGUA DE "PARADO" DA FRASE É A DA EMPRESA — a mesma com que o banco montou a fila.
+  // `pauta_do_dia_de` lê `pauta_dias_parado` de `configuracoes_automacao` e cai em 3 quando a
+  // empresa nunca salvou; este hook lê a mesma chave e cai no mesmo 3 (`PADROES_DA_PAUTA`). Um 3
+  // cravado aqui mediria com outra régua no dia em que uma empresa mudasse o ajuste: desde
+  // 12/09/2026 acabou o enchimento que completava a fila com negócio dentro do prazo (migration
+  // 20260912100000_pauta_do_dia_que_encolhe.sql) — só entra quem está PARADO pela régua da
+  // empresa —, mas a frase ainda decide por conta própria, no degrau 3, se um negócio da fila
+  // DESTOA dos outros comparando os dias dele com este limite; com um 3 cravado, uma empresa que
+  // use 10 veria a frase apontar como "fora da curva" um negócio que só acabou de cruzar a régua
+  // dela.
+  //
+  // A chave de cache é a mesma da aba Automação, e salvar lá invalida esta leitura junto com a fila
+  // (`useSalvarConfiguracaoAutomacao`). Enquanto a resposta não chega — ou se ela falhar —, vale o
+  // padrão, que é o do banco.
+  const { data: ajustesDaPauta } = useConfiguracoesAutomacao(empresaId);
+  const diasParadoDaEmpresa =
+    ajustesDaPauta?.pauta_dias_parado ?? PADROES_DA_PAUTA.pauta_dias_parado;
+
+  // O que o topo da tela diz sai de `vozDaPauta` (`src/lib/voz-da-pauta.ts`), a escada de seis
+  // degraus desenhada para a tela e o e-mail das 7h dizerem a mesma coisa. Lá o dinheiro sai sem
+  // centavos, de propósito — é o texto aprovado. Os itens logo abaixo continuam com
+  // `formatarMoedaBRL`, com centavos.
+  // 🔴 `naTela`, e não `pauta`: a voz conta os negócios da frase ("R$ X parados em N
+  // negócios"), e contar os já feitos faria a manchete cobrar trabalho que a pessoa acabou de
+  // entregar. A voz é a mesma do e-mail das 7h — lá o filtro é feito no `index.ts`.
+  const voz = useMemo(
+    () => vozDaPauta(naTela, diasParadoDaEmpresa),
+    [naTela, diasParadoDaEmpresa],
+  );
 
   const hoje = new Date();
 
@@ -257,12 +299,21 @@ const Hoje = () => {
   // com a soma das esperas a tela ficaria em esqueleto por segundos com os itens já em mãos.
   const esperandoOTime = total === 0 && carregandoOTime;
 
-  // A fila vazia só COMEMORA quando a tabela de baixo RESPONDEU e veio vazia. Para as três
-  // gestoras da MD que não têm negócio próprio, a fila fica em zero todo dia — comemorar ali
-  // seria dizer "acabou" logo acima de uma tabela com a carteira da equipe inteira. E ausência de
-  // resposta não é resposta: sem saber o que há embaixo, a tela usa a frase sóbria, que não
-  // promete nada.
+  // A fila vazia só COMEMORA quando a tabela de baixo RESPONDEU e veio vazia. Isso já não é o
+  // normal do dia de quem supervisiona: desde 12/09/2026 a fila de quem tem a chave
+  // `pauta_de_todos` já traz a equipe (§3.3 do desenho de 12/09/2026), então ela só zera quando
+  // NINGUÉM — nem a pessoa, nem a equipe — tem negócio parado ou compromisso hoje. Mesmo aí a
+  // tabela pode não estar vazia: ela usa um recorte mais largo (`negocios_em_risco`, que também
+  // conta "sem próxima ação"), então comemorar sem checar a tabela diria "acabou" em cima de uma
+  // carteira que ainda tem o que fazer. E ausência de resposta não é resposta: sem saber o que há
+  // embaixo, a tela usa a frase sóbria, que não promete nada.
   const filaVaziaEComemora = total === 0 && timeRespondeu && totalDoTime === 0;
+
+  // 🔴 GANHA DOS OUTROS DOIS ESTADOS, e é o ponto do pedido de 12/09/2026: sem ele, quem
+  // trabalhou o dia inteiro e zerou vê exatamente a mesma tela de quem não tinha nada parado.
+  // Não depende da tabela do time ter respondido: o que houver embaixo não desmente o fato de
+  // a pauta DE HOJE ter sido cumprida.
+  const zerouAPautaDeHoje = total === 0 && feitos.length > 0;
 
   return (
     <AppLayout title="Hoje" subtitle={format(hoje, "EEEE, d 'de' MMMM", { locale: ptBR })}>
@@ -276,23 +327,39 @@ const Hoje = () => {
               ))}
             </div>
           </div>
-        ) : filaVaziaEComemora ? (
-          // O vazio COMEMORA. É o dia em que a pessoa terminou — e é exatamente o momento
-          // que faz ela abrir a tela amanhã.
+        ) : zerouAPautaDeHoje ? (
+          // O dia cumprido. A frase é NEUTRA quanto a quem fez, de propósito: na pauta do
+          // gestor os negócios são da equipe, e "você zerou" seria falso ali.
           <div className="flex flex-col items-center gap-3 py-20 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
               <Sun className="h-6 w-6 text-primary" />
             </div>
-            <h2 className="text-2xl font-semibold text-card-foreground">Pauta zerada</h2>
+            <h2 className="text-2xl font-semibold text-card-foreground">Pauta de hoje zerada</h2>
+            <p className="max-w-sm text-sm text-muted-foreground">
+              {negociosDoDia === 1
+                ? 'O negócio do dia recebeu retorno. A pauta de amanhã nasce de manhã.'
+                : `Os ${negociosDoDia} negócios do dia receberam retorno. A pauta de amanhã nasce de manhã.`}
+            </p>
+          </div>
+        ) : filaVaziaEComemora ? (
+          // O vazio COMEMORA. É o dia em que a pessoa terminou — e é exatamente o momento
+          // que faz ela abrir a tela amanhã. Com a fila vazia, a voz é sempre o degrau 1.
+          <div className="flex flex-col items-center gap-3 py-20 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Sun className="h-6 w-6 text-primary" />
+            </div>
+            <h2 className="text-2xl font-semibold text-card-foreground">{voz.manchete}</h2>
             <p className="max-w-sm text-sm text-muted-foreground">
               Nada em aberto para hoje. Nenhum orçamento parado além do prazo e nenhum
               compromisso na agenda.
             </p>
           </div>
         ) : total === 0 ? (
-          // A fila está vazia, mas HÁ o que fazer logo abaixo. Sem comemoração e sem sol: para
-          // quem supervisiona, a fila própria vazia é o normal do dia, não uma conquista — e uma
-          // frase de "acabou" logo acima de uma tabela cheia é simplesmente falsa.
+          // A fila está vazia, mas HÁ o que fazer logo abaixo. Sem comemoração e sem sol: a fila
+          // só olha "parado além do prazo" e compromisso de hoje — mais estreito que a tabela
+          // (`negocios_em_risco`, que também conta "sem próxima ação") —, então zerar aqui não
+          // quer dizer que a carteira está limpa. Uma frase de "acabou" logo acima de uma tabela
+          // cheia seria simplesmente falsa.
           <div className="flex flex-col items-center gap-2 py-14 text-center">
             <h2 className="text-xl font-semibold text-card-foreground">Sua fila está vazia</h2>
             <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
@@ -306,12 +373,17 @@ const Hoje = () => {
           <>
             <header className="mb-6">
               <h2 className="text-2xl font-semibold leading-tight tracking-tight text-card-foreground sm:text-[34px]">
-                {total === 1 ? '1 coisa espera você' : `${total} coisas esperam você`}
+                {voz.manchete}
                 <span className="text-primary">.</span>
               </h2>
-              {valorEmJogo > 0 && (
+              {voz.apoio && (
                 <p className="mt-1 font-mono text-sm tabular-nums text-muted-foreground">
-                  {formatarMoedaBRL(valorEmJogo)} em jogo
+                  {voz.apoio}
+                </p>
+              )}
+              {feitos.length > 0 && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {`${feitos.length} de ${negociosDoDia} feitos hoje`}
                 </p>
               )}
             </header>
@@ -319,7 +391,7 @@ const Hoje = () => {
             {/* Duas colunas, em duplas. Com número ímpar, o ÚLTIMO ocupa a linha toda —
                 senão sobra um buraco do lado dele e a tela fica torta. */}
             <ol className="grid list-none gap-4 p-0 sm:grid-cols-2">
-              {pauta!.map((item, i) => (
+              {naTela.map((item, i) => (
                 <ItemPauta
                   key={`${item.tipo}-${item.referencia_id}`}
                   item={item}
@@ -343,10 +415,11 @@ const Hoje = () => {
                     setAlvo({
                       pedidoId: item.referencia_id,
                       titulo: item.titulo,
-                      // Da fila vem SEMPRE nulo desde 09/09/2026 (a fila é pessoal, então o
-                      // negócio é sempre de quem está olhando). O campo continua sendo lido
-                      // porque a coluna existe e é o que o e-mail leria se um dia voltasse a
-                      // haver item de outra pessoa aqui.
+                      // Desde 12/09/2026 este campo pode vir preenchido: a fila de quem tem a
+                      // chave `pauta_de_todos` traz item da equipe (§3.3 do desenho de
+                      // 12/09/2026), e `pauta_do_dia_de` só grava o nome do dono quando o
+                      // negócio NÃO é de quem está olhando. É o que faz o diálogo trocar de
+                      // texto e avisar o colega, em vez do próprio gestor.
                       responsavel: item.responsavel,
                     })
                   }

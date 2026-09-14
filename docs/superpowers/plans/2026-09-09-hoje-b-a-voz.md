@@ -109,11 +109,11 @@ describe('vozDaPauta', () => {
 
   it('degrau 3 — um negócio destoa dos outros', () => {
     const v = vozDaPauta([
-      negocio('Cond Residl Dionisio', 214000, 40),
+      negocio('Obra Exemplo', 180000, 40),
       negocio('Outro', 10000, 8),
     ], 3);
     expect(v.manchete).toBe('Um negócio seu está há 40 dias sem mexer');
-    expect(v.apoio).toBe('R$ 214.000,00 · Cond Residl Dionisio');
+    expect(v.apoio).toBe('R$ 180.000,00 · Obra Exemplo');
   });
 
   it('degrau 3 NÃO casa quando o primeiro não é o dobro do segundo', () => {
@@ -135,7 +135,7 @@ describe('vozDaPauta', () => {
   it('degrau 3 ignora compromissos ao eleger primeiro e segundo', () => {
     const v = vozDaPauta([
       compromisso('Reunião'),
-      negocio('Cond Residl Dionisio', 214000, 40),
+      negocio('Obra Exemplo', 180000, 40),
       negocio('Outro', 10000, 8),
     ], 3);
     expect(v.manchete).toBe('Um negócio seu está há 40 dias sem mexer');
@@ -297,7 +297,7 @@ describe('as duas cópias dizem a mesma coisa', () => {
   const casos: ItemParaVoz[][] = [
     [],
     [compromisso('Reunião')],
-    [negocio('A', 214000, 40), negocio('B', 10000, 8)],
+    [negocio('A', 180000, 40), negocio('B', 10000, 8)],
     [compromisso('R'), negocio('A', 100, 5), negocio('B', 90, 5)],
     [negocio('A', 300000, 5), negocio('B', 182900, 5)],
     [negocio('A', 0, 5)],
@@ -463,7 +463,7 @@ silêncio.
 
 Em `automation_logs`: a execução de 09/09/2026 mandou **10 e-mails com 3 pautas vazias**; a de
 07/09, antes de a pauta ampliada entrar, mandou **7 com 6 vazias**. Depois do Plano C a conta
-volta para 7/6 — e **três gestoras da MD param de receber**, uma delas a Fabiola, que é a
+volta para 7/6 — e **três gestoras da MD param de receber**, uma delas a Carla, que é a
 principal usuária do cliente-âncora.
 
 **A decisão:** em vez de sumir, o e-mail **muda de assunto**. Quem tem a chave e está sem negócio
@@ -472,13 +472,13 @@ próprio recebe o **pulso da equipe**:
 ```
 ASSUNTO:  145 negócios da equipe pedem atenção
 
-  Bom dia, Fabiola
+  Bom dia, Carla
 
   R$ 7.402.422 parados
   em 145 negócios da equipe
 
-  • Cond Residl Dionisio | Deca Metais
-    Érika Marques · R$ 214.000 · parado há 40 dias
+  • Obra Exemplo | Fabricante Exemplo
+    Ana Souza · R$ 180.000 · parado há 40 dias
   • Jampa Ocean Palace | Deca
     Pricila Azevedo · R$ 198.000 · parado há 32 dias
 

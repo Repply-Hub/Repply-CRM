@@ -44,6 +44,7 @@ import { ListPagination } from '@/components/shared/ListPagination';
 import { CargoSelect } from '@/components/shared/CargoSelect';
 import { ConfirmarEnviarEmailDialog } from '@/components/email/ConfirmarEnviarEmailDialog';
 import { slugify } from '@/lib/utils';
+import { formatarDataBR } from '@/lib/data-local';
 
 // O icone continua vindo do codigo -- so o ROTULO passou a vir da lista de tipos da
 // empresa (rotuloDoTipo). Um slug que a empresa criou e não está aqui cai no Building2.
@@ -52,16 +53,6 @@ const tipoIcons: Record<string, typeof Building2> = { construtora: Building2, lo
 // O formulário de obra em branco, escrito uma vez só: ele é reposto em três pontos do
 // cadastro rápido (obra duplicada, cadastro concluído e o estado inicial).
 const NOVA_OBRA_VAZIA = { nome_obra: '', endereco_entrega: '', marcador_id: '', spe_cnpj: '' };
-
-// Formata datas ISO ("aaaa-mm-dd" ou timestamp completo) para dd/mm/aaaa sem passar
-// por conversão de timezone do navegador (o valor já representa a data salva pelo backend).
-const formatDateBR = (value?: string | null) => {
-  if (!value) return '';
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!match) return value;
-  const [, ano, mes, dia] = match;
-  return `${dia}/${mes}/${ano}`;
-};
 
 const ClienteDetalhe = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -663,7 +654,7 @@ const ClienteDetalhe = () => {
                  <div className="min-w-0">
                    <p className="text-xs text-muted-foreground">Data de criação</p>
                    <p className="text-sm font-medium text-foreground truncate">
-                     {formatDateBR((cliente as any).data_criacao || cliente.created_at)}
+                     {formatarDataBR((cliente as any).data_criacao || cliente.created_at)}
                    </p>
                  </div>
               </CardContent>

@@ -14,7 +14,8 @@ export interface CalendarEvent {
   // Se false, o usuário está vendo o evento (ex.: evento "empresa" do qual não
   // é participante/organizador) mas não pode salvar alterações nem excluir.
   podeEditar?: boolean;
-  lembreteMinutos?: number | null;
+  lembretes?: number[];
+  avisarParticipantes?: boolean;
   grupoId?: string;
   criadoPor?: string;
   // Presente quando o evento é uma visita a obra (rota de visita). Uma visita
@@ -34,7 +35,8 @@ export interface EventoForm {
   tipoCalendario: CalendarType;
   cor: string;
   participantes?: string[]; // user_ids (auth) dos participantes do evento
-  lembreteMinutos: number | null; // antecedência em minutos p/ notificar os participantes
+  lembretes: number[]; // minutos antes do início, até 5 — ver lembretes-do-evento
+  avisarParticipantes?: boolean; // chat + e-mail no convite, mudança, cancelamento e lembretes
   obraId?: string | null;
   visitaRealizada?: boolean;
   visitaObservacao?: string;
