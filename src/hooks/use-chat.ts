@@ -24,6 +24,8 @@ export interface ChatMessage {
   quoted_arquivo_nome?: string | null;
   quoted_arquivo_tipo?: string | null;
   quoted_remetente_nome?: string | null;
+  mencionados?: string[];
+  menciona_todos?: boolean;
   vendedor?: { id: string; nome: string; email: string; avatar_url?: string | null };
 }
 
@@ -454,7 +456,7 @@ export function useSendMessage() {
   const [sending, setSending] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: async ({ conteudo, files, grupoId, recipientId, quoted }: { conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null, quoted?: QuotedMessage | null }) => {
+    mutationFn: async ({ conteudo, files, grupoId, recipientId, quoted, mencoes }: { conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null, quoted?: QuotedMessage | null, mencoes?: { ids: string[]; todos: boolean } | null }) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Usuário não autenticado');
 
@@ -474,6 +476,11 @@ export function useSendMessage() {
         quoted_remetente_nome: quoted.remetente_nome,
       } : {};
 
+      const camposDeMencao = {
+        mencionados: mencoes?.ids ?? [],
+        menciona_todos: mencoes?.todos ?? false,
+      };
+
       // Se não houver arquivos, envia apenas a mensagem de texto
       if (!files || files.length === 0) {
         const newMsg = {
@@ -483,6 +490,7 @@ export function useSendMessage() {
           grupo_id: grupoId || null,
           recipient_id: recipientId || null,
           ...quotedFields,
+          ...camposDeMencao,
         };
 
         const { data: savedMsg, error } = await supabase
@@ -523,6 +531,7 @@ export function useSendMessage() {
           grupo_id: grupoId || null,
           recipient_id: recipientId || null,
           ...(i === 0 ? quotedFields : {}),
+          ...(i === 0 ? camposDeMencao : {}),
         };
 
         const { data: savedMsg, error } = await supabase
@@ -635,10 +644,10 @@ export function useSendMessage() {
     }
   });
 
-  const send = useCallback(async (conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null, quoted?: QuotedMessage | null) => {
+  const send = useCallback(async (conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null, quoted?: QuotedMessage | null, mencoes?: { ids: string[]; todos: boolean } | null) => {
     setSending(true);
     try {
-      await mutation.mutateAsync({ conteudo, files, grupoId, recipientId, quoted });
+      await mutation.mutateAsync({ conteudo, files, grupoId, recipientId, quoted, mencoes });
     } finally {
       setSending(false);
     }

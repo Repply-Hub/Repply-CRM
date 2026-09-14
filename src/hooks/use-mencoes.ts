@@ -74,10 +74,14 @@ export function useMarcarMencoesLidas() {
   const { profile } = useAuth();
   return useMutation({
     mutationFn: async ({ origem, chave }: { origem: 'chat' | 'whatsapp_nota'; chave: string }) => {
+      // Sem perfil carregado ainda, não há id para filtrar — não grava nada em vez de
+      // arriscar `profile!.id` vazio (guarda pedida na revisão da Task 5).
+      const meId = profile?.id;
+      if (!meId) return;
       const { error } = await supabase
         .from('mencoes')
         .update({ lida_em: new Date().toISOString() })
-        .eq('mencionado_id', profile!.id)
+        .eq('mencionado_id', meId)
         .eq('origem', origem)
         .eq('conversa_chave', chave)
         .is('lida_em', null);
