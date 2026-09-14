@@ -7,8 +7,10 @@ import { join } from 'node:path';
  *
  * 🔴 148 cadastros têm dois números no mesmo campo (medido em 11/09/2026). Um `<Input>` de
  * telefone com máscara de um número só — o que a ficha do contato tinha, com `formatarTelefone` —
- * apaga o segundo número na primeira edição, sem aviso. Esta varredura impede que um campo novo
- * nasça assim, e que um dos 13 de hoje volte a ser `<Input>`.
+ * apaga o segundo número na primeira edição, sem aviso. Esta varredura prende os arquivos
+ * LISTADOS abaixo: impede que um deles volte a usar `<Input>` ou `formatarTelefone`. Ela não
+ * pega um campo de telefone de cadastro NOVO nascendo em outro arquivo — quem criar um precisa
+ * entrar na tabela `CAMPOS_DE_TELEFONE`.
  *
  * Fica de fora a lista de conversas do WhatsApp: lá o número é identificador da conversa, não
  * cadastro (desenho de 11/09/2026, §5).
@@ -40,5 +42,9 @@ describe('telefone de cadastro usa o CampoTelefones', () => {
     // `\s` e não `\b`: comentário que cita "o <CampoTelefones>" não é uso.
     expect(codigo.match(/<CampoTelefones\s/g) ?? []).toHaveLength(quantos);
     expect(codigo).not.toMatch(INPUT_DE_TELEFONE);
+    // 🔴 `formatarTelefone` (src/lib/telefone.ts) é a máscara de um número só que apagava o
+    // segundo em campo com mais de um telefone (CLAUDE.md, ver o comentário do topo). Nenhum
+    // destes arquivos pode voltar a chamá-la.
+    expect(codigo).not.toMatch(/\bformatarTelefone\(/);
   });
 });

@@ -163,7 +163,7 @@ export const CampoCnpj = forwardRef<CampoCnpjHandle, CampoCnpjProps>(function Ca
 
   const mensagem = resultado ? mensagemDoDocumento(resultado, { seNaoExistir, aceitaCpf }) : null;
   // A decisão de bloquear não é reescrita aqui: vem da função canônica `resultadoPermiteSalvar`.
-  // Se a regra mudar, muda num lugar só, e todas as telas respeitam. Ver CLAUDE.md §7.13.
+  // Se a regra mudar, muda num lugar só, e todas as telas respeitam.
   const bloqueado = resultado === 'nao_existe' && !resultadoPermiteSalvar(resultado, seNaoExistir);
   const conferido = resultado === 'encontrado' || resultado === 'cpf';
   const borda =

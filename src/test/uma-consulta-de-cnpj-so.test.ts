@@ -45,6 +45,10 @@ describe('uma consulta de CNPJ só', () => {
       expect(usos[0], arquivo).toMatch(/\bref=\{/);
       expect(codigo, arquivo).toContain('.conferir()');
       expect(codigo, arquivo).not.toMatch(/fetchCnpjData\s*\(/);
+      // O <CampoCnpj> mostrar o bloqueio no campo não impede o Salvar de gravar mesmo assim —
+      // quem trava de verdade é o `if (... && !resultadoPermiteSalvar(..., 'bloquear')) return`
+      // no envio. Aspas simples OU duplas: `Fabricantes.tsx` usa aspas duplas.
+      expect(codigo, arquivo).toMatch(/resultadoPermiteSalvar\([^)]*['"]bloquear['"][^)]*\)/);
     }
   });
 
