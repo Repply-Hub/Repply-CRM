@@ -24,7 +24,9 @@ describe('CardDeSom', () => {
     fireEvent.click(screen.getByRole('button', { name: /quero mudar o som/i }));
     expect(screen.getAllByRole('radio')).toHaveLength(10);
     expect((screen.getByRole('radio', { name: 'Padrão' }) as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByText('Criados pela Repply')).toBeTruthy();
+    // 🔴 Sem o rótulo "Criados pela Repply" (pedido de 14/09/2026): para quem usa, todos os sons
+    // foram feitos pela Repply, e o rótulo separava a lista sem motivo.
+    expect(screen.queryByText('Criados pela Repply')).toBeNull();
   });
 
   it('escolher grava na hora e toca o som uma vez', () => {

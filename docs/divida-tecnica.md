@@ -2733,40 +2733,6 @@ risco não medido. O caminho é módulo a módulo, cada um com o seu teste, como
 
 ---
 
-## 69. "É meu?" decidido pelo NOME na tabela do time — com homônimos, a tela diz uma coisa e o banco faz outra
-
-**Gravidade: baixa hoje (zero casos), e nada impede que apareça amanhã.**
-
-Na tela "Hoje", "Retomar depois" clicado na **tabela do time** decide se o negócio é de quem
-está olhando comparando **o nome** do dono com o nome de quem está logado, em minúsculas e sem
-espaços (`aoRetomarDaTabela`, `src/pages/Hoje.tsx`). Compara nome porque `negocios_em_risco`
-devolve só o nome (`responsavel text`), não o identificador.
-
-Com duas pessoas de mesmo nome na mesma empresa, o mesmo gesto erra três frases de uma vez — "O
-negócio volta para a sua pauta", o rótulo "Criar uma tarefa para mim" e o aviso "Uma tarefa foi
-criada no seu nome" — enquanto o banco, corretamente, manda a tarefa **e** o aviso com o motivo
-para a homônima. Desde a caixinha "Criar tarefa" (Plano D, 10/09/2026) o erro deixou de ser só
-de texto: a tela **afirma** que uma tarefa ficou com a pessoa, e ela não ficou.
-
-Medido na revisão de 10/09/2026:
-
-```sql
-select empresa_id, lower(trim(nome)), count(*) from usuarios group by 1, 2 having count(*) > 1;
--- 0 linhas, sobre 38 usuários vivos
-```
-
-E nada segura o zero: `usuarios` tem só `pkey(id)`, `unique(user_id)` e a chave de `empresa_id`.
-Não há restrição nem índice único sobre `nome`.
-
-**A fila de cima não tem o problema:** `pauta_do_dia_de` já decide por identificador
-(`case when n.e_meu then null else n.dono end`) e manda o nome só quando o negócio é de outra
-pessoa.
-
-**O conserto é de banco:** `negocios_em_risco_de` passar a devolver o mesmo `e_meu` (ou o
-`usuario_id` do dono), e a tela comparar isso em vez do nome. É mudança de assinatura
-(`RETURNS TABLE`) — DROP + CREATE, com as concessões repostas no mesmo arquivo.
-
----
 ## 70. Datas que mudam de dia fora do banco: o que sobrou da varredura de 11/09
 
 **Gravidade: baixa.** Nenhuma exportação que o cliente usa hoje escreve data errada, e o código dos
@@ -2859,6 +2825,24 @@ e-mail das 7h. As revisões acharam quatro pontas soltas, nenhuma por defeito de
 ---
 
 ## Resolvidos
+
+### 14/09/2026 — "é meu?" da tabela do time decidido pelo identificador (era o item 69)
+
+> ✅ **Resolvido na leva de 14/09/2026** — migration `20260914153000_tabela_do_time_com_rosto.sql`
+> e `src/lib/responsavel-para-o-dialogo.ts`. Os commits são os que tocam esses dois arquivos
+> (`git log -- src/lib/responsavel-para-o-dialogo.ts`).
+
+**O que estava errado.** "Retomar depois" clicado na tabela do time decidia se o negócio era de
+quem estava olhando comparando o NOME do dono com o de quem estava logado, porque
+`negocios_em_risco` devolvia só o nome. Com dois homônimos na mesma empresa, a tela afirmava "o
+negócio volta para a sua pauta" e "uma tarefa foi criada no seu nome", enquanto o banco,
+corretamente, mandava a tarefa e o aviso para a homônima. Medido em 10/09/2026: nenhum homônimo
+entre 38 usuários vivos — e nada no banco impedia o primeiro.
+
+**O conserto.** As duas funções da tabela passaram a devolver `responsavel_id` (e
+`responsavel_avatar`, para o rosto na coluna Responsável). `responsavelParaODialogo` compara o
+identificador do dono com `profile.id`; sem identificador — site novo falando com o banco anterior
+à migration —, volta a comparar o nome, como antes.
 
 ### 14/09/2026 — Teste que lê o `src/` inteiro com o limite de 5 s (era o item 72)
 
