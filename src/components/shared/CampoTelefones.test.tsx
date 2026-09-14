@@ -103,4 +103,45 @@ describe('CampoTelefones', () => {
     expect(campos()[0]).toBeRequired();
     expect(campos()[0]).toHaveAttribute('id', 'telefone');
   });
+
+  it('🔴 colar um número por cima de outro já preenchido é recusado em silêncio: mantém o valor antigo e avisa', () => {
+    render(<Formulario inicial="84999998888" />);
+    fireEvent.change(campos()[0], { target: { value: '5584988887777' } });
+    expect(campos()[0].value).toBe('(84) 99999-8888');
+    // `getByText`, não `getByRole('status')`: o `<output data-testid="banco">` deste próprio
+    // arquivo já tem role "status" implícito, e com os dois o `getByRole` recusaria por ambiguidade.
+    const aviso = screen.getByText(
+      'Este campo aceita um número por vez. Para colar outro, apague o que está aqui; para código de país, comece com +.',
+    );
+    expect(aviso).toHaveAttribute('role', 'status');
+  });
+
+  it('depois do aviso, apagar o campo e colar de novo aceita o número e o aviso some', () => {
+    render(<Formulario inicial="84999998888" />);
+    fireEvent.change(campos()[0], { target: { value: '5584988887777' } });
+    expect(
+      screen.queryByText(
+        'Este campo aceita um número por vez. Para colar outro, apague o que está aqui; para código de país, comece com +.',
+      ),
+    ).not.toBeNull();
+    fireEvent.change(campos()[0], { target: { value: '' } });
+    fireEvent.change(campos()[0], { target: { value: '5584988887777' } });
+    expect(campos()[0].value).toBe('5584988887777');
+    expect(
+      screen.queryByText(
+        'Este campo aceita um número por vez. Para colar outro, apague o que está aqui; para código de país, comece com +.',
+      ),
+    ).toBeNull();
+  });
+
+  it('digitar normalmente num número incompleto nunca mostra o aviso', () => {
+    render(<Formulario />);
+    fireEvent.change(campos()[0], { target: { value: '8499999' } });
+    expect(campos()[0].value).toBe('8499999');
+    expect(
+      screen.queryByText(
+        'Este campo aceita um número por vez. Para colar outro, apague o que está aqui; para código de país, comece com +.',
+      ),
+    ).toBeNull();
+  });
 });

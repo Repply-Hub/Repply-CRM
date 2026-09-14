@@ -31,6 +31,15 @@ function partesDoValor(valor: string | null | undefined): string[] {
 }
 
 /**
+ * Colar um número por cima de um campo já preenchido (ex.: `5584988887777` sobre
+ * `(84) 99999-8888`) é o caso que `limitarTelefoneDigitado` recusa por falta de evidência de
+ * código de país — 906 números da base estão gravados assim. Sem este aviso, o campo
+ * simplesmente não mudava e a pessoa salvava o número velho sem perceber.
+ */
+const AVISO_COLAR_SOBRE_NUMERO =
+  'Este campo aceita um número por vez. Para colar outro, apague o que está aqui; para código de país, comece com +.';
+
+/**
  * Telefone de cadastro: um campo por número, "+ outro telefone" abaixo, e um × em cada campo extra.
  *
  * Quem usa não precisa saber que ele se divide: recebe e devolve o texto do banco, a mesma lista
@@ -54,6 +63,8 @@ export function CampoTelefones({
   const ultimoEmitidoRef = useRef<string | null>(null);
   const camposRef = useRef<(HTMLInputElement | null)[]>([]);
   const [focar, setFocar] = useState<number | null>(null);
+  // Índice do campo que está mostrando o aviso de colagem recusada. Só um por vez.
+  const [recusado, setRecusado] = useState<number | null>(null);
 
   // Mudança que veio de FORA (o formulário limpou, a consulta de CNPJ preencheu o telefone):
   // redesenha os campos. A que nasceu aqui dentro volta igual ao que foi emitido e é ignorada —
@@ -61,6 +72,7 @@ export function CampoTelefones({
   useEffect(() => {
     if ((value ?? '') === ultimoEmitidoRef.current) return;
     setPartes(partesDoValor(value));
+    setRecusado(null);
   }, [value]);
 
   useEffect(() => {
@@ -80,6 +92,7 @@ export function CampoTelefones({
   function aoDigitar(indice: number, texto: string) {
     // Colou vários números, ou digitou a vírgula: cada número ganha o seu campo.
     if (SEPARADOR_DE_TELEFONES.test(texto)) {
+      if (recusado === indice) setRecusado(null);
       const pedacos = texto.split(SEPARADOR_DE_TELEFONES).map((p) => p.trim());
       const cheios = pedacos.filter(Boolean).map(formatarTelefoneGuardado);
       if (cheios.length === 0) return;
@@ -90,12 +103,22 @@ export function CampoTelefones({
       atualizar(novas);
       return;
     }
+    const limitado = limitarTelefoneDigitado(texto, partes[indice]);
+    if (limitado !== texto) {
+      // Colar um número por cima de outro já preenchido: `limitarTelefoneDigitado` recusou por
+      // falta de evidência de código de país, e sem aviso a pessoa salvaria o número velho sem
+      // perceber (ver o comentário de `AVISO_COLAR_SOBRE_NUMERO`, acima).
+      setRecusado(indice);
+      return;
+    }
+    if (recusado === indice) setRecusado(null);
     const novas = [...partes];
-    novas[indice] = limitarTelefoneDigitado(texto, partes[indice]);
+    novas[indice] = limitado;
     atualizar(novas);
   }
 
   function aoSair(indice: number) {
+    if (recusado === indice) setRecusado(null);
     const formatado = formatarTelefoneGuardado(partes[indice]);
     if (formatado === partes[indice]) return;
     const novas = [...partes];
@@ -110,40 +133,51 @@ export function CampoTelefones({
 
   function remover(indice: number) {
     const novas = partes.filter((_, i) => i !== indice);
+    setRecusado((atual) => {
+      if (atual === null || atual === indice) return null;
+      return atual > indice ? atual - 1 : atual;
+    });
     atualizar(novas.length > 0 ? novas : ['']);
   }
 
   return (
     <div className="space-y-2">
       {partes.map((parte, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <Input
-            ref={(el) => {
-              camposRef.current[i] = el;
-            }}
-            id={i === 0 ? id : undefined}
-            value={parte}
-            onChange={(e) => aoDigitar(i, e.target.value)}
-            onBlur={() => aoSair(i)}
-            inputMode="tel"
-            placeholder={i === 0 ? placeholder : 'Outro telefone'}
-            required={i === 0 && obrigatorio}
-            disabled={disabled}
-            aria-label={i === 0 ? undefined : `Telefone ${i + 1}`}
-            className={cn('flex-1', className)}
-          />
-          {i > 0 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              onClick={() => remover(i)}
+        <div key={i}>
+          <div className="flex items-center gap-2">
+            <Input
+              ref={(el) => {
+                camposRef.current[i] = el;
+              }}
+              id={i === 0 ? id : undefined}
+              value={parte}
+              onChange={(e) => aoDigitar(i, e.target.value)}
+              onBlur={() => aoSair(i)}
+              inputMode="tel"
+              placeholder={i === 0 ? placeholder : 'Outro telefone'}
+              required={i === 0 && obrigatorio}
               disabled={disabled}
-              aria-label={`Tirar o telefone ${i + 1}`}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+              aria-label={i === 0 ? undefined : `Telefone ${i + 1}`}
+              className={cn('flex-1', className)}
+            />
+            {i > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={() => remover(i)}
+                disabled={disabled}
+                aria-label={`Tirar o telefone ${i + 1}`}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          {recusado === i && (
+            <p role="status" className="mt-1 text-xs text-destructive">
+              {AVISO_COLAR_SOBRE_NUMERO}
+            </p>
           )}
         </div>
       ))}
