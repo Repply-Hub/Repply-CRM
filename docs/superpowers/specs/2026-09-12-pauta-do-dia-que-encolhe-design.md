@@ -215,8 +215,10 @@ exatamente o mesmo valor em risco. Isso nunca foi decisão — é a regra de lei
 é da empresa inteira, aparecendo sem portão.
 
 Passam a seguir a mesma chave da pauta: sem a chave, os cartões e o resumo por fabricante contam só
-os negócios da pessoa. O gráfico por vendedor e a lista dos 10 maiores já seguem desde 07/09; com o
-corte feito uma vez na origem, o portão deles fica redundante e sai junto.
+os negócios da pessoa. O gráfico por vendedor já seguia a chave desde 07/09 e continua vazio para quem não a tem: o
+portão dele **fica**, mesmo redundante depois do corte na origem, porque sem ele o gráfico passaria
+a desenhar uma barra só, com o nome de quem está olhando. A tabela do time segue a chave pela
+própria função (`negocios_em_risco_de`); a antiga lista dos 10 maiores saiu desta função em 09/09.
 
 ⚠️ **Isto muda números que as pessoas veem todo dia.** Para quem não tem a chave, o valor em risco
 vai cair — não porque algo sumiu, mas porque ele passa a ser o valor em risco *dela*.

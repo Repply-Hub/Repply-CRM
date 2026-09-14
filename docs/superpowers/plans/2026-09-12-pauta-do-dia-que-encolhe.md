@@ -1389,7 +1389,7 @@ select p.oid::regprocedure, coalesce(array_to_string(p.proacl,' | '),'(padrao)')
 
 Esperado, idêntico à medição de antes: `pauta_do_dia_de(uuid)` com `postgres=X/postgres | service_role=X/postgres`, e `pauta_do_dia()` com `authenticated=X/postgres`. Se `authenticated` aparecer em `pauta_do_dia_de`, **pare**: a fila de qualquer colega acabou de ficar aberta a qualquer pessoa logada.
 
-Conferir também o corpo aplicado: `md5(prosrc)` de `pauta_do_dia_de` tem de ser `983af134a74a354158f33457815a08ca` (12.312 caracteres). 🔴 Esse md5 é do conteúdo COMMITADO, com fim de linha LF — nesta máquina `core.autocrlf=true`, então aplique a partir de `git show <commit>:<arquivo>`, nunca do arquivo da árvore de trabalho, ou o md5 não bate.
+Conferir também o corpo aplicado: `md5(prosrc)` de `pauta_do_dia_de` tem de ser `983af134a74a354158f33457815a08ca` (12.312 caracteres), e o de `dashboard_negocios_risco` tem de ser `fdc67428253abd609cbdf6ac53bae82d` (3.246 caracteres). 🔴 Esse md5 é do conteúdo COMMITADO, com fim de linha LF — nesta máquina `core.autocrlf=true`, então aplique a partir de `git show <commit>:<arquivo>`, nunca do arquivo da árvore de trabalho, ou o md5 não bate.
 
 E repetir as medições guardadas nas Tarefas 5 e 6, comparando com o que a simulação previu.
 
