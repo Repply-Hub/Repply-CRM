@@ -47,7 +47,7 @@ describe('vozDaPauta', () => {
       negocio('Obra Exemplo', 180000, 40),
       negocio('Outro', 10000, 8),
     ], 3);
-    expect(v.manchete).toBe('Um negócio seu está há 40 dias sem mexer');
+    expect(v.manchete).toBe('Um negócio está há 40 dias sem mexer');
     expect(semNbsp(v.apoio)).toBe('R$ 180.000 · Obra Exemplo');
   });
 
@@ -73,7 +73,7 @@ describe('vozDaPauta', () => {
       negocio('Obra Exemplo', 180000, 40),
       negocio('Outro', 10000, 8),
     ], 3);
-    expect(v.manchete).toBe('Um negócio seu está há 40 dias sem mexer');
+    expect(v.manchete).toBe('Um negócio está há 40 dias sem mexer');
   });
 
   it('degrau 4 — compromissos e negócios', () => {
@@ -149,8 +149,8 @@ describe('concordância no singular', () => {
   it('degrau 3 com 1 dia: "há 1 dia", nunca "há 1 dias"', () => {
     // Só acontece se a empresa ajustar `pauta_dias_parado` para 1 — a tela aceita de 1 a 365.
     const v = vozDaPauta([negocio('Obra Exemplo', 100, 1), negocio('Outro', 50, 0)], 1);
-    expect(v.manchete).toBe('Um negócio seu está há 1 dia sem mexer');
-    expect(v.assunto).toBe('Um negócio seu está há 1 dia sem mexer');
+    expect(v.manchete).toBe('Um negócio está há 1 dia sem mexer');
+    expect(v.assunto).toBe('Um negócio está há 1 dia sem mexer');
   });
 });
 
@@ -163,18 +163,18 @@ describe('o que a revisão achou sem teste', () => {
     // A fila vem ordenada por VALOR, então o negócio esquecido raramente é o primeiro da lista.
     // Eleger "o primeiro da lista" daria os 40 dias certos com o nome e o valor do negócio errado.
     const v = vozDaPauta([negocio('Grande', 500000, 5), negocio('Esquecido', 1000, 40)], 3);
-    expect(v.manchete).toBe('Um negócio seu está há 40 dias sem mexer');
+    expect(v.manchete).toBe('Um negócio está há 40 dias sem mexer');
     expect(semNbsp(v.apoio)).toBe('R$ 1.000 · Esquecido');
   });
 
   it('degrau 3 no empate exato: o dobro já casa ("pelo menos o dobro")', () => {
     expect(vozDaPauta([negocio('A', 100, 6), negocio('B', 50, 3)], 3).manchete)
-      .toBe('Um negócio seu está há 6 dias sem mexer');
+      .toBe('Um negócio está há 6 dias sem mexer');
   });
 
   it('degrau 3 exatamente no ajuste da empresa: "a partir de", como a própria fila', () => {
     expect(vozDaPauta([negocio('A', 100, 3), negocio('B', 50, 1)], 3).manchete)
-      .toBe('Um negócio seu está há 3 dias sem mexer');
+      .toBe('Um negócio está há 3 dias sem mexer');
   });
 
   it('degrau 3 com o negócio sem valor: embaixo vai só o nome, nunca "R$ 0 · nome"', () => {

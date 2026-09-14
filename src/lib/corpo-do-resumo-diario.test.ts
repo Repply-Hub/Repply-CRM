@@ -219,7 +219,7 @@ describe('a fila pessoal fala com a voz da pauta', () => {
     const fila: ItemDaPauta[] = [{ ...destoa[0], titulo: 'Obra <Norte> & Sul', valor: 180000 }, destoa[1]];
     const html = montarEmail('Ana', fila, LINK, 3);
     const t = texto(html);
-    expect(t).toContain('Um negócio seu está há 40 dias sem mexer');
+    expect(t).toContain('Um negócio está há 40 dias sem mexer');
     expect(t).toContain('R$ 180.000 · Obra &lt;Norte&gt; &amp; Sul');
     // Nenhuma etiqueta veio do dado: o `<Norte>` do nome não pode virar HTML no e-mail.
     expect(html).not.toContain('<Norte>');
@@ -245,8 +245,8 @@ describe('a fila pessoal fala com a voz da pauta', () => {
     // Numa empresa que só chama de parado a partir de 10 dias, a fila dela não o considera
     // parado — e o e-mail não pode dizer que ele está esquecido.
     const fila: ItemDaPauta[] = [{ ...itens[0], dias_parado: 8 }, { ...itens[1], dias_parado: 4 }];
-    expect(assuntoDaPauta(fila, 3)).toBe('Um negócio seu está há 8 dias sem mexer');
-    expect(texto(montarEmail('Ana', fila, LINK, 3))).toContain('Um negócio seu está há 8 dias sem mexer');
+    expect(assuntoDaPauta(fila, 3)).toBe('Um negócio está há 8 dias sem mexer');
+    expect(texto(montarEmail('Ana', fila, LINK, 3))).toContain('Um negócio está há 8 dias sem mexer');
     expect(semNbsp(assuntoDaPauta(fila, 10))).toBe('R$ 20.000 esperando você hoje');
     expect(texto(montarEmail('Ana', fila, LINK, 10))).toContain('R$ 20.000 parados em 2 negócios');
   });

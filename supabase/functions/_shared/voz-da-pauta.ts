@@ -77,10 +77,16 @@ export function vozDaPauta(itens: ItemParaVoz[], diasParadoDaEmpresa: number): V
   if (porParado.length >= 2 && primeiro >= limite && primeiro >= segundo * 2) {
     const alvo = porParado[0];
     const valorDoAlvo = Number(alvo.valor) || 0;
+    // 🔴 "Um negócio ESTÁ", não "SEU" (decisão do dono do produto, 13/09/2026): desde
+    // 12/09/2026 a pauta de quem tem a chave `pauta_de_todos` traz negócio da equipe junto com
+    // os próprios (§3.3 do desenho de 12/09), e o item que destoa pode muito bem ser de um
+    // colega — o nome dele aparece logo abaixo, na etiqueta de dono. "Seu" seria falso ali. É o
+    // mesmo cuidado que já fez a frase "Pauta de hoje zerada" ficar neutra quanto a quem
+    // trabalhou.
     return {
-      manchete: `Um negócio seu está há ${plural(primeiro, 'dia', 'dias')} sem mexer`,
+      manchete: `Um negócio está há ${plural(primeiro, 'dia', 'dias')} sem mexer`,
       apoio: valorDoAlvo > 0 ? `${dinheiro(valorDoAlvo)} · ${alvo.titulo}` : alvo.titulo,
-      assunto: `Um negócio seu está há ${plural(primeiro, 'dia', 'dias')} sem mexer`,
+      assunto: `Um negócio está há ${plural(primeiro, 'dia', 'dias')} sem mexer`,
     };
   }
 

@@ -163,7 +163,7 @@ describe('o topo da tela "Hoje"', () => {
     prepararTela({ pauta: [negocio('Obra Grande', 500000, 5), negocio('Obra Esquecida', 1000, 40)] });
     montarATela();
 
-    expect(manchete()).toBe('Um negócio seu está há 40 dias sem mexer.');
+    expect(manchete()).toBe('Um negócio está há 40 dias sem mexer.');
     expect(comoSeLe(apoio())).toBe('R$ 1.000 · Obra Esquecida');
   });
 
@@ -184,7 +184,7 @@ describe('o topo da tela "Hoje"', () => {
       prepararTela({ pauta: fila });
       montarATela();
 
-      expect(manchete()).toBe('Um negócio seu está há 4 dias sem mexer.');
+      expect(manchete()).toBe('Um negócio está há 4 dias sem mexer.');
       expect(comoSeLe(apoio())).toBe('R$ 100 · Obra A');
     });
   });
