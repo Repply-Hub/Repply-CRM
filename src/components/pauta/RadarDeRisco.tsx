@@ -129,8 +129,12 @@ export function RadarDeRisco({
     <section className="mt-10 border-t border-border pt-8">
       <header className="mb-1">
         <h2 className="text-lg font-semibold text-card-foreground">No geral</h2>
+        {/* 🔴 A primeira frase depende de `podeFiltrarPorResponsavel`: desde a migration
+            20260912110000_risco_segue_a_chave.sql, sem a chave `pauta_de_todos` os cartões e o
+            "Resumo por fabricante" abaixo já mostram só os negócios da pessoa — manter "empresa
+            inteira" aqui em cima seria anunciar um número que os cartões não mostram mais. */}
         <p className="text-sm text-muted-foreground">
-          A carteira da empresa inteira. É a foto de agora — não depende de período.
+          {podeFiltrarPorResponsavel ? 'A carteira da empresa inteira.' : 'A sua carteira.'} É a foto de agora — não depende de período.
         </p>
       </header>
 

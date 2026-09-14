@@ -38,13 +38,13 @@ import { lerFiltrosDoEndereco } from '@/lib/filtros-do-painel';
 
 afterEach(cleanup);
 
-function desenhar() {
+function desenhar(podeFiltrarPorResponsavel = true) {
   render(
     <RadarDeRisco
       empresaId="emp-1"
       filtros={lerFiltrosDoEndereco(new URLSearchParams())}
       onChangeFiltros={() => {}}
-      podeFiltrarPorResponsavel
+      podeFiltrarPorResponsavel={podeFiltrarPorResponsavel}
       onAbrirNegocio={() => {}}
       onRetomarNegocio={() => {}}
     />,
@@ -66,5 +66,23 @@ describe('a ordem do Radar', () => {
   it('os três cartões de risco continuam no topo, antes da tabela', () => {
     desenhar();
     expect(vemAntes(screen.getByText('Negócios Parados'), screen.getByTestId('tabela-do-time'))).toBe(true);
+  });
+});
+
+/**
+ * O subtítulo do "No geral" diz de QUEM são os números — e isso depende da MESMA propriedade
+ * que decide o resto do painel. Desde a migration 20260912110000_risco_segue_a_chave.sql, sem a
+ * chave `pauta_de_todos` os cartões acima já mostram só os negócios da pessoa; o texto tinha
+ * ficado para trás, dizendo "empresa inteira" por cima de um número que não é mais isso.
+ */
+describe('o subtítulo do "No geral"', () => {
+  it('com a chave, o subtítulo continua dizendo "empresa inteira"', () => {
+    desenhar(true);
+    expect(screen.getByText(/empresa inteira/)).toBeInTheDocument();
+  });
+
+  it('🔴 sem a chave, o subtítulo diz "A sua carteira" — os cartões acima já são só dela', () => {
+    desenhar(false);
+    expect(screen.getByText(/A sua carteira/)).toBeInTheDocument();
   });
 });
