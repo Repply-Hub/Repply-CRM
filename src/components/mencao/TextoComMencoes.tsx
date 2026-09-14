@@ -24,7 +24,7 @@ export function TextoComMencoes({ texto, nomes, todos, meuNome }: Props) {
           <span
             key={i}
             data-mencao={minha ? 'minha' : 'outra'}
-            className={minha ? 'rounded bg-yellow-200 px-0.5 font-semibold text-yellow-950' : 'font-semibold'}
+            className={minha ? 'rounded bg-primary/15 px-0.5 font-semibold text-foreground' : 'font-semibold'}
           >
             {p.texto}
           </span>

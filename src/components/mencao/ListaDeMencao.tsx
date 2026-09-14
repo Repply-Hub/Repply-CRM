@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -29,6 +30,17 @@ const iniciais = (nome: string) =>
  * barra de busca para clicar no nome").
  */
 export function ListaDeMencao({ consulta, sugestoes, ativa, onEscolher, mensagemVazia, className }: Props) {
+  const refsDasOpcoes = useRef<Array<HTMLButtonElement | null>>([]);
+
+  // Ao mover a opção ativa pelas setas, rola a lista para ela continuar visível —
+  // sem isso, passar do ~6º item some com o destaque (a lista tem altura limitada).
+  useEffect(() => {
+    const el = refsDasOpcoes.current[ativa];
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ block: 'nearest' });
+    }
+  }, [ativa, sugestoes]);
+
   return (
     <div
       className={cn(
@@ -49,13 +61,23 @@ export function ListaDeMencao({ consulta, sugestoes, ativa, onEscolher, mensagem
           sugestoes.map((s, i) => (
             <button
               key={s.id}
+              ref={(el) => (refsDasOpcoes.current[i] = el)}
               type="button"
               role="option"
               aria-selected={i === ativa}
+              // -1: a opção nunca entra no Tab — quem digita continua no campo de
+              // mensagem, e é de lá que as setas do teclado navegam esta lista.
+              tabIndex={-1}
               // mousedown, e não click: o click tiraria o foco do campo antes de escolher.
               onMouseDown={(e) => {
                 e.preventDefault();
                 onEscolher(s);
+              }}
+              // O clique do mouse já foi resolvido no mousedown acima. Aqui só sobra o
+              // clique que vem de teclado ou leitor de tela (Enter/Space no ativo),
+              // que nunca passa por mousedown — e chega com detail 0.
+              onClick={(e) => {
+                if (e.detail === 0) onEscolher(s);
               }}
               className={cn(
                 'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm',
