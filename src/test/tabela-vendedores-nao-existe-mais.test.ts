@@ -44,7 +44,11 @@ function ehComentario(linha: string): boolean {
 }
 
 describe('a tabela `vendedores` não existe mais', () => {
-  it('🔴 nenhuma consulta do app pede `vendedores` — o PostgREST recusaria a consulta inteira', () => {
+  // 20 s, e não os 5 s de fábrica: este teste LÊ O `src/` INTEIRO do disco. Sozinho leva 0,17 s;
+  // em 14/09/2026, na bateria inteira de uma cópia recém-criada do `origin/main`, levou 7,3 s e
+  // reprovou por tempo sem defeito nenhum — o falso alarme que ensina a desligar um guarda que
+  // existe para ser confiável. Os outros guardas que varrem o `src/` já tinham essa folga.
+  it('🔴 nenhuma consulta do app pede `vendedores` — o PostgREST recusaria a consulta inteira', { timeout: 20_000 }, () => {
     const ofensores: string[] = [];
 
     for (const arquivo of arquivosDeCodigo(RAIZ)) {
