@@ -209,4 +209,51 @@ describe('EventDialog — Salvar espera os participantes existentes (QueryClient
       ]);
     },
   );
+
+  it(
+    '🔴 (e) um sucesso repetido da MESMA busca (dado idêntico) não apaga um toggle local ' +
+      'em andamento — Bloco 3, item A, segundo conserto da revisão',
+    async () => {
+      funcionariosMock.data = [
+        { id: 'f1', user_id: 'organizador', nome: 'Fulano Organizador', email: 'fulano@exemplo.com' },
+        { id: 'f2', user_id: 'convidado-A', nome: 'Beltrano Convidado', email: 'beltrano@exemplo.com' },
+      ];
+      const onSave = vi.fn();
+      montar(true, onSave);
+
+      // A lista original chega com os dois.
+      act(() => {
+        resolverBusca!([{ user_id: 'organizador' }, { user_id: 'convidado-A' }]);
+      });
+      await waitFor(() => expect(botaoSalvar()).not.toBeDisabled());
+      expect(screen.getByText('2 selecionado(s)')).toBeTruthy();
+
+      // Toggle LOCAL: a pessoa remove o convidado pelo "×" do badge dele (o segundo badge —
+      // o primeiro é "Você", o próprio organizador).
+      const botoesRemover = screen.getAllByRole('button', { name: '×' });
+      expect(botoesRemover).toHaveLength(2);
+      fireEvent.click(botoesRemover[1]);
+      expect(screen.getByText('1 selecionado(s)')).toBeTruthy();
+
+      // Outra busca da MESMA chave termina com sucesso, com dado IDÊNTICO ao original —
+      // simula um refetch por foco de janela, ou outra tela (`NovaRotaVisitaDialog`)
+      // invalidando a mesma chave enquanto este diálogo continua aberto.
+      act(() => {
+        qc.invalidateQueries({ queryKey: ['evento-participantes', 'grupo-1'] });
+      });
+      await waitFor(() => expect(chamadasAoSupabase).toBe(2));
+      act(() => {
+        resolverBusca!([{ user_id: 'organizador' }, { user_id: 'convidado-A' }]);
+      });
+      // `dataUpdatedAt` avançou (novo sucesso), então Salvar libera de novo — mas o toggle
+      // local não pode ter sido apagado por isso.
+      await waitFor(() => expect(botaoSalvar()).not.toBeDisabled());
+      expect(screen.getByText('1 selecionado(s)')).toBeTruthy();
+
+      fireEvent.click(botaoSalvar());
+      expect((onSave.mock.calls[0][0] as { participantes: string[] }).participantes).toEqual([
+        'organizador',
+      ]);
+    },
+  );
 });

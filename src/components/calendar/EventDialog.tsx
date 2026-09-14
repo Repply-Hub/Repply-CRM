@@ -39,6 +39,7 @@ import { EVENT_PRESET_COLORS, CALENDAR_COLORS } from './types';
 import { EventDateTimeField } from './EventDateTimeField';
 import { LembretesField } from './LembretesField';
 import { LEMBRETES_PADRAO, normalizarLembretes } from '@/lib/lembretes-do-evento';
+import { ajustarCicloDeAberturaEProntidao } from '@/lib/prontidao-de-participantes';
 
 interface EventDialogProps {
   open: boolean;
@@ -141,17 +142,40 @@ export function EventDialog({
     refetch: refetchParticipantes,
   } = useEventoParticipantes(open && editingEvent ? editingEvent.grupoId : null);
 
-  // Ref, e não estado: o valor precisa ficar visível para o efeito de baixo (que copia
-  // participantes para o formulário) DENTRO DO MESMO LOTE de efeitos em que é gravado —
-  // um `useState` só refletiria a mudança no PRÓXIMO render, tarde demais para fechar a
-  // brecha descrita acima.
-  const marcaAntesDeBuscarDeNovoRef = useRef(0);
-  // Espelha `participantesAtualizadoEm` a CADA render (não só em efeito), para o efeito de
-  // abertura poder ler o valor atual sem entrar na lista de dependências dele — se entrasse,
-  // esse efeito (que também reseta o formulário) rodaria de novo toda vez que uma busca de
-  // participantes terminasse, apagando o que a pessoa estivesse digitando.
-  const participantesAtualizadoEmRef = useRef(participantesAtualizadoEm);
-  participantesAtualizadoEmRef.current = participantesAtualizadoEm;
+  // 🔴 Bloco 3, item A (segundo conserto da revisão). `cicloRef` guarda o que
+  // `ajustarCicloDeAberturaEProntidao` (função pura, `src/lib/prontidao-de-participantes.ts`)
+  // já sabia antes desta renderização; a chamada abaixo devolve o que passa a valer AGORA.
+  //
+  // 🔴 POR QUE ISTO NÃO PODE VIVER SÓ NUM `useEffect`. Um `useEffect` só roda DEPOIS que o
+  // navegador já teve chance de pintar a tela (é passivo, ao contrário de `useLayoutEffect`)
+  // — então, no PRIMEIRO render depois de abrir (reabrindo o MESMO evento com cache quente,
+  // ou trocando de evento), uma marca corrigida só dentro do efeito ainda estaria com o
+  // valor de um ciclo anterior por essa renderização inteira, e `dataUpdatedAt` do cache já
+  // podia ser maior que ela — "pronto" leria `true` com dado VELHO, e chegaria a PINTAR
+  // assim num navegador de verdade. Testes com `act()` não veem essa janela (ele esvazia os
+  // efeitos antes de qualquer asserção), o que já escondeu esse exato bug uma vez — por isso
+  // a lógica em si mora numa função PURA (testável fora do React) e só o "ler o ref, chamar
+  // a função, gravar o ref de volta" fica aqui.
+  //
+  // A correção, então, acontece SÍNCRONA, na mesma passada de render que detecta a mudança
+  // — é o padrão "ajustar durante a renderização" da documentação do React. Mutar o ref aqui
+  // (não um estado) é seguro e não pede um render extra: o valor já fica visível para o
+  // cálculo de `participantesProntos`, usado mais abaixo nesta mesma função.
+  const cicloRef = useRef<{ cicloAberto: string | null; marcaAntesDeBuscarDeNovo: number }>({
+    cicloAberto: null,
+    marcaAntesDeBuscarDeNovo: 0,
+  });
+  const { cicloAberto, marcaAntesDeBuscarDeNovo, participantesProntos } = ajustarCicloDeAberturaEProntidao(
+    open,
+    editingEvent?.grupoId,
+    {
+      isFetching: carregandoParticipantes,
+      isSuccess: participantesCarregaramComSucesso,
+      dataUpdatedAt: participantesAtualizadoEm,
+    },
+    cicloRef.current,
+  );
+  cicloRef.current = { cicloAberto, marcaAntesDeBuscarDeNovo };
 
   // Funcionários da empresa, incluindo o próprio usuário logado (aparece como "Você", no topo)
   const funcionariosDisponiveis = useMemo(() => {
@@ -178,13 +202,10 @@ export function EventDialog({
     // abrir, força ir ao banco de novo sem mudar o `staleTime` da consulta (que outra tela,
     // `NovaRotaVisitaDialog`, também usa e não deve ser afetada).
     //
-    // 🔴 O CARIMBO VEM ANTES DO INVALIDATE, de propósito. Guardamos aqui o `dataUpdatedAt`
-    // de ANTES de pedir a busca de novo; os dois efeitos abaixo (trava de Salvar e cópia
-    // para o formulário) só aceitam um resultado com `dataUpdatedAt` MAIOR que este
-    // carimbo — nunca um igual, que é exatamente o que o cache quente ainda mostra no
-    // instante em que este efeito roda.
+    // A marca (`marcaAntesDeBuscarDeNovo`) já foi capturada ACIMA, durante a própria
+    // renderização (`ajustarCicloDeAberturaEProntidao`) — aqui só falta pedir a busca de
+    // verdade.
     if (editingEvent?.grupoId) {
-      marcaAntesDeBuscarDeNovoRef.current = participantesAtualizadoEmRef.current;
       qc.invalidateQueries({ queryKey: ['evento-participantes', editingEvent.grupoId] });
     }
 
@@ -246,33 +267,34 @@ export function EventDialog({
   // que este bloco existe para consertar: a tela mostraria (e salvaria, se o usuário fosse
   // rápido) uma lista que já pode estar desatualizada.
   //
-  // A condição agora exige TODAS estas coisas ao mesmo tempo:
+  // `participantesProntos` (de `ajustarCicloDeAberturaEProntidao`, calculado acima) já
+  // exige TODAS estas coisas ao mesmo tempo:
   //   - sucesso (nunca copia em cima de erro, mesmo com dado velho ainda em cache);
   //   - não estar buscando agora (nem a busca inicial, nem um refetch em segundo plano);
-  //   - `dataUpdatedAt` MAIOR que o carimbo guardado no momento em que pedimos a busca de
-  //     novo — prova que ESTE resultado é de uma busca mais nova que aquele pedido, e não
-  //     apenas o dado que já estava no cache antes dele.
-  // Até essas três coisas serem verdade, `form.participantes` continua `undefined` — o que
-  // mantém a defesa de `useUpdateEvento` significativa mesmo neste caminho.
+  //   - `dataUpdatedAt` MAIOR que a marca capturada no início deste ciclo de abertura —
+  //     prova que ESTE resultado é de uma busca mais nova que aquele pedido, e não apenas
+  //     o dado que já estava no cache antes dele.
+  // Até isso ser verdade, `form.participantes` continua `undefined` — o que mantém a
+  // defesa de `useUpdateEvento` significativa mesmo neste caminho.
+  //
+  // 🔴 SÓ NA PRIMEIRA VEZ por ciclo de abertura — `prev.participantes === undefined` é a
+  // trava (segundo conserto da revisão). `participantesProntos` pode voltar a ficar
+  // verdadeiro mais de uma vez no MESMO ciclo — um refetch por foco de janela, ou outra
+  // tela invalidando a mesma chave (`NovaRotaVisitaDialog` também usa
+  // `useEventoParticipantes`), dispararia este efeito de novo. Sem a trava, isso
+  // reescreveria por cima de qualquer toggle que a pessoa já tivesse feito no seletor
+  // enquanto o diálogo continuasse aberto. Fechar e reabrir volta a valer: o efeito de
+  // abertura reseta `participantes` para `undefined` a cada abertura, então a "primeira
+  // vez" se renova a cada ciclo.
   useEffect(() => {
-    if (
-      open &&
-      editingEvent &&
-      participantesCarregaramComSucesso &&
-      !carregandoParticipantes &&
-      participantesAtualizadoEm > marcaAntesDeBuscarDeNovoRef.current &&
-      participantesExistentes
-    ) {
-      setForm((prev) => ({ ...prev, participantes: participantesExistentes }));
+    if (open && editingEvent && participantesProntos && participantesExistentes) {
+      setForm((prev) =>
+        prev.participantes === undefined
+          ? { ...prev, participantes: participantesExistentes }
+          : prev,
+      );
     }
-  }, [
-    open,
-    editingEvent,
-    participantesExistentes,
-    participantesCarregaramComSucesso,
-    carregandoParticipantes,
-    participantesAtualizadoEm,
-  ]);
+  }, [open, editingEvent, participantesExistentes, participantesProntos]);
 
   const set = <K extends keyof EventoForm>(key: K, value: EventoForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -321,14 +343,10 @@ export function EventDialog({
   // existente: criar evento novo não consulta participantes existentes, e quem só participa
   // nunca atualiza o grupo inteiro (ver `useUpdateEvento`).
   //
-  // "Pronto" usa o MESMO carimbo do efeito de cópia acima — não basta ter sucesso e não
-  // estar buscando: com cache quente, isso já era verdade no instante em que pedimos o
-  // refetch (ver comentário no efeito de abertura). Só conta como pronto um sucesso mais
-  // novo que aquele pedido.
-  const participantesProntos =
-    participantesCarregaramComSucesso &&
-    !carregandoParticipantes &&
-    participantesAtualizadoEm > marcaAntesDeBuscarDeNovoRef.current;
+  // `participantesProntos` já vem de `ajustarCicloDeAberturaEProntidao` (calculado no topo
+  // da função, síncrono com a renderização) — não basta ter sucesso e não estar buscando:
+  // com cache quente, isso já era verdade na PRÓPRIA renderização em que se decide reabrir.
+  // Só conta como pronto um sucesso mais novo que a marca capturada para ESTE ciclo.
   const aguardandoParticipantes = isEditing && podeGerenciarParticipantes && !participantesProntos;
 
   const salvarDeFato = () => {
