@@ -82,6 +82,13 @@ describe('os estados da tela "Hoje"', () => {
     desenhar();
     expect(screen.getByText('1 de 2 feitos hoje')).toBeInTheDocument();
     expect(screen.queryByText('Pauta de hoje zerada')).not.toBeInTheDocument();
+    // 🔴 PRENDE O CONTRATO: a manchete fala com a voz só o que está NA TELA (`naTela`), não a
+    // pauta inteira. Com só o pendente (R$ 90.000, 1 negócio) a voz cai no degrau do valor
+    // somado. Contando o feito também (R$ 90.000 + R$ 180.000 em 2 negócios) a frase seria outra
+    // — e é essa diferença que prova que `Hoje.tsx` filtra antes de chamar `vozDaPauta`. `\s`
+    // porque o `Intl` separa "R$" do número com um espaço NÃO SEPARÁVEL (U+00A0), não um espaço
+    // comum.
+    expect(screen.getByText(/R\$\s90\.000 parados em 1 negócio/)).toBeInTheDocument();
   });
 
   it('sem nada feito e sem nada parado, continua a frase de hoje', () => {
