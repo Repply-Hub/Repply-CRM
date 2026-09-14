@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Star, X, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { iniciais } from '@/lib/iniciais';
 import { Button } from '@/components/ui/button';
 import {
   Command,
@@ -52,13 +53,6 @@ interface Props {
   value: ResponsavelSelecionado[];
   onChange: (proximo: ResponsavelSelecionado[]) => void;
   disabled?: boolean;
-}
-
-function iniciais(nome: string): string {
-  const partes = nome.trim().split(/\s+/).filter(Boolean);
-  if (partes.length === 0) return '?';
-  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
-  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
 }
 
 export function CampoDeResponsaveis({ pessoas, value, onChange, disabled }: Props) {
