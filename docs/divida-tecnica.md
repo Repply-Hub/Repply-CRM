@@ -2845,12 +2845,8 @@ e-mail das 7h. As revisões acharam quatro pontas soltas, nenhuma por defeito de
    `empresa_id` devolve lista vazia SEM erro, e todo mundo passa a ser medido com 3 — calado. Hoje
    não aparece porque nenhuma empresa salvou o ajuste. **Gatilho:** a próxima edição do
    `index.ts`. O teste que falta: montar o `index.ts` com o banco e o envio simulados e conferir a
-   frase de quem recebe — a revisão fez esse ensaio uma vez, à mão.
-2. **"Parados" sobre negócio que não está parado.** A fila completa o mínimo de itens com negócio
-   abaixo do corte (`r.posicao <= greatest(v_min - v_compromissos, 0)`, em `pauta_do_dia_de`), e
-   o degrau 5 chama o total de "R$ X parados". O pulso da equipe já evita essa armadilha dizendo
-   "pedem atenção". Hoje é verdade para todo mundo. **Gatilho:** alguém com menos de três negócios
-   de fato parados. É decisão de texto do dono do produto, não conserto técnico.
+   frase de quem recebe — a revisão fez esse ensaio uma vez, à mão. **Atualização de 14/09/2026:** o gatilho disparou — a Tarefa 3 da pauta que encolhe editou o `index.ts` (o filtro `soOsPendentes` passou a rodar antes da decisão de enviar), e o teste continua faltando; agora ele prenderia também essa ordem.
+2. ~~**"Parados" sobre negócio que não está parado.**~~ **Resolvido em 14/09/2026:** a migration `20260912100000_pauta_do_dia_que_encolhe.sql` acabou com o enchimento até o mínimo de itens. Só entra na fila o que está parado além do corte, então "R$ X parados" passou a ser verdade por construção.
 3. **Tela e e-mail podem ler o ajuste de jeitos diferentes.** O gancho da tela
    (`src/hooks/use-configuracoes-automacao.ts`) só aceita número; o banco e o e-mail aceitam
    também número guardado como texto ("7"). **Gatilho:** alguém gravar o ajuste à mão no painel
