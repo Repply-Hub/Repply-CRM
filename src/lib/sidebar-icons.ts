@@ -5,6 +5,7 @@ import {
   Truck, Wallet, Wrench, Zap, MessageCircle, MessageSquare, List, FileWarning,
   Smartphone, Building2, History, ToggleLeft, Sun, type LucideIcon
 } from 'lucide-react';
+import { IconeWhatsApp } from '@/components/icones/IconeWhatsApp';
 
 const ICON_MAP: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -42,6 +43,13 @@ const ICON_MAP: Record<string, LucideIcon> = {
   History,
   ToggleLeft,
   Sun,
+  // O símbolo de marca do WhatsApp, para sair o `MessageCircle` genérico do
+  // item da barra lateral (dono do produto, 14/09/2026). Não é um ícone do
+  // lucide-react — não nasce de `forwardRef`, então o tipo não bate 1:1 com
+  // `LucideIcon` — mas cumpre o mesmo contrato que todo lugar deste arquivo
+  // usa (`<Icon className="..." />`), então o cast abaixo é só para o TIPO
+  // do mapa aceitar.
+  WhatsApp: IconeWhatsApp as unknown as LucideIcon,
 };
 
 export const AVAILABLE_ICONS = Object.keys(ICON_MAP);

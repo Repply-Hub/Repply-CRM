@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizarLinksExternos, SidebarItem } from './use-sidebar-preferences';
+import { normalizarLinksExternos, fixChatWhatsappIcons, SidebarItem } from './use-sidebar-preferences';
 
 function item(overrides: Partial<SidebarItem>): SidebarItem {
   return { id: 'x', path: '/x', label: 'X', icon: 'Link', visible: true, ...overrides };
@@ -36,5 +36,28 @@ describe('normalizarLinksExternos', () => {
     ]);
     expect(inalterado.path).toBe('/clientes');
     expect(inalterado.isExternal).toBe(false);
+  });
+});
+
+describe('fixChatWhatsappIcons', () => {
+  it('troca o ícone antigo (genérico) do item whatsapp pelo símbolo novo, mesmo salvo há tempos', () => {
+    const [corrigido] = fixChatWhatsappIcons([
+      item({ id: 'whatsapp', label: 'WhatsApp', icon: 'MessageCircle' }),
+    ]);
+    expect(corrigido.icon).toBe('WhatsApp');
+  });
+
+  it('não mexe no ícone do chat interno — continua MessageSquare', () => {
+    const [inalterado] = fixChatWhatsappIcons([
+      item({ id: 'chat', label: 'Chat', icon: 'MessageSquare' }),
+    ]);
+    expect(inalterado.icon).toBe('MessageSquare');
+  });
+
+  it('não mexe em item que não é chat nem whatsapp', () => {
+    const [inalterado] = fixChatWhatsappIcons([
+      item({ id: 'clientes', label: 'Clientes', icon: 'Users' }),
+    ]);
+    expect(inalterado.icon).toBe('Users');
   });
 });

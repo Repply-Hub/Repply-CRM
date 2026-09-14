@@ -8,12 +8,22 @@ interface IconeWhatsAppProps {
  * O glifo do WhatsApp (telefone dentro do balão) como um único path de SVG —
  * o projeto não tem ícone de marca do WhatsApp em lugar nenhum, e criar um
  * componente aqui evita importar biblioteca nova só para isto. Usado no selo
- * de origem do aviso de mensagem nova (ver `aviso-de-mensagem-nova.ts`).
+ * de origem do aviso de mensagem nova (`aviso-de-mensagem-nova.ts`) e, desde
+ * 14/09/2026, no item "WhatsApp" da barra lateral (`sidebar-icons.ts`).
+ *
+ * O `viewBox` tem 2px de margem em cada lado (26x26 em vez de 24x24, o
+ * padrão do lucide-react). O glifo é PREENCHIDO e os ícones do lucide ao
+ * lado dele na barra são só TRAÇO — na mesma caixa de 24x24, o preenchido
+ * parece maior e mais pesado que os vizinhos mesmo em pixel idêntico. A
+ * margem encolhe o desenho para ~86% da caixa (2/28 de cada lado) sem mexer
+ * em `size`/`className`, que continuam controlando o tamanho de fora — e
+ * vale também para o selo do aviso de mensagem nova, que fica um pouco mais
+ * leve junto (efeito pequeno, não é regressão do que já foi aprovado).
  */
 export function IconeWhatsApp({ size = 14, className }: IconeWhatsAppProps) {
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox="-2 -2 28 28"
       width={size}
       height={size}
       fill="currentColor"

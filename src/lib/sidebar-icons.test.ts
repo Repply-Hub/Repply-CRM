@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getIconComponent, isExternalUrl, looksLikeDomain } from './sidebar-icons';
+import { IconeWhatsApp } from '@/components/icones/IconeWhatsApp';
 
 describe('isExternalUrl', () => {
   it('reconhece URL com protocolo explícito', () => {
@@ -44,5 +45,9 @@ describe('getIconComponent', () => {
 
   it('nunca devolve undefined — cai no ícone genérico se o nome não existir mais no catálogo', () => {
     expect(getIconComponent('IconeQueNaoExisteMais')).toBeDefined();
+  });
+
+  it('"WhatsApp" resolve para o componente do símbolo de marca, não para um ícone do lucide', () => {
+    expect(getIconComponent('WhatsApp')).toBe(IconeWhatsApp);
   });
 });
