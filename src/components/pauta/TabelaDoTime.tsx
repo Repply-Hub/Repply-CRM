@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { iniciais } from '@/lib/iniciais';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MOLDURA_DA_PAUTA } from '@/components/pauta/moldura-da-pauta';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -115,7 +117,9 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
   const temMais = linhas.length < total;
 
   return (
-    <Card className={`${MOLDURA_DA_PAUTA} mt-5`}>
+    // 🔴 `id="tabela-do-time"` é a âncora do botão "Ver a tabela" do aviso da pauta vazia
+    // (`AvisoDaTabela`, em `src/pages/Hoje.tsx`). `scroll-mt-4` deixa um respiro acima do cartão.
+    <Card id="tabela-do-time" className={`${MOLDURA_DA_PAUTA} mt-5 scroll-mt-4`}>
       <CardHeader className="pb-1">
         <CardTitle className="text-sm font-bold">
           {podeVerDeTodos ? 'Negócios da equipe que pedem atenção' : 'Seus negócios que pedem atenção'}
@@ -180,7 +184,11 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
             <div className="overflow-x-auto">
               <table className="w-full min-w-[880px] text-sm">
                 <thead>
-                  <tr className="bg-muted text-[11px] uppercase tracking-wider text-muted-foreground">
+                  {/* A faixa do título das colunas, com o contraste do dashboard de referência
+                      (pedido de 14/09/2026): mais escura que o fundo, texto forte e sem caixa-alta.
+                      `foreground` com transparência escurece no tema claro e clareia no escuro, sem
+                      regra por tema. */}
+                  <tr className="bg-foreground/[0.06] text-xs text-card-foreground">
                     <th className="px-3 py-2 text-left font-semibold">Negócio</th>
                     <th className="px-3 py-2 text-left font-semibold">Fabricante</th>
                     <th className="px-3 py-2 text-left font-semibold">Etapa</th>
@@ -205,7 +213,24 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
                       <td className="px-3 py-2 text-muted-foreground">{n.fabrica ?? '—'}</td>
                       <td className="px-3 py-2 text-muted-foreground">{n.etapa ?? '—'}</td>
                       {podeVerDeTodos && (
-                        <td className="px-3 py-2 text-muted-foreground">{n.responsavel ?? '—'}</td>
+                        <td className="px-3 py-2 text-card-foreground">
+                          {/* O rosto do dono; sem foto, as iniciais — o mesmo círculo do campo de
+                              responsáveis do negócio (`CampoDeResponsaveis`). `AvatarFallback`
+                              também cobre a foto que demora ou falha ao carregar. */}
+                          <span className="flex min-w-0 items-center gap-2">
+                            <Avatar className="h-7 w-7 shrink-0">
+                              {n.responsavel_avatar && (
+                                <AvatarImage src={n.responsavel_avatar} alt="" className="h-full w-full object-cover" />
+                              )}
+                              <AvatarFallback className="bg-muted text-[10px] font-medium text-muted-foreground">
+                                {iniciais(n.responsavel ?? '')}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="truncate" title={n.responsavel ?? undefined}>
+                              {n.responsavel ?? '—'}
+                            </span>
+                          </span>
+                        </td>
                       )}
                       <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums text-card-foreground">
                         {n.valor === null ? '—' : formatarMoedaBRL(n.valor)}
@@ -222,7 +247,9 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
                           tempo em que abre o diálogo. */}
                       <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-2">
-                          <Button size="sm" variant="outline" onClick={() => onAbrir(n.id)}>
+                          {/* O botão principal, laranja como o da pauta logo acima (pedido de
+                              14/09/2026): abrir o negócio é a ação desta tabela. */}
+                          <Button size="sm" onClick={() => onAbrir(n.id)}>
                             Abrir negócio
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => onRetomar(n)}>

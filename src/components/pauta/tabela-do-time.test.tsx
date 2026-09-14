@@ -251,4 +251,32 @@ describe('a tabela do time', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Abrir negócio' })[0]);
     expect(abertos).toEqual(['neg-0']);
   });
+
+  describe('a tabela do time: rosto do dono, botão laranja e âncora', () => {
+    it('🔴 o dono aparece no círculo, com as iniciais quando não há foto', async () => {
+      montar({}, true);
+      // O jsdom não carrega imagem, então a FOTO em si é conferida nas fotos da tela antes de
+      // publicar. O que se prende aqui é o círculo com as iniciais — que é também o que aparece
+      // enquanto a foto carrega ou quando ela falha.
+      expect(await screen.findAllByText('AS')).toHaveLength(10);
+    });
+
+    it('sem a chave, não há círculo de dono', async () => {
+      montar({}, false);
+      await screen.findByText('Negócio 0');
+      expect(screen.queryByText('AS')).toBeNull();
+    });
+
+    it('"Abrir negócio" é o botão principal, laranja como na pauta', async () => {
+      montar();
+      const botoes = await screen.findAllByRole('button', { name: 'Abrir negócio' });
+      expect(botoes[0].className).toContain('bg-primary');
+    });
+
+    it('o cartão tem a âncora que o aviso da pauta vazia usa', async () => {
+      const { container } = montar();
+      await screen.findByText('Negócio 0');
+      expect(container.querySelector('#tabela-do-time')).not.toBeNull();
+    });
+  });
 });
