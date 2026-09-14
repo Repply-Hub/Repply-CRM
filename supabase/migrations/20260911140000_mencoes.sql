@@ -1,14 +1,55 @@
--- 🔴 TEMPO LIMITE DE TRAVA, antes de qualquer outra coisa.
--- `alter table … add column` em `chat_mensagens`, `whatsapp_mensagens` e `notificacoes` —
--- e também `add constraint`, `create policy` e `create trigger` nessas tabelas — pede a
--- trava exclusiva da tabela. Se houver uma leitura longa em andamento, o pedido entra na fila
--- atrás dela, e TODA gravação que chegar depois entra na fila atrás do pedido: a mensagem que
--- o webhook do WhatsApp recebe, a que a pessoa manda do chat, o registro do sininho. Sem
--- limite, as mensagens ficam paradas enquanto durar a leitura que ninguém vê.
--- Com 3 segundos, o pior caso é segurar as gravações por 3 segundos e a migration FALHAR com
--- erro visível (55P03, `lock_not_available`) — e aí ela é rodada de novo num momento calmo.
--- Rodada numa transação só, a falha desfaz tudo: nada fica pela metade.
-set lock_timeout = '3s';
+-- 🔴 TRAVAS: TODAS AQUI NO COMEÇO, DA TABELA MAIS FRIA PARA A MAIS QUENTE, 3 s DE ESPERA CADA.
+--
+-- O PROBLEMA. `add column`, `add constraint`, `create policy` e `create trigger` pedem a trava
+-- exclusiva da tabela (ACCESS EXCLUSIVE), que barra leitura e gravação. A chave estrangeira de
+-- `mencoes` pede SHARE ROW EXCLUSIVE nas tabelas para onde aponta, que barra gravação. Enquanto
+-- um pedido de trava ESPERA, quem chega depois pedindo algo que conflita espera atrás dele; e a
+-- trava obtida só é solta no COMMIT.
+--
+-- O LIMITE. Os papéis da API desistem em 8 s (conferido em `pg_roles.rolconfig` em 14/09/2026:
+-- `authenticator` com `lock_timeout=8s` e `statement_timeout=8s`; `authenticated` com
+-- `statement_timeout=8s`). Passou disso, a gravação do chat e a do webhook do WhatsApp FALHAM —
+-- não esperam.
+--
+-- POR QUE TUDO AQUI. Com as travas espalhadas pelo arquivo, cada uma esperaria até 3 s com as
+-- anteriores já presas: uns 15 s com o chat bloqueado. Pegando todas aqui, depois da última só
+-- sobra trabalho de catálogo, em milissegundos: as colunas novas têm default constante, `mencoes`
+-- nasce vazia, e a conferência do `link` lê as poucas linhas do sininho. Cada tabela fica
+-- bloqueada, no pior caso, pela própria espera somada à espera de cada trava pedida DEPOIS dela.
+--
+-- A ORDEM, pelas gravações medidas em `pg_stat_user_tables` em 14/09/2026:
+--   1. `whatsapp_conversas`, `wapi_instancia_usuarios`, `whatsapp_conversa_responsaveis`, em
+--      ACCESS SHARE. Os corpos das funções `language sql` (§3 e §4) são conferidos na criação
+--      (`check_function_bodies = on`) e leem essas tabelas. ACCESS SHARE não barra leitura nem
+--      gravação de ninguém; só espera por quem tenha travado a tabela inteira (outra migration).
+--      Pedida aqui, essa espera acontece ANTES de qualquer tabela quente estar presa.
+--   2. `empresas`, `usuarios`, em SHARE ROW EXCLUSIVE (a chave estrangeira de `mencoes`). Barram
+--      só gravação, e são as mais frias: dezenas de gravações no período medido. A leitura e a
+--      checagem de chave estrangeira do chat e do WhatsApp em `usuarios` (ROW SHARE) passam.
+--   3. `notificacoes`: dezenas de gravações.
+--   4. `chat_mensagens`: centenas de gravações.
+--   5. `whatsapp_mensagens`: dezenas de milhares — o webhook. A MAIS QUENTE, por último.
+--
+-- PIOR CASO, com cada espera batendo os 3 s:
+--   · `whatsapp_mensagens`: bloqueada até 3 s (só a própria espera);
+--   · `chat_mensagens`: até 6 s (a própria + a do WhatsApp);
+--   · `notificacoes`: até 9 s. A leitura do sininho pode passar dos 8 s e é refeita pela tela;
+--   · `usuarios` e `empresas`: gravação parada até 12 s e 15 s. São as de dezenas de gravações.
+-- O chat e o WhatsApp ficam abaixo dos 8 s. Esse pior caso pede uma trava longa em cada tabela no
+-- mesmo instante; o normal é esperar milissegundos.
+-- Espera que passar de 3 s derruba a migration com erro visível (55P03, `lock_not_available`): a
+-- transação desfaz tudo, e roda-se de novo num momento calmo.
+--
+-- `set local`: vale só nesta transação e some no COMMIT, sem ficar grudado na conexão que a
+-- aplicou.
+set local lock_timeout = '3s';
+
+lock table public.whatsapp_conversas, public.wapi_instancia_usuarios, public.whatsapp_conversa_responsaveis
+  in access share mode;
+lock table public.empresas, public.usuarios in share row exclusive mode;
+lock table public.notificacoes in access exclusive mode;
+lock table public.chat_mensagens in access exclusive mode;
+lock table public.whatsapp_mensagens in access exclusive mode;
 
 -- Menções (@) no chat interno (Geral e grupos) e nas notas internas do WhatsApp.
 -- Spec: docs/superpowers/specs/2026-09-11-busca-config-agenda-mencoes-design.md, Bloco 4.
@@ -345,6 +386,7 @@ declare
   v_grupo       public.chat_grupos;
   v_escolhidos  uuid[];
   v_todos       boolean;
+  v_nome        text;
   v_chave       text;
   v_lugar       text;
   v_previa      text;
@@ -406,7 +448,11 @@ begin
       return null;
     end if;
     v_chave := 'grupo_' || new.grupo_id;
-    v_lugar := 'no grupo ' || coalesce(nullif(btrim(v_grupo.nome), ''), 'sem nome');
+    -- O nome vai no título do sininho: numa linha só e com teto de 80. É a mesma normalização
+    -- da prévia (qualquer sequência de espaço, quebra de linha ou tabulação vira um espaço).
+    v_nome := nullif(btrim(regexp_replace(coalesce(v_grupo.nome, ''), '\s+', ' ', 'g')), '');
+    if char_length(v_nome) > 80 then v_nome := rtrim(left(v_nome, 79)) || '…'; end if;
+    v_lugar := 'no grupo ' || coalesce(v_nome, 'sem nome');
   end if;
 
   select coalesce(array_agg(u.id), '{}')
@@ -496,6 +542,7 @@ declare
   v_autor       public.usuarios;
   v_escolhidos  uuid[];
   v_todos       boolean;
+  v_nome        text;
   v_lugar       text;
   v_previa      text;
   v_link        text;
@@ -555,8 +602,13 @@ begin
      and (v_todos or u.id = any (v_escolhidos))
      and usuario_alcanca_wa_conversa(u.id, v_conversa.id);
 
-  v_lugar  := 'numa nota da conversa com '
-              || coalesce(nullif(btrim(v_conversa.nome_contato), ''), v_conversa.telefone, 'um contato');
+  -- O nome do contato vai no título do sininho, e há nome de contato com quebra de linha: numa
+  -- linha só e com teto de 80, pela mesma normalização da prévia logo abaixo. Normaliza ANTES de
+  -- decidir se está vazio — um nome que é só quebra de linha cai no telefone, não em "um contato".
+  v_nome := nullif(btrim(regexp_replace(coalesce(v_conversa.nome_contato, ''), '\s+', ' ', 'g')), '');
+  v_nome := coalesce(v_nome, nullif(btrim(regexp_replace(coalesce(v_conversa.telefone, ''), '\s+', ' ', 'g')), ''));
+  if char_length(v_nome) > 80 then v_nome := rtrim(left(v_nome, 79)) || '…'; end if;
+  v_lugar  := 'numa nota da conversa com ' || coalesce(v_nome, 'um contato');
   v_previa := nullif(left(btrim(regexp_replace(new.conteudo, '\s+', ' ', 'g')), 140), '');
   v_link   := '/whatsapp?conversaId=' || v_conversa.id || '&mensagemId=' || new.id;
 
