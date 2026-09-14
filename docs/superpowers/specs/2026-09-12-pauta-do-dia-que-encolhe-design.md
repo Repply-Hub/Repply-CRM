@@ -190,10 +190,12 @@ marcados com um tipo próprio (`negocio_feito`). Quem consome tem de filtrar:
 - `supabase/functions/pauta-resumo-diario/index.ts` — filtra os feitos **antes** de decidir se há
   e-mail a mandar; com a lista inteira, uma pauta zerada pareceria cheia e o e-mail sairia.
 
-🔴 **A voz da pauta não é tocada.** `vozDaPauta` (e a cópia byte a byte do e-mail) continua como
-está: os dois lados passam a ela apenas o que está na tela. Filtrar dentro dela significaria editar
-o arquivo duplicado e mexer na frase que já está no ar — risco sem ganho, quando quem chama já sabe
-o que quer contar.
+🔴 **A voz da pauta muda uma palavra só.** Os dois lados passam a `vozDaPauta` apenas o que está
+na tela, então filtrar os feitos dentro dela não é preciso. Mas o degrau 3 dizia "Um negócio **seu**
+está há N dias sem mexer", e na pauta do gestor o negócio destacado pode ser de colega, com o nome
+dele logo abaixo. Decisão do dono do produto em 13/09/2026: frase neutra, "Um negócio está há N dias
+sem mexer" — o mesmo cuidado de "Pauta de hoje zerada". A troca vale nas duas cópias, a da tela e
+a do e-mail, e na manchete e no assunto.
 
 ### 3.6 O e-mail das 7h
 

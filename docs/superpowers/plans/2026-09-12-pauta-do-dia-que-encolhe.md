@@ -1332,11 +1332,13 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>" --only -- supabase/migrat
 
 **Files:** nenhum.
 
+**Janela: segunda-feira, 14/09/2026, de manhã, em horário de trabalho.** O domingo à noite passou durante uma pausa por limite de uso, e o dono do produto mandou publicar assim que estivesse pronto. Consequências: o aviso "recarregue a tela Hoje" é OBRIGATÓRIO antes de aplicar no banco, porque há abas abertas; e **hoje, por exceção, o e-mail da pauta é disparado à mão logo depois de aplicar** — a partir de amanhã, volta para as 7h.
+
 🔴 **A ORDEM É OBRIGATÓRIA, e é o INVERSO da ordem do pacote anterior.** A migration faz a fila devolver o tipo `negocio_feito`; o site e a função de borda que ainda não sabem filtrá-lo desenhariam os negócios **já feitos** como se fossem pendentes, com o botão "Retomar depois" do lado.
 
 - [ ] **Step 1: Publicar o site**
 
-Levar só os commits das Tarefas 1 a 4, por cherry-pick sobre `origin/main`, em pasta de trabalho isolada:
+Levar SÓ estes commits, nesta ordem, por cherry-pick sobre `origin/main`, em pasta de trabalho isolada: `f144026e` `3dae8f78` `24d9d576` `eb063156` `490e20e4` `53719c50` `d73e3d32`, e depois os commits da rodada de consertos da revisão final (hashes no registro de progresso, `.superpowers/sdd/progress.md`). 🔴 "Tarefas 1 a 4" ao pé da letra deixaria de fora `53719c50` e `d73e3d32` e publicaria a frase "do mais parado para o menos", que o dono do produto descartou em 13/09.
 
 ```bash
 git fetch origin
@@ -1361,6 +1363,8 @@ Conferir a versão publicada com `get_edge_function` e comparar com o commit.
 
 🔴 **Mudança no banco de produção pede o "pode" do Lucas antes** (CLAUDE.md §11). Mostre a ele o que muda, o ensaio abaixo e a rota de volta, e só então aplique.
 
+🔴 **A ordem site → e-mail → banco não fecha uma janela: a aba aberta.** O site não confere versão e não recarrega dados ao voltar o foco. Uma tela "Hoje" aberta ANTES do push continua com o código velho depois da migration: o negócio já feito vira cartão pendente com "Retomar depois", e quem clicar de novo grava outro contato, outra tarefa para o dono e outro aviso. Por isso: aplicar **fora do expediente, horas depois do push**, e mandar ANTES o aviso do Step 5 com "recarregue a tela Hoje".
+
 Antes de aplicar, dois preparativos que custam minutos e evitam o pior caso — a pauta de todo mundo quebrada:
 
 a) **Ensaio que se desfaz sozinho.** É o método que já funcionou nesta base em 13/09/2026 (memória `ensaio-de-migration-em-producao`), com o "pode ensaiar" do Lucas e o horário combinado:
@@ -1370,7 +1374,12 @@ a) **Ensaio que se desfaz sozinho.** É o método que já funcionou nesta base e
    3. **O que conferir dentro do ensaio:**
       - o `md5(prosrc)` novo;
       - a `proacl` de `pauta_do_dia_de`, inalterada;
-      - `pauta_do_dia()` e `dashboard_negocios_risco()` chamadas COMO USUÁRIO DE VERDADE — `set_config('request.jwt.claims','{"sub":"<login>","role":"authenticated"}',true)` e `set_config('role','authenticated',true)` —, para uma pessoa com a chave e uma sem.
+      - `pauta_do_dia()` e `dashboard_negocios_risco()` chamadas COMO USUÁRIO DE VERDADE — `set_config('request.jwt.claims','{"sub":"<login>","role":"authenticated"}',true)` e `set_config('role','authenticated',true)` —, para uma pessoa com a chave e uma sem;
+      - para um gestor que tenha negócio PRÓPRIO e da equipe: `responsavel` nulo só nas linhas dele;
+      - para quem não tem a chave: `responsavel` nulo em TODAS as linhas;
+      - pendentes mais feitos nunca acima do teto menos os compromissos da virada.
+
+      Essas três prendem no banco o que o teste da tela só prova no esboço (a etiqueta de dono depende do `responsavel` nulo vir do SQL).
 
       Só trocar as claims continua rodando como `postgres` e não prova privilégio. O identificador de login vai só na chamada, nunca em arquivo (CLAUDE.md §6.9). É aqui que aparece o erro que só existe quando o plpgsql roda de verdade — coluna ambígua com as colunas de saída, tipo trocado. As simulações das Tarefas 5 e 6 foram `SELECT` puro e não pegam essa família de erro.
    4. **Depois:** conferir que nada ficou, com o `md5(prosrc)` das duas funções de volta aos valores vigentes.
@@ -1387,11 +1396,17 @@ select p.oid::regprocedure, coalesce(array_to_string(p.proacl,' | '),'(padrao)')
  where n.nspname='public' and p.proname like 'pauta_do_dia%';
 ```
 
-Esperado, idêntico à medição de antes: `pauta_do_dia_de(uuid)` com `postgres=X/postgres | service_role=X/postgres`, e `pauta_do_dia()` com `authenticated=X/postgres`. Se `authenticated` aparecer em `pauta_do_dia_de`, **pare**: a fila de qualquer colega acabou de ficar aberta a qualquer pessoa logada.
+Esperado, idêntico à medição de antes: `pauta_do_dia_de(uuid)` com `postgres=X/postgres | service_role=X/postgres`, e `pauta_do_dia()` como já estava: `=X/postgres | postgres=X/postgres | anon=X/postgres | authenticated=X/postgres | service_role=X/postgres`. Se `authenticated` aparecer em `pauta_do_dia_de`, **pare**: a fila de qualquer colega acabou de ficar aberta a qualquer pessoa logada.
 
 Conferir também o corpo aplicado: `md5(prosrc)` de `pauta_do_dia_de` tem de ser `983af134a74a354158f33457815a08ca` (12.312 caracteres), e o de `dashboard_negocios_risco` tem de ser `fdc67428253abd609cbdf6ac53bae82d` (3.246 caracteres). 🔴 Esse md5 é do conteúdo COMMITADO, com fim de linha LF — nesta máquina `core.autocrlf=true`, então aplique a partir de `git show <commit>:<arquivo>`, nunca do arquivo da árvore de trabalho, ou o md5 não bate.
 
 E repetir as medições guardadas nas Tarefas 5 e 6, comparando com o que a simulação previu.
+
+- [ ] **Step 3b: Subir as migrations e a documentação da leva**
+
+Logo depois de aplicar e conferir: cherry-pick de `490b80f2` `523f993c` `13b488ab` `0051915c` (as migrations) e dos commits de documentação da leva (lista no registro de progresso) sobre `origin/main`, e push na mesma janela. O push NÃO aplica migration — não há automação que faça isso, e o banco já está com elas. Sem este passo, produção fica com duas mudanças que o repositório público não tem.
+
+No mesmo push, em `docs/divida-tecnica.md` §71: marcar o item 2 como resolvido (a voz chamava de "parado" o enchimento, que deixou de existir) e registrar no item 1 que o gatilho dele — a próxima edição do `index.ts` — já aconteceu na Tarefa 3, e o teste que prende `soOsPendentes` antes do `if` continua faltando.
 
 - [ ] **Step 4: Conferir no ar**
 
@@ -1400,6 +1415,8 @@ Além dos itens abaixo, conferir que os três cartões de risco e o "Resumo por 
 - Abrir a tela "Hoje" logado como gestor: os negócios próprios em cima, os da equipe em seguida com o nome do dono ao lado.
 - Dar um "Retomar depois" num negócio da pauta e recarregar: ele sai da lista, o contador aparece ("1 de N feitos hoje"), e **nenhum negócio novo entra no lugar**.
 - Conferir Configurações → Automação: um campo só, "Até quantos itens por dia".
+- O subtítulo do "No geral" diz "A sua carteira." para quem não tem a chave.
+- A manchete do negócio que destoa, quando aparecer, não diz mais "seu" (decisão de 13/09/2026).
 
 - [ ] **Step 5: Avisar a equipe**
 
