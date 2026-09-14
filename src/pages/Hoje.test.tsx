@@ -118,12 +118,17 @@ afterEach(() => {
 
 describe('o topo da tela "Hoje"', () => {
   describe('🔴 fila vazia com trabalho na tabela do time — a fila é mais estreita que a tabela', () => {
-    it('continua dizendo "Sua fila está vazia", e aponta a tabela de baixo', () => {
+    it('continua dizendo "Sua fila está vazia", e aponta a tabela de baixo com um botão', () => {
       prepararTela({ pauta: [], tabelaDoTime: { total: 5 } });
       montarATela();
 
       expect(manchete()).toBe('Sua fila está vazia');
-      expect(screen.getByText(/O que pede atenção está na tabela logo abaixo — 5 negócios\./)).toBeInTheDocument();
+      // Este arquivo monta a tela SEM a chave `pauta_de_todos` (o esboço de
+      // `usePossoVerPautaDeTodos` devolve falso): o aviso fala dos negócios da própria pessoa.
+      expect(
+        screen.getByText('Quer adiantar? Seus 5 negócios que pedem atenção estão na tabela logo abaixo.'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Ver a tabela' })).toBeInTheDocument();
       expect(screen.queryByText(/Seu dia está seu/)).toBeNull();
     });
 
@@ -133,6 +138,8 @@ describe('o topo da tela "Hoje"', () => {
 
       expect(manchete()).toBe('Sua fila está vazia');
       expect(screen.queryByText(/Seu dia está seu/)).toBeNull();
+      // E não aponta para uma tabela que não respondeu.
+      expect(screen.queryByRole('button', { name: 'Ver a tabela' })).toBeNull();
     });
   });
 
