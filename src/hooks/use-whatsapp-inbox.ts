@@ -127,6 +127,11 @@ export interface WaMensagem {
   // Nota de sistema (ex: "Fulano assumiu esta conversa") — nunca enviada ao
   // WhatsApp, renderizada como chip central em vez de bolha de mensagem.
   is_nota_interna?: boolean;
+  // Quem foi mencionado nesta nota (id de usuário) e se marcou @todos. Só a janela
+  // "Adicionar nota" preenche isto de verdade — notas de sistema gravam com os
+  // padrões (`[]`/`false`) e nunca disparam menção.
+  mencionados?: string[];
+  menciona_todos?: boolean;
   // Notas fixadas aparecem numa faixa fixa no topo do chat, além da posição
   // cronológica normal — só tem efeito quando is_nota_interna também é true.
   fixada?: boolean;
@@ -1719,7 +1724,19 @@ export function useWaAddNota() {
 
   return useMutation({
     mutationFn: async (
-      { conversaId, texto, fixada = false }: { conversaId: string; texto: string; fixada?: boolean },
+      {
+        conversaId,
+        texto,
+        fixada = false,
+        mencionados = [],
+        mencionaTodos = false,
+      }: {
+        conversaId: string;
+        texto: string;
+        fixada?: boolean;
+        mencionados?: string[];
+        mencionaTodos?: boolean;
+      },
     ) => {
       if (!profile?.empresa_id) throw new Error('Empresa não identificada');
       const { data, error } = await supabase
@@ -1735,6 +1752,8 @@ export function useWaAddNota() {
           lida: true,
           is_nota_interna: true,
           fixada,
+          mencionados,
+          menciona_todos: mencionaTodos,
         })
         .select()
         .single();
