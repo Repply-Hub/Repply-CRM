@@ -2860,6 +2860,34 @@ e-mail das 7h. As revisões acharam quatro pontas soltas, nenhuma por defeito de
 
 ## Resolvidos
 
+### 14/09/2026 — Teste que lê o `src/` inteiro com o limite de 5 s (era o item 72)
+
+> ✅ **Resolvido e no ar em 14/09/2026** — `src/test/tabela-vendedores-nao-existe-mais.test.ts` ganhou
+> `{ timeout: 20_000 }` no `it`, com comentário. Os commits são os que tocam esse arquivo
+> (`git log -- src/test/tabela-vendedores-nao-existe-mais.test.ts`).
+
+**O que estava errado.** O guarda lê, um a um, os 435 `.ts`/`.tsx` de `src/` que não são teste e
+rodava com o limite de fábrica do Vitest, 5 s. Numa cópia recém-criada do `origin/main` (commit
+`e112e576`), a bateria inteira reprovou só por ele e só por tempo — 7.291 ms, sem defeito nenhum —,
+e o mesmo arquivo sozinho passou em 165 ms. Vermelho que some ao repetir segura publicação à toa
+(`CLAUDE.md` §9 pede a bateria limpa) e ensina a desligar o guarda.
+
+**Conferido depois do conserto**, no cenário em que ele reprovava: primeira bateria completa numa
+cópia recém-criada do `origin/main`, 1.613 testes de 1.613, com o guarda em 254 ms.
+
+**O que a varredura achou, para não refazer.** Oito arquivos de teste listam pasta do disco. Os seis
+que leem o `src/` inteiro têm folga própria: `uma-leitura-de-planilha-so`, `hoje-no-fuso-local` e
+`foto-do-avatar-sai-por-avatar-image` com 20 s no `it`; `comentario-vazado-no-jsx` com 30 s no
+terceiro argumento do `it`; `painel-do-negocio-e-uma-peca-so` com 20 s no `beforeAll`, que faz a
+varredura uma vez só; e, desde este conserto, `tabela-vendedores-nao-existe-mais` com 20 s.
+`gate-de-plano` e `passos-do-novo-negocio` leem as migrations no corpo do `describe`, onde o limite
+não vale (conferido no Vitest 3.2.4) — não precisam.
+
+**Continua opcional:** uma função comum em `src/test/` que devolva os arquivos de `src/` (com o
+filtro de extensão como parâmetro) e exporte a constante da folga, para o próximo guarda já nascer
+com ela. **Não suba o `testTimeout` global:** os outros ~1.600 testes não leem disco e devem
+continuar reprovando depressa quando travam.
+
 ### 21/08/2026 — seleção em massa na lista de Negócios
 
 > ✅ **Commitado e no ar.**
