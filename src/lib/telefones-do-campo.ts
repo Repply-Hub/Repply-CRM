@@ -66,24 +66,23 @@ export function ehTelefoneLivre(parte: string): boolean {
 export function limitarTelefoneDigitado(novo: string, anterior = ''): string {
   if (ehTelefoneLivre(novo) || ehTelefoneLivre(anterior)) return novo;
   if (digitosNacionais(anterior).length > 11) return novo;
-  // DDD 55 (Rio Grande do Sul) é onde a leitura de número pronto engana quem está digitando:
-  // um celular de 11 dígitos com esse DDD, ao ganhar mais um dígito, fica indistinguível de
-  // "código do país 55" + outro DDD de 9 dígitos — `digitosNacionais` desconta o 55 nos dois
-  // casos, então contar por ela aqui deixaria passar o 12º e 13º dígito sem barrar.
+  // O "55" da frente é ambíguo: pode ser código de país OU o DDD 55 (Rio Grande do Sul). Por
+  // isso ele só conta como código de país quando há EVIDÊNCIA disso — "+" no texto novo ou no
+  // anterior (isso cobre apagar o "+" de um número completo), o anterior já vinha com o 55
+  // grudado em mais de 11 dígitos (é como 999 telefones estão gravados no banco), ou o número
+  // foi colado num campo vazio. Sem nenhuma evidência, o teto é de 11 dígitos BRUTOS, para que
+  // um DDD 55 com um dígito a mais nunca vire, sem aviso, outro DDD.
   //
-  // Por isso a digitação usa outra régua, e a leitura de número JÁ GRAVADO não muda: 999
-  // telefones da base guardam o 55 grudado sem "+", e é assim que `digitosNacionais` e
-  // `formatarTelefoneGuardado` continuam lendo — só o limite de tecla é diferente.
-  const digitosNovos = novo.replace(/\D/g, '').length;
-  const digitosAnteriores = anterior.replace(/\D/g, '').length;
-  // Com "+" na frente a pessoa está escrevendo o código do país de propósito: vale a leitura
-  // de número completo, que desconta o 55.
-  const comCodigoDePais = novo.trim().startsWith('+');
-  // Um dígito a mais que antes é TECLA. Um salto maior é COLAR — e colar número com o 55
-  // grudado é como 999 telefones já estão gravados na base.
-  const ehTecla = digitosNovos - digitosAnteriores <= 1;
-  if (!comCodigoDePais && ehTecla) return digitosNovos > 11 ? anterior : novo;
-  return digitosNacionais(novo).length > 11 ? anterior : novo;
+  // Colar um número inteiro de DDD 55 com dígitos sobrando num campo vazio continua ambíguo —
+  // e é lido do mesmo jeito que os telefones já gravados, como código de país.
+  const digitosNovos = novo.replace(/\D/g, '');
+  const digitosAnteriores = anterior.replace(/\D/g, '');
+  const comMais = novo.trim().startsWith('+') || anterior.trim().startsWith('+');
+  const anteriorJaVinhaComCodigoDePais = digitosAnteriores.length > 11 && digitosAnteriores.startsWith('55');
+  const coladoNumCampoVazio = digitosAnteriores.length === 0 && digitosNovos.length > 1;
+  const contaCodigoDePais = comMais || anteriorJaVinhaComCodigoDePais || coladoNumCampoVazio;
+  const tamanho = contaCodigoDePais ? digitosNacionais(novo).length : digitosNovos.length;
+  return tamanho > 11 ? anterior : novo;
 }
 
 /**

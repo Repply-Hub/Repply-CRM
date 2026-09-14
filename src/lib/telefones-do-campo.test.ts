@@ -135,4 +135,23 @@ describe('limitarTelefoneDigitado — enquanto a pessoa digita', () => {
   it('quem digita com "+" pode escrever o código do país tecla a tecla', () => {
     expect(limitarTelefoneDigitado('+55 84 99999-8888', '+55 84 99999-888')).toBe('+55 84 99999-8888');
   });
+
+  it('🔴 pedaço colado num DDD 55 incompleto não fura o teto de 11 dígitos', () => {
+    expect(limitarTelefoneDigitado('559912345678', '559912345')).toBe('559912345');
+    expect(limitarTelefoneDigitado('559912345678', '5599123456')).toBe('5599123456');
+  });
+
+  it('🔴 apagar só o "+" de um número completo é permitido, não desfeito', () => {
+    expect(limitarTelefoneDigitado('5584999998888', '+5584999998888')).toBe('5584999998888');
+    expect(limitarTelefoneDigitado('55 84 99999-8888', '+55 84 99999-8888')).toBe('55 84 99999-8888');
+  });
+
+  it('número que já veio do banco com o 55 grudado: apagar um dígito continua permitido', () => {
+    expect(limitarTelefoneDigitado('558499999888', '5584999998888')).toBe('558499999888');
+  });
+
+  it('colar "55" sozinho no campo vazio não dá passe livre para o resto da digitação', () => {
+    expect(limitarTelefoneDigitado('55', '')).toBe('55');
+    expect(limitarTelefoneDigitado('559912345678', '55991234567')).toBe('55991234567');
+  });
 });
