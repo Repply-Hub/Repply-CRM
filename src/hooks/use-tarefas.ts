@@ -30,11 +30,14 @@ const RECUSA_AO_ALTERAR = 'Só o responsável pela tarefa ou um gestor da empres
 // lembrava deles:
 //
 //   · `pauta-do-dia` (`pauta_do_dia_de`, `use-pauta.ts`) — tarefa com prazo HOJE e status
-//     diferente de "concluida" entra na fila como compromisso E consome uma vaga
-//     (`v_vagas = v_max - v_compromissos`), então um negócio parado SAI da lista no mesmo gesto.
-//     Medido na tela em 09/09/2026, na empresa de demonstração: criar uma tarefa com prazo hoje
-//     empurrou para fora um negócio de R$ 340.300,00 e o "em jogo" caiu de R$ 2.523.100,00 para
-//     R$ 2.182.800,00 — mas só depois de recarregar a página, que é o defeito que isto fecha.
+//     diferente de "concluida" entra na fila como um compromisso, e compromisso é lido AO VIVO
+//     (§3.2 do desenho de 12/09/2026): sem invalidar esta chave, a tarefa recém-criada só
+//     apareceria na tela depois que os 30 minutos de cache da fila vencessem por conta própria.
+//     🔴 Desde 12/09/2026 (migration 20260912100000_pauta_do_dia_que_encolhe.sql) ela NÃO empurra
+//     mais negócio parado para fora: só o compromisso que já existia em aberto NA VIRADA do dia
+//     desconta vaga (`v_vagas = v_max - v_compromissos`). Criada agora, com prazo hoje, ela entra
+//     na tela ALÉM do teto, sem tirar ninguém do lugar — é a promessa da aba Configurações →
+//     Automação (`AutomacaoTab.tsx`).
 //
 //   · `dashboard_negocios_risco` — `sem_proxima_acao` é `NOT EXISTS (tarefas do negócio com
 //     status <> 'concluida')`, então uma tarefa aberta tira o negócio do cartão "Sem próxima

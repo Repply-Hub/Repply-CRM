@@ -57,7 +57,7 @@ const semNbsp = (s: string) => s.split(String.fromCharCode(0xa0)).join(' ');
 /** Parágrafo sem texto nenhum dentro — o buraco que a linha de baixo vazia deixava. */
 const PARAGRAFO_VAZIO = /<p[^>]*>\s*<\/p>/;
 
-describe('pulso da equipe — o e-mail de quem tem a chave e ficou sem negócio próprio', () => {
+describe('pulso da equipe — o e-mail de quem tem a chave, quando nem a fila própria nem a da equipe têm algo', () => {
   const cinco = [
     negocio({ id: '1', nome: 'Obra Exemplo | Fabricante Exemplo', valor: 180000, dias_parado: 40, responsavel: 'Ana Souza' }),
     negocio({ id: '2', nome: 'Obra Modelo | Marca B', valor: 150000, dias_parado: 32, responsavel: 'Vendedor Dois' }),

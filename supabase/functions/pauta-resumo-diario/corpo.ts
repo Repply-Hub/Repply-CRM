@@ -17,7 +17,10 @@ import { MODELO_RESUMO, MODELO_ITEM, MODELO_LINHA } from "./modelo.ts";
 // byte, de `src/lib/voz-da-pauta.ts` — presas uma à outra por `src/lib/voz-da-pauta.test.ts`.
 import { vozDaPauta } from "../_shared/voz-da-pauta.ts";
 
-/** Um item da fila pessoal, como `pauta_do_dia_de` devolve. */
+/**
+ * Um item da fila de quem vai receber o e-mail, como `pauta_do_dia_de` devolve — inclui os da
+ * equipe quando a pessoa tem a chave `pauta_de_todos` (§3.3 do desenho de 12/09/2026).
+ */
 export interface ItemDaPauta {
   tipo: string;
   selo: string;
@@ -32,9 +35,10 @@ export interface ItemDaPauta {
   // de quem vai receber o e-mail — para o próprio dono ele vem nulo de propósito, senão o
   // e-mail ficaria repetindo o nome da própria pessoa em todo item.
   //
-  // ⚠️ Desde a migration 20260909120000 a fila é sempre pessoal, então ele vem SEMPRE nulo.
-  // A coluna ficou no retorno de propósito (ver o cabeçalho daquela migration), e o tratamento
-  // aqui também: o dia em que a fila voltar a ter item de outra pessoa, os dois voltam a servir.
+  // ⚠️ Desde 12/09/2026 (migration 20260912100000_pauta_do_dia_que_encolhe.sql) a chave
+  // `pauta_de_todos` volta a trazer negócio da equipe: quem a tem recebe, além dos próprios, os
+  // da equipe, com este campo preenchido em cada item de colega. Para quem não tem a chave, e
+  // para o próprio dono em qualquer item, continua vindo nulo.
   responsavel?: string | null;
 }
 
@@ -232,8 +236,11 @@ export function diasParadoPorEmpresa(linhas: AjusteDaEmpresa[]): (empresaId: str
 // ────────────────────────────────────────────────────────────────────────────
 // O PULSO DA EQUIPE
 //
-// Para quem tem a chave `pauta_de_todos` e ficou sem negócio próprio. Ver o comentário do
-// `index.ts` sobre por que este e-mail existe.
+// Para quem tem a chave `pauta_de_todos` e cuja fila do dia — a própria mais a da equipe, desde
+// 12/09/2026 — veio vazia. Hoje é o caso raro em que nem a pessoa nem a equipe têm negócio
+// parado ou compromisso hoje, ou um reenvio depois de a fila já ter zerado no meio do dia (ela
+// só encolhe — ver `soOsPendentes` acima). Ver o comentário do `index.ts` sobre por que este
+// e-mail existe.
 // ────────────────────────────────────────────────────────────────────────────
 
 /**

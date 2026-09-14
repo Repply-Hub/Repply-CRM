@@ -26,20 +26,26 @@ import {
  * tipo de divergência leva meses até alguém notar.
  *
  * ────────────────────────────────────────────────────────────────────────────
- * DOIS E-MAILS, E A REGRA QUE ESCOLHE ENTRE ELES (decisão do dono do produto, 09/09/2026)
+ * DOIS E-MAILS, E A REGRA QUE ESCOLHE ENTRE ELES (decisão do dono do produto, 09/09 e 12/09/2026)
  * ────────────────────────────────────────────────────────────────────────────
- * Desde a migration 20260909120000 a fila da tela "Hoje" voltou a ser SEMPRE pessoal. Quem tem
- * a chave `pauta_de_todos` e nenhum negócio próprio passou a ter fila vazia — e fila vazia não
- * gerava e-mail. Na MD eram três gestoras, uma delas a principal usuária do cliente: as três
- * parariam de receber o e-mail das 7h em silêncio.
+ * Desde 12/09/2026 (migration 20260912100000_pauta_do_dia_que_encolhe.sql) a fila de quem tem a
+ * chave `pauta_de_todos` volta a trazer a equipe: primeiro os negócios do próprio nome, depois
+ * os da equipe. Isso já resolve por conta própria o problema que o PULSO DA EQUIPE nasceu para
+ * cobrir em 09/09/2026 (gestor sem negócio próprio ficando com a fila sempre vazia) — hoje ela só
+ * vem vazia quando NEM a pessoa NEM a equipe têm negócio parado ou compromisso hoje, ou quando o
+ * envio roda de novo depois de a fila do dia já ter zerado (ela só encolhe — ver `soOsPendentes`
+ * em `corpo.ts`).
  *
- * Em vez de sumir, o e-mail MUDA DE ASSUNTO. A regra tem DUAS condições, e as duas contam:
+ * Por isso o e-mail continua sem sumir nesse caso raro: em vez de nada, ele MUDA DE ASSUNTO. A
+ * regra tem DUAS condições, e as duas contam:
  *
- *   fila pessoal vazia   +  TEM a chave  →  o PULSO DA EQUIPE (os 5 maiores da tabela do time)
- *   fila pessoal vazia   +  não tem      →  não sai nada, como sempre
- *   fila pessoal com item                →  a fila pessoal, como sempre — inclusive para quem
- *                                           tem a chave. Não se troca o e-mail de quem já
- *                                           tinha um útil.
+ *   fila (própria + equipe) vazia   +  TEM a chave  →  o PULSO DA EQUIPE (os 5 maiores da
+ *                                                       tabela do time, um recorte mais largo
+ *                                                       que a fila)
+ *   fila (própria + equipe) vazia   +  não tem       →  não sai nada, como sempre
+ *   fila com item                                    →  a fila normal, como sempre — inclusive
+ *                                                        para quem tem a chave. Não se troca o
+ *                                                        e-mail de quem já tinha um útil.
  *
  * 🔴 O CASO DE BORDA — chave, fila vazia E a equipe sem nada em risco: NÃO SAI E-MAIL, e conta
  * como `pulso_vazio` no registro. Três motivos:

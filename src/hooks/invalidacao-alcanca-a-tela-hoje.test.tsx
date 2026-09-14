@@ -15,8 +15,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
  * As três consultas da tela "Hoje" usam "tem tarefa aberta" como critério, e é isso que as
  * amarra a uma tabela que não é a delas:
  *
- *   · a FILA (`pauta_do_dia_de`) põe a tarefa com prazo hoje na lista como compromisso E desconta
- *     uma vaga (`v_vagas = v_max - v_compromissos`), então um negócio parado sai no mesmo gesto;
+ *   · a FILA (`pauta_do_dia_de`) põe a tarefa com prazo hoje na lista como compromisso, AO VIVO —
+ *     e é só isso que este arquivo prende: desde 12/09/2026 uma tarefa criada agora não desconta
+ *     mais vaga nem empurra negócio parado para fora (só o compromisso que já existia na virada
+ *     do dia faz isso); ela aparece além do teto, e é por isso que a fila precisa ser invalidada;
  *   · os CARTÕES de risco (`dashboard_negocios_risco`) calculam `sem_proxima_acao` como
  *     `NOT EXISTS (tarefas do negócio com status <> 'concluida')`;
  *   · a TABELA DO TIME (`negocios_em_risco`) usa a MESMA condição, e desde 09/09/2026 tem chave
@@ -111,7 +113,7 @@ afterEach(() => {
 });
 
 describe('criar tarefa', () => {
-  it('🔴 recarrega a fila da tela "Hoje" — a tarefa entra nela e empurra um negócio para fora', async () => {
+  it('🔴 recarrega a fila da tela "Hoje" — a tarefa entra nela como compromisso, ao vivo', async () => {
     const { wrapper, qc } = envolver();
     const { result } = renderHook(() => useCreateTarefa(), { wrapper });
 

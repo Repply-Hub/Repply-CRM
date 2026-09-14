@@ -14,8 +14,10 @@ import Hoje from './Hoje';
  *   · fila vazia E tabela do time vazia — a tela comemora com o degrau 1, e o sol continua;
  *   · 🔴 fila vazia COM trabalho na tabela do time, ou sem resposta dela — "Sua fila está vazia".
  *     A voz NÃO entra aqui: com a fila vazia ela diz "Seu dia está seu", e isso seria mentira logo
- *     acima de uma tabela cheia. É o estado de quem supervisiona e não tem negócio próprio; ele
- *     nasceu depois do plano da voz, e por isso é o mais fácil de alguém "unificar" sem perceber.
+ *     acima de uma tabela cheia. Desde 12/09/2026 a fila de quem tem a chave já traz a equipe, e
+ *     este estado ficou mais raro — mas continua possível, porque a fila só conta "parado além do
+ *     prazo" e compromisso, e a tabela usa um recorte mais largo ("sem próxima ação" também
+ *     conta); é o mais fácil de alguém "unificar" sem perceber.
  *
  * E a régua de "parado" da frase tem de ser a da empresa, a mesma com que o banco montou a fila: o
  * último bloco prova que o ajuste lido do banco chega à voz, e que sem ele vale o 3 do banco.
@@ -115,7 +117,7 @@ afterEach(() => {
 });
 
 describe('o topo da tela "Hoje"', () => {
-  describe('🔴 fila vazia com trabalho na tabela do time — quem supervisiona e não tem negócio próprio', () => {
+  describe('🔴 fila vazia com trabalho na tabela do time — a fila é mais estreita que a tabela', () => {
     it('continua dizendo "Sua fila está vazia", e aponta a tabela de baixo', () => {
       prepararTela({ pauta: [], tabelaDoTime: { total: 5 } });
       montarATela();

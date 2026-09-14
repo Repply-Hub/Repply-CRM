@@ -166,12 +166,16 @@ const Hoje = () => {
   // recebeu e só mexe nas três chaves dele, então mexer num filtro com o painel aberto preserva
   // `negocio=` — e `comNegocio` faz o simétrico, preservando os filtros ao abrir e ao fechar.
   const { negocioAberto, abrirNegocio, fecharNegocio } = useNegocioNoEndereco();
-  // 🔴 A CHAVE, NÃO O PAPEL, e desde 09/09/2026 ela NÃO governa mais a fila. A fila é sempre
-  // pessoal, para todo mundo (migration 20260909120000): a chave passou a liberar a TABELA DO
-  // TIME, o gráfico por vendedor e o filtro de responsável, todos no painel "No geral" de baixo.
-  // Continua sendo a chave e não o papel: um gestor com o interruptor `pauta_de_todos` desligado
-  // à mão vê a tabela só com os próprios negócios, porque é assim que o servidor responde
-  // (ver `usePossoVerPautaDeTodos` e `eu_vejo_pauta_de_todos()`).
+  // 🔴 A CHAVE, NÃO O PAPEL — e desde 12/09/2026 (migration
+  // 20260912100000_pauta_do_dia_que_encolhe.sql) ela volta a governar a FILA: quem tem
+  // `pauta_de_todos` recebe primeiro os negócios do próprio nome e, depois deles, os da equipe
+  // (com o nome do colega em cada item deles); quem não tem, só os seus. A MESMA chave continua
+  // liberando a TABELA DO TIME, o gráfico por vendedor e o filtro de responsável no painel "No
+  // geral" de baixo — e, desde 20260912110000_risco_segue_a_chave.sql, também os três cartões de
+  // risco e o "Resumo por fabricante" ali. Continua sendo a chave e não o papel: um gestor com o
+  // interruptor `pauta_de_todos` desligado à mão vê a fila e a tabela só com os próprios
+  // negócios, porque é assim que o servidor responde
+  // (ver `usePossoVerPautaDeTodos` e `eu_vejo_pauta_de_todos()`/`ve_pauta_de_todos()`).
   const podeVerDeTodos = usePossoVerPautaDeTodos();
 
   // O MESMO recorte que o painel de baixo manda ao servidor — uma tradução só, para os números
@@ -253,9 +257,13 @@ const Hoje = () => {
   // 🔴 A RÉGUA DE "PARADO" DA FRASE É A DA EMPRESA — a mesma com que o banco montou a fila.
   // `pauta_do_dia_de` lê `pauta_dias_parado` de `configuracoes_automacao` e cai em 3 quando a
   // empresa nunca salvou; este hook lê a mesma chave e cai no mesmo 3 (`PADROES_DA_PAUTA`). Um 3
-  // cravado aqui mediria com outra régua no dia em que uma empresa mudasse o ajuste: a fila AFROUXA
-  // o corte para chegar ao mínimo de itens, então com o ajuste em 10 ela pode trazer um negócio de
-  // 8 dias — e a frase o chamaria de esquecido sem ele nem estar parado para aquela empresa.
+  // cravado aqui mediria com outra régua no dia em que uma empresa mudasse o ajuste: desde
+  // 12/09/2026 acabou o enchimento que completava a fila com negócio dentro do prazo (migration
+  // 20260912100000_pauta_do_dia_que_encolhe.sql) — só entra quem está PARADO pela régua da
+  // empresa —, mas a frase ainda decide por conta própria, no degrau 3, se um negócio da fila
+  // DESTOA dos outros comparando os dias dele com este limite; com um 3 cravado, uma empresa que
+  // use 10 veria a frase apontar como "fora da curva" um negócio que só acabou de cruzar a régua
+  // dela.
   //
   // A chave de cache é a mesma da aba Automação, e salvar lá invalida esta leitura junto com a fila
   // (`useSalvarConfiguracaoAutomacao`). Enquanto a resposta não chega — ou se ela falhar —, vale o
@@ -291,11 +299,14 @@ const Hoje = () => {
   // com a soma das esperas a tela ficaria em esqueleto por segundos com os itens já em mãos.
   const esperandoOTime = total === 0 && carregandoOTime;
 
-  // A fila vazia só COMEMORA quando a tabela de baixo RESPONDEU e veio vazia. Para as três
-  // gestoras da MD que não têm negócio próprio, a fila fica em zero todo dia — comemorar ali
-  // seria dizer "acabou" logo acima de uma tabela com a carteira da equipe inteira. E ausência de
-  // resposta não é resposta: sem saber o que há embaixo, a tela usa a frase sóbria, que não
-  // promete nada.
+  // A fila vazia só COMEMORA quando a tabela de baixo RESPONDEU e veio vazia. Isso já não é o
+  // normal do dia de quem supervisiona: desde 12/09/2026 a fila de quem tem a chave
+  // `pauta_de_todos` já traz a equipe (§3.3 do desenho de 12/09/2026), então ela só zera quando
+  // NINGUÉM — nem a pessoa, nem a equipe — tem negócio parado ou compromisso hoje. Mesmo aí a
+  // tabela pode não estar vazia: ela usa um recorte mais largo (`negocios_em_risco`, que também
+  // conta "sem próxima ação"), então comemorar sem checar a tabela diria "acabou" em cima de uma
+  // carteira que ainda tem o que fazer. E ausência de resposta não é resposta: sem saber o que há
+  // embaixo, a tela usa a frase sóbria, que não promete nada.
   const filaVaziaEComemora = total === 0 && timeRespondeu && totalDoTime === 0;
 
   // 🔴 GANHA DOS OUTROS DOIS ESTADOS, e é o ponto do pedido de 12/09/2026: sem ele, quem
@@ -344,9 +355,11 @@ const Hoje = () => {
             </p>
           </div>
         ) : total === 0 ? (
-          // A fila está vazia, mas HÁ o que fazer logo abaixo. Sem comemoração e sem sol: para
-          // quem supervisiona, a fila própria vazia é o normal do dia, não uma conquista — e uma
-          // frase de "acabou" logo acima de uma tabela cheia é simplesmente falsa.
+          // A fila está vazia, mas HÁ o que fazer logo abaixo. Sem comemoração e sem sol: a fila
+          // só olha "parado além do prazo" e compromisso de hoje — mais estreito que a tabela
+          // (`negocios_em_risco`, que também conta "sem próxima ação") —, então zerar aqui não
+          // quer dizer que a carteira está limpa. Uma frase de "acabou" logo acima de uma tabela
+          // cheia seria simplesmente falsa.
           <div className="flex flex-col items-center gap-2 py-14 text-center">
             <h2 className="text-xl font-semibold text-card-foreground">Sua fila está vazia</h2>
             <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
@@ -402,10 +415,11 @@ const Hoje = () => {
                     setAlvo({
                       pedidoId: item.referencia_id,
                       titulo: item.titulo,
-                      // Da fila vem SEMPRE nulo desde 09/09/2026 (a fila é pessoal, então o
-                      // negócio é sempre de quem está olhando). O campo continua sendo lido
-                      // porque a coluna existe e é o que o e-mail leria se um dia voltasse a
-                      // haver item de outra pessoa aqui.
+                      // Desde 12/09/2026 este campo pode vir preenchido: a fila de quem tem a
+                      // chave `pauta_de_todos` traz item da equipe (§3.3 do desenho de
+                      // 12/09/2026), e `pauta_do_dia_de` só grava o nome do dono quando o
+                      // negócio NÃO é de quem está olhando. É o que faz o diálogo trocar de
+                      // texto e avisar o colega, em vez do próprio gestor.
                       responsavel: item.responsavel,
                     })
                   }

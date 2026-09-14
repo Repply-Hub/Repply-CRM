@@ -2,11 +2,13 @@
  * "Esta pessoa enxerga os negócios de TODA a equipe na tela 'Hoje'?" — a mesma resposta que o
  * banco dá.
  *
- * ⚠️ O NOME DA CHAVE FICOU PARA TRÁS. `pauta_de_todos` já ampliou a FILA da tela "Hoje"; desde
- * 09/09/2026 (migration 20260909120000) a fila é sempre pessoal, para todo mundo. A chave passou
- * a governar o painel "No geral": a TABELA DO TIME (`negocios_em_risco`), o gráfico "Risco por
- * Vendedor" e o filtro de Responsável. Renomeá-la reescreveria linha de permissão em produção, e
- * o que ela decide continua sendo o mesmo — "vejo só os meus ou os da equipe?".
+ * ⚠️ O NOME DA CHAVE JÁ FICOU PARA TRÁS UMA VEZ, E VOLTOU A FAZER SENTIDO. Entre 09/09/2026
+ * (migration 20260909120000, fila sempre pessoal) e 12/09/2026 ela só governava o painel "No
+ * geral": a TABELA DO TIME (`negocios_em_risco`), o gráfico "Risco por Vendedor" e o filtro de
+ * Responsável. Desde 12/09/2026 (migration 20260912100000_pauta_do_dia_que_encolhe.sql) ela
+ * VOLTOU a governar também a FILA — quem a tem recebe primeiro os negócios do próprio nome, e
+ * depois os da equipe. Renomeá-la reescreveria linha de permissão em produção, e o que ela decide
+ * continua sendo o mesmo — "vejo só os meus ou os da equipe?".
  *
  * 🔴 ISTO NÃO PROTEGE NADA (CLAUDE.md §6.1). Quem decide de verdade é
  * `public.ve_pauta_de_todos(uuid)` no Postgres — e, para as consultas do painel,
