@@ -136,6 +136,32 @@ describe('mencionadosNoTexto', () => {
       todos: false,
     });
   });
+
+  it('acha o nome escrito em outra caixa', () => {
+    expect(mencionadosNoTexto('chama @ana agora', new Map([['u1', 'Ana']]))).toEqual({
+      ids: ['u1'],
+      todos: false,
+    });
+    expect(mencionadosNoTexto('@ANA SOUZA', new Map([['u2', 'Ana Souza']]))).toEqual({
+      ids: ['u2'],
+      todos: false,
+    });
+  });
+
+  it('a fronteira de nome continua valendo com maiúscula e minúscula misturadas', () => {
+    expect(mencionadosNoTexto('@anabela', new Map([['u1', 'Ana']]))).toEqual({
+      ids: [],
+      todos: false,
+    });
+  });
+
+  it('conta os dois nomes mesmo com a caixa trocada em algum deles', () => {
+    const doisEscolhidos = new Map([['u1', 'Ana'], ['u2', 'Ana Souza']]);
+    expect(mencionadosNoTexto('@ana souza e @Ana', doisEscolhidos)).toEqual({
+      ids: ['u1', 'u2'],
+      todos: false,
+    });
+  });
 });
 
 describe('consultaCasaComTodos', () => {

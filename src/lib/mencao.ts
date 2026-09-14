@@ -72,7 +72,9 @@ const RE_TODOS = /(?:^|\s)@(?:todos|all)(?![\p{L}\p{N}])/iu;
  * ("@Anabela" não conta para quem escolheu "Ana") nem um nome mais curto engolindo o
  * espaço de um mais longo ("@Ana Souza" sozinho não conta também para quem escolheu só
  * "Ana"). Por isso o nome mais longo é testado primeiro, do mesmo jeito que
- * `partesComMencao` já faz para destacar.
+ * `partesComMencao` já faz para destacar. A busca não distingue maiúscula de minúscula
+ * (revisão de 14/09/2026: `partesComMencao` já destacava "@ana" sem a caixa certa, mas
+ * antes disto ninguém era avisado, porque a comparação de nomes era exata).
  */
 export function mencionadosNoTexto(
   texto: string,
@@ -82,10 +84,10 @@ export function mencionadosNoTexto(
   const nomesEncontrados = new Set<string>();
   if (entradas.length > 0) {
     const alvos = [...entradas].sort((a, b) => b[1].length - a[1].length).map(([, nome]) => escaparRegex(nome));
-    const re = new RegExp(`(?:^|\\s)@(${alvos.join('|')})(?![\\p{L}\\p{N}])`, 'gu');
-    for (const m of texto.matchAll(re)) nomesEncontrados.add(m[1]);
+    const re = new RegExp(`(?:^|\\s)@(${alvos.join('|')})(?![\\p{L}\\p{N}])`, 'giu');
+    for (const m of texto.matchAll(re)) nomesEncontrados.add(m[1].toLowerCase());
   }
-  const ids = entradas.filter(([, nome]) => nomesEncontrados.has(nome)).map(([id]) => id);
+  const ids = entradas.filter(([, nome]) => nomesEncontrados.has(nome.toLowerCase())).map(([id]) => id);
   return { ids, todos: RE_TODOS.test(texto) };
 }
 
