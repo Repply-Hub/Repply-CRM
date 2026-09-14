@@ -26,6 +26,9 @@ const CAMPOS_DE_TELEFONE: Record<string, number> = {
   'components/fabricantes/ContatosDaFabrica.tsx': 1,
   'components/shared/EmpresaSelector.tsx': 1,
   'components/obras/SeletorContatosObra.tsx': 1,
+  'components/whatsapp/CriarContatoDaConversaDialog.tsx': 1,
+  'components/whatsapp/SalvarContatoRecebidoDialog.tsx': 1,
+  'components/whatsapp/VincularEAtualizarContato.tsx': 1,
 };
 
 /** Um `<Input ... />` cujo `value` é um telefone — o que não pode sobrar. */

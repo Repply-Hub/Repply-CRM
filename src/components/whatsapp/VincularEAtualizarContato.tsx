@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CargoSelect } from '@/components/shared/CargoSelect';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { CampoTelefones } from '@/components/shared/CampoTelefones';
 import { useAuth } from '@/hooks/use-auth';
 import { useClientes } from '@/hooks/use-clientes';
 import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
@@ -230,11 +231,9 @@ export function VincularEAtualizarContato({
 
           <div className="space-y-1.5">
             <Label htmlFor="vinc-telefone">Telefone *</Label>
-            <Input
-              id="vinc-telefone"
-              value={telefone}
-              onChange={(e) => setTelefone(e.target.value)}
-            />
+            {/* O número da conversa vem somado aos da ficha (`telefoneComONumeroDoChat`), com
+                ", " — o mesmo separador do campo. Cada número aparece no seu campo. */}
+            <CampoTelefones id="vinc-telefone" value={telefone} onChange={setTelefone} />
             {notaDoTelefone && (
               <p className="text-[11px] text-primary">{notaDoTelefone}</p>
             )}
