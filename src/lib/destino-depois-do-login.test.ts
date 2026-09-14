@@ -30,6 +30,22 @@ describe('destinoDepoisDoLogin', () => {
     expect(destinoDepoisDoLogin('/login')).toBeNull();
   });
 
+  it('/login?x=1 — query não muda que é o próprio login, recusa (Bloco 3, revisão)', () => {
+    expect(destinoDepoisDoLogin('/login?x=1')).toBeNull();
+  });
+
+  it('/login#y — hash não muda que é o próprio login, recusa (Bloco 3, revisão)', () => {
+    expect(destinoDepoisDoLogin('/login#y')).toBeNull();
+  });
+
+  it('/login/sub — sub-rota do login também recusa', () => {
+    expect(destinoDepoisDoLogin('/login/sub')).toBeNull();
+  });
+
+  it('/loginho — rota DIFERENTE que só começa com as mesmas letras, continua aceita', () => {
+    expect(destinoDepoisDoLogin('/loginho')).toBe('/loginho');
+  });
+
   it('um número — não é string, recusa', () => {
     expect(destinoDepoisDoLogin(42)).toBeNull();
   });

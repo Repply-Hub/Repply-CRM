@@ -14,7 +14,12 @@ export function destinoDepoisDoLogin(from: unknown): string | null {
   // é a mesma armadilha por outra porta: alguns navegadores tratam a barra invertida como "/".
   if (from.startsWith('//')) return null;
   if (from.startsWith('/\\')) return null;
-  if (from === '/login') return null;
+  // 🔴 Não é só a string exata `/login`. `/login?x=1` e `/login#y` também voltam para a
+  // MESMA tela de login (query e hash não mudam qual rota o React Router casa), e cairiam
+  // num "redireciona para onde já está" se aceitos. O corte é logo depois de "/login": só
+  // aceita se vier "/", "?", "#" ou o fim da string ali — "/loginho" (uma rota diferente,
+  // que só por acaso começa com as mesmas letras, se um dia existir) continua liberado.
+  if (/^\/login(?:[/?#]|$)/.test(from)) return null;
 
   // Um esquema disfarçado de caminho ("/javascript:alert(1)") ainda tem ":" antes da
   // primeira "/", "?" ou "#" do primeiro segmento — corta ali para não confundir com
