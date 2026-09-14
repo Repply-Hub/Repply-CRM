@@ -1,3 +1,4 @@
+import { createElement } from 'react';
 import {
   LayoutDashboard, Kanban, Users, FileText, Settings, HardHat, Factory,
   Globe, CalendarDays, ClipboardList, Link, BarChart3, Mail, Phone,
@@ -43,21 +44,34 @@ const ICON_MAP: Record<string, LucideIcon> = {
   History,
   ToggleLeft,
   Sun,
-  // O símbolo de marca do WhatsApp, para sair o `MessageCircle` genérico do
-  // item da barra lateral (dono do produto, 14/09/2026). Não é um ícone do
-  // lucide-react — não nasce de `forwardRef`, então o tipo não bate 1:1 com
-  // `LucideIcon` — mas cumpre o mesmo contrato que todo lugar deste arquivo
-  // usa (`<Icon className="..." />`), então o cast abaixo é só para o TIPO
-  // do mapa aceitar.
-  WhatsApp: IconeWhatsApp as unknown as LucideIcon,
 };
 
+// A grade de ícones que `SidebarAddItemDialog` oferece para quem cria um
+// atalho personalizado — de propósito, NÃO inclui 'WhatsApp'. Continua vindo
+// só do ICON_MAP (o catálogo genérico); o símbolo de marca é resolvido à
+// parte, abaixo, e nunca entra nesta lista.
 export const AVAILABLE_ICONS = Object.keys(ICON_MAP);
+
+// Invólucro fino: repassa `className` (e `size`, se vier) para o glifo do
+// WhatsApp, com a margem que a barra lateral precisa (ver o comentário de
+// `margem` em `IconeWhatsApp.tsx` — mesma caixa, glifo preenchido ao lado de
+// ícones só de traço). Fica FORA do ICON_MAP de propósito: não é um ícone do
+// catálogo geral, é o símbolo de UM item específico (dono do produto,
+// 14/09/2026) — ver a regra de `AVAILABLE_ICONS` acima.
+function IconeWhatsAppNaBarra({ className, size }: { className?: string; size?: number }) {
+  return createElement(IconeWhatsApp, { className, size, margem: 2 });
+}
 
 // Sempre devolve um ícone válido. Um nome salvo que saia do ICON_MAP (ex.:
 // ícone removido do catálogo numa limpeza futura) antes deixava o atalho sem
 // nenhum ícone renderizado — nem erro, nem fallback, só espaço em branco.
 export function getIconComponent(name: string): LucideIcon {
+  // 'WhatsApp' resolve à parte — ver `IconeWhatsAppNaBarra` acima. Não é um
+  // ícone do lucide-react (não nasce de `forwardRef`), então o tipo não bate
+  // 1:1 com `LucideIcon`; o cast é só para o TIPO aceitar — todo chamador
+  // deste arquivo só faz `<Icon className="..." />`, contrato que o
+  // invólucro cumpre.
+  if (name === 'WhatsApp') return IconeWhatsAppNaBarra as unknown as LucideIcon;
   return ICON_MAP[name] ?? Link;
 }
 

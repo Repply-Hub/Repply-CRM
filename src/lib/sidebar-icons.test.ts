@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { getIconComponent, isExternalUrl, looksLikeDomain } from './sidebar-icons';
-import { IconeWhatsApp } from '@/components/icones/IconeWhatsApp';
+import { createElement } from 'react';
+import { render } from '@testing-library/react';
+import { getIconComponent, isExternalUrl, looksLikeDomain, AVAILABLE_ICONS } from './sidebar-icons';
 
 describe('isExternalUrl', () => {
   it('reconhece URL com protocolo explícito', () => {
@@ -47,7 +48,16 @@ describe('getIconComponent', () => {
     expect(getIconComponent('IconeQueNaoExisteMais')).toBeDefined();
   });
 
-  it('"WhatsApp" resolve para o componente do símbolo de marca, não para um ícone do lucide', () => {
-    expect(getIconComponent('WhatsApp')).toBe(IconeWhatsApp);
+  it('"WhatsApp" resolve para o símbolo de marca, desenhado com a margem da barra lateral (viewBox -2 -2 28 28)', () => {
+    const Icon = getIconComponent('WhatsApp');
+    const { container } = render(createElement(Icon, { className: 'h-4 w-4' }));
+    const svg = container.querySelector('svg');
+    expect(svg).not.toBeNull();
+    expect(svg?.getAttribute('viewBox')).toBe('-2 -2 28 28');
+    expect(svg?.getAttribute('class')).toBe('h-4 w-4');
+  });
+
+  it('"WhatsApp" não entra na grade de ícones do "Adicionar item" — é o símbolo de UM item, não do catálogo geral', () => {
+    expect(AVAILABLE_ICONS).not.toContain('WhatsApp');
   });
 });
