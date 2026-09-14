@@ -86,3 +86,12 @@ describe('o subtítulo do "No geral"', () => {
     expect(screen.getByText(/A sua carteira/)).toBeInTheDocument();
   });
 });
+
+describe('o rótulo dos cartões', () => {
+  it('o rótulo dos cartões sai do cinza em caixa-alta, pelo contraste de 14/09/2026', () => {
+    desenhar();
+    const rotulo = screen.getByText('Negócios Parados');
+    expect(rotulo.className).not.toContain('uppercase');
+    expect(rotulo.className).toContain('text-card-foreground');
+  });
+});

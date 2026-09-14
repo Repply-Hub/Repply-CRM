@@ -33,8 +33,9 @@ import { recorteParaOServidor, type FiltrosDoPainel } from '@/lib/filtros-do-pai
 // pro eixo — tick em SVG puro (sem a prop `width`, que é o que dispara o word-wrap) e a
 // largura do eixo calculada a partir do nome mais longo.
 // Os nomes na cor do texto principal, e não no cinza secundário: são o que se lê primeiro no
-// gráfico. A grade e o eixo de valores continuam em `commonAxisProps`/`commonGridProps`, que são
-// compartilhados com o Dashboard — mexer lá mudaria aquela tela também.
+// gráfico. Desde 14/09/2026 a grade e os valores do eixo também ganham a força do tema — trocados
+// só no gráfico daqui, porque `commonAxisProps`/`commonGridProps` são compartilhados com o
+// Dashboard e mexer lá mudaria aquela tela também.
 const renderVendedorTick = ({ x, y, payload }: { x: number; y: number; payload: { value: string } }) => (
   <text x={x} y={y} dy={4} textAnchor="end" fontSize={11} fill="hsl(var(--card-foreground))">
     {payload?.value ?? ''}
@@ -156,7 +157,7 @@ export function RadarDeRisco({
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1.5">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Negócios Parados</p>
+                <p className="text-xs font-semibold text-card-foreground">Negócios Parados</p>
                 <p className="text-2xl font-extrabold text-card-foreground tracking-tight">{risco.qtdParados}</p>
                 <span className="text-xs font-semibold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.1)]">
                   {formatCurrency(risco.valorParados)}
@@ -172,7 +173,7 @@ export function RadarDeRisco({
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1.5">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Sem Próxima Ação</p>
+                <p className="text-xs font-semibold text-card-foreground">Sem Próxima Ação</p>
                 <p className="text-2xl font-extrabold text-card-foreground tracking-tight">{risco.qtdSemProximaAcao}</p>
                 <span className="text-xs font-semibold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.1)]">
                   {formatCurrency(risco.valorSemProximaAcao)}
@@ -192,7 +193,7 @@ export function RadarDeRisco({
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1.5">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Valor em Risco</p>
+                <p className="text-xs font-semibold text-card-foreground">Valor em Risco</p>
                 <p className="text-2xl font-extrabold text-card-foreground tracking-tight">{formatCurrency(risco.valorRiscoTotal)}</p>
                 {/* Valor ÚNICO — negócio que é parado E sem próxima ação entra uma vez só.
                     Sem contagem aqui de propósito: qtdParados + qtdSemProximaAcao contaria
@@ -248,8 +249,13 @@ export function RadarDeRisco({
                       <stop offset="100%" stopColor={chartColors.warning} stopOpacity={1} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid {...commonGridProps} vertical horizontal={false} />
-                  <XAxis type="number" {...commonAxisProps} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                  <CartesianGrid {...commonGridProps} stroke="hsl(var(--border))" vertical horizontal={false} />
+                  <XAxis
+                    type="number"
+                    {...commonAxisProps}
+                    tick={{ ...commonAxisProps.tick, fill: 'hsl(var(--card-foreground))' }}
+                    tickFormatter={v => `${(v / 1000).toFixed(0)}k`}
+                  />
                   <YAxis dataKey="vendedor" type="category" {...commonAxisProps} width={riscoVendedorAxisWidth} tick={renderVendedorTick} interval={0} />
                   <Tooltip content={<ChartTooltip formatValue={formatCurrency} />} />
                   <Bar
@@ -283,7 +289,8 @@ export function RadarDeRisco({
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-muted text-[11px] uppercase tracking-wider text-muted-foreground">
+                    {/* A mesma faixa da tabela do time: contraste do dashboard de referência. */}
+                    <tr className="bg-foreground/[0.06] text-xs text-card-foreground">
                       <th className="px-3 py-2 text-left font-semibold">Fabricante</th>
                       <th className="px-3 py-2 text-right font-semibold">Negócios</th>
                       <th className="px-3 py-2 text-right font-semibold">Valor</th>
