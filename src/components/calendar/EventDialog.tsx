@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -121,10 +121,37 @@ export function EventDialog({
   const { data: usuarios, refetch: refetchUsuarios } = useVendedores();
   const {
     data: participantesExistentes,
-    isLoading: carregandoParticipantes,
+    // 🔴 Bloco 3, item A (revisão da revisão). `isFetching`, NÃO `isLoading`. Em React
+    // Query v5, `isLoading = isPending && isFetching`, e `isPending` já nasce falso
+    // assim que existe QUALQUER dado em cache para a chave — inclusive o de uma
+    // abertura anterior deste MESMO evento. Reabrir com o cache quente disparava o
+    // refetch forçado (efeito abaixo) com `isLoading` já falso o tempo todo: a trava
+    // de Salvar nunca via "carregando" nenhum. `isFetching` continua `true` durante
+    // QUALQUER busca, inclusive esse refetch em segundo plano.
+    isFetching: carregandoParticipantes,
+    isSuccess: participantesCarregaramComSucesso,
     isError: participantesComErro,
+    // Quando esta consulta atualizou pela última vez COM SUCESSO — usado para provar que
+    // um resultado é de uma busca mais nova que o pedido de invalidação que este diálogo
+    // disparou ao abrir (ver os dois efeitos abaixo). `isFetching` sozinho não bastava:
+    // ele só reflete a busca já em andamento NUM RENDER SEGUINTE ao `invalidateQueries`,
+    // não no mesmo lote de efeitos em que ele é chamado — e é exatamente nesse intervalo
+    // que uma lista velha do cache podia ser copiada para o formulário.
+    dataUpdatedAt: participantesAtualizadoEm,
     refetch: refetchParticipantes,
   } = useEventoParticipantes(open && editingEvent ? editingEvent.grupoId : null);
+
+  // Ref, e não estado: o valor precisa ficar visível para o efeito de baixo (que copia
+  // participantes para o formulário) DENTRO DO MESMO LOTE de efeitos em que é gravado —
+  // um `useState` só refletiria a mudança no PRÓXIMO render, tarde demais para fechar a
+  // brecha descrita acima.
+  const marcaAntesDeBuscarDeNovoRef = useRef(0);
+  // Espelha `participantesAtualizadoEm` a CADA render (não só em efeito), para o efeito de
+  // abertura poder ler o valor atual sem entrar na lista de dependências dele — se entrasse,
+  // esse efeito (que também reseta o formulário) rodaria de novo toda vez que uma busca de
+  // participantes terminasse, apagando o que a pessoa estivesse digitando.
+  const participantesAtualizadoEmRef = useRef(participantesAtualizadoEm);
+  participantesAtualizadoEmRef.current = participantesAtualizadoEm;
 
   // Funcionários da empresa, incluindo o próprio usuário logado (aparece como "Você", no topo)
   const funcionariosDisponiveis = useMemo(() => {
@@ -150,7 +177,14 @@ export function EventDialog({
     // convidando de novo quem já tinha saído entre uma abertura e outra. Invalidar aqui, ao
     // abrir, força ir ao banco de novo sem mudar o `staleTime` da consulta (que outra tela,
     // `NovaRotaVisitaDialog`, também usa e não deve ser afetada).
+    //
+    // 🔴 O CARIMBO VEM ANTES DO INVALIDATE, de propósito. Guardamos aqui o `dataUpdatedAt`
+    // de ANTES de pedir a busca de novo; os dois efeitos abaixo (trava de Salvar e cópia
+    // para o formulário) só aceitam um resultado com `dataUpdatedAt` MAIOR que este
+    // carimbo — nunca um igual, que é exatamente o que o cache quente ainda mostra no
+    // instante em que este efeito roda.
     if (editingEvent?.grupoId) {
+      marcaAntesDeBuscarDeNovoRef.current = participantesAtualizadoEmRef.current;
       qc.invalidateQueries({ queryKey: ['evento-participantes', editingEvent.grupoId] });
     }
 
@@ -202,13 +236,43 @@ export function EventDialog({
     }
   }, [open, editingEvent, initialData, retomandoRascunho, user?.id, qc]);
 
-  // Preenche os participantes do evento assim que a busca resolve (chega
-  // depois da abertura do modal, por isso é um efeito separado do de cima).
+  // Preenche os participantes do evento assim que a busca resolve (chega depois da
+  // abertura do modal, por isso é um efeito separado do de cima).
+  //
+  // 🔴 Bloco 3, item A (revisão da revisão) — NÃO BASTA `participantesExistentes` existir.
+  // Com o cache quente (reabrir o MESMO evento), `data` já vem preenchido com a lista
+  // VELHA desde o primeiro render depois de abrir — antes mesmo do refetch forçado (efeito
+  // acima) aparecer como "buscando" para este hook. Copiar direto daria exatamente o bug
+  // que este bloco existe para consertar: a tela mostraria (e salvaria, se o usuário fosse
+  // rápido) uma lista que já pode estar desatualizada.
+  //
+  // A condição agora exige TODAS estas coisas ao mesmo tempo:
+  //   - sucesso (nunca copia em cima de erro, mesmo com dado velho ainda em cache);
+  //   - não estar buscando agora (nem a busca inicial, nem um refetch em segundo plano);
+  //   - `dataUpdatedAt` MAIOR que o carimbo guardado no momento em que pedimos a busca de
+  //     novo — prova que ESTE resultado é de uma busca mais nova que aquele pedido, e não
+  //     apenas o dado que já estava no cache antes dele.
+  // Até essas três coisas serem verdade, `form.participantes` continua `undefined` — o que
+  // mantém a defesa de `useUpdateEvento` significativa mesmo neste caminho.
   useEffect(() => {
-    if (open && editingEvent && participantesExistentes) {
+    if (
+      open &&
+      editingEvent &&
+      participantesCarregaramComSucesso &&
+      !carregandoParticipantes &&
+      participantesAtualizadoEm > marcaAntesDeBuscarDeNovoRef.current &&
+      participantesExistentes
+    ) {
       setForm((prev) => ({ ...prev, participantes: participantesExistentes }));
     }
-  }, [open, editingEvent, participantesExistentes]);
+  }, [
+    open,
+    editingEvent,
+    participantesExistentes,
+    participantesCarregaramComSucesso,
+    carregandoParticipantes,
+    participantesAtualizadoEm,
+  ]);
 
   const set = <K extends keyof EventoForm>(key: K, value: EventoForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -250,14 +314,22 @@ export function EventDialog({
   // é participante nem organizador: pode abrir e ler, não pode salvar/excluir.
   const somenteLeitura = isEditing && editingEvent?.podeEditar === false;
 
-  // 🔴 Bloco 3, item A (CRÍTICO). Salvar antes de a lista de participantes voltar do banco
-  // fazia `useUpdateEvento` tratar "ainda não chegou" como "esvaziei de propósito" — e ele
-  // apaga quem não está na lista, disparando "Evento cancelado para você" por chat e e-mail
-  // para todo mundo. Só se aplica a QUEM PODE GERENCIAR participantes de um evento JÁ
+  // 🔴 Bloco 3, item A (CRÍTICO, revisado). Salvar antes de a lista de participantes voltar
+  // do banco fazia `useUpdateEvento` tratar "ainda não chegou" como "esvaziei de propósito"
+  // — e ele apaga quem não está na lista, disparando "Evento cancelado para você" por chat e
+  // e-mail para todo mundo. Só se aplica a QUEM PODE GERENCIAR participantes de um evento JÁ
   // existente: criar evento novo não consulta participantes existentes, e quem só participa
   // nunca atualiza o grupo inteiro (ver `useUpdateEvento`).
-  const aguardandoParticipantes =
-    isEditing && podeGerenciarParticipantes && (carregandoParticipantes || participantesComErro);
+  //
+  // "Pronto" usa o MESMO carimbo do efeito de cópia acima — não basta ter sucesso e não
+  // estar buscando: com cache quente, isso já era verdade no instante em que pedimos o
+  // refetch (ver comentário no efeito de abertura). Só conta como pronto um sucesso mais
+  // novo que aquele pedido.
+  const participantesProntos =
+    participantesCarregaramComSucesso &&
+    !carregandoParticipantes &&
+    participantesAtualizadoEm > marcaAntesDeBuscarDeNovoRef.current;
+  const aguardandoParticipantes = isEditing && podeGerenciarParticipantes && !participantesProntos;
 
   const salvarDeFato = () => {
     onSave(form);
@@ -476,7 +548,10 @@ export function EventDialog({
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={!podeGerenciarParticipantes}
+                    // 🔴 Bloco 3, item A (revisão). Também trava enquanto a lista está sendo
+                    // (re)buscada — sem isso, o organizador podia editar uma seleção que está
+                    // prestes a ser substituída pelo resultado do refetch em andamento.
+                    disabled={!podeGerenciarParticipantes || aguardandoParticipantes}
                     className="w-full justify-between font-normal h-10"
                   >
                     <span className="flex items-center gap-2 min-w-0">
@@ -547,7 +622,11 @@ export function EventDialog({
                     return (
                       <Badge key={uid} variant="secondary" className="gap-1">
                         {isSelf ? 'Você' : u.nome}
-                        {podeGerenciarParticipantes && (
+                        {/* 🔴 Bloco 3, item A (revisão): também trava enquanto busca/refetch —
+                            este "×" fica fora do popover, então travar só o gatilho principal
+                            não bastaria para impedir remover alguém da lista que já está prestes
+                            a ser substituída. */}
+                        {podeGerenciarParticipantes && !aguardandoParticipantes && (
                           <button
                             type="button"
                             className="ml-1 hover:text-destructive"
