@@ -72,6 +72,33 @@ vem **igual ao original** e a pessoa troca o que precisar **antes** de o negóci
 9. **A cópia não ganha marca de "veio de outro negócio".** O espaço de comentários é da equipe, e
    recado automático ali vira ruído.
 
+### Decisões do dono do produto (15/09/2026 — correção da revisão final)
+
+10. **D1 — vendedor comum duplicando o negócio de outra pessoa vira o único responsável.** Fala
+    literal do dono do produto: "Cópia nasce dele, no entanto o responsável do negócio o qual foi
+    copiado não precisa entrar como responsável secundário, pode ser somente o novo responsável
+    mesmo." Lida como "só o novo responsável, mais ninguém": nem o principal do original nem os
+    outros responsáveis dele entram na cópia.
+
+    Por quê: a regra de segurança do banco (`pedidos_insert`) só deixa quem NÃO é gestor criar um
+    negócio em nome de SI MESMO (`usuario_id = get_my_usuario_id()`), e o campo Responsável da
+    janela vem travado para quem não é gestor (`disabled={!isGestor}`). Sem esta regra, duplicar
+    o negócio de um colega nascia com um `vendedorId` que a pessoa não conseguia trocar nem
+    conseguia salvar — o "Criar" era recusado pelo banco, com uma frase em inglês.
+
+    A decisão 5 continua valendo exatamente como estava para os outros dois casos: gestor
+    duplicando qualquer negócio, ou alguém duplicando o PRÓPRIO negócio — nesses dois, o
+    principal da cópia continua sendo o do original, e os outros responsáveis viajam junto.
+
+11. **D2 — negócio que sumiu ou saiu do alcance não trava a tela.** Quando `?copiaDe=` aponta
+    para um negócio que não existe mais ou que a pessoa não pode ver (a consulta volta `null`, por
+    exclusão ou pela regra de segurança do banco), a tela não fica girando nem mostra erro cru:
+    avisa uma vez —
+
+    > "Não foi possível abrir o negócio para duplicar — ele pode ter sido excluído."
+
+    — e abre o Novo Negócio em branco, o mesmo que abriria sem `?copiaDe=` nenhum.
+
 ## 4. O desenho
 
 ### 4.1 O gesto
@@ -89,8 +116,8 @@ Fechar a janela sem confirmar **não grava nada**.
 | Vem preenchido | De onde |
 |---|---|
 | Cliente, obra, fábrica | as mesmas do original |
-| Responsável principal | o mesmo do original (decisão 5) |
-| Outros responsáveis | os mesmos; se a gravação for recusada por permissão, vale o aviso que já existe |
+| Responsável principal | o mesmo do original (decisão 5) — **exceto** quando quem duplica não é gestor e não é o principal do original: aí é ela mesma (D1, 15/09/2026) |
+| Outros responsáveis | os mesmos; se a gravação for recusada por permissão, vale o aviso que já existe — **exceto** no mesmo caso de D1 acima, em que a cópia nasce sem nenhum outro responsável |
 | Marcador, origem do lead, endereço de entrega | os mesmos |
 | Valor de negociação | o mesmo |
 | Anexo | **o mesmo arquivo**, pelo link (decisão 8) |
