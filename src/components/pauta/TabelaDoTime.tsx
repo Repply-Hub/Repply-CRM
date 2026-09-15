@@ -9,6 +9,7 @@ import {
   restaurarColuna,
   somaDasLarguras,
   type ColunaAjustavel,
+  type Larguras,
 } from '@/lib/larguras-de-colunas';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MOLDURA_DA_PAUTA } from '@/components/pauta/moldura-da-pauta';
@@ -216,27 +217,23 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
   const mudarLargura = (coluna: ColunaAjustavel, nova: number) =>
     setLarguras((atual) => ajustarLargura(atual, coluna, nova));
 
-  // O fim do gesto muda e grava. A conta parte das larguras DESTA renderização, e isso é seguro:
-  // durante um arraste só a coluna arrastada muda, e o valor final dela vem do ponteiro, não do
-  // estado.
-  const soltarLargura = (coluna: ColunaAjustavel, nova: number) => {
-    const final = ajustarLargura(larguras, coluna, nova);
-    // Sem mudança de verdade — um clique na alça sem chegar a arrastar, por exemplo — não grava.
-    // Gravar aqui mesmo sem mudança congelaria a largura-padrão de hoje no navegador de quem só
-    // tocou a alça, como se a pessoa tivesse escolhido um ajuste que nunca fez.
-    if (final[coluna.chave] === larguras[coluna.chave]) return;
+  // Sem mudança de verdade — um clique na alça sem chegar a arrastar, por exemplo — não grava.
+  // Gravar mesmo sem mudança congelaria a largura-padrão de hoje no navegador de quem só tocou a
+  // alça, como se a pessoa tivesse escolhido um ajuste que nunca fez.
+  const aplicarSeMudou = (chave: string, final: Larguras) => {
+    if (final[chave] === larguras[chave]) return;
     setLarguras(final);
     gravarLarguras(chaveGuardada, final);
   };
 
-  const restaurarLargura = (coluna: ColunaAjustavel) => {
-    const final = restaurarColuna(larguras, coluna);
-    // Mesmo motivo do `soltarLargura` acima: coluna que já está no padrão e recebe dois cliques
-    // não tem nada de novo para gravar.
-    if (final[coluna.chave] === larguras[coluna.chave]) return;
-    setLarguras(final);
-    gravarLarguras(chaveGuardada, final);
-  };
+  // O fim do gesto muda e grava. A conta parte das larguras DESTA renderização, e isso é seguro:
+  // durante um arraste só a coluna arrastada muda, e o valor final dela vem do ponteiro, não do
+  // estado.
+  const soltarLargura = (coluna: ColunaAjustavel, nova: number) =>
+    aplicarSeMudou(coluna.chave, ajustarLargura(larguras, coluna, nova));
+
+  const restaurarLargura = (coluna: ColunaAjustavel) =>
+    aplicarSeMudou(coluna.chave, restaurarColuna(larguras, coluna));
 
   const coluna = (chave: string) => colunas.find((c) => c.chave === chave) as ColunaAjustavel;
 

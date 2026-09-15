@@ -294,6 +294,9 @@ describe('a tabela do time', () => {
         // A prova de que a foto SUBSTITUI a inicial, em vez de as duas aparecerem juntas — o
         // defeito original relatado pelo Lucas (ver o comentário de `CampoDeResponsaveis.foto.test.tsx`).
         expect(within(linhaDoDono).queryByText('AS')).toBeNull();
+        // As outras 9 linhas continuam mostrando as iniciais porque não têm foto — o conserto não
+        // esconde a inicial de quem não tem avatar.
+        expect(screen.getAllByText('AS')).toHaveLength(9);
       } finally {
         (window as unknown as { Image: unknown }).Image = ImagemOriginal;
       }
