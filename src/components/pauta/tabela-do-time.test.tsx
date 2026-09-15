@@ -144,6 +144,9 @@ describe('a tabela do time', () => {
    * 🔴 O TETO DE 100 DA FUNÇÃO DE BANCO. Passando dele, o servidor devolve as mesmas 100 linhas
    * por mais que a tela peça — um "Ver mais" ali seria um botão que não faz nada. A tabela para
    * de oferecê-lo e diz onde parou.
+   *
+   * O teste desenha até 100 linhas em nove cliques: sozinho leva uns 3 s, e com a máquina
+   * ocupada passou dos 5 s do padrão (15/09/2026). Daí o prazo próprio no fim.
    */
   it('para no teto de 100 e explica, em vez de oferecer um botão que não muda nada', async () => {
     estado.total = 145;
@@ -156,7 +159,7 @@ describe('a tabela do time', () => {
       expect(screen.getByText(/Mostrando os 100 maiores de 145/)).toBeInTheDocument(),
     );
     expect(screen.queryByText(/Ver mais/)).toBeNull();
-  });
+  }, 15_000);
 
   /**
    * Sem a chave `pauta_de_todos` o servidor só manda os negócios da própria pessoa, então a
