@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
@@ -20,7 +20,12 @@ import type { ReactNode } from 'react';
  */
 
 const estado = vi.hoisted(() => ({
-  chamadas: [] as { p_limite: number; p_etapas: string[] | null }[],
+  chamadas: [] as {
+    p_limite: number;
+    p_etapas: string[] | null;
+    p_ordenar_por?: string;
+    p_ascendente?: boolean;
+  }[],
   total: 145,
   // Quantas retomadas a PRIMEIRA linha teve (as outras vêm com 0). Um teste sobe isto para provar a
   // etiqueta "Nª tentativa"; o padrão 0 mantém os outros testes sem etiqueta nenhuma.
@@ -32,7 +37,10 @@ const estado = vi.hoisted(() => ({
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
-    rpc: async (_nome: string, args: { p_limite: number; p_etapas: string[] | null }) => {
+    rpc: async (
+      _nome: string,
+      args: { p_limite: number; p_etapas: string[] | null; p_ordenar_por?: string; p_ascendente?: boolean },
+    ) => {
       estado.chamadas.push(args);
       if (estado.erro) return { data: null, error: estado.erro };
       // O servidor devolve no máximo o que existe no recorte — e nunca mais de 100, que é o teto
@@ -84,6 +92,16 @@ function montar(filtros: { etapas?: string[] } = {}, podeVerDeTodos = true) {
   );
 }
 
+// O menu de ordenação é Radix, que usa APIs de ponteiro que o jsdom não implementa; sem estes
+// esboços, abrir o menu estoura.
+beforeAll(() => {
+  const proto = window.HTMLElement.prototype;
+  proto.hasPointerCapture ??= () => false;
+  proto.setPointerCapture ??= () => {};
+  proto.releasePointerCapture ??= () => {};
+  proto.scrollIntoView ??= () => {};
+});
+
 beforeEach(() => {
   estado.chamadas = [];
   estado.total = 145;
@@ -121,6 +139,40 @@ describe('a tabela do time', () => {
 
     expect(await screen.findByText('Ver mais (mostrando 20 de 145)')).toBeInTheDocument();
     expect(estado.chamadas.map((c) => c.p_limite)).toEqual([10, 20]);
+  });
+
+  it('a ordenação-padrão que vai ao servidor é maior valor primeiro', async () => {
+    montar();
+    await screen.findByText('Negócio 0');
+    expect(estado.chamadas[0].p_ordenar_por).toBe('valor');
+    expect(estado.chamadas[0].p_ascendente).toBe(false);
+  });
+
+  it('ordenar por "Menor valor primeiro" manda valor ascendente e volta o "Ver mais" para 10', async () => {
+    montar();
+    // Cresce para 20 primeiro — é o que prova que trocar a ordem REINICIA a lista, não pede 20 da
+    // ordem nova (o mesmo cuidado do reinício por filtro, acima).
+    fireEvent.click(await screen.findByText('Ver mais (mostrando 10 de 145)'));
+    await screen.findByText('Ver mais (mostrando 20 de 145)');
+
+    // Abre o menu do título "Valor" (Enter abre o menu Radix de forma confiável no jsdom) e escolhe
+    // o crescente.
+    fireEvent.keyDown(screen.getByRole('button', { name: /Valor/ }), { key: 'Enter' });
+    fireEvent.click(await screen.findByText('Menor valor primeiro'));
+
+    await waitFor(() => {
+      const ultima = estado.chamadas.at(-1)!;
+      expect(ultima.p_ordenar_por).toBe('valor');
+      expect(ultima.p_ascendente).toBe(true);
+      expect(ultima.p_limite).toBe(10);
+    });
+  });
+
+  it('a coluna de ações não tem menu de ordenação', async () => {
+    montar();
+    await screen.findByText('Negócio 0');
+    // O cabeçalho de ações é o rótulo invisível "Ações", e não vira gatilho de ordenação.
+    expect(screen.queryByRole('button', { name: 'Ações' })).toBeNull();
   });
 
   it('🔴 mexer no filtro volta para 10 SEM pedir antes as 20 do recorte novo', async () => {

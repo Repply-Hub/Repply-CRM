@@ -264,14 +264,14 @@ export type NegocioEmRisco = {
 // É por isso que o teto de 100 dentro da função importa — ver o cabeçalho da migration.
 export function useNegociosEmRisco(
   empresaId: string | undefined,
-  filtros: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number; etapas?: string[]; dataDe?: string; dataAte?: string },
+  filtros: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number; etapas?: string[]; dataDe?: string; dataAte?: string; ordenarPor?: string; ascendente?: boolean },
   quantos: number,
 ) {
-  const { usuarioIds, fabricanteIds, funilId, diasParado = 7, etapas, dataDe, dataAte } = filtros;
+  const { usuarioIds, fabricanteIds, funilId, diasParado = 7, etapas, dataDe, dataAte, ordenarPor, ascendente } = filtros;
 
   return useQuery({
     // `quantos` entra na chave: cada "Ver mais" é uma consulta nova, e a anterior fica em cache.
-    queryKey: ['negocios_em_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado, etapas, dataDe, dataAte, quantos],
+    queryKey: ['negocios_em_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado, etapas, dataDe, dataAte, ordenarPor, ascendente, quantos],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('negocios_em_risco', {
         // Array vazio em filtro de RPC filtra tudo fora (CLAUDE.md §7.8): `= ANY('{}')` não casa
@@ -289,6 +289,10 @@ export function useNegociosEmRisco(
         // colunas de data — §7.9). Vazio (null) = sem recorte, o padrão.
         p_data_de: dataDe ?? null,
         p_data_ate: dataAte ?? null,
+        // Ordenação por coluna, NO SERVIDOR (a tabela é paginada — ordenar só a página enganaria).
+        // A lista branca de colunas mora no SQL; aqui só o nome e a direção. Padrão: maior valor.
+        p_ordenar_por: ordenarPor ?? 'valor',
+        p_ascendente: ascendente ?? false,
       });
       if (error) throw error;
       const linhas = (data ?? []) as NegocioEmRisco[];

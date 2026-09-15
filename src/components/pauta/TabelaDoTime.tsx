@@ -1,5 +1,13 @@
 import { useRef, useState } from 'react';
+import { Check, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { iniciais } from '@/lib/iniciais';
 import {
@@ -201,6 +209,18 @@ interface Props {
 export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRetomar }: Props) {
   const [quantos, setQuantos] = useState(PAGINA);
 
+  // A ORDENAÇÃO, NO SERVIDOR — pedido de 15/09/2026. A tabela é paginada (cresce de 10 em 10), então
+  // ordenar só as linhas já carregadas enganaria: clicar em "valor" reordenaria o pedaço visível, não
+  // a lista inteira. Por isso a coluna e a direção vão para a função de banco. Padrão: maior valor
+  // primeiro, como antes. A lista branca de colunas permitidas mora no SQL (segura pelo teto de 100).
+  const [ordem, setOrdem] = useState<{ coluna: string; ascendente: boolean }>({
+    coluna: 'valor',
+    ascendente: false,
+  });
+  // Trocar a ordenação volta a lista ao começo (as 10 primeiras da ordem nova). O reinício sai de
+  // graça: `ordem` entra na `chaveDoRecorte` abaixo, que já zera o "Ver mais" quando ela muda.
+  const ordenarPor = (coluna: string, ascendente: boolean) => setOrdem({ coluna, ascendente });
+
   // As larguras das colunas: uma lista para cada forma da tabela, e o ajuste guardado neste
   // navegador. Ver `COLUNAS_COM_RESPONSAVEL` e `src/lib/larguras-de-colunas.ts`.
   const colunas = podeVerDeTodos ? COLUNAS_COM_RESPONSAVEL : COLUNAS_SEM_RESPONSAVEL;
@@ -247,22 +267,57 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
    * largura da coluna Responsável" — o leitor de tela repetiria a frase da alça a cada célula, e o
    * teste que procura a coluna pelo nome deixaria de achá-la.
    */
-  const titulo = (c: ColunaAjustavel, rotulo: string, alinhamento: 'left' | 'right') => (
-    <th
-      aria-label={rotulo}
-      className={`relative px-2 py-2 font-semibold ${alinhamento === 'right' ? 'text-right' : 'text-left'}`}
-    >
-      {rotulo}
-      <AlcaDeLargura
-        rotulo={rotulo}
-        largura={larguras[c.chave]}
-        minima={c.minima}
-        onMudar={(nova) => mudarLargura(c, nova)}
-        onSoltar={(nova) => soltarLargura(c, nova)}
-        onRestaurar={() => restaurarLargura(c)}
-      />
-    </th>
-  );
+  const titulo = (
+    c: ColunaAjustavel,
+    rotulo: string,
+    alinhamento: 'left' | 'right',
+    sortKey: string,
+    rotuloAsc: string,
+    rotuloDesc: string,
+  ) => {
+    const ativa = ordem.coluna === sortKey;
+    return (
+      <th
+        aria-label={rotulo}
+        className={`relative px-2 py-2 font-semibold ${alinhamento === 'right' ? 'text-right' : 'text-left'}`}
+      >
+        {/* O NOME abre o menu de ordenação; a alça na borda direita continua sendo a de LARGURA. Os
+            dois gestos não se cruzam: a alça é uma faixa de 8px colada na borda, fora deste botão. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                'inline-flex max-w-full items-center gap-1 rounded hover:text-foreground',
+                alinhamento === 'right' && 'flex-row-reverse',
+              )}
+            >
+              <span className="truncate">{rotulo}</span>
+              <ChevronDown className={cn('h-3 w-3 shrink-0', ativa && 'text-primary')} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align={alinhamento === 'right' ? 'end' : 'start'} className="w-52">
+            <DropdownMenuItem className="gap-2" onClick={() => ordenarPor(sortKey, true)}>
+              <Check className={cn('h-3.5 w-3.5 shrink-0', !(ativa && ordem.ascendente) && 'opacity-0')} />
+              {rotuloAsc}
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2" onClick={() => ordenarPor(sortKey, false)}>
+              <Check className={cn('h-3.5 w-3.5 shrink-0', !(ativa && !ordem.ascendente) && 'opacity-0')} />
+              {rotuloDesc}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <AlcaDeLargura
+          rotulo={rotulo}
+          largura={larguras[c.chave]}
+          minima={c.minima}
+          onMudar={(nova) => mudarLargura(c, nova)}
+          onSoltar={(nova) => soltarLargura(c, nova)}
+          onRestaurar={() => restaurarLargura(c)}
+        />
+      </th>
+    );
+  };
 
   /**
    * 🔴 MEXER EM QUALQUER FILTRO VOLTA PARA 10.
@@ -296,6 +351,8 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
     filtros.etapas ?? null,
     filtros.dataDe ?? null,
     filtros.dataAte ?? null,
+    ordem.coluna,
+    ordem.ascendente,
   ]);
   const [recorteMostrado, setRecorteMostrado] = useState(chaveDoRecorte);
   if (recorteMostrado !== chaveDoRecorte) {
@@ -305,7 +362,7 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
 
   const { data, isPending, isPaused, isFetching, error, failureReason } = useNegociosEmRisco(
     empresaId,
-    filtros,
+    { ...filtros, ordenarPor: ordem.coluna, ascendente: ordem.ascendente },
     quantos,
   );
 
@@ -329,7 +386,7 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
               (migration 20260909130000). Na MD, hoje, a maioria da lista é "sem próxima ação" — o
               corte de parado é de 7 dias. Um título que só dissesse "parados" mentiria sobre o
               que a tabela lista. */}
-          Parados além do prazo ou sem próxima ação marcada. Do maior valor para o menor.
+          Parados além do prazo ou sem próxima ação marcada. Ordene por qualquer coluna no título.
         </CardDescription>
       </CardHeader>
 
@@ -402,12 +459,13 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
                       `foreground` com transparência escurece no tema claro e clareia no escuro, sem
                       regra por tema. */}
                   <tr className="bg-foreground/[0.06] text-xs text-card-foreground">
-                    {titulo(coluna('negocio'), 'Negócio', 'left')}
-                    {titulo(coluna('fabricante'), 'Fabricante', 'left')}
-                    {titulo(coluna('etapa'), 'Etapa', 'left')}
-                    {podeVerDeTodos && titulo(coluna('responsavel'), 'Responsável', 'left')}
-                    {titulo(coluna('valor'), 'Valor', 'right')}
-                    {titulo(coluna('dias'), 'Sem mexer há', 'right')}
+                    {titulo(coluna('negocio'), 'Negócio', 'left', 'negocio', 'A → Z', 'Z → A')}
+                    {titulo(coluna('fabricante'), 'Fabricante', 'left', 'fabricante', 'A → Z', 'Z → A')}
+                    {titulo(coluna('etapa'), 'Etapa', 'left', 'etapa', 'A → Z', 'Z → A')}
+                    {podeVerDeTodos &&
+                      titulo(coluna('responsavel'), 'Responsável', 'left', 'responsavel', 'A → Z', 'Z → A')}
+                    {titulo(coluna('valor'), 'Valor', 'right', 'valor', 'Menor valor primeiro', 'Maior valor primeiro')}
+                    {titulo(coluna('dias'), 'Sem mexer há', 'right', 'dias', 'Menos dias primeiro', 'Mais dias primeiro')}
                     <th className="px-2 py-2 text-right font-semibold">
                       <span className="sr-only">Ações</span>
                     </th>
