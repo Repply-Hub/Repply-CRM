@@ -176,6 +176,12 @@ serve(async (req) => {
             .from("email_contas")
             .update({ status: "revogada", ultimo_erro: ultimoMotivo.slice(0, 500) })
             .eq("id", m.conta_id);
+          // A conta caiu no meio: as mensagens desta seleção ainda não tentadas
+          // NÃO serão processadas. Elas contam como falha para o aviso na tela
+          // não subestimar o problema — "1 não foi excluído" quando 15 nem foram
+          // tentadas seria a mesma mentira que esta mudança veio consertar.
+          // Nenhuma é escondida: só se grava local o que o provedor confirmou.
+          falharam = alvos.length - excluidas;
           break;
         }
         continue;
