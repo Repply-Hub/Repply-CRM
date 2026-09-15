@@ -40,6 +40,7 @@ import { EventDateTimeField } from './EventDateTimeField';
 import { LembretesField } from './LembretesField';
 import { LEMBRETES_PADRAO, normalizarLembretes } from '@/lib/lembretes-do-evento';
 import { ajustarCicloDeAberturaEProntidao } from '@/lib/prontidao-de-participantes';
+import { paraCampoData, paraCampoDataHora, novoFimAoMudarInicio } from '@/lib/campo-de-data-hora';
 
 interface EventDialogProps {
   open: boolean;
@@ -73,14 +74,6 @@ interface EventDialogProps {
    * acontecer normalmente.
    */
   retomandoRascunho?: boolean;
-}
-
-function toDatetimeLocal(iso: string): string {
-  return iso.slice(0, 16);
-}
-
-function toDateInput(iso: string): string {
-  return iso.slice(0, 10);
 }
 
 const defaultForm = (): EventoForm => {
@@ -216,12 +209,17 @@ export function EventDialog({
     if (retomandoRascunho) return;
 
     if (editingEvent) {
+      // 🔴 `editingEvent.inicio`/`.fim` já são `Date` — nunca passar por `toISOString()` aqui.
+      // `toISOString()` lê UTC, e o campo `datetime-local`/`date` é sempre fuso LOCAL: um
+      // evento das 17h de Brasília aparecia como 20h no campo, e salvar sem mudar nada já
+      // empurrava o evento 3 horas. `paraCampoData`/`paraCampoDataHora` (`campo-de-data-hora.ts`)
+      // leem o `Date` no fuso local, a mesma família que `defaultForm` já usa acima.
       const ini = editingEvent.diaInteiro
-        ? toDateInput(editingEvent.inicio.toISOString())
-        : toDatetimeLocal(editingEvent.inicio.toISOString());
+        ? paraCampoData(editingEvent.inicio)
+        : paraCampoDataHora(editingEvent.inicio);
       const fim = editingEvent.diaInteiro
-        ? toDateInput(editingEvent.fim.toISOString())
-        : toDatetimeLocal(editingEvent.fim.toISOString());
+        ? paraCampoData(editingEvent.fim)
+        : paraCampoDataHora(editingEvent.fim);
       setForm({
         titulo: editingEvent.titulo,
         descricao: editingEvent.descricao ?? '',
@@ -505,7 +503,19 @@ export function EventDialog({
               label="Início"
               type={form.diaInteiro ? 'date' : 'datetime-local'}
               value={form.inicio}
-              onChange={(value) => set('inicio', value)}
+              // "Leva o fim junto", como no Google Agenda: mudar o início anda o fim para
+              // manter a mesma duração (`novoFimAoMudarInicio`, campo-de-data-hora.ts). Usa o
+              // `prev` do próprio setState — nunca `form` fechado no closure — porque início e
+              // fim têm de mudar juntos, na mesma atualização de estado. Mudar o FIM não passa
+              // por aqui (onChange dele continua chamando `set` sozinho, abaixo): nunca mexe no
+              // início.
+              onChange={(value) =>
+                setForm((prev) => ({
+                  ...prev,
+                  inicio: value,
+                  fim: novoFimAoMudarInicio(prev.inicio, value, prev.fim, prev.diaInteiro),
+                }))
+              }
             />
             <EventDateTimeField
               label="Fim"

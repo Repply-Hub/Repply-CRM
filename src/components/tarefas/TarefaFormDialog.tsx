@@ -34,6 +34,7 @@ import { SeletorComBusca } from '@/components/tarefas/SeletorComBusca';
 import { ParticipantesMultiSelect } from '@/components/tarefas/ParticipantesMultiSelect';
 import { MarcadoresMultiSelect } from '@/components/tarefas/MarcadoresMultiSelect';
 import { EventDateTimeField } from '@/components/calendar/EventDateTimeField';
+import { paraCampoDataHora } from '@/lib/campo-de-data-hora';
 
 interface KanbanStage {
   key: string;
@@ -128,7 +129,12 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
     if (editingTarefa) {
       setForm({
         titulo: editingTarefa.titulo, descricao: editingTarefa.descricao || '', status: editingTarefa.status,
-        prazo_final: editingTarefa.prazo_final ? editingTarefa.prazo_final.slice(0, 16) : '',
+        // 🔴 `.slice(0, 16)` cortava o texto em UTC direto do banco (`timestamptz`) e o jogava
+        // no campo como se já fosse hora local — um prazo das 17h de Brasília aparecia como
+        // 20h, e salvar sem mudar nada empurrava o prazo 3 horas (mesma família do CLAUDE.md
+        // §7.12). `new Date(...)` lê o carimbo certo (UTC) e `paraCampoDataHora` escreve no
+        // fuso local, igual ao padrão de `campo-de-data-hora.ts`.
+        prazo_final: editingTarefa.prazo_final ? paraCampoDataHora(new Date(editingTarefa.prazo_final)) : '',
         responsavel: editingTarefa.responsavel || '', participantes: editingTarefa.participantes || '',
         observadores: editingTarefa.observadores || '', projeto: editingTarefa.projeto || '', marcadores: editingTarefa.marcadores || '',
         pedido_id: editingTarefa.pedido_id || '', cliente_id: editingTarefa.cliente_id || '',
