@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
@@ -13,6 +14,8 @@ import {
   PADROES_DA_PAUTA,
   type ChaveDaPauta,
 } from '@/hooks/use-configuracoes-automacao';
+// A mesma consulta que a aba de Usuários usa (`UsuariosTab`); a RLS de `usuarios` isola por empresa.
+import { useVendedores } from '@/hooks/use-clientes';
 
 /**
  * A aba "Automação" das Configurações.
@@ -53,6 +56,7 @@ interface Props {
 export function AutomacaoTab({ empresaId }: Props) {
   const { data: config, isLoading } = useConfiguracoesAutomacao(empresaId);
   const salvar = useSalvarConfiguracaoAutomacao(empresaId);
+  const { data: equipe } = useVendedores();
 
   // Os campos de número são digitados: guardar em texto deixa o campo ficar vazio enquanto
   // a pessoa apaga para redigitar. Converter a cada tecla faria "" virar 0 e o cursor
@@ -66,7 +70,7 @@ export function AutomacaoTab({ empresaId }: Props) {
     setMaximo(String(config.pauta_max_itens));
   }, [config]);
 
-  const gravar = async (chave: ChaveDaPauta, valor: number | boolean | number[]) => {
+  const gravar = async (chave: ChaveDaPauta, valor: number | boolean | number[] | string[]) => {
     try {
       await salvar.mutateAsync({ chave, valor });
     } catch (e) {
@@ -117,6 +121,15 @@ export function AutomacaoTab({ empresaId }: Props) {
       return;
     }
     void gravar('pauta_dias_da_semana', novo);
+  };
+
+  const excluidos = config.pauta_resumo_excluidos;
+
+  // Lista de EXCLUÍDOS (não de incluídos): desmarcar a pessoa a acrescenta, marcar a remove.
+  // Ausência = recebe. É o que faz "todos por padrão" valer inclusive para quem entra depois.
+  const alternarPessoa = (id: string, recebe: boolean) => {
+    const novos = recebe ? excluidos.filter((x) => x !== id) : [...excluidos, id];
+    void gravar('pauta_resumo_excluidos', novos);
   };
 
   return (
@@ -223,6 +236,30 @@ export function AutomacaoTab({ empresaId }: Props) {
               Só o e-mail respeita esses dias. A tela "Hoje" continua mostrando a pauta de hoje
               todo dia, inclusive fim de semana, para quem escolher trabalhar.
             </p>
+          </div>
+
+          {/* A EQUIPE, pessoa a pessoa — pedido de 15/09/2026. Todos marcados por padrão; o gestor
+              desmarca as exceções. Some quando o resumo está desligado, como os dias acima. */}
+          <div className={cn('space-y-2', !config.pauta_resumo_email && 'opacity-50')}>
+            <Label>Quem recebe</Label>
+            <p className="text-xs text-muted-foreground">
+              Todos recebem por padrão. Desmarque quem não deve receber.
+            </p>
+            <div className="space-y-2 pt-1">
+              {(equipe ?? []).map((pessoa) => (
+                <label
+                  key={pessoa.id}
+                  className="flex items-center gap-2 text-sm text-card-foreground"
+                >
+                  <Checkbox
+                    checked={!excluidos.includes(pessoa.id)}
+                    disabled={!config.pauta_resumo_email || salvar.isPending}
+                    onCheckedChange={(marcado) => alternarPessoa(pessoa.id, marcado === true)}
+                  />
+                  {pessoa.nome}
+                </label>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
