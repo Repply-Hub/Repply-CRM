@@ -178,12 +178,12 @@ export interface DashboardNegociosRisco {
 // via diasParado) afetam este painel.
 export function useDashboardNegociosRisco(
   empresaId?: string,
-  filters?: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number; etapas?: string[] },
+  filters?: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number; etapas?: string[]; dataDe?: string; dataAte?: string },
 ) {
-  const { usuarioIds, fabricanteIds, funilId, diasParado = 7, etapas } = filters ?? {};
+  const { usuarioIds, fabricanteIds, funilId, diasParado = 7, etapas, dataDe, dataAte } = filters ?? {};
 
   return useQuery({
-    queryKey: ['dashboard_negocios_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado, etapas],
+    queryKey: ['dashboard_negocios_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado, etapas, dataDe, dataAte],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('dashboard_negocios_risco', {
         p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
@@ -194,6 +194,9 @@ export function useDashboardNegociosRisco(
         // não casa com nada, e o painel voltaria zerado em vez de "sem filtro". Mesma
         // conversão que os três filtros acima já fazem.
         p_etapas: etapas && etapas.length > 0 ? etapas : null,
+        // Período opcional por DATA DE CRIAÇÃO — vazio (null) = sem recorte, o padrão do bloco.
+        p_data_de: dataDe ?? null,
+        p_data_ate: dataAte ?? null,
       });
       if (error) throw error;
       const row = (data as unknown as DashboardNegociosRisco[] | null)?.[0];
@@ -261,14 +264,14 @@ export type NegocioEmRisco = {
 // É por isso que o teto de 100 dentro da função importa — ver o cabeçalho da migration.
 export function useNegociosEmRisco(
   empresaId: string | undefined,
-  filtros: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number; etapas?: string[] },
+  filtros: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number; etapas?: string[]; dataDe?: string; dataAte?: string },
   quantos: number,
 ) {
-  const { usuarioIds, fabricanteIds, funilId, diasParado = 7, etapas } = filtros;
+  const { usuarioIds, fabricanteIds, funilId, diasParado = 7, etapas, dataDe, dataAte } = filtros;
 
   return useQuery({
     // `quantos` entra na chave: cada "Ver mais" é uma consulta nova, e a anterior fica em cache.
-    queryKey: ['negocios_em_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado, etapas, quantos],
+    queryKey: ['negocios_em_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado, etapas, dataDe, dataAte, quantos],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('negocios_em_risco', {
         // Array vazio em filtro de RPC filtra tudo fora (CLAUDE.md §7.8): `= ANY('{}')` não casa
@@ -282,6 +285,10 @@ export function useNegociosEmRisco(
         p_limite: quantos,
         // Sempre zero: ver o comentário sobre o `LIMIT` que cresce, acima.
         p_deslocamento: 0,
+        // Período opcional por DATA DE CRIAÇÃO (coluna única `data_pedido`, sem escolher entre duas
+        // colunas de data — §7.9). Vazio (null) = sem recorte, o padrão.
+        p_data_de: dataDe ?? null,
+        p_data_ate: dataAte ?? null,
       });
       if (error) throw error;
       const linhas = (data ?? []) as NegocioEmRisco[];

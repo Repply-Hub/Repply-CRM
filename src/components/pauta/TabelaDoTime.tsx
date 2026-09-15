@@ -187,6 +187,8 @@ interface Props {
     funilId?: string;
     diasParado?: number;
     etapas?: string[];
+    dataDe?: string;
+    dataAte?: string;
   };
   /** Tem a chave `pauta_de_todos`? Decide só se a coluna "Responsável" é desenhada. */
   podeVerDeTodos: boolean;
@@ -292,6 +294,8 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
     filtros.funilId ?? null,
     filtros.diasParado ?? null,
     filtros.etapas ?? null,
+    filtros.dataDe ?? null,
+    filtros.dataAte ?? null,
   ]);
   const [recorteMostrado, setRecorteMostrado] = useState(chaveDoRecorte);
   if (recorteMostrado !== chaveDoRecorte) {

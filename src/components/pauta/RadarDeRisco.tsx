@@ -23,10 +23,12 @@ import { recorteParaOServidor, type FiltrosDoPainel } from '@/lib/filtros-do-pai
  * foi textual de propósito. A definição de cada condição vive na função de banco
  * `dashboard_negocios_risco` (migration 20260824220000).
  *
- * SEM FILTRO DE PERÍODO, e isso é deliberado: um negócio aberto criado há meses continua
- * sendo risco hoje. Filtrar por data de criação ou de fechamento esconderia justamente os
- * mais antigos parados, que são os que mais importa achar. Ver o comentário de
- * `useDashboardNegociosRisco`.
+ * SEM FILTRO DE PERÍODO POR PADRÃO, e isso é deliberado: um negócio aberto criado há meses
+ * continua sendo risco hoje, e recortar por data esconderia justamente os mais antigos parados,
+ * que são os que mais importa achar. Desde 15/09/2026 há um filtro de período OPCIONAL, que nasce
+ * desligado (`PeriodoDoPainel`): só quando a pessoa escolhe um período o bloco recorta, por data de
+ * CRIAÇÃO (`data_pedido`) — nunca de fechamento, que para negócio aberto é um chute (§4.4). Ver o
+ * comentário de `useDashboardNegociosRisco`.
  */
 
 // Recharts quebra o texto do tick em várias linhas quando ele não cabe na largura reservada
@@ -135,7 +137,10 @@ export function RadarDeRisco({
             "Resumo por fabricante" abaixo já mostram só os negócios da pessoa — manter "empresa
             inteira" aqui em cima seria anunciar um número que os cartões não mostram mais. */}
         <p className="text-sm text-muted-foreground">
-          {podeFiltrarPorResponsavel ? 'A carteira da empresa inteira.' : 'A sua carteira.'} É a foto de agora — não depende de período.
+          {podeFiltrarPorResponsavel ? 'A carteira da empresa inteira.' : 'A sua carteira.'}{' '}
+          {filtros.dataDe && filtros.dataAte
+            ? 'No período escolhido, por data de criação.'
+            : 'É a foto de agora — não depende de período.'}
         </p>
       </header>
 
@@ -149,8 +154,8 @@ export function RadarDeRisco({
     {/* Radar de Risco — negócios ABERTOS (nem ganhos nem perdidos) parados ou sem
         próxima ação agendada. Ver useDashboardNegociosRisco e a migration
         20260824220000_dashboard_negocios_risco.sql para a definição exata de cada
-        condição. Sem filtro de Período de propósito: um negócio antigo parado
-        continua sendo risco hoje mesmo fora da janela de data escolhida no topo. */}
+        condição. Sem período escolhido na barra, mostra tudo — inclusive os parados antigos;
+        com um período, recorta por data de criação (`data_pedido`). */}
     <div className="mt-5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
         <Card className={MOLDURA_DA_PAUTA}>
