@@ -1112,17 +1112,35 @@ const Emails = () => {
 
   const deleteEmailMutation = useMutation({
     mutationFn: async ({ id }: { id: string; type: "sent" | "received" }) => {
-      // Exclusão lógica nos dois casos. Apagar de verdade faria o webhook e o
-      // sync trazerem a mensagem de volta na próxima entrega — e o cliente nem
-      // tem DELETE em email_mensagens (só UPDATE de lido/favorito/excluido).
-      const { error } = await supabase
-        .from("email_mensagens")
-        .update({ excluido: true })
-        .eq("id", id);
-      if (error) throw error;
+      // Fala com o Gmail PRIMEIRO: só sai da Entrada aqui se o provedor
+      // confirmou a mudança para a lixeira (`email-excluir`). Decisão do dono
+      // do produto, 15/09/2026: se o provedor falhar, NÃO esconder e avisar —
+      // nunca fingir que excluiu.
+      const { data, error } = await supabase.functions.invoke("email-excluir", {
+        body: { mensagem_id: id },
+      });
+      if (error) {
+        throw await erroLegivelDaFunction(
+          error,
+          "Não foi possível excluir o e-mail.",
+        );
+      }
+      const resultado = data as {
+        excluidas: number;
+        falharam: number;
+        detalhe?: string;
+      };
+      // Um alvo só, e ele falhou: TRATAR COMO ERRO, para o e-mail continuar na
+      // lista e o aviso aparecer — é a decisão "não excluir e avisar" acima.
+      if (resultado.excluidas === 0) {
+        throw new Error(
+          resultado.detalhe ||
+            "O Gmail não confirmou a exclusão. Tente de novo.",
+        );
+      }
     },
     onSuccess: (_, variables) => {
-      toast.success("E-mail excluído com sucesso");
+      toast.success("E-mail movido para a lixeira");
       queryClient.invalidateQueries({
         queryKey: [variables.type === "sent" ? "emails" : "received_emails"],
       });
@@ -1131,6 +1149,10 @@ const Emails = () => {
       // Sem esta linha o número ao lado de "Todas" continuaria contando as
       // mensagens que acabaram de ser excluídas.
       queryClient.invalidateQueries({ queryKey: ["received_emails_total"] });
+      // A lixeira e a Caixa de entrada dependem da mesma coluna `pastas`, que
+      // a function acabou de reescrever — sem isto o selo da barra lateral
+      // ficaria contando a mensagem na pasta errada até um refresh manual.
+      queryClient.invalidateQueries({ queryKey: ["email_contagem_por_pasta"] });
       if (selectedEmail?.id === variables.id) {
         setSelectedEmail(null);
       }
@@ -1149,16 +1171,27 @@ const Emails = () => {
       ids: string[];
       type: "sent" | "received";
     }) => {
-      const { error } = await supabase
-        .from("email_mensagens")
-        .update({ excluido: true })
-        .in("id", ids);
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke("email-excluir", {
+        body: { mensagem_ids: ids },
+      });
+      if (error) {
+        throw await erroLegivelDaFunction(
+          error,
+          "Não foi possível excluir os e-mails.",
+        );
+      }
+      return data as { excluidas: number; falharam: number; detalhe?: string };
     },
-    onSuccess: (_, variables) => {
-      toast.success(
-        `${variables.ids.length} e-mail(s) excluído(s) com sucesso`,
-      );
+    onSuccess: (r, variables) => {
+      if (r.falharam === 0) {
+        toast.success(`${r.excluidas} e-mail(s) movido(s) para a lixeira`);
+      } else {
+        // Falha PARCIAL não é erro da mutação: quem deu certo já saiu da
+        // lista. Avisa quantos ficaram para trás em vez de fingir que foi tudo.
+        toast.warning(
+          `${r.falharam} não ${r.falharam === 1 ? "foi excluído" : "foram excluídos"}: o Gmail não confirmou. Tente de novo.`,
+        );
+      }
       queryClient.invalidateQueries({
         queryKey: [variables.type === "sent" ? "emails" : "received_emails"],
       });
@@ -1167,6 +1200,7 @@ const Emails = () => {
       // Sem esta linha o número ao lado de "Todas" continuaria contando as
       // mensagens que acabaram de ser excluídas.
       queryClient.invalidateQueries({ queryKey: ["received_emails_total"] });
+      queryClient.invalidateQueries({ queryKey: ["email_contagem_por_pasta"] });
       setSelectedIds([]);
       setIsBulkDeleting(false);
     },
@@ -1814,8 +1848,8 @@ const Emails = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>Excluir este e-mail?</AlertDialogTitle>
               <AlertDialogDescription>
-                Ele sai da sua caixa no CRM. A mensagem original continua na
-                conta de e-mail — nada é apagado no provedor.
+                O e-mail vai para a lixeira do Gmail e sai da sua caixa de
+                entrada. Dá para recuperar na lixeira por até 30 dias.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -2775,10 +2809,10 @@ const Emails = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogTitle>Excluir este e-mail?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Isso excluirá permanentemente o
-              e-mail do nosso banco de dados.
+              O e-mail vai para a lixeira do Gmail e sai da sua caixa de
+              entrada. Dá para recuperar na lixeira por até 30 dias.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2802,8 +2836,9 @@ const Emails = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir e-mails em massa?</AlertDialogTitle>
             <AlertDialogDescription>
-              Você está prestes a excluir {selectedIds.length} e-mail(s). Esta
-              ação não pode ser desfeita.
+              {selectedIds.length} e-mail(s) vão para a lixeira do Gmail e
+              saem da sua caixa de entrada. Dá para recuperar na lixeira por
+              até 30 dias.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
