@@ -1,3 +1,5 @@
+import type { PainelChatCelular } from './painel-do-chat-no-celular';
+
 /**
  * Decide se a menção da conversa atual deve ser marcada como vista AGORA —
  * regra combinada com o dono do produto: o @ some quando a pessoa de fato
@@ -9,15 +11,14 @@
  * tela no Geral e o efeito de `?conversa=` trocar para o alvo que o aviso
  * pediu, ou no celular, onde o alvo já pode estar selecionado por baixo dos
  * panos enquanto só a LISTA está na tela (`painelVisivelNoCelular`, em
- * `src/lib/painel-do-chat-no-celular.ts`).
+ * `src/lib/painel-do-chat-no-celular.ts`, dono do tipo `PainelChatCelular`
+ * que esta função reusa em vez de duplicar).
  */
-export type PainelCelularDoChat = 'lista' | 'conversa';
-
 export function deveMarcarMencaoComoVista(params: {
   tipoDoAlvo: 'geral' | 'grupo' | 'dm';
   temMencaoNaoLida: boolean;
   isMobile: boolean;
-  painelCelular: PainelCelularDoChat;
+  painelCelular: PainelChatCelular;
 }): boolean {
   const { tipoDoAlvo, temMencaoNaoLida, isMobile, painelCelular } = params;
   // Conversa direta nunca marca por aqui (regra que já existia no `Chat.tsx`
