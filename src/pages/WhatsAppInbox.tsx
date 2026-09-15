@@ -4482,7 +4482,11 @@ export default function WhatsAppInbox() {
   // Quem pode ser mencionado na nota: só quem atende o número E enxerga esta conversa.
   // Quem decide é o banco (pessoas_mencionaveis_na_conversa), com a mesma regra da RLS.
   const notaTextoRef = useRef<HTMLTextAreaElement>(null);
-  const { data: mencionaveisDaNota = [] } = useQuery({
+  const {
+    data: mencionaveisDaNota = [],
+    isLoading: carregandoMencionaveisDaNota,
+    isError: erroAoCarregarMencionaveisDaNota,
+  } = useQuery({
     queryKey: ["mencionaveis_da_conversa", conversaAtiva?.id],
     enabled: novaNotaOpen && !!conversaAtiva?.id,
     queryFn: async () => {
@@ -9791,9 +9795,16 @@ export default function WhatsAppInbox() {
                 ativa={mencaoNota.ativa}
                 onEscolher={mencaoNota.escolher}
                 mensagemVazia={
-                  conversaAtiva?.instancia_id
-                    ? "Ninguém com esse nome atende este número."
-                    : "Ninguém atende este número, então não há a quem mencionar."
+                  // Enquanto carrega ou se falhar, a lista vazia NÃO significa "ninguém
+                  // atende este número" — só ainda não se sabe. A nota continua podendo
+                  // ser salva sem @ nos dois casos (decisão do dono do produto, 15/09/2026).
+                  carregandoMencionaveisDaNota
+                    ? "Carregando quem pode ser mencionado…"
+                    : erroAoCarregarMencionaveisDaNota
+                      ? "Não foi possível carregar a lista. Feche e abra a nota de novo."
+                      : conversaAtiva?.instancia_id
+                        ? "Ninguém com esse nome atende este número."
+                        : "Ninguém atende este número, então não há a quem mencionar."
                 }
               />
             )}
