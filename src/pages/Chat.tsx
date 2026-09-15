@@ -11,6 +11,7 @@ import { useCampoComMencao } from '@/hooks/use-campo-com-mencao';
 import { ListaDeMencao } from '@/components/mencao/ListaDeMencao';
 import { TextoComMencoes } from '@/components/mencao/TextoComMencoes';
 import { useMencoesNaoLidas, useMarcarMencoesLidas } from '@/hooks/use-mencoes';
+import { deveMarcarMencaoComoVista } from '@/lib/marcar-mencao-como-vista';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
@@ -658,11 +659,23 @@ const Chat = () => {
   const isAdminEmpresa = profile?.role === 'empresa' || profile?.role === 'admin';
   const canManageGrupos = isAdminEmpresa || profile?.role === 'gestor';
   const onlineIds = useOnlineUsers();
-  const [target, setTarget] = useState<ChatTarget>({ type: 'geral' });
-  // `?conversa=<chave>` chega do aviso de mensagem nova (ver
-  // `alvo-do-chat.ts` e `use-notificacoes.ts`) — o efeito logo abaixo de
-  // `handleSelectTarget` é quem lê isto e troca de alvo.
+  // `?conversa=<chave>` chega do aviso de mensagem nova (ver `alvo-do-chat.ts` e
+  // `use-notificacoes.ts`). Precisa vir antes do `useState` do alvo logo abaixo,
+  // que já lê o parâmetro para nascer na conversa certa.
   const [searchParams, setSearchParams] = useSearchParams();
+  // O alvo nasce direto da URL quando ela já pede uma conversa válida — nunca
+  // passa por `{ type: 'geral' }` no caminho. Antes o `useState` sempre
+  // começava no Geral e só trocava depois, no efeito abaixo de
+  // `handleSelectTarget`; no intervalo entre montar e esse efeito rodar, o
+  // Geral chegava a contar como alvo selecionado e sua menção não lida era
+  // marcada como vista mesmo quando a pessoa tinha clicado no aviso de OUTRA
+  // conversa (achado I-2 da revisão final do Bloco 4). O efeito continua
+  // existindo — ele cuida do painel do celular e de limpar o parâmetro da
+  // URL, e roda também quando o parâmetro chega com o chat já montado
+  // (segundo aviso clicado sem sair de `/chat`).
+  const [target, setTarget] = useState<ChatTarget>(
+    () => alvoInicialDaUrl(searchParams.get('conversa')) ?? { type: 'geral' },
+  );
 
   // Chave da conversa atual ('geral' | `grupo_<id>` | `dm_<id>`) — usada tanto para saber
   // se há menção não lida nesta conversa quanto para o campo com @ saber quando trocou de
@@ -670,14 +683,6 @@ const Chat = () => {
   const chaveAtual = chaveDoAlvo(target);
   const { data: mencoes } = useMencoesNaoLidas();
   const marcarMencoesLidas = useMarcarMencoesLidas();
-  // Estar com a conversa aberta é ter visto a menção — inclusive a que chega enquanto a
-  // pessoa está lá. Só dispara quando há o que marcar.
-  useEffect(() => {
-    if (target.type === 'dm') return;
-    if (!mencoes?.chat[chaveAtual]) return;
-    marcarMencoesLidas.mutate({ origem: 'chat', chave: chaveAtual });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chaveAtual, mencoes?.chat[chaveAtual]]);
 
   // Abaixo de `md`: false = mostra a lista, true = mostra a conversa (uma coisa
   // por vez — decisão do dono do produto em 11/09/2026). Começa em `false` mesmo
@@ -692,6 +697,26 @@ const Chat = () => {
   // `teamCollapsed` continua intacto: ao alargar de volta, o recolhimento
   // manual reaparece do jeito que a pessoa deixou.
   const isMobile = useIsMobile();
+
+  // Estar com a conversa aberta é ter visto a menção — inclusive a que chega
+  // enquanto a pessoa está lá. Abaixo de `md` isso só é verdade quando o
+  // celular mostra a CONVERSA, não a lista: o alvo pode já estar selecionado
+  // por baixo dos panos (é o que o `useState` acima faz a partir da URL) sem
+  // que a pessoa tenha de fato aberto aquela tela. No desktop o painel da
+  // conversa está sempre visível, então basta o alvo estar selecionado — ver
+  // `deveMarcarMencaoComoVista` em `src/lib/marcar-mencao-como-vista.ts`.
+  useEffect(() => {
+    const deve = deveMarcarMencaoComoVista({
+      tipoDoAlvo: target.type,
+      temMencaoNaoLida: !!mencoes?.chat[chaveAtual],
+      isMobile,
+      painelCelular,
+    });
+    if (!deve) return;
+    marcarMencoesLidas.mutate({ origem: 'chat', chave: chaveAtual });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveAtual, mencoes?.chat[chaveAtual], isMobile, painelCelular]);
+
   const [text, setText] = useState('');
   const [previewFile, setPreviewFile] = useState<FilePreviewTarget | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<{ file: File; previewUrl: string | null }[]>([]);
@@ -1077,7 +1102,11 @@ const Chat = () => {
   // aviso enquanto já se está em `/chat` troca de novo, pelo mesmo caminho de
   // quem clica na lista (`handleSelectTarget`, que no celular também troca
   // para a visão de conversa). Chave inválida ou ausente: não faz nada, fica
-  // no Geral.
+  // no Geral. Roda também na primeira montagem, mesmo com o alvo já tendo
+  // nascido nessa mesma conversa (pelo `useState` lá em cima): é o que liga
+  // `mostrarConversaNoCelular` no celular, e como o alvo já está correto,
+  // `handleSelectTarget` só repete o mesmo valor — sem piscar outra conversa
+  // na tela nem criar laço (o parâmetro sai da URL logo depois).
   useEffect(() => {
     const conversa = searchParams.get('conversa');
     if (!conversa) return;
