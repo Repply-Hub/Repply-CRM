@@ -4692,6 +4692,8 @@ export type Database = {
       }
       dashboard_negocios_risco: {
         Args: {
+          p_data_ate?: string
+          p_data_de?: string
           p_dias_parado?: number
           p_etapas?: string[]
           p_fabricante_ids?: string[]
@@ -4789,12 +4791,16 @@ export type Database = {
       }
       negocios_em_risco: {
         Args: {
+          p_ascendente?: boolean
+          p_data_ate?: string
+          p_data_de?: string
           p_deslocamento?: number
           p_dias_parado?: number
           p_etapas?: string[]
           p_fabricante_ids?: string[]
           p_funil_id?: string
           p_limite?: number
+          p_ordenar_por?: string
           p_usuario_ids?: string[]
         }
         Returns: {
@@ -4806,6 +4812,7 @@ export type Database = {
           responsavel: string | null
           responsavel_avatar: string | null
           responsavel_id: string
+          tentativas: number
           total_geral: number
           valor: number
         }[]
@@ -4824,6 +4831,7 @@ export type Database = {
           dias_parado: number | null
           ordem: number
           responsavel: string | null
+          tentativas: number
         }[]
       }
       parse_endereco_livre: {
