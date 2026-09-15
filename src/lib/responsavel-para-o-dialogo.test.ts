@@ -23,6 +23,20 @@ describe('responsavelParaODialogo', () => {
     expect(responsavelParaODialogo({ responsavel: 'Bruno Lima' }, eu)).toBe('Bruno Lima');
   });
 
+  it('🔴 responsavel_id veio, mas o perfil de quem está logado ainda não tem id: volta a comparar o nome', () => {
+    // O perfil chega em duas partes (useAuth): a sessão primeiro, a linha de `usuarios` depois.
+    // Nesse meio-tempo `eu` existe mas sem `id` — e `responsavel_id` comparado com um `id`
+    // ausente não pode "ganhar" a decisão por acidente. A regra cai para o nome, como quando
+    // não há identificador nenhum.
+    const euAindaCarregando = { nome: 'Ana Souza' };
+    expect(
+      responsavelParaODialogo({ responsavel: 'Ana Souza', responsavel_id: 'u-2' }, euAindaCarregando),
+    ).toBeNull();
+    expect(
+      responsavelParaODialogo({ responsavel: 'Bruno Lima', responsavel_id: 'u-2' }, euAindaCarregando),
+    ).toBe('Bruno Lima');
+  });
+
   it('sem dono, não há quem nomear', () => {
     expect(responsavelParaODialogo({ responsavel: null, responsavel_id: 'u-2' }, eu)).toBeNull();
     expect(responsavelParaODialogo({ responsavel: '   ' }, eu)).toBeNull();

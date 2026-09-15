@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
@@ -42,6 +42,9 @@ vi.mock('@/integrations/supabase/client', () => ({
           fabrica: 'Fábrica X',
           etapa: 'Proposta',
           responsavel: 'Ana Souza',
+          // Só a primeira linha tem foto — as outras nove seguem sem, e são a prova de que o
+          // conserto da foto (F1 da revisão final) não esconde a inicial de quem não tem uma.
+          responsavel_avatar: i === 0 ? 'https://exemplo.test/ana-souza.png' : null,
           valor: 10_000 - i,
           dias_parado: 9,
           // `total_geral` repete em toda linha o total do RECORTE, não o da página.
@@ -255,10 +258,45 @@ describe('a tabela do time', () => {
   describe('a tabela do time: rosto do dono, botão laranja e âncora', () => {
     it('🔴 o dono aparece no círculo, com as iniciais quando não há foto', async () => {
       montar({}, true);
-      // O jsdom não carrega imagem, então a FOTO em si é conferida nas fotos da tela antes de
-      // publicar. O que se prende aqui é o círculo com as iniciais — que é também o que aparece
-      // enquanto a foto carrega ou quando ela falha.
+      // O jsdom não carrega imagem sozinho: sem o truque do `window.Image` (ver o teste "com a
+      // foto…", logo abaixo), o `<AvatarImage>` nunca avisa que carregou e o Radix mantém a
+      // inicial — que é também o que aparece enquanto a foto de verdade carrega ou quando falha.
       expect(await screen.findAllByText('AS')).toHaveLength(10);
+    });
+
+    it('🔴 com a foto carregada, a linha do dono mostra a imagem — sem esconder a inicial de quem não tem foto', async () => {
+      // O mesmo truque de CampoDeResponsaveis.foto.test.tsx (linhas ~19-38): quem o Radix
+      // consulta para saber se a foto chegou é um `new window.Image()` interno, não o `<img>`
+      // desenhado na tela — e o jsdom não carrega nenhum dos dois sozinho. Restaura o original no
+      // fim MESMO se o teste falhar, para a troca não vazar para os outros testes deste arquivo,
+      // que contam com o jsdom NÃO carregando imagem para continuar mostrando a inicial.
+      class ImagemJaCarregada {
+        complete = true;
+        naturalWidth = 64;
+        src = '';
+        referrerPolicy = '';
+        crossOrigin: string | null = null;
+        addEventListener() {}
+        removeEventListener() {}
+      }
+      const ImagemOriginal = window.Image;
+      (window as unknown as { Image: unknown }).Image = ImagemJaCarregada;
+
+      try {
+        montar({}, true);
+        const linhaDoDono = (await screen.findByText('Negócio 0')).closest('tr') as HTMLElement;
+
+        await waitFor(() =>
+          expect(
+            linhaDoDono.querySelector('img[src="https://exemplo.test/ana-souza.png"]'),
+          ).not.toBeNull(),
+        );
+        // A prova de que a foto SUBSTITUI a inicial, em vez de as duas aparecerem juntas — o
+        // defeito original relatado pelo Lucas (ver o comentário de `CampoDeResponsaveis.foto.test.tsx`).
+        expect(within(linhaDoDono).queryByText('AS')).toBeNull();
+      } finally {
+        (window as unknown as { Image: unknown }).Image = ImagemOriginal;
+      }
     });
 
     it('sem a chave, não há círculo de dono', async () => {
@@ -332,6 +370,28 @@ describe('as larguras da tabela do time', () => {
 
     await waitFor(() => expect(cols[0].style.width).toBe('154px'));
     expect(JSON.parse(localStorage.getItem(CHAVE_COM) as string).negocio).toBe(154);
+  });
+
+  it('🔴 a alça é acessível: tem piso, teto e um texto do valor em pixels', async () => {
+    // Sem aria-valuemin/aria-valuemax um role="separator" assume a faixa padrão 0–100, e a
+    // MAIOR largura-padrão da tabela (154, de "Negócio") já ficaria fora dela.
+    const { container } = montar();
+    await colunas(container);
+
+    const alcaDoNegocio = alca('Negócio');
+    expect(alcaDoNegocio.getAttribute('aria-valuemin')).toBe('120');
+    expect(alcaDoNegocio.getAttribute('aria-valuetext')).toBe('154 pixels');
+  });
+
+  it('🔴 a coluna já no padrão: dois cliques na alça não gravam nada', async () => {
+    // Um duplo clique numa coluna que já está no padrão não muda largura nenhuma — e não deveria
+    // congelar as larguras-padrão de hoje no navegador de quem só tocou a alça.
+    const { container } = montar();
+    await colunas(container);
+
+    fireEvent.doubleClick(alca('Negócio'));
+
+    expect(localStorage.getItem(CHAVE_COM)).toBeNull();
   });
 
   it('o título da coluna continua com o nome dela, e não com o texto da alça', async () => {

@@ -261,6 +261,8 @@ const Hoje = () => {
    * quem está logado — `responsavelParaODialogo` (`src/lib/responsavel-para-o-dialogo.ts`).
    * Comparando nomes, dois homônimos faziam o diálogo prometer "volta para a sua pauta" sobre o
    * negócio do colega (item 69 da dívida técnica). Sem identificador, cai no nome, como antes.
+   * Mas isto é só o TEXTO do diálogo — não é a permissão. Quem decide se o gesto pode mesmo
+   * acontecer, e quem de fato recebe a tarefa e o aviso, é `registrar_retorno` no servidor.
    */
   function aoRetomarDaTabela(linha: NegocioEmRisco) {
     setAlvo({

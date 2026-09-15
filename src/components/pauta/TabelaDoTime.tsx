@@ -91,7 +91,13 @@ const COLUNAS_SEM_RESPONSAVEL: ColunaAjustavel[] = [
   { chave: 'acoes', padrao: 260, minima: 260 },
 ];
 
-/** Uma chave por forma da tabela: as larguras de uma não servem na outra. */
+/**
+ * Uma chave por forma da tabela: as larguras de uma não servem na outra.
+ *
+ * Mudou um `padrao` ali em cima (`COLUNAS_COM_RESPONSAVEL` ou `COLUNAS_SEM_RESPONSAVEL`)? Suba o
+ * `_v1` das duas chaves para `_v2`: quem já ajustou a coluna tem a largura ANTIGA guardada neste
+ * navegador, e ela continuaria valendo por cima do padrão novo sem a troca.
+ */
 const CHAVE_COM_RESPONSAVEL = 'repply_hoje_larguras_tabela_do_time_com_responsavel_v1';
 const CHAVE_SEM_RESPONSAVEL = 'repply_hoje_larguras_tabela_do_time_sem_responsavel_v1';
 
@@ -111,12 +117,15 @@ const PASSO_DO_TECLADO = 16;
 function AlcaDeLargura({
   rotulo,
   largura,
+  minima,
   onMudar,
   onSoltar,
   onRestaurar,
 }: {
   rotulo: string;
   largura: number;
+  /** Menor largura aceita desta coluna — o piso do `aria-valuemin` da alça. */
+  minima: number;
   onMudar: (novaLargura: number) => void;
   onSoltar: (novaLargura: number) => void;
   onRestaurar: () => void;
@@ -136,6 +145,13 @@ function AlcaDeLargura({
       aria-orientation="vertical"
       aria-label={`Ajustar a largura da coluna ${rotulo}`}
       aria-valuenow={largura}
+      aria-valuemin={minima}
+      // 926 = o espaço da tabela na página (mesma medida das larguras-padrão, acima). Sem um
+      // teto de verdade um role="separator" assume a faixa padrão 0–100, e a MAIOR
+      // largura-padrão da tabela (154, de "Negócio") já ficaria fora dela; o `Math.max` cobre
+      // também quem arrastou a coluna além dos 926.
+      aria-valuemax={Math.max(largura, 926)}
+      aria-valuetext={`${largura} pixels`}
       tabIndex={0}
       className="absolute right-0 top-0 h-full w-2 cursor-col-resize touch-none select-none border-r-2 border-border hover:border-primary focus-visible:border-primary focus-visible:outline-none"
       onPointerDown={(e) => {
@@ -205,12 +221,19 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
   // estado.
   const soltarLargura = (coluna: ColunaAjustavel, nova: number) => {
     const final = ajustarLargura(larguras, coluna, nova);
+    // Sem mudança de verdade — um clique na alça sem chegar a arrastar, por exemplo — não grava.
+    // Gravar aqui mesmo sem mudança congelaria a largura-padrão de hoje no navegador de quem só
+    // tocou a alça, como se a pessoa tivesse escolhido um ajuste que nunca fez.
+    if (final[coluna.chave] === larguras[coluna.chave]) return;
     setLarguras(final);
     gravarLarguras(chaveGuardada, final);
   };
 
   const restaurarLargura = (coluna: ColunaAjustavel) => {
     const final = restaurarColuna(larguras, coluna);
+    // Mesmo motivo do `soltarLargura` acima: coluna que já está no padrão e recebe dois cliques
+    // não tem nada de novo para gravar.
+    if (final[coluna.chave] === larguras[coluna.chave]) return;
     setLarguras(final);
     gravarLarguras(chaveGuardada, final);
   };
@@ -233,6 +256,7 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
       <AlcaDeLargura
         rotulo={rotulo}
         largura={larguras[c.chave]}
+        minima={c.minima}
         onMudar={(nova) => mudarLargura(c, nova)}
         onSoltar={(nova) => soltarLargura(c, nova)}
         onRestaurar={() => restaurarLargura(c)}
@@ -397,7 +421,7 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
                       <td className="px-2 py-2 font-medium text-card-foreground">
                         {/* Até duas linhas: o nome é o que se lê primeiro, e cortar na primeira
                             esconderia a fabricante nos nomes montados como "Cliente | Fabricante". */}
-                        <span className="line-clamp-2" title={n.nome}>
+                        <span className="line-clamp-2 break-words" title={n.nome}>
                           {n.nome}
                         </span>
                       </td>
