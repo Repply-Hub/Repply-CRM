@@ -174,6 +174,27 @@ describe('o topo da tela "Hoje"', () => {
     expect(comoSeLe(apoio())).toBe('R$ 1.000 · Obra Esquecida');
   });
 
+  describe('a etiqueta de negócio perseguido substitui o selo na fila (15/09/2026)', () => {
+    it('com retomada, mostra "Nª tentativa" no lugar do selo', () => {
+      const perseguido: ItemDaPauta = { ...negocio('Obra Exemplo', 180000, 9), tentativas: 1 };
+      prepararTela({ pauta: [perseguido] });
+      montarATela();
+
+      // 1 retomada + o envio = "2ª tentativa"
+      expect(screen.getByText('2ª tentativa')).toBeInTheDocument();
+      // o selo comum ("Parado", no esboço) não aparece para esse item
+      expect(screen.queryByText('Parado')).toBeNull();
+    });
+
+    it('sem retomada, continua o selo que o banco mandou', () => {
+      prepararTela({ pauta: [negocio('Obra Exemplo', 180000, 9)] });
+      montarATela();
+
+      expect(screen.getByText('Parado')).toBeInTheDocument();
+      expect(screen.queryByText(/ª tentativa/)).toBeNull();
+    });
+  });
+
   describe('a régua de "parado" é a da empresa — a mesma com que o banco montou a fila', () => {
     // 4 dias é o dobro de 2 e passa do padrão (3): com a régua padrão, a voz aponta o negócio.
     const fila = [negocio('Obra A', 100, 4), negocio('Obra B', 50, 2)];

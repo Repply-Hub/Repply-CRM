@@ -13,6 +13,7 @@ import {
 } from '@/lib/larguras-de-colunas';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MOLDURA_DA_PAUTA } from '@/components/pauta/moldura-da-pauta';
+import { EtiquetaDeTentativa } from '@/components/pauta/EtiquetaDeTentativa';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatarMoedaBRL } from '@/lib/moeda';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
@@ -421,6 +422,13 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
                         <span className="line-clamp-2 break-words" title={n.nome}>
                           {n.nome}
                         </span>
+                        {/* A etiqueta de negócio perseguido, abaixo do nome (pedido de 15/09/2026).
+                            Aqui ela ACOMPANHA a coluna "Sem mexer há" em vez de substituir um selo —
+                            a tabela não tem o selo "Orçamento parado" da pauta, e sim uma coluna de
+                            dias. Só aparece a partir da 1ª retomada. */}
+                        {(n.tentativas ?? 0) > 0 && (
+                          <EtiquetaDeTentativa tentativas={n.tentativas as number} className="mt-1" />
+                        )}
                       </td>
                       <td className="truncate px-2 py-2 text-muted-foreground" title={n.fabrica ?? undefined}>
                         {n.fabrica ?? '—'}

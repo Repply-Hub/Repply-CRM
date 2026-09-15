@@ -17,6 +17,7 @@ import { useConfiguracoesAutomacao, PADROES_DA_PAUTA } from '@/hooks/use-configu
 import { usePossoVerPautaDeTodos } from '@/hooks/use-minha-permissao';
 import { usePauta, type ItemDaPauta } from '@/hooks/use-pauta';
 import { DialogoRetorno } from '@/components/pauta/DialogoRetorno';
+import { EtiquetaDeTentativa } from '@/components/pauta/EtiquetaDeTentativa';
 import { RadarDeRisco } from '@/components/pauta/RadarDeRisco';
 import { PainelDoNegocio } from '@/components/pedidos/PainelDoNegocio';
 import { useNegocioNoEndereco } from '@/hooks/use-negocio-no-endereco';
@@ -91,16 +92,24 @@ function ItemPauta({
     >
       <div className="min-w-0 flex-1">
         <div className="mb-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <span
-            className={cn(
-              'rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
-              ehCompromisso
-                ? 'bg-muted text-muted-foreground'
-                : 'bg-destructive/10 text-destructive',
-            )}
-          >
-            {item.selo}
-          </span>
+          {/* 🔴 A ETIQUETA DE TENTATIVA SUBSTITUI O SELO "Orçamento parado" — pedido de
+              15/09/2026. Um negócio já cobrado várias vezes não está "parado", e é o que mais pede
+              atenção. Só para negócio (compromisso mantém o selo "Hoje"), e só a partir da 1ª
+              retomada; sem retomada, continua o selo que o banco mandou. */}
+          {!ehCompromisso && (item.tentativas ?? 0) > 0 ? (
+            <EtiquetaDeTentativa tentativas={item.tentativas as number} />
+          ) : (
+            <span
+              className={cn(
+                'rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
+                ehCompromisso
+                  ? 'bg-muted text-muted-foreground'
+                  : 'bg-destructive/10 text-destructive',
+              )}
+            >
+              {item.selo}
+            </span>
+          )}
           {item.valor !== null && (
             <span className="font-mono text-xs tabular-nums text-muted-foreground">
               {formatarMoedaBRL(item.valor)}

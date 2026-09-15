@@ -237,6 +237,12 @@ export type NegocioEmRisco = {
   valor: number | null;
   dias_parado: number | null;
   total_geral: number;
+  /**
+   * Quantas retomadas ("Retomar depois") já foram registradas neste negócio. A tabela mostra a
+   * etiqueta "Nª tentativa" (`tentativas + 1`) a partir de 1. Opcional: cai em 0 quando o site novo
+   * fala com um banco anterior à migration das tentativas (15/09/2026).
+   */
+  tentativas?: number;
 };
 
 // A TABELA DO TIME da tela "Hoje": os negócios da equipe que pedem atenção — os mesmos

@@ -31,6 +31,12 @@ export interface ItemDaPauta {
   ordem: number;
   /** Nome do dono, só quando o negócio NÃO é de quem está olhando. */
   responsavel: string | null;
+  /**
+   * Quantas retomadas ("Retomar depois") já foram registradas neste negócio. A etiqueta mostra
+   * `tentativas + 1` (o envio é a 1ª), no lugar do selo "Orçamento parado". Opcional: cai em 0
+   * quando o site novo fala com um banco anterior à migration das tentativas.
+   */
+  tentativas?: number;
 }
 
 export function usePauta() {

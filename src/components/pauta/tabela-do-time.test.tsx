@@ -22,6 +22,9 @@ import type { ReactNode } from 'react';
 const estado = vi.hoisted(() => ({
   chamadas: [] as { p_limite: number; p_etapas: string[] | null }[],
   total: 145,
+  // Quantas retomadas a PRIMEIRA linha teve (as outras vêm com 0). Um teste sobe isto para provar a
+  // etiqueta "Nª tentativa"; o padrão 0 mantém os outros testes sem etiqueta nenhuma.
+  tentativas: 0,
   // O erro do Supabase é um objeto simples, não um `Error` — é essa a forma que chega na tela
   // (CLAUDE.md §4.6), e é por isso que o esboço devolve exatamente ela.
   erro: null as null | { message: string; details?: string; hint?: string; code?: string },
@@ -49,6 +52,8 @@ vi.mock('@/integrations/supabase/client', () => ({
           dias_parado: 9,
           // `total_geral` repete em toda linha o total do RECORTE, não o da página.
           total_geral: estado.total,
+          // Só a primeira linha carrega as retomadas do cenário; as demais, nenhuma.
+          tentativas: i === 0 ? estado.tentativas : 0,
         })),
         error: null,
       };
@@ -82,6 +87,7 @@ function montar(filtros: { etapas?: string[] } = {}, podeVerDeTodos = true) {
 beforeEach(() => {
   estado.chamadas = [];
   estado.total = 145;
+  estado.tentativas = 0;
   estado.erro = null;
 });
 
@@ -97,6 +103,16 @@ describe('a tabela do time', () => {
     expect(await screen.findByText('Ver mais (mostrando 10 de 145)')).toBeInTheDocument();
     expect(screen.getAllByRole('row')).toHaveLength(11); // 10 linhas + o cabeçalho
     expect(estado.chamadas[0].p_limite).toBe(10);
+  });
+
+  it('a linha perseguida mostra a etiqueta "Nª tentativa", e a não-perseguida não', async () => {
+    estado.tentativas = 2; // a primeira linha teve 2 retomadas registradas
+    montar();
+    await screen.findByText('Negócio 0');
+    // 2 retomadas + o envio = "3ª tentativa"
+    expect(screen.getByText('3ª tentativa')).toBeInTheDocument();
+    // só a primeira linha ganha a etiqueta; as outras nove seguem sem nenhuma
+    expect(screen.getAllByText(/ª tentativa/)).toHaveLength(1);
   });
 
   it('"Ver mais" cresce o limite em vez de andar com o deslocamento', async () => {
