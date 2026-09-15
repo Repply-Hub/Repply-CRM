@@ -98,6 +98,24 @@ export function consultaCasaComTodos(consulta: string): boolean {
 }
 
 /**
+ * O insert de mensagem/nota SEM @ tem de sair idêntico ao de antes deste bloco de
+ * menções — sem as chaves `mencionados`/`menciona_todos` no payload. É o que permite
+ * publicar o código ANTES de aplicar a migration `20260911140000_mencoes.sql`: coluna
+ * que ainda não existe no banco faz o PostgREST recusar o INSERT inteiro (erro
+ * PGRST204, "coluna não encontrada no esquema") — não é o Postgres ignorando uma coluna
+ * a mais, é o PostgREST barrando a linha toda antes dela chegar no banco. Por isso o
+ * chat e as notas do WhatsApp não podem depender da ordem entre publicar o site e rodar
+ * a migration: sem menção, este retorno é `{}`, e o `...camposDeMencaoParaGravar(...)`
+ * no insert não acrescenta nada.
+ */
+export function camposDeMencaoParaGravar(
+  mencoes: { ids: string[]; todos: boolean } | null | undefined,
+): { mencionados: string[]; menciona_todos: boolean } | Record<string, never> {
+  if (!mencoes || (mencoes.ids.length === 0 && !mencoes.todos)) return {};
+  return { mencionados: mencoes.ids, menciona_todos: mencoes.todos };
+}
+
+/**
  * Parte o texto nos trechos "@Nome" dos mencionados, para a tela destacar. O nome mais
  * longo é tentado primeiro ("@Ana Souza" antes de "@Ana"), e o nome precisa
  * terminar ali ("@Anabela" não é "@Ana").

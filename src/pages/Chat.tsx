@@ -947,6 +947,10 @@ const Chat = () => {
   // a própria pessoa e sem excluído (`useVendedores` já vem sem excluído).
   const { data: ativos = [] } = useVendedores();
   const pessoasMencionaveis = useMemo(() => {
+    // Enquanto `get_my_vendedor_id` (myVendedor) ainda não respondeu, ele é `undefined` —
+    // e `u.id !== myVendedor` nunca é falso, porque nenhum id real é igual a `undefined`.
+    // Sem este corte, a própria pessoa aparecia na lista de @ até a consulta voltar.
+    if (!myVendedor) return [];
     const vivos = (ativos as { id: string; nome: string | null; avatar_url?: string | null; user_id: string | null }[])
       .filter((u) => u.user_id && u.id !== myVendedor);
     const base = target.type === 'grupo'

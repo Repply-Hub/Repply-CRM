@@ -12,6 +12,7 @@ import {
   avisarMensagemNova,
   previaDaMensagem,
 } from '@/lib/aviso-de-mensagem-nova';
+import { camposDeMencaoParaGravar } from '@/lib/mencao';
 
 // WhatsApp/uazapi às vezes usa o JID de celulares BR sem o 9º dígito (número antigo).
 // Normaliza para o formato canônico, igual ao _shared/whatsapp.ts das edge functions
@@ -1739,6 +1740,11 @@ export function useWaAddNota() {
       },
     ) => {
       if (!profile?.empresa_id) throw new Error('Empresa não identificada');
+      // Sem @, o payload não cita `mencionados`/`menciona_todos` — inclusive a nota de
+      // sistema (ex.: "assumiu esta conversa"), que chama sem menção. Ver o comentário
+      // de `camposDeMencaoParaGravar` em src/lib/mencao.ts sobre por que isso importa
+      // enquanto a migration das menções não roda em produção.
+      const camposDeMencao = camposDeMencaoParaGravar({ ids: mencionados, todos: mencionaTodos });
       const { data, error } = await supabase
         .from('whatsapp_mensagens')
         .insert({
@@ -1752,8 +1758,7 @@ export function useWaAddNota() {
           lida: true,
           is_nota_interna: true,
           fixada,
-          mencionados,
-          menciona_todos: mencionaTodos,
+          ...camposDeMencao,
         })
         .select()
         .single();

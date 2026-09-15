@@ -5,6 +5,7 @@ import { sanitizeFileName } from '@/lib/file-validation';
 import { toast } from 'sonner';
 import { tocarEnvio } from '@/lib/som';
 import { somLigado } from '@/hooks/use-som-ligado';
+import { camposDeMencaoParaGravar } from '@/lib/mencao';
 
 export interface ChatMessage {
   id: string;
@@ -476,10 +477,10 @@ export function useSendMessage() {
         quoted_remetente_nome: quoted.remetente_nome,
       } : {};
 
-      const camposDeMencao = {
-        mencionados: mencoes?.ids ?? [],
-        menciona_todos: mencoes?.todos ?? false,
-      };
+      // Sem @, o payload não cita `mencionados`/`menciona_todos` — ver o comentário de
+      // `camposDeMencaoParaGravar` em src/lib/mencao.ts sobre por que isso importa
+      // enquanto a migration das menções não roda em produção.
+      const camposDeMencao = camposDeMencaoParaGravar(mencoes);
 
       // Se não houver arquivos, envia apenas a mensagem de texto
       if (!files || files.length === 0) {

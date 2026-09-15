@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  camposDeMencaoParaGravar,
   consultaCasaComTodos,
   detectarMencao,
   filtrarPessoas,
@@ -160,6 +161,41 @@ describe('mencionadosNoTexto', () => {
     expect(mencionadosNoTexto('@ana souza e @Ana', doisEscolhidos)).toEqual({
       ids: ['u1', 'u2'],
       todos: false,
+    });
+  });
+});
+
+describe('camposDeMencaoParaGravar', () => {
+  it('nulo devolve objeto vazio, sem as chaves', () => {
+    expect(camposDeMencaoParaGravar(null)).toEqual({});
+  });
+
+  it('indefinido devolve objeto vazio, sem as chaves', () => {
+    expect(camposDeMencaoParaGravar(undefined)).toEqual({});
+  });
+
+  it('sem ids e sem todos devolve objeto vazio, mesmo com o objeto presente', () => {
+    expect(camposDeMencaoParaGravar({ ids: [], todos: false })).toEqual({});
+  });
+
+  it('só ids devolve as duas chaves', () => {
+    expect(camposDeMencaoParaGravar({ ids: ['u1', 'u2'], todos: false })).toEqual({
+      mencionados: ['u1', 'u2'],
+      menciona_todos: false,
+    });
+  });
+
+  it('só todos devolve as duas chaves, com ids vazio', () => {
+    expect(camposDeMencaoParaGravar({ ids: [], todos: true })).toEqual({
+      mencionados: [],
+      menciona_todos: true,
+    });
+  });
+
+  it('ids e todos juntos devolvem as duas chaves', () => {
+    expect(camposDeMencaoParaGravar({ ids: ['u1'], todos: true })).toEqual({
+      mencionados: ['u1'],
+      menciona_todos: true,
     });
   });
 });
