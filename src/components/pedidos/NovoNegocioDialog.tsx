@@ -42,6 +42,7 @@ import type { CnpjData } from '@/lib/cnpj';
 import { getNomeNegocioAutomatico } from '@/lib/nome-negocio';
 import { OrigemLeadSelect } from '@/components/shared/OrigemLeadSelect';
 import { filenameFromUrl } from '@/lib/download-file';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import type { CopiaDeNegocio } from '@/lib/copia-de-negocio';
 
 export interface NovoNegocioDialogProps {
@@ -382,8 +383,10 @@ function NovoNegocioFormContent({
       });
       toast.success('Negócio criado com sucesso!');
       onCreated?.(created?.id);
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err) {
+      // CLAUDE.md §4.6: erro do Supabase não é um `Error` — é `{ message, details, hint, code }`
+      // —, e `err.message` cru pulava a parte que o banco escreve em `details`/`hint`.
+      toast.error(mensagemDeErro(err, 'Não foi possível criar o negócio.'));
     } finally {
       setIsUploading(false);
     }

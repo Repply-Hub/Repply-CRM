@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import type { CopiaDeNegocio } from '@/lib/copia-de-negocio';
 
 /**
@@ -280,5 +282,45 @@ describe('NovoNegocioDialog — nasce preenchido por uma cópia', () => {
     expect(supabaseDeleteSpy).not.toHaveBeenCalled();
     expect(supabaseUpdateSpy).not.toHaveBeenCalled();
     expect(createPedidoMock).not.toHaveBeenCalled();
+  });
+
+  // M1-T2 da revisão final (15/09/2026): criar a partir de uma cópia com anexo herdado manda o
+  // MESMO link ao gravar — nunca sobe arquivo, porque não há arquivo novo nenhum.
+  it('(M1-T2) "Criar Negócio" manda o mesmo link do anexo herdado, sem subir arquivo', async () => {
+    createPedidoMock.mockResolvedValue({ id: 'negocio-2' });
+    const { onCreated } = desenhar();
+
+    fireEvent.click(screen.getByRole('button', { name: /próximo/i }));
+    fireEvent.click(screen.getByRole('button', { name: /criar negócio/i }));
+
+    await waitFor(() => expect(createPedidoMock).toHaveBeenCalledTimes(1));
+
+    const payloadEnviado = createPedidoMock.mock.calls[0][0];
+    expect(payloadEnviado.pdf_url).toBe(COPIA_DE_EXEMPLO.pdfUrl);
+    expect(storageUploadSpy).not.toHaveBeenCalled();
+    expect(onCreated).toHaveBeenCalledWith('negocio-2');
+  });
+
+  // CLAUDE.md §4.6: erro do Supabase NÃO é um `Error` — é `{ message, details, hint, code }` —,
+  // e `e.message` cru pulava a parte útil (`details`/`hint`) que o banco manda junto.
+  it('gravação recusada mostra a frase de mensagemDeErro, não a mensagem crua do banco', async () => {
+    const erroDoBanco = {
+      message: 'duplicate key value violates unique constraint',
+      code: '23505',
+      details: 'Key (id)=(negocio-2) already exists.',
+      hint: null,
+    };
+    createPedidoMock.mockRejectedValue(erroDoBanco);
+    desenhar();
+
+    fireEvent.click(screen.getByRole('button', { name: /próximo/i }));
+    fireEvent.click(screen.getByRole('button', { name: /criar negócio/i }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+
+    // A frase que `mensagemDeErro` monta junta `message` e `details` — é ela, e não
+    // `erroDoBanco.message` sozinho, que precisa chegar à tela.
+    expect(toast.error).toHaveBeenCalledWith(mensagemDeErro(erroDoBanco));
+    expect(toast.error).not.toHaveBeenCalledWith(erroDoBanco.message);
   });
 });
