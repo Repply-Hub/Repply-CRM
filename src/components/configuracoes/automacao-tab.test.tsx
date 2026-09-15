@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 
 // Estado dos esboços (config, gravações e equipe) — trocado por teste. Nomes INVENTADOS (§6.9).
 const estado = vi.hoisted(() => ({
@@ -40,41 +40,60 @@ function prepara({ email = true, excluidos = [] as string[] }) {
   estado.gravados = [];
 }
 
+// O "Adicionar" é um Popover Radix, que usa APIs de ponteiro que o jsdom não traz.
+beforeAll(() => {
+  const proto = window.HTMLElement.prototype;
+  proto.hasPointerCapture ??= () => false;
+  proto.setPointerCapture ??= () => {};
+  proto.releasePointerCapture ??= () => {};
+  proto.scrollIntoView ??= () => {};
+});
+
 afterEach(cleanup);
 
 describe('AutomacaoTab — quem recebe o e-mail da pauta', () => {
-  it('todos marcados por padrão (lista de excluídos vazia)', () => {
+  it('todos aparecem como autorizados por padrão (nenhum excluído, nenhum botão de adicionar)', () => {
     prepara({ email: true, excluidos: [] });
     render(<AutomacaoTab empresaId="emp-1" />);
 
-    const caixas = screen.getAllByRole('checkbox');
-    expect(caixas).toHaveLength(2);
-    caixas.forEach((c) => expect(c).toBeChecked());
+    expect(screen.getByRole('button', { name: 'Remover Ana Souza' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remover Bruno Lima' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Adicionar/ })).toBeNull();
   });
 
-  it('quem já está na lista de excluídos aparece desmarcado', () => {
-    prepara({ email: true, excluidos: ['u-1'] });
-    render(<AutomacaoTab empresaId="emp-1" />);
-
-    // A ordem das caixas segue a da equipe: [Ana, Bruno].
-    const [ana, bruno] = screen.getAllByRole('checkbox');
-    expect(ana).not.toBeChecked();
-    expect(bruno).toBeChecked();
-  });
-
-  it('desmarcar uma pessoa grava a lista de excluídos com o id dela', () => {
+  it('remover uma pessoa grava a lista de excluídos com o id dela', () => {
     prepara({ email: true, excluidos: [] });
     render(<AutomacaoTab empresaId="emp-1" />);
 
-    fireEvent.click(screen.getAllByRole('checkbox')[0]); // desmarca "Ana Souza" (u-1)
+    fireEvent.click(screen.getByRole('button', { name: 'Remover Ana Souza' }));
 
     expect(estado.gravados).toContainEqual({ chave: 'pauta_resumo_excluidos', valor: ['u-1'] });
   });
 
-  it('com o resumo por e-mail desligado, as caixas ficam desabilitadas', () => {
+  it('quem foi removido não aparece como autorizado, e surge o "Adicionar"', () => {
+    prepara({ email: true, excluidos: ['u-1'] });
+    render(<AutomacaoTab empresaId="emp-1" />);
+
+    expect(screen.queryByRole('button', { name: 'Remover Ana Souza' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Remover Bruno Lima' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Adicionar/ })).toBeInTheDocument();
+  });
+
+  it('adicionar de volta tira a pessoa da lista de excluídos', async () => {
+    prepara({ email: true, excluidos: ['u-1'] });
+    render(<AutomacaoTab empresaId="emp-1" />);
+
+    // O Popover Radix abre no clique do gatilho; dentro, cada removido é um botão para trazer de volta.
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar/ }));
+    fireEvent.click(await screen.findByText('Ana Souza'));
+
+    expect(estado.gravados).toContainEqual({ chave: 'pauta_resumo_excluidos', valor: [] });
+  });
+
+  it('com o resumo por e-mail desligado, os botões de remover ficam desabilitados', () => {
     prepara({ email: false, excluidos: [] });
     render(<AutomacaoTab empresaId="emp-1" />);
 
-    screen.getAllByRole('checkbox').forEach((c) => expect(c).toBeDisabled());
+    expect(screen.getByRole('button', { name: 'Remover Ana Souza' })).toBeDisabled();
   });
 });
