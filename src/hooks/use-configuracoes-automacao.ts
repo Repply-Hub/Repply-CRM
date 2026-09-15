@@ -40,6 +40,15 @@ export const PADROES_DA_PAUTA = {
    * mostra a pauta de hoje inclusive num sábado, para quem escolher trabalhar.
    */
   pauta_dias_da_semana: [1, 2, 3, 4, 5] as number[],
+  /**
+   * Quem o gestor TIROU do e-mail da pauta, por empresa — lista de `usuarios.id`.
+   *
+   * É lista de EXCLUÍDOS, não de incluídos, de propósito: ausência da pessoa aqui = ela recebe.
+   * Assim o padrão "todos recebem" vale inclusive para quem entrar na equipe depois, sem ninguém
+   * ter de marcá-la. Nasce vazia (ninguém excluído). Quem de fato respeita esta lista é a função
+   * de banco `pauta_resumo_destinatarios` — esconder na tela não bastaria (§6.1).
+   */
+  pauta_resumo_excluidos: [] as string[],
 };
 
 export type ChaveDaPauta = keyof typeof PADROES_DA_PAUTA;
@@ -69,8 +78,12 @@ export function useConfiguracoesAutomacao(empresaId?: string) {
         // tem o mesmo formato do padrão — linha corrompida à mão no painel do Supabase cai
         // no padrão em vez de quebrar a tela.
         if (Array.isArray(padrao)) {
-          if (Array.isArray(bruto) && bruto.every((v) => typeof v === 'number')) {
-            (resultado[chave] as number[]) = bruto as number[];
+          // O tipo esperado dos itens vem do PRIMEIRO item do padrão. A lista de excluídos nasce
+          // vazia, então não revela o tipo pelo conteúdo — cai em 'string', que é o que ela guarda
+          // (é a única lista de texto). Lista corrompida à mão cai no padrão em vez de quebrar a tela.
+          const tipoDoItem = padrao.length > 0 ? typeof padrao[0] : 'string';
+          if (Array.isArray(bruto) && bruto.every((v) => typeof v === tipoDoItem)) {
+            (resultado[chave] as unknown[]) = bruto as unknown[];
           }
         } else if (typeof padrao === 'number') {
           if (typeof bruto === 'number' && Number.isFinite(bruto)) {
@@ -91,7 +104,7 @@ export function useSalvarConfiguracaoAutomacao(empresaId?: string) {
   const { profile } = useAuth();
 
   return useMutation({
-    mutationFn: async (args: { chave: ChaveDaPauta; valor: number | boolean | number[] }) => {
+    mutationFn: async (args: { chave: ChaveDaPauta; valor: number | boolean | number[] | string[] }) => {
       if (!empresaId) throw new Error('Sem empresa definida');
       const { error } = await supabase.from('configuracoes_automacao').upsert(
         {
