@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
-  Building2, CalendarIcon, ClipboardList, Clock, DollarSign, Factory, FileText, History,
+  Building2, CalendarIcon, ClipboardList, Clock, Copy, DollarSign, Factory, FileText, History,
   Loader2, MessageSquare, Pencil, Plus, Tag, Trash2, User,
 } from 'lucide-react';
 import { Sheet, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -621,6 +621,13 @@ export function PainelDoNegocio({
                     enquanto a busca corria caía em Editar. */}
                 <Button disabled={!negocio} onClick={() => navigate(`/pedidos/${pedidoId}/editar`)}>
                   <Pencil className="mr-2 h-4 w-4" /> Editar
+                </Button>
+                {/* Duplicar é CRIAR: abre a tela de negócio novo preenchida com a cópia, e nada
+                    é gravado até a pessoa confirmar lá. Por isso é uma navegação, e não um
+                    diálogo por cima deste painel — dois modais do Radix empilhados brigam pelo
+                    foco, e este projeto desligou Esc e clique-fora (CLAUDE.md §7.11). */}
+                <Button variant="outline" disabled={!negocio} onClick={() => navigate(`/pedidos/novo?copiaDe=${pedidoId}`)}>
+                  <Copy className="mr-2 h-4 w-4" /> Duplicar
                 </Button>
                 <Button variant="outline" onClick={onClose}>
                   Fechar
