@@ -28,9 +28,10 @@ import { papelDoToken } from "../_shared/papel-do-token.ts";
  * chamadores com credenciais diferentes (o cron e a pessoa logada), e só decide
  * QUEM está chamando — nunca SE o token é legítimo, isso já foi conferido antes.
  *
- * Até 12/09/2026 a distinção era por IGUALDADE de texto contra a variável de
- * ambiente `SUPABASE_SERVICE_ROLE_KEY`. Quebrou em produção (95 respostas 401
- * em 24h): a chave guardada no cofre (`vault`) é um JWT `service_role` válido,
+ * Até 15/09/2026 a distinção era por IGUALDADE de texto contra a variável de
+ * ambiente `SUPABASE_SERVICE_ROLE_KEY`. Quebrou em produção — medido em 15/09:
+ * 95 respostas 401 em 24h, e provavelmente desde 25/08, quando a chave foi
+ * gravada no cofre (`vault`). Essa chave é um JWT `service_role` válido,
  * mas seu texto não é byte-a-byte igual ao da variável de ambiente desta
  * função — e a comparação falhava mesmo com credencial correta, empurrando o
  * cron para o fluxo de usuário, que `getUser()` recusava com 401. Por isso a
