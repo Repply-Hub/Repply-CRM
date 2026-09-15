@@ -28,6 +28,9 @@ const {
   useConfiguracoesCamposMock,
   useKanbanColunasMock,
   useAuthMock,
+  useMyVendedorIdMock,
+  useIsGestorMock,
+  toastErrorMock,
   propsRecebidas,
   montagens,
 } = vi.hoisted(() => ({
@@ -36,6 +39,9 @@ const {
   useConfiguracoesCamposMock: vi.fn(),
   useKanbanColunasMock: vi.fn(),
   useAuthMock: vi.fn(),
+  useMyVendedorIdMock: vi.fn(),
+  useIsGestorMock: vi.fn(),
+  toastErrorMock: vi.fn(),
   propsRecebidas: [] as NovoNegocioDialogProps[],
   montagens: { current: 0 },
 }));
@@ -45,6 +51,8 @@ vi.mock('@/hooks/use-responsaveis-do-negocio', () => ({ useResponsaveisDoNegocio
 vi.mock('@/hooks/use-configuracoes-campos', () => ({ useConfiguracoesCampos: useConfiguracoesCamposMock }));
 vi.mock('@/hooks/use-kanban-colunas', () => ({ useKanbanColunas: useKanbanColunasMock }));
 vi.mock('@/hooks/use-auth', () => ({ useAuth: useAuthMock }));
+vi.mock('@/hooks/use-novo-pedido', () => ({ useMyVendedorId: useMyVendedorIdMock, useIsGestor: useIsGestorMock }));
+vi.mock('sonner', () => ({ toast: { error: toastErrorMock, success: vi.fn(), warning: vi.fn(), info: vi.fn() } }));
 
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children, headerContent }: { children: React.ReactNode; headerContent?: React.ReactNode }) => (
@@ -138,16 +146,23 @@ const COLUNAS_PADRAO = [
 ];
 
 function configurarHooks(overrides: {
-  original?: EstadoConsulta<typeof ORIGINAL_PADRAO>;
+  original?: EstadoConsulta<typeof ORIGINAL_PADRAO | null>;
   responsaveis?: EstadoConsulta<typeof RESPONSAVEIS_PADRAO>;
   campos?: EstadoConsulta<typeof CAMPOS_CONFIG_PADRAO>;
   colunas?: EstadoConsulta<typeof COLUNAS_PADRAO>;
+  // Padrão: gestor. Com `quemDuplica.ehGestor` valendo `true`, a regra D1 não entra em jogo e
+  // o comportamento fica igual ao de antes desta correção — o que os testes já existentes
+  // (escritos antes de D1) continuam esperando.
+  isGestor?: EstadoConsulta<boolean>;
+  myVendedorId?: EstadoConsulta<string>;
 } = {}) {
   useAuthMock.mockReturnValue({ profile: { id: 'user-1', empresa_id: 'empresa-1', role: 'vendedor' } });
   usePedidoPorIdMock.mockReturnValue(overrides.original ?? resolvido(ORIGINAL_PADRAO));
   useResponsaveisDoNegocioMock.mockReturnValue(overrides.responsaveis ?? resolvido(RESPONSAVEIS_PADRAO));
   useConfiguracoesCamposMock.mockReturnValue(overrides.campos ?? resolvido(CAMPOS_CONFIG_PADRAO));
   useKanbanColunasMock.mockReturnValue(overrides.colunas ?? resolvido(COLUNAS_PADRAO));
+  useIsGestorMock.mockReturnValue(overrides.isGestor ?? resolvido(true));
+  useMyVendedorIdMock.mockReturnValue(overrides.myVendedorId ?? resolvido('user-1'));
 }
 
 function montar(path = '/pedidos/novo?copiaDe=negocio-1') {
@@ -195,6 +210,23 @@ describe('NovoPedido — o endereço ?copiaDe= monta a cópia', () => {
 
     it('etapas do funil ainda carregando', () => {
       configurarHooks({ colunas: carregando() });
+      montar();
+      expect(screen.queryByTestId('novo-negocio-dialog-stub')).not.toBeInTheDocument();
+      expect(montagens.current).toBe(0);
+    });
+
+    // 🔴 A fresta que a Correção da revisão final (15/09/2026) fecha: sem esperar estas duas,
+    // a cópia podia nascer tratando a pessoa como gestor (ou com um `usuarioId` vazio) e travar
+    // assim para sempre — `copiaDe` só alimenta `useState` inicial dentro da janela.
+    it('useIsGestor ainda carregando', () => {
+      configurarHooks({ isGestor: carregando() });
+      montar();
+      expect(screen.queryByTestId('novo-negocio-dialog-stub')).not.toBeInTheDocument();
+      expect(montagens.current).toBe(0);
+    });
+
+    it('useMyVendedorId ainda carregando', () => {
+      configurarHooks({ myVendedorId: carregando() });
       montar();
       expect(screen.queryByTestId('novo-negocio-dialog-stub')).not.toBeInTheDocument();
       expect(montagens.current).toBe(0);
@@ -257,5 +289,52 @@ describe('NovoPedido — o endereço ?copiaDe= monta a cópia', () => {
     expect(props.clienteId).toBe('cliente-1');
     expect(props.status).toBe('negociacao');
     expect(props.funilId).toBe('funil-1');
+  });
+
+  // Decisão D1 do dono do produto (15/09/2026, ver docs/superpowers/specs/2026-09-12-duplicar-
+  // negocio-design.md §3): quem duplica NÃO é gestor e não é o principal do original vira o
+  // ÚNICO responsável da cópia — nem o principal do original, nem os outros responsáveis dele.
+  it('D1: vendedor comum duplicando o negócio de outra pessoa vira o único responsável', () => {
+    configurarHooks({
+      isGestor: resolvido(false),
+      myVendedorId: resolvido('user-9'),
+    });
+    montar();
+
+    expect(montagens.current).toBe(1);
+    const props = propsRecebidas[0];
+    expect(props.copiaDe?.vendedorId).toBe('user-9');
+    expect(props.copiaDe?.participantes).toEqual([]);
+  });
+
+  // Decisão D2 do dono do produto (15/09/2026): negócio que sumiu ou que a pessoa não pode ver
+  // abre a janela de Novo Negócio em branco, com um aviso — não trava a tela.
+  describe('D2: negócio original não encontrado', () => {
+    it('mostra o aviso UMA vez e monta a janela em branco (copiaDe undefined)', () => {
+      configurarHooks({ original: resolvido(null) });
+      montar();
+
+      expect(toastErrorMock).toHaveBeenCalledTimes(1);
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        'Não foi possível abrir o negócio para duplicar — ele pode ter sido excluído.',
+      );
+      expect(montagens.current).toBe(1);
+      const props = propsRecebidas[propsRecebidas.length - 1];
+      expect(props.copiaDe).toBeUndefined();
+    });
+
+    it('não repete o aviso quando a página re-renderiza depois de mostrado', () => {
+      configurarHooks({ original: resolvido(null) });
+      const { rerender } = montar();
+      expect(toastErrorMock).toHaveBeenCalledTimes(1);
+
+      rerender(
+        <MemoryRouter initialEntries={['/pedidos/novo?copiaDe=negocio-1']}>
+          <NovoPedido />
+        </MemoryRouter>,
+      );
+
+      expect(toastErrorMock).toHaveBeenCalledTimes(1);
+    });
   });
 });
