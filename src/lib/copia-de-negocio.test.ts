@@ -99,6 +99,70 @@ describe('montarCopiaDeNegocio — o que a cópia NÃO leva', () => {
   });
 });
 
+describe('montarCopiaDeNegocio — quemDuplica (decisão D1 do dono do produto, 15/09/2026)', () => {
+  // A regra de segurança de `pedidos` (`pedidos_insert`) só deixa quem NÃO é gestor criar um
+  // negócio em nome de SI MESMO (`usuario_id = get_my_usuario_id()`). Duplicar o negócio de um
+  // colega deixaria essa pessoa com um `vendedorId` que ela não pode salvar — o campo
+  // Responsável vem travado na tela (`disabled={!isGestor}`) e o "Criar" seria recusado pelo
+  // banco, com uma frase em inglês.
+  //
+  // D1, na fala literal do dono do produto (15/09/2026): "Cópia nasce dele, no entanto o
+  // responsável do negócio o qual foi copiado não precisa entrar como responsável secundário,
+  // pode ser somente o novo responsável mesmo." Lida como "só o novo responsável, mais
+  // ninguém": nem o principal do original nem os outros responsáveis dele entram na cópia.
+
+  it('quem duplica NÃO é gestor e NÃO é o principal do original: vira o único responsável', () => {
+    const copia = montarCopiaDeNegocio({
+      negocio: ORIGINAL,
+      responsaveis: [
+        { usuarioId: 'user-1', principal: true },
+        { usuarioId: 'user-2', principal: false },
+      ],
+      quemDuplica: { usuarioId: 'user-9', ehGestor: false },
+    });
+    expect(copia.vendedorId).toBe('user-9');
+    expect(copia.participantes).toEqual([]);
+  });
+
+  it('quem duplica NÃO é gestor mas É o principal do original: nada muda', () => {
+    const copia = montarCopiaDeNegocio({
+      negocio: ORIGINAL,
+      responsaveis: [
+        { usuarioId: 'user-1', principal: true },
+        { usuarioId: 'user-2', principal: false },
+      ],
+      quemDuplica: { usuarioId: 'user-1', ehGestor: false },
+    });
+    expect(copia.vendedorId).toBe('user-1');
+    expect(copia.participantes).toEqual(['user-2']);
+  });
+
+  it('quem duplica é gestor: nada muda, mesmo duplicando o negócio de outra pessoa', () => {
+    const copia = montarCopiaDeNegocio({
+      negocio: ORIGINAL,
+      responsaveis: [
+        { usuarioId: 'user-1', principal: true },
+        { usuarioId: 'user-2', principal: false },
+      ],
+      quemDuplica: { usuarioId: 'user-9', ehGestor: true },
+    });
+    expect(copia.vendedorId).toBe('user-1');
+    expect(copia.participantes).toEqual(['user-2']);
+  });
+
+  it('sem quemDuplica: comportamento de hoje, sem mudança nenhuma', () => {
+    const copia = montarCopiaDeNegocio({
+      negocio: ORIGINAL,
+      responsaveis: [
+        { usuarioId: 'user-1', principal: true },
+        { usuarioId: 'user-2', principal: false },
+      ],
+    });
+    expect(copia.vendedorId).toBe('user-1');
+    expect(copia.participantes).toEqual(['user-2']);
+  });
+});
+
 describe('montarCopiaDeNegocio — o nome', () => {
   it('original sem nome próprio: a cópia continua no nome automático', () => {
     const copia = montarCopiaDeNegocio({ negocio: ORIGINAL });
