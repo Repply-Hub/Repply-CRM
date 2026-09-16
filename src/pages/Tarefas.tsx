@@ -5,8 +5,8 @@ import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
 import { useVendedores, useClientes } from '@/hooks/use-clientes';
-import { usePedidosOptions } from '@/hooks/use-pedidos';
-import { getNomeNegocio } from '@/lib/nome-negocio';
+import { usePedidosOptions, usePedidoOptionPorId } from '@/hooks/use-pedidos';
+import { getNomeNegocio, negocioParaFichaDaTarefa } from '@/lib/nome-negocio';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -111,6 +111,11 @@ export default function Tarefas() {
   const [newTarefaStatus, setNewTarefaStatus] = useState<string | undefined>();
   const [deleteTarefaTarget, setDeleteTarefaTarget] = useState<Tarefa | null>(null);
   const [selectedTarefa, setSelectedTarefa] = useState<Tarefa | null>(null);
+  // A ficha da tarefa (folha lateral) mostra o negócio ligado. `pedidosOptions` traz só os ~500
+  // negócios mais recentes; se o da tarefa for mais antigo, ele não está nessa lista e a ficha
+  // mostrava "—" num vínculo que existe. Buscamos aquele negócio pelo id — o mesmo remédio que o
+  // TarefaFormDialog já usa no próprio seletor (`usePedidoOptionPorId`).
+  const { data: negocioDaFichaPorId } = usePedidoOptionPorId(selectedTarefa?.pedido_id ?? null);
 
   // Bulk selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -788,12 +793,12 @@ export default function Tarefas() {
                     <div className="space-y-1">
                       <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Negócio</Label>
                       <p className="text-sm font-medium">
-                        {selectedTarefa.pedido_id
-                          ? (() => {
-                              const p = pedidosOptions.find(o => o.id === selectedTarefa.pedido_id);
-                              return p ? getNomeNegocio(p) : '—';
-                            })()
-                          : '—'}
+                        {(() => {
+                          const p = negocioParaFichaDaTarefa(
+                            selectedTarefa.pedido_id, pedidosOptions, negocioDaFichaPorId,
+                          );
+                          return p ? getNomeNegocio(p) : '—';
+                        })()}
                       </p>
                     </div>
                     {selectedTarefa.participantes && (
