@@ -58,7 +58,6 @@ Dois pedidos do Lucas:
    passo. O texto livre de hoje continua, como "mais alguma coisa".
 5. **O próximo passo vira tarefa**, com a data marcada.
 6. **O envio é o resumo do dia**, pelo botão de enviar rota que já existe.
-7. **Rota com visita já realizada não recebe sugestão de ordem** (16/09/2026). Uma parada marcada como realizada é passado — reordená-la reassociaria o time a um horário que já correu, quebraria a agenda dos participantes e tornaria mentira a hora que o cliente recebeu. Nenhuma parada da rota pode ter `realizada === true`.
 
 ### Decisões do desenho, apresentadas e aprovadas
 
@@ -72,6 +71,10 @@ Dois pedidos do Lucas:
     tem coluna de obra, e criar uma mexeria na tela de tarefas inteira.
 11. **A fase da obra aparece na ficha da obra** como "última fase conhecida", com a data da visita
     — calculada da visita mais recente que respondeu, sem coluna nova em `obras`.
+
+### Decisão do dono do produto de 16/09/2026
+
+12. **Rota com visita já realizada não recebe sugestão de ordem.** Uma parada marcada como realizada é passado — reordená-la reassociaria o time a um horário que já correu, quebraria a agenda dos participantes e tornaria mentira a hora que o cliente recebeu. Nenhuma parada da rota pode ter `realizada === true`.
 
 ## 4. O desenho
 

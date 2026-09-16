@@ -89,7 +89,7 @@ export function rotaAceitaSugestaoDeOrdem(
  * "serviço fora do ar, lento, ou obra sem localização: nenhuma sugestão".
  *
  * Lista de paradas vazia devolve lista vazia — não é erro, é "nada para sugerir", e
- * `urlDaMelhorOrdem` já devolve string vazio sozinho para menos de 3 pontos.
+ * `urlDaMelhorOrdem` já devolve string vazia sozinho para menos de 3 pontos.
  */
 export function pontosDaRotaEmOrdem(
   paradasEmOrdem: ReadonlyArray<{ obraId: string }>,
