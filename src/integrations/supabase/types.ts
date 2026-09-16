@@ -1830,7 +1830,12 @@ export type Database = {
           titulo: string
           updated_at: string
           user_id: string
+          visita_concorrentes: string | null
+          visita_contato_id: string | null
+          visita_fase: string | null
           visita_observacao: string | null
+          visita_proximo_passo: string | null
+          visita_proximo_passo_em: string | null
           visita_realizada: boolean
         }
         Insert: {
@@ -1856,7 +1861,12 @@ export type Database = {
           titulo: string
           updated_at?: string
           user_id: string
+          visita_concorrentes?: string | null
+          visita_contato_id?: string | null
+          visita_fase?: string | null
           visita_observacao?: string | null
+          visita_proximo_passo?: string | null
+          visita_proximo_passo_em?: string | null
           visita_realizada?: boolean
         }
         Update: {
@@ -1882,7 +1892,12 @@ export type Database = {
           titulo?: string
           updated_at?: string
           user_id?: string
+          visita_concorrentes?: string | null
+          visita_contato_id?: string | null
+          visita_fase?: string | null
           visita_observacao?: string | null
+          visita_proximo_passo?: string | null
+          visita_proximo_passo_em?: string | null
           visita_realizada?: boolean
         }
         Relationships: [
@@ -1891,6 +1906,13 @@ export type Database = {
             columns: ["obra_id"]
             isOneToOne: false
             referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eventos_visita_contato_id_fkey"
+            columns: ["visita_contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
             referencedColumns: ["id"]
           },
         ]
