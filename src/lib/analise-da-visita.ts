@@ -1,0 +1,107 @@
+/**
+ * A análise que o vendedor deixa quando marca a visita como realizada.
+ *
+ * 🔴 POR QUE ISTO EXISTE. Até 12/09/2026 havia UMA pergunta aberta ("O que você viu nesta
+ * obra?") — e das 6 visitas marcadas como realizadas, só 2 tinham texto. Pergunta aberta é fácil
+ * de pular. O desenho de 12/09/2026 trocou por quatro respostas rápidas, todas opcionais, cada
+ * uma escolhida por servir para VENDER DEPOIS:
+ *
+ *   fase da obra .......... diz o que aquela obra vai comprar, e quando
+ *   concorrente visto ..... diz quem está ganhando a obra, e com qual marca
+ *   com quem falou ........ sem isso a próxima visita recomeça do zero
+ *   próximo passo ......... a única resposta que vira trabalho futuro
+ */
+
+/** A ordem é a do canteiro, e é ela que a tela mostra. Vocabulário do ramo, não configuração. */
+export const FASES_DA_OBRA = [
+  { chave: 'fundacao', rotulo: 'Fundação' },
+  { chave: 'estrutura', rotulo: 'Estrutura' },
+  { chave: 'alvenaria', rotulo: 'Alvenaria' },
+  { chave: 'instalacoes', rotulo: 'Instalações' },
+  { chave: 'acabamento', rotulo: 'Acabamento' },
+  { chave: 'entrega', rotulo: 'Entrega' },
+] as const;
+
+/** Rótulo da fase gravada. Chave desconhecida devolve vazio: melhor calar que inventar fase. */
+export function rotuloDaFase(chave?: string | null): string {
+  return FASES_DA_OBRA.find((f) => f.chave === (chave ?? '').trim())?.rotulo ?? '';
+}
+
+export interface AnaliseDaVisita {
+  fase?: string | null;
+  concorrentes?: string | null;
+  contatoNome?: string | null;
+  proximoPasso?: string | null;
+  /** `AAAA-MM-DD`, como vem do campo de data. */
+  proximoPassoEm?: string | null;
+  observacao?: string | null;
+}
+
+const texto = (valor?: string | null) => (typeof valor === 'string' ? valor.trim() : '');
+
+/** `AAAA-MM-DD` vira `20/09`. Sem `new Date`: a data é texto e nenhum fuso encosta nela. */
+function diaEMes(data?: string | null): string {
+  const [ano, mes, dia] = texto(data).split('-');
+  return ano && mes && dia ? `${dia}/${mes}` : '';
+}
+
+/** As linhas prontas da análise — a mensagem do WhatsApp só as indenta e junta. */
+export function resumoDaAnalise(analise?: AnaliseDaVisita | null): string[] {
+  if (!analise) return [];
+  const linhas: string[] = [];
+
+  const fase = rotuloDaFase(analise.fase);
+  if (fase) linhas.push(`Fase: ${fase}`);
+
+  const concorrente = texto(analise.concorrentes);
+  if (concorrente) linhas.push(`Concorrente: ${concorrente}`);
+
+  const contato = texto(analise.contatoNome);
+  if (contato) linhas.push(`Falou com: ${contato}`);
+
+  const passo = texto(analise.proximoPasso);
+  if (passo) {
+    const quando = diaEMes(analise.proximoPassoEm);
+    linhas.push(quando ? `Próximo passo: ${passo} (até ${quando})` : `Próximo passo: ${passo}`);
+  }
+
+  const observacao = texto(analise.observacao);
+  if (observacao) linhas.push(`Obs.: ${observacao}`);
+
+  return linhas;
+}
+
+/**
+ * A tarefa do próximo passo — ou `null` quando não há o que cobrar.
+ *
+ * 🔴 SÓ COM DATA. Tarefa sem prazo não aparece em lista nenhuma de cobrança e vira registro
+ * morto, que é justamente o que este trabalho veio resolver.
+ *
+ * A tarefa liga ao CLIENTE da obra: `tarefas` não tem coluna de obra (medido em 12/09/2026), e
+ * criar uma mexeria na tela de tarefas inteira. O nome da obra vai no título, que é onde quem lê
+ * a lista procura.
+ */
+export function tarefaDoProximoPasso({
+  nomeObra,
+  clienteId,
+  proximoPasso,
+  proximoPassoEm,
+}: {
+  nomeObra?: string | null;
+  clienteId?: string | null;
+  proximoPasso?: string | null;
+  proximoPassoEm?: string | null;
+}): { titulo: string; descricao: string; prazo_final: string; cliente_id: string | null } | null {
+  const passo = texto(proximoPasso);
+  const data = texto(proximoPassoEm);
+  if (!passo || !data) return null;
+
+  return {
+    titulo: `Próximo passo — ${texto(nomeObra) || 'obra sem nome'}`,
+    descricao: passo,
+    // Âncora de meio-dia, o padrão da casa para data que vira carimbo (CLAUDE.md §7.12): às
+    // 00:00 qualquer deslocamento de fuso joga a tarefa para o dia anterior.
+    prazo_final: `${data}T12:00:00`,
+    cliente_id: clienteId ?? null,
+  };
+}
