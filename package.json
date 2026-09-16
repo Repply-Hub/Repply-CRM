@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "skills:sincronizar": "node scripts/sincronizar-skills.mjs"
   },
   "dependencies": {
     "@formkit/auto-animate": "^0.9.0",
