@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { recusaSemErro } from '@/lib/recusa-do-banco';
-import type { RespostasDaVisita } from '@/lib/analise-da-visita';
+import { tarefaDoProximoPasso, type RespostasDaVisita } from '@/lib/analise-da-visita';
+import { useCreateTarefa } from '@/hooks/use-tarefas';
 
 export type { RespostasDaVisita };
 
@@ -228,9 +230,21 @@ const RECUSA_AO_DESMARCAR_VISITA = 'Desmarcar visita é a mesma permissão de re
  * pergunta não pode apagar a resposta de quem perguntou. `visita_observacao` continua sendo
  * gravada sempre que `realizada` é verdadeiro — isso já era assim antes e nenhuma tela hoje
  * chama sem intenção de gravar a observação.
+ *
+ * 🔴 A TAREFA DO PRÓXIMO PASSO É CONSEQUÊNCIA, NÃO É O TRABALHO (Tarefa 7a, 16/09/2026). A
+ * visita acima é o registro de quem esteve em campo, e tem que gravar sozinha, sempre. Só
+ * DEPOIS dela valer é que este hook tenta a segunda gravação: uma TAREFA, e só quando a visita
+ * PASSA a realizada — nunca ao reabrir uma visita já realizada para editar (`respostas.criarTarefa`
+ * volta sempre `true` nesse caso, mas `tarefaDoProximoPasso` já filtra por texto+data, não pelo
+ * "passou a realizada") — com próximo passo E data preenchidos e a caixinha `criarTarefa`
+ * marcada (campo TRANSITÓRIO da tela, nunca uma coluna do banco — ver `RespostasDaVisita` em
+ * `src/lib/analise-da-visita.ts`). Se a criação da tarefa falhar, a visita já gravada continua
+ * valendo: a pessoa não perde o registro de campo por causa de um problema na tarefa. Mesmo
+ * espírito do aviso de participantes de `useCreatePedidoCompleto` (`use-novo-pedido.ts`).
  */
 export function useMarcarVisitaRealizada() {
   const qc = useQueryClient();
+  const criarTarefa = useCreateTarefa();
 
   return useMutation({
     mutationFn: async ({
@@ -239,12 +253,18 @@ export function useMarcarVisitaRealizada() {
       realizada,
       observacao,
       respostas,
+      nomeObra,
+      clienteId,
     }: {
       grupoId: string;
       obraId: string;
       realizada: boolean;
       observacao?: string | null;
       respostas?: RespostasDaVisita;
+      /** Título da tarefa do próximo passo. Nulo/ausente vira "obra sem nome" (`tarefaDoProximoPasso`). */
+      nomeObra?: string | null;
+      /** Cliente dono da obra, para ligar a tarefa a ele. */
+      clienteId?: string | null;
     }) => {
       const payload: Record<string, unknown> = { visita_realizada: realizada };
       if (realizada) {
@@ -280,12 +300,41 @@ export function useMarcarVisitaRealizada() {
           ),
         );
       }
-      return obraId;
+
+      // A visita já está gravada a partir daqui. `tarefaDoProximoPasso` só devolve algo quando
+      // há texto E data — sem os dois, não há o que cobrar (mesmo motivo da frase "sem data,
+      // não vira tarefa" em `PerguntasDaVisita.tsx`).
+      let avisoDaTarefa: string | null = null;
+      if (realizada && respostas?.criarTarefa) {
+        const tarefa = tarefaDoProximoPasso({
+          nomeObra,
+          clienteId,
+          proximoPasso: respostas?.proximoPasso,
+          proximoPassoEm: respostas?.proximoPassoEm,
+        });
+        if (tarefa) {
+          try {
+            await criarTarefa.mutateAsync(tarefa);
+          } catch {
+            // A visita já gravou — este `catch` não pode virar `throw`, ou a pessoa em campo
+            // veria a gravação inteira falhar por causa de uma tarefa que ela nem escolheu
+            // conferir agora.
+            avisoDaTarefa =
+              'A visita foi gravada, mas a tarefa do próximo passo não. Crie-a pela tela de Tarefas.';
+          }
+        }
+      }
+
+      return { obraId, avisoDaTarefa };
     },
-    onSuccess: (obraId) => {
+    onSuccess: ({ obraId, avisoDaTarefa }) => {
       qc.invalidateQueries({ queryKey: ['obra_visitas', obraId] });
       qc.invalidateQueries({ queryKey: ['obra_visitas_todas'] });
       qc.invalidateQueries({ queryKey: ['eventos'] });
+      if (avisoDaTarefa) {
+        toast.warning(avisoDaTarefa);
+        qc.invalidateQueries({ queryKey: ['tarefas'] });
+      }
     },
   });
 }

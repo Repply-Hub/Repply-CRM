@@ -91,7 +91,7 @@ describe('tarefaDoProximoPasso', () => {
 });
 
 describe('RESPOSTAS_VAZIAS', () => {
-  it('as seis respostas começam vazias', () => {
+  it('as seis respostas começam vazias, com a caixinha de criar tarefa marcada', () => {
     expect(RESPOSTAS_VAZIAS).toEqual({
       fase: '',
       concorrentes: '',
@@ -99,7 +99,12 @@ describe('RESPOSTAS_VAZIAS', () => {
       proximoPasso: '',
       proximoPassoEm: '',
       observacao: '',
+      criarTarefa: true,
     });
+  });
+
+  it('🔴 criarTarefa começa marcada — o padrão do produto é criar a tarefa do próximo passo', () => {
+    expect(RESPOSTAS_VAZIAS.criarTarefa).toBe(true);
   });
 });
 
@@ -121,6 +126,7 @@ describe('respostasDaVisita — o rascunho a partir do que já está gravado', (
       proximoPasso: 'Mandar proposta de louças',
       proximoPassoEm: '2026-09-20',
       observacao: 'Obra parada por chuva',
+      criarTarefa: true,
     });
   });
 
@@ -139,5 +145,17 @@ describe('respostasDaVisita — o rascunho a partir do que já está gravado', (
     expect(respostasDaVisita({})).toEqual(RESPOSTAS_VAZIAS);
     expect(respostasDaVisita(undefined)).toEqual(RESPOSTAS_VAZIAS);
     expect(respostasDaVisita(null)).toEqual(RESPOSTAS_VAZIAS);
+  });
+
+  it('🔴 a visita gravada NÃO guarda a escolha da caixinha — reabrir sempre volta marcado', () => {
+    // A tarefa só nasce quando a visita PASSA a realizada (useMarcarVisitaRealizada), nunca a
+    // cada reedição — então não há como (nem por quê) a gravação lembrar se a caixinha estava
+    // marcada da última vez.
+    expect(
+      respostasDaVisita({
+        visitaProximoPasso: 'Mandar proposta de louças',
+        visitaProximoPassoEm: '2026-09-20',
+      }).criarTarefa,
+    ).toBe(true);
   });
 });

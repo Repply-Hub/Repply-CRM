@@ -24,6 +24,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FASES_DA_OBRA, type RespostasDaVisita } from '@/lib/analise-da-visita';
 import { useContatosDoCliente } from '@/hooks/use-obra-contatos';
@@ -54,6 +55,11 @@ export function PerguntasDaVisita({
   const { data: contatos = [] } = useContatosDoCliente(clienteId, clienteEmpresa);
 
   const atualizar = (patch: Partial<RespostasDaVisita>) => onChange({ ...valor, ...patch });
+
+  // A caixinha só faz sentido quando há o que agendar: `tarefaDoProximoPasso`
+  // (`src/lib/analise-da-visita.ts`) já devolve `null` sem os dois campos, então oferecer a
+  // escolha "criar tarefa" com um dos dois vazio prometeria uma tarefa que nunca nasceria.
+  const proximoPassoComData = valor.proximoPasso.trim() !== '' && valor.proximoPassoEm.trim() !== '';
 
   return (
     <div className="space-y-4">
@@ -141,7 +147,33 @@ export function PerguntasDaVisita({
             onChange={(e) => atualizar({ proximoPassoEm: e.target.value })}
           />
         </div>
-        <p className="text-xs text-muted-foreground">sem data, não vira tarefa</p>
+        {proximoPassoComData ? (
+          // Nasce MARCADA — mesmo padrão do "Retomar depois" (`DialogoRetorno.tsx`): o
+          // produto assume que quem preencheu texto e data quer a cobrança na agenda, e quem
+          // não quer desmarca com um clique, antes de salvar.
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="visita-criar-tarefa"
+                checked={valor.criarTarefa}
+                disabled={disabled}
+                // `onCheckedChange` do Radix também devolve `'indeterminate'` — o `=== true`
+                // é o que garante um booleano de verdade indo para o rascunho, nunca a string.
+                onCheckedChange={(marcado) => atualizar({ criarTarefa: marcado === true })}
+              />
+              <Label htmlFor="visita-criar-tarefa" className="cursor-pointer font-normal">
+                Criar tarefa de acompanhamento
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {valor.criarTarefa
+                ? 'Uma tarefa com esse prazo vai para a sua lista de Tarefas.'
+                : 'Sem tarefa: o próximo passo fica só registrado na visita.'}
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">sem data, não vira tarefa</p>
+        )}
       </div>
 
       <div className="space-y-1.5">

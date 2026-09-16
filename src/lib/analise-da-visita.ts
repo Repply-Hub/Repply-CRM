@@ -39,6 +39,15 @@ export interface RespostasDaVisita {
   proximoPasso: string;
   proximoPassoEm: string;
   observacao: string;
+  /**
+   * 🔴 CAMPO TRANSITÓRIO — decisão passageira da TELA (criar ou não a tarefa do próximo
+   * passo), NUNCA uma coluna do banco. `eventos` guarda só as cinco respostas acima;
+   * `useMarcarVisitaRealizada` lê esta chave para decidir se monta `tarefaDoProximoPasso`, mas
+   * ela não entra no `payload` de gravação da visita. Por isso `respostasDaVisita` (o rascunho
+   * a partir do que já está gravado) sempre devolve `true` aqui: não há valor anterior para
+   * lembrar, e reabrir uma visita para editar não pode herdar a decisão da vez passada.
+   */
+  criarTarefa: boolean;
 }
 
 export const RESPOSTAS_VAZIAS: RespostasDaVisita = {
@@ -48,6 +57,9 @@ export const RESPOSTAS_VAZIAS: RespostasDaVisita = {
   proximoPasso: '',
   proximoPassoEm: '',
   observacao: '',
+  // O padrão do produto é criar a tarefa — mesmo espírito da caixinha "Retomar depois"
+  // (`DialogoRetorno.tsx`): quem não quer desmarca, um clique, antes de salvar.
+  criarTarefa: true,
 };
 
 /**
@@ -71,6 +83,11 @@ export function respostasDaVisita(
     proximoPasso: v?.visitaProximoPasso ?? '',
     proximoPassoEm: v?.visitaProximoPassoEm ?? '',
     observacao: v?.visitaObservacao ?? '',
+    // Sempre marcada ao reabrir: a visita gravada não guarda esta escolha (ver o comentário na
+    // interface). Isso é seguro porque a tarefa só nasce quando a visita PASSA a realizada,
+    // nunca a cada reedição — reabrir uma visita já realizada não dispara `tarefaDoProximoPasso`
+    // de novo.
+    criarTarefa: true,
   };
 }
 

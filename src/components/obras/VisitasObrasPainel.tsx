@@ -386,6 +386,11 @@ export function VisitasObrasPainel({
                       realizada: true,
                       observacao: rascunho.observacao,
                       respostas: rascunho,
+                      // Para a tarefa do próximo passo (Tarefa 7a): título com o nome da obra,
+                      // ligada ao cliente dono dela. Os dois já vêm prontos em `visita`
+                      // (`VisitaObraListagem`), sem consulta extra.
+                      nomeObra: visita.nomeObra,
+                      clienteId: visita.clienteId,
                     },
                     {
                       onSuccess: () => setEditandoId(null),

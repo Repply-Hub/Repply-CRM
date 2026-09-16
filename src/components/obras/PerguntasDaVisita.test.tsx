@@ -91,6 +91,41 @@ describe('próximo passo', () => {
   });
 });
 
+describe('caixinha "criar tarefa de acompanhamento"', () => {
+  it('🔴 sem data, a caixinha NÃO aparece — só o aviso "sem data, não vira tarefa"', () => {
+    montar({ ...RESPOSTAS_VAZIAS, proximoPasso: 'Mandar proposta de louças' });
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByText(/sem data, não vira tarefa/i)).toBeInTheDocument();
+  });
+
+  it('com próximo passo e data preenchidos, a caixinha aparece marcada por padrão', () => {
+    montar({
+      ...RESPOSTAS_VAZIAS,
+      proximoPasso: 'Mandar proposta de louças',
+      proximoPassoEm: '2026-09-20',
+    });
+    expect(screen.queryByText(/sem data, não vira tarefa/i)).not.toBeInTheDocument();
+    const caixinha = screen.getByRole('checkbox');
+    expect(caixinha).toBeInTheDocument();
+    expect(caixinha).toBeChecked();
+  });
+
+  it('clicar na caixinha marcada chama onChange com criarTarefa: false', () => {
+    const { onChange } = montar({
+      ...RESPOSTAS_VAZIAS,
+      proximoPasso: 'Mandar proposta de louças',
+      proximoPassoEm: '2026-09-20',
+    });
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(onChange).toHaveBeenCalledWith({
+      ...RESPOSTAS_VAZIAS,
+      proximoPasso: 'Mandar proposta de louças',
+      proximoPassoEm: '2026-09-20',
+      criarTarefa: false,
+    });
+  });
+});
+
 describe('mais alguma coisa (texto livre)', () => {
   it('digitar chama onChange com a observação', () => {
     const { onChange } = montar();
