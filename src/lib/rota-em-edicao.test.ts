@@ -940,4 +940,31 @@ describe('diferencaDaRota — as cinco respostas da visita concluída', () => {
 
     expect(diferencaDaRota(antes, depois, DIA).semMudanca).toBe(true);
   });
+
+  it('🔴 resposta gravada como `null` e string vazia na tela são a MESMA coisa: nenhuma das cinco entra', () => {
+    // O banco guarda `null` na coluna sem resposta; o rascunho da tela devolve `''` (é o que
+    // `respostasDaVisita` monta a partir de nulo/indefinido). Sem a normalização `|| null` de
+    // cada campo, abrir e fechar a edição de uma visita sem análise mandaria um UPDATE que
+    // reescreve as cinco colunas com string vazia — troca invisível de `null` por `''` no
+    // banco, e um "mudou" onde nada mudou. Este é o contrato que o código documenta e que os
+    // outros testes deste bloco ainda não exercitavam.
+    const antes = [gravada('g1', MARES, 9, 0, { visitaRealizada: true })];
+    const depois: ParadaEditada[] = [
+      {
+        ...editada(MARES, '09:00', 'g1'),
+        visitaRealizada: true,
+        visitaObservacao: '',
+        visitaFase: '',
+        visitaConcorrentes: '',
+        visitaContatoId: '',
+        visitaProximoPasso: '',
+        visitaProximoPassoEm: '',
+      },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.semMudanca).toBe(true);
+    expect(diff.alterar).toEqual([]);
+  });
 });

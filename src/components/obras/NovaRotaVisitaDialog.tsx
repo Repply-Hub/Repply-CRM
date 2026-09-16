@@ -932,8 +932,20 @@ export function NovaRotaVisitaDialog({
                                   existe uma visita pode ter acontecido e a seguinte não. Vem
                                   marcada e com o comentário quando já está assim no banco.
                                   CRIANDO: quem manda é a chave do topo — ali a rota inteira é
-                                  registrada de uma vez, que é o que aquela chave significa. */}
+                                  registrada de uma vez, que é o que aquela chave significa.
+
+                                  🔴 SÓ a parada que JÁ EXISTE no banco (tem `grupoId`) oferece
+                                  marcar como realizada aqui. Uma obra acrescentada AGORA, no meio
+                                  da edição, ainda não foi gravada: ela cai no caminho de INSERIR
+                                  (`diferencaDaRota` → `inserir`), que grava a parada nova SEMPRE
+                                  como não realizada e sem análise. Oferecer a caixa para ela era
+                                  prometer um registro que o salvamento descartava em silêncio — a
+                                  pessoa preenchia fase, concorrente e próximo passo, via "1
+                                  acrescentada" e nada ficava. O gesto certo é o mesmo que o resto
+                                  do código já segue: parada nova nasce não realizada; marcar como
+                                  feita é um passo separado, na ficha da obra. */}
                               {editando ? (
+                                parada.grupoId ? (
                                 <div className="mt-2 space-y-2">
                                   <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground">
                                     <Checkbox
@@ -951,6 +963,12 @@ export function NovaRotaVisitaDialog({
                                     />
                                   )}
                                 </div>
+                                ) : (
+                                  <p className="mt-2 text-xs text-muted-foreground">
+                                    Salve a rota primeiro. Depois, marque esta visita como feita na
+                                    ficha da obra.
+                                  </p>
+                                )
                               ) : (
                                 jaRealizada && (
                                   <div className="mt-2">
