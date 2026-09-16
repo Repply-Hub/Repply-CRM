@@ -138,6 +138,10 @@ export function estaEmOrdemCrescente(paradas: readonly ParadaOrdenavel[]): boole
  * ocupa cada uma. Inventar horário novo seria decidir pela pessoa algo que ela combinou fora do
  * sistema.
  *
+ * A `ordem` refere-se aos índices das paradas **em ordem de horário**, não à ordem em que
+ * chegam como argumento. Isso faz a função funcionara com a lista em qualquer ordem: o algoritmo
+ * ordena uma única vez e aplica aos índices da lista já ordenada.
+ *
  * Ordem inválida (tamanho diferente, índice repetido ou fora da faixa) devolve a lista como
  * estava: melhor não fazer nada do que embaralhar a rota de alguém.
  */
@@ -154,8 +158,9 @@ export function aplicarOrdemMantendoHorarios<T extends ParadaOrdenavel>(
     vistos.add(indice);
   }
 
-  const grade = ordenarPorHorario(paradas).map((p) => p.horario);
-  return ordem.map((indice, lugar) => ({ ...paradas[indice], horario: grade[lugar] }));
+  const ordenadas = ordenarPorHorario(paradas);
+  const grade = ordenadas.map((p) => p.horario);
+  return ordem.map((indice, lugar) => ({ ...ordenadas[indice], horario: grade[lugar] }));
 }
 
 /* ────────────────────────────────────────────────────────────────────────────

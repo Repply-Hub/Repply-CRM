@@ -26,4 +26,26 @@ describe('avaliarOrdemDaRota', () => {
   ])('sem sugestão quando não dá para comparar (%s)', (_caso, entrada) => {
     expect(avaliarOrdemDaRota(entrada as never).caso).toBe('sem_sugestao');
   });
+
+  it('ganho negativo (ordem atual é mais rápida): já ótima', () => {
+    const r = avaliarOrdemDaRota({ duracaoAtualS: 2400, melhorOrdem: { ordem: [0, 2, 1], duracaoS: 3000 } });
+    expect(r.caso).toBe('ja_otima');
+    expect(r.ordem).toBeNull();
+    expect(r.ganhoS).toBe(0);
+  });
+
+  it('ganho exatamente 300 segundos (limiar mínimo): ordem melhor', () => {
+    const r = avaliarOrdemDaRota({ duracaoAtualS: 3600, melhorOrdem: { ordem: [0, 2, 1], duracaoS: 3300 } });
+    expect(r.caso).toBe('ordem_melhor');
+    expect(r.ganhoS).toBe(300);
+    expect(r.ordem).toEqual([0, 2, 1]);
+  });
+
+  it('sem números finitos (NaN e Infinity): sem sugestão', () => {
+    const r1 = avaliarOrdemDaRota({ duracaoAtualS: NaN, melhorOrdem: { ordem: [0, 2, 1], duracaoS: 2400 } });
+    expect(r1.caso).toBe('sem_sugestao');
+
+    const r2 = avaliarOrdemDaRota({ duracaoAtualS: 3600, melhorOrdem: { ordem: [0, 2, 1], duracaoS: Infinity } });
+    expect(r2.caso).toBe('sem_sugestao');
+  });
 });
