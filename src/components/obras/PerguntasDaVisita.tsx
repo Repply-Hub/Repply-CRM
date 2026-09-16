@@ -86,6 +86,7 @@ export function PerguntasDaVisita({
             value={valor.concorrentes}
             disabled={disabled}
             placeholder="Qual marca?"
+            className="flex-1 min-w-0"
             onChange={(e) => atualizar({ concorrentes: e.target.value })}
           />
           <Button

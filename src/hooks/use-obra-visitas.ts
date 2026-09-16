@@ -203,6 +203,7 @@ export function useTodasVisitasObras() {
 }
 
 const RECUSA_AO_GRAVAR_VISITA = 'Registrar visita é uma permissão à parte, e o seu usuário não tem.';
+const RECUSA_AO_DESMARCAR_VISITA = 'Desmarcar visita é a mesma permissão de registrar, e o seu usuário não tem.';
 
 /**
  * Marcar (ou desmarcar) uma visita como realizada, com observação e respostas opcionais.
@@ -217,6 +218,16 @@ const RECUSA_AO_GRAVAR_VISITA = 'Registrar visita é uma permissão à parte, e 
  * isso o `update` de desmarcar manda SÓ `visita_realizada: false`: nenhuma outra chave entra no
  * payload, e uma coluna ausente no `update` do PostgREST não é tocada. Apagar de propósito
  * continua possível: marcar de novo, limpar os campos na tela e salvar — aí sim vai `null`.
+ *
+ * 🔴 MARCAR SEM `respostas` TAMBÉM NÃO APAGA A ANÁLISE — mesmo princípio do parágrafo acima,
+ * achado na revisão do Task 6a. As cinco colunas de análise só entram no `payload` quando quem
+ * chamou passou `respostas`. `HistoricoVisitasObra.tsx` marca a visita como realizada sem
+ * perguntar fase/concorrente/próximo passo (essas perguntas chegam lá só numa tarefa futura); se
+ * as cinco colunas fossem gravadas sempre com `respostas?.campo || null`, marcar por aquela tela
+ * apagaria silenciosamente o que já estava salvo pelo painel de visitas. Uma tela que não
+ * pergunta não pode apagar a resposta de quem perguntou. `visita_observacao` continua sendo
+ * gravada sempre que `realizada` é verdadeiro — isso já era assim antes e nenhuma tela hoje
+ * chama sem intenção de gravar a observação.
  */
 export function useMarcarVisitaRealizada() {
   const qc = useQueryClient();
@@ -238,11 +249,15 @@ export function useMarcarVisitaRealizada() {
       const payload: Record<string, unknown> = { visita_realizada: realizada };
       if (realizada) {
         payload.visita_observacao = observacao || null;
-        payload.visita_fase = respostas?.fase || null;
-        payload.visita_concorrentes = respostas?.concorrentes || null;
-        payload.visita_contato_id = respostas?.contatoId || null;
-        payload.visita_proximo_passo = respostas?.proximoPasso || null;
-        payload.visita_proximo_passo_em = respostas?.proximoPassoEm || null;
+        // Só grava as cinco colunas de análise quando a tela PERGUNTOU — ver o comentário
+        // acima. Sem `respostas`, elas ficam de fora do payload e o PostgREST não as toca.
+        if (respostas) {
+          payload.visita_fase = respostas.fase || null;
+          payload.visita_concorrentes = respostas.concorrentes || null;
+          payload.visita_contato_id = respostas.contatoId || null;
+          payload.visita_proximo_passo = respostas.proximoPasso || null;
+          payload.visita_proximo_passo_em = respostas.proximoPassoEm || null;
+        }
       }
 
       // 🔴 ZERO LINHAS NÃO É SUCESSO (CLAUDE.md §4.6). A regra de acesso pode recusar o
@@ -261,7 +276,7 @@ export function useMarcarVisitaRealizada() {
             realizada
               ? 'A visita NÃO foi gravada como realizada: as respostas não foram salvas.'
               : 'A visita NÃO foi desmarcada: ela continua como realizada.',
-            RECUSA_AO_GRAVAR_VISITA,
+            realizada ? RECUSA_AO_GRAVAR_VISITA : RECUSA_AO_DESMARCAR_VISITA,
           ),
         );
       }

@@ -95,6 +95,24 @@ describe('useMarcarVisitaRealizada', () => {
     expect(filtrouPorGrupo).toHaveBeenCalledWith('grupo_id', 'grupo-1');
   });
 
+  it('🔴 marcar como realizada SEM respostas não apaga a análise já salva — nenhuma das cinco chaves entra no payload', async () => {
+    const { wrapper } = envolver();
+    const { result } = renderHook(() => useMarcarVisitaRealizada(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        grupoId: 'grupo-1',
+        obraId: 'obra-1',
+        realizada: true,
+        observacao: 'Obra parada por chuva',
+      });
+    });
+
+    const payloadEnviado = atualizou.mock.calls[0][0];
+    expect(Object.keys(payloadEnviado)).toEqual(['visita_realizada', 'visita_observacao']);
+    expect(payloadEnviado).toEqual({ visita_realizada: true, visita_observacao: 'Obra parada por chuva' });
+  });
+
   it('🔴 desmarcar manda SÓ visita_realizada: false — nenhuma outra chave no payload', async () => {
     const { wrapper } = envolver();
     const { result } = renderHook(() => useMarcarVisitaRealizada(), { wrapper });
@@ -126,6 +144,23 @@ describe('useMarcarVisitaRealizada', () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect((result.current.error as Error).message).toMatch(/NÃO foi/i);
+  });
+
+  it('🔴 desmarcar com zero linhas usa frase própria — não reaproveita "Registrar visita"', async () => {
+    respostaDoUpdate = { error: null, count: 0 };
+    const { wrapper } = envolver();
+    const { result } = renderHook(() => useMarcarVisitaRealizada(), { wrapper });
+
+    await act(async () => {
+      await result.current
+        .mutateAsync({ grupoId: 'grupo-1', obraId: 'obra-1', realizada: false })
+        .catch(() => {});
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    const mensagem = (result.current.error as Error).message;
+    expect(mensagem).toMatch(/NÃO foi desmarcada/i);
+    expect(mensagem).not.toMatch(/Registrar visita/i);
   });
 
   it('count nulo (sem cabeçalho de contagem) NÃO é tratado como recusa', async () => {
