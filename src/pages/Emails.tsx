@@ -21,7 +21,6 @@ import {
   ChevronsRight,
   Tag,
   CornerUpLeft,
-  Move,
   GripVertical,
   X,
 } from "lucide-react";
@@ -60,7 +59,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useEmailEmpresa } from "@/hooks/use-email-empresa";
 import { useEmailAnexos } from "@/hooks/use-email-anexos";
 import {
@@ -68,6 +67,7 @@ import {
   mensagemDeRejeicao,
 } from "@/lib/email-anexos";
 import { erroLegivelDaFunction } from "@/lib/erro-edge-function";
+import { parseEnderecos } from "@/lib/enderecos-email";
 import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
 import { LeitorEmail, type EmailAberto } from "@/components/email/LeitorEmail";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
@@ -225,6 +225,7 @@ const SeloMarcadores = ({
 };
 
 const Emails = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   // A busca só vira consulta depois que a digitação para. Enquanto o termo
@@ -253,8 +254,6 @@ const Emails = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   /** Ids das mensagens em processo de "mover para marcador" — vazio = fechado. */
   const [mensagensParaMover, setMensagensParaMover] = useState<string[]>([]);
-  /** Arrastar-e-soltar linha -> marcador. Desligado por padrão: clique comum não pode virar arrasto sem querer. */
-  const [modoArrastar, setModoArrastar] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("received");
   /** `nylas_message_id` da mensagem sendo respondida; nulo num e-mail novo. */
   const [respondendoA, setRespondendoA] = useState<string | null>(null);
@@ -362,6 +361,8 @@ const Emails = () => {
     destinatario: "",
     assunto: "",
     corpo: "",
+    cc: "",
+    cco: "",
   });
   /** Id do rascunho em `email_rascunhos` sendo editado; nulo enquanto o autosave ainda não gravou a primeira vez. */
   const [rascunhoId, setRascunhoId] = useState<string | null>(null);
@@ -1018,6 +1019,8 @@ const Emails = () => {
       destinatario: string;
       assunto: string;
       corpo: string;
+      cc: string;
+      cco: string;
     }) => {
       if (!isConnected) {
         throw new Error(
@@ -1067,13 +1070,17 @@ const Emails = () => {
       // conhece o id devolvido pelo Nylas. Gravar também daqui criaria duas
       // linhas para o mesmo envio — e o cliente nem tem INSERT nessa tabela.
       return await sendEmail(
-        data.destinatario,
+        // "Para" agora aceita vários endereços — mesma regra de separador e
+        // duplicado do Cc/Cco (ver `enderecos-email.ts`).
+        parseEnderecos(data.destinatario),
         data.assunto,
         htmlBody,
         respondendoA,
         // A função de servidor puxa os anexos deste rascunho, monta o
         // multipart pro Nylas e depois apaga balde + linhas.
         rascunhoId,
+        parseEnderecos(data.cc),
+        parseEnderecos(data.cco),
       );
     },
     onSuccess: () => {
@@ -1085,6 +1092,8 @@ const Emails = () => {
         destinatario: "",
         assunto: "",
         corpo: "",
+        cc: "",
+        cco: "",
       });
       setIncluirAssinatura(true);
       // Enviado com sucesso: o rascunho que o alimentava não serve mais.
@@ -1283,8 +1292,15 @@ const Emails = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.destinatario || !formData.assunto || !formData.corpo) {
+    if (!formData.assunto || !formData.corpo) {
       toast.error("Preencha todos os campos");
+      return;
+    }
+    // Cobre tanto o campo vazio quanto um texto que não sobra em endereço
+    // nenhum depois de separado (ex.: só vírgula) — nos dois casos não há
+    // para quem enviar.
+    if (parseEnderecos(formData.destinatario).length === 0) {
+      toast.error("Informe pelo menos um endereço em Para.");
       return;
     }
     sendEmailMutation.mutate(formData);
@@ -1348,6 +1364,10 @@ const Emails = () => {
       ),
       assunto: replySubject,
       corpo: `\n\n--- Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${selectedEmail.remetente} escreveu:\n\n${citado}`,
+      // Contexto novo: Cc/Cco de uma composição anterior não continuam numa
+      // resposta diferente.
+      cc: "",
+      cco: "",
     });
     // Guarda a QUAL mensagem se está respondendo, no id do provedor. É o que o
     // Nylas usa para montar In-Reply-To/References; sem isso a resposta sai
@@ -1374,7 +1394,7 @@ const Emails = () => {
    * mensagem nova para aquele endereço, não uma resposta.
    */
   const enviarPara = (endereco: string) => {
-    setFormData({ destinatario: endereco, assunto: "", corpo: "" });
+    setFormData({ destinatario: endereco, assunto: "", corpo: "", cc: "", cco: "" });
     setRespondendoA(null);
     setRespondendo(false);
     setRascunhoId(null);
@@ -1400,13 +1420,17 @@ const Emails = () => {
         destinatario: maisRecente.destinatario ?? "",
         assunto: maisRecente.assunto ?? "",
         corpo: maisRecente.corpo ?? "",
+        // Rascunho não guarda Cc/Cco (ver `RascunhoEmail`) — recuperar um
+        // antigo nunca traz cópia/cópia oculta de volta.
+        cc: "",
+        cco: "",
       });
       setRascunhoId(maisRecente.id);
       // A escolha de assinatura não é gravada no rascunho — sempre começa incluída.
       setIncluirAssinatura(true);
       toast.info("Rascunho recuperado.");
     } else {
-      setFormData({ destinatario: "", assunto: "", corpo: "" });
+      setFormData({ destinatario: "", assunto: "", corpo: "", cc: "", cco: "" });
       setRascunhoId(null);
       setIncluirAssinatura(true);
     }
@@ -1426,6 +1450,8 @@ const Emails = () => {
       destinatario: r.destinatario ?? "",
       assunto: r.assunto ?? "",
       corpo: r.corpo ?? "",
+      cc: "",
+      cco: "",
     });
     setRascunhoId(r.id);
     setIncluirAssinatura(true);
@@ -1763,7 +1789,7 @@ const Emails = () => {
           descartarRascunhoMutation.mutate(rascunhoId);
         }
         setRascunhoId(null);
-        setFormData({ destinatario: "", assunto: "", corpo: "" });
+        setFormData({ destinatario: "", assunto: "", corpo: "", cc: "", cco: "" });
         setIncluirAssinatura(true);
         fecharCompositor(false);
       }}
@@ -1777,6 +1803,7 @@ const Emails = () => {
       onAnexar={aoAnexar}
       onRemoverAnexo={aoRemoverAnexo}
       anexando={anexosCtrl.subindo}
+      onConfigurarAssinatura={() => navigate("/configuracoes?tab=perfil")}
     />
   );
 
@@ -2084,31 +2111,6 @@ const Emails = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              {/* Arrastar-e-soltar: só nas caixas que representam mensagens
-                  reais no provedor (recebidos e enviados). Rascunho nunca
-                  chegou a existir no provedor, então não tem marcador para
-                  carregar. Desligado por padrão — ligado sempre, um clique
-                  comum na linha correria o risco de virar arrasto sem querer. */}
-              {isConnected && (activeTab === "received" || activeTab === "sent") && (
-                <Button
-                  variant={modoArrastar ? "default" : "ghost"}
-                  size="icon"
-                  className={cn(
-                    "rounded-full shrink-0",
-                    !modoArrastar && "hover:bg-muted",
-                  )}
-                  onClick={() => setModoArrastar((v) => !v)}
-                  aria-pressed={modoArrastar}
-                  title={
-                    modoArrastar
-                      ? "Desligar o modo de arrastar para marcador"
-                      : "Arrastar mensagens para um marcador"
-                  }
-                  aria-label="Arrastar mensagens para um marcador"
-                >
-                  <Move className="h-5 w-5" />
-                </Button>
-              )}
               {isConnected && (
                 <Button
                   variant="ghost"
@@ -2179,11 +2181,12 @@ const Emails = () => {
               contagens={contagens}
               contaId={conta?.id}
               podeCriarMarcador={podeGerenciarCaixa}
-              onMoverParaMarcador={
-                modoArrastar
-                  ? (ids, pastaId) =>
-                      moverParaMarcadorMut.mutate({ mensagemIds: ids, pastaId })
-                  : undefined
+              // Arrastar é sempre ligado (alça própria na linha, item 2 do
+              // desenho) — só as linhas de Recebidos e Enviados têm
+              // `draggable`, então soltar aqui nunca dispara a partir de
+              // Rascunhos, mesmo com o handler sempre presente.
+              onMoverParaMarcador={(ids, pastaId) =>
+                moverParaMarcadorMut.mutate({ mensagemIds: ids, pastaId })
               }
             />
           )}
@@ -2207,7 +2210,7 @@ const Emails = () => {
                         rotuloPrincipal="Destinatário"
                         rotuloData="Enviado em"
                         rotuloAssunto="Assunto e prévia"
-                        mostrarEspacoAlca={modoArrastar}
+                        mostrarEspacoAlca
                         checkbox={{
                           checked:
                             emails.length > 0 &&
@@ -2226,12 +2229,14 @@ const Emails = () => {
                             onClick={() =>
                               void abrirComCorpo({ ...email, type: "sent" })
                             }
-                            draggable={modoArrastar}
+                            draggable
                             onDragStart={(e) => iniciarArrastoLinha(e, email.id)}
                           >
-                            {modoArrastar && (
-                              <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
-                            )}
+                            {/* Alça sempre presente, discreta — clique comum na
+                                linha não é arrasto (nativo não confunde os
+                                dois), então não há por que escondê-la atrás
+                                de um modo à parte. */}
+                            <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground opacity-60 group-hover:opacity-100" />
                             <Checkbox
                               className="shrink-0"
                               checked={selectedIds.includes(email.id)}
@@ -2275,6 +2280,11 @@ const Emails = () => {
                               className={cn(
                                 LARGURA_COL_ACOES,
                                 "flex items-center justify-end",
+                                // Some no hover/seleção só a partir de `sm:` —
+                                // no celular não há hover, então ali a ação
+                                // continua sempre visível (item 4 do desenho).
+                                "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
+                                selectedIds.includes(email.id) && "sm:opacity-100",
                               )}
                             >
                               <Button
@@ -2470,7 +2480,7 @@ const Emails = () => {
                         rotuloPrincipal="Remetente"
                         rotuloData="Recebido em"
                         rotuloAssunto="Assunto e prévia"
-                        mostrarEspacoAlca={modoArrastar}
+                        mostrarEspacoAlca
                         checkbox={{
                           checked:
                             receivedEmails.length > 0 &&
@@ -2487,12 +2497,10 @@ const Emails = () => {
                           )}
                           // Marca lido aqui E no provedor (ver `marcarLido`).
                           onClick={() => abrirRecebido(email)}
-                          draggable={modoArrastar}
+                          draggable
                           onDragStart={(e) => iniciarArrastoLinha(e, email.id)}
                         >
-                          {modoArrastar && (
-                            <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
-                          )}
+                          <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground opacity-60 group-hover:opacity-100" />
                           <Checkbox
                             className="shrink-0"
                             checked={selectedIds.includes(email.id)}
@@ -2597,6 +2605,8 @@ const Emails = () => {
                             className={cn(
                               LARGURA_COL_ACOES,
                               "flex items-center justify-end gap-1",
+                              "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
+                              selectedIds.includes(email.id) && "sm:opacity-100",
                             )}
                           >
                             {email.lido && (
@@ -2760,6 +2770,9 @@ const Emails = () => {
                               className={cn(
                                 LARGURA_COL_ACOES,
                                 "flex items-center justify-end",
+                                // Rascunho não tem seleção em massa (sem checkbox
+                                // no cabeçalho), então só hover/foco decidem aqui.
+                                "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
                               )}
                             >
                               <Button

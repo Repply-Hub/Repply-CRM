@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { Loader2, Mail, Paperclip, Send, Trash2, Undo2, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Loader2, Mail, Paperclip, Send, Settings, Trash2, Undo2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,6 +16,10 @@ export interface RascunhoEmail {
   destinatario: string;
   assunto: string;
   corpo: string;
+  /** Vários endereços separados por vírgula/ponto-e-vírgula, como o "Para". Não persiste no rascunho salvo (ver `Props.valores`). */
+  cc: string;
+  /** Idem, para cópia oculta. */
+  cco: string;
 }
 
 interface Props {
@@ -58,6 +62,12 @@ interface Props {
   onRemoverAnexo: (id: string) => void;
   /** `true` enquanto um upload está em curso: trava o Enviar para o arquivo não ficar de fora. */
   anexando: boolean;
+  /**
+   * Leva para a edição da assinatura em Configurações. Opcional e sem
+   * guarda de papel: qualquer pessoa que escreve e-mail pode ajustar a
+   * própria assinatura, não só quem gerencia a caixa da empresa.
+   */
+  onConfigurarAssinatura?: () => void;
 }
 
 /**
@@ -97,8 +107,28 @@ export function CompositorEmail({
   onAnexar,
   onRemoverAnexo,
   anexando,
+  onConfigurarAssinatura,
 }: Props) {
   const inputArquivoRef = useRef<HTMLInputElement>(null);
+  // Começa aberto quando já chega preenchido (reabrir um rascunho com Cc/Cco
+  // digitados nesta mesma sessão de composição não pode escondê-los de volta
+  // atrás do link). O link "Cc"/"Cco" some assim que a linha já está aberta —
+  // não faz sentido oferecer de novo o que já está na tela.
+  const [mostrarCc, setMostrarCc] = useState(!!valores.cc);
+  const [mostrarCco, setMostrarCco] = useState(!!valores.cco);
+  // O compositor não desmonta entre "Escrever" e "Responder" (é a mesma
+  // instância, só o `open` alterna), então sem isto o Cc/Cco aberto numa
+  // composição continuaria aberto e vazio na seguinte. Ao (re)abrir, volta
+  // ao padrão: fechado, a menos que já chegue preenchido. Depende só de
+  // `open` de propósito — reagir a `valores.cc` esconderia o campo enquanto
+  // a pessoa apaga o que digitou.
+  useEffect(() => {
+    if (open) {
+      setMostrarCc(!!valores.cc);
+      setMostrarCco(!!valores.cco);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* `gap-0`: o DialogContent é um grid com `gap-4`. Com `p-0`, essa calha de
@@ -153,8 +183,64 @@ export function CompositorEmail({
                 value={valores.destinatario}
                 onChange={(e) => onChange({ ...valores, destinatario: e.target.value })}
               />
+              {/* Estilo Gmail: o link some depois de clicado — a linha revelada já
+                  é o próprio campo aberto, oferecer o link de novo seria redundante. */}
+              <div className="flex shrink-0 items-center gap-2">
+                {!mostrarCc && (
+                  <button
+                    type="button"
+                    className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+                    onClick={() => setMostrarCc(true)}
+                  >
+                    Cc
+                  </button>
+                )}
+                {!mostrarCco && (
+                  <button
+                    type="button"
+                    className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+                    onClick={() => setMostrarCco(true)}
+                  >
+                    Cco
+                  </button>
+                )}
+              </div>
             </div>
           </div>
+
+          {mostrarCc && (
+            <div className="border-b px-6">
+              <div className="flex items-center gap-2 py-2">
+                <label htmlFor="cc" className="min-w-[60px] text-sm text-muted-foreground">
+                  Cc
+                </label>
+                <Input
+                  id="cc"
+                  placeholder="email@exemplo.com"
+                  className="h-8 border-none bg-transparent px-0 shadow-none"
+                  value={valores.cc}
+                  onChange={(e) => onChange({ ...valores, cc: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          {mostrarCco && (
+            <div className="border-b px-6">
+              <div className="flex items-center gap-2 py-2">
+                <label htmlFor="cco" className="min-w-[60px] text-sm text-muted-foreground">
+                  Cco
+                </label>
+                <Input
+                  id="cco"
+                  placeholder="email@exemplo.com"
+                  className="h-8 border-none bg-transparent px-0 shadow-none"
+                  value={valores.cco}
+                  onChange={(e) => onChange({ ...valores, cco: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="border-b px-6">
             <div className="flex items-center gap-2 py-3">
@@ -274,17 +360,35 @@ export function CompositorEmail({
                   <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     Assinatura (adicionada automaticamente ao enviar)
                   </p>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 gap-1 px-2 text-xs text-muted-foreground"
-                    onClick={() => onIncluirAssinaturaChange(false)}
-                    title="Remover a assinatura deste e-mail"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    Remover
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {/* Discreto e sem guarda de papel: qualquer pessoa que escreve
+                        e-mail chega direto na própria assinatura, sem depender de
+                        quem gerencia a caixa da empresa abrir "Gerenciar caixa". */}
+                    {onConfigurarAssinatura && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 gap-1 px-2 text-xs text-muted-foreground"
+                        onClick={onConfigurarAssinatura}
+                        title="Editar a assinatura salva em Configurações"
+                      >
+                        <Settings className="h-3.5 w-3.5" />
+                        Configurar assinatura
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 gap-1 px-2 text-xs text-muted-foreground"
+                      onClick={() => onIncluirAssinaturaChange(false)}
+                      title="Remover a assinatura deste e-mail"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Remover
+                    </Button>
+                  </div>
                 </div>
                 <div
                   className="max-h-40 overflow-y-auto rounded-md border bg-white p-3 text-sm"
@@ -301,17 +405,32 @@ export function CompositorEmail({
                 <p className="text-xs text-muted-foreground">
                   Assinatura removida deste e-mail.
                 </p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 gap-1 px-2 text-xs text-muted-foreground"
-                  onClick={() => onIncluirAssinaturaChange(true)}
-                  title="Voltar a incluir a assinatura neste e-mail"
-                >
-                  <Undo2 className="h-3.5 w-3.5" />
-                  Adicionar de volta
-                </Button>
+                <div className="flex shrink-0 items-center gap-1">
+                  {onConfigurarAssinatura && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 gap-1 px-2 text-xs text-muted-foreground"
+                      onClick={onConfigurarAssinatura}
+                      title="Editar a assinatura salva em Configurações"
+                    >
+                      <Settings className="h-3.5 w-3.5" />
+                      Configurar assinatura
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 gap-1 px-2 text-xs text-muted-foreground"
+                    onClick={() => onIncluirAssinaturaChange(true)}
+                    title="Voltar a incluir a assinatura neste e-mail"
+                  >
+                    <Undo2 className="h-3.5 w-3.5" />
+                    Adicionar de volta
+                  </Button>
+                </div>
               </div>
             )}
           </div>
