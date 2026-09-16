@@ -1,4 +1,4 @@
-import type { MelhorOrdemDoServico } from './osrm';
+import type { MelhorOrdemDoServico, PontoNoMapa } from './osrm';
 
 /**
  * Vale a pena sugerir outra ordem para as paradas?
@@ -46,4 +46,44 @@ export function avaliarOrdemDaRota({
   if (ganhoS < GANHO_MINIMO_S) return JA_OTIMA;
 
   return { caso: 'ordem_melhor', ganhoS, ordem: [...ordem] };
+}
+
+/**
+ * Os pontos da rota para o OSRM, um por parada, NA MESMA ORDEM que `paradasEmOrdem` — prontos
+ * para `urlDaRota` e `urlDaMelhorOrdem`. A localização vem da OBRA de cada parada (`obraId`),
+ * não da parada — `Parada`, no formulário da rota, não guarda coordenada nenhuma.
+ *
+ * 🔴 TUDO OU NADA: se QUALQUER parada estiver com a obra não encontrada, ou com latitude ou
+ * longitude ausente/não numérica, a função devolve `null` para a ROTA INTEIRA — nunca filtra
+ * as que faltam localização e segue com o resto.
+ *
+ * Parece mais útil sugerir com o que dá (filtrar as sem localização e calcular com as outras),
+ * mas isso DESLOCARIA OS ÍNDICES. A resposta do serviço (`ordem`, em `MelhorOrdemDoServico`)
+ * viria calculada sobre a lista FILTRADA — e `aplicarOrdemMantendoHorarios`
+ * (`ordem-das-paradas.ts`) aplica esses índices em cima de `paradasEmOrdem`, a lista COMPLETA,
+ * em ordem de horário. Um índice que na resposta do serviço significava "a terceira obra COM
+ * localização" apontaria, em `paradasEmOrdem`, para uma parada diferente — e o botão "Usar
+ * esta ordem" moveria a obra errada para o horário errado, sem nenhum aviso na tela.
+ *
+ * Com `null` a tela simplesmente não mostra sugestão nenhuma, que é a decisão 7 do desenho:
+ * "serviço fora do ar, lento, ou obra sem localização: nenhuma sugestão".
+ *
+ * Lista de paradas vazia devolve lista vazia — não é erro, é "nada para sugerir", e
+ * `urlDaMelhorOrdem` já devolve string vazia sozinho para menos de 3 pontos.
+ */
+export function pontosDaRotaEmOrdem(
+  paradasEmOrdem: ReadonlyArray<{ obraId: string }>,
+  obras: ReadonlyArray<{ id: string; latitude?: number | null; longitude?: number | null }>,
+): PontoNoMapa[] | null {
+  const obraPorId = new Map(obras.map((obra) => [obra.id, obra]));
+
+  const pontos: PontoNoMapa[] = [];
+  for (const parada of paradasEmOrdem) {
+    const obra = obraPorId.get(parada.obraId);
+    if (!obra || !Number.isFinite(obra.latitude) || !Number.isFinite(obra.longitude)) {
+      return null;
+    }
+    pontos.push({ lat: obra.latitude as number, lng: obra.longitude as number });
+  }
+  return pontos;
 }

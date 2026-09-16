@@ -10,9 +10,14 @@ import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import type { RotaDoDia } from '@/lib/rota-do-dia';
 import {
   ordenarPorHorario,
+  aplicarOrdemMantendoHorarios,
   moverParadaMantendoHorarios,
   ultimoHorarioUtilizavel,
 } from '@/lib/ordem-das-paradas';
+import { pontosDaRotaEmOrdem, avaliarOrdemDaRota } from '@/lib/melhor-ordem-da-rota';
+import { duracaoLegivel } from '@/lib/osrm';
+import { useRotaOsrm } from '@/hooks/use-rota-osrm';
+import { useMelhorOrdem } from '@/hooks/use-melhor-ordem';
 import {
   Dialog, DialogTitle, DialogDescription,
   ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo,
@@ -342,6 +347,32 @@ export function NovaRotaVisitaDialog({
    * Isto é o que garante a promessa em qualquer caminho: a rota grava na ordem do relógio.
    */
   const paradasEmOrdem = useMemo(() => ordenarPorHorario(paradas), [paradas]);
+
+  /**
+   * A localização de cada parada vem da OBRA (`obraId`), não da parada — `Parada` não guarda
+   * coordenada. `pontosDaRotaEmOrdem` devolve `null` (nenhuma sugestão) se QUALQUER obra da
+   * rota estiver sem localização, de propósito: ver o comentário dela em
+   * `melhor-ordem-da-rota.ts` sobre por que filtrar deslocaria os índices da sugestão.
+   *
+   * Os pontos vêm de `paradasEmOrdem` (a lista em ordem de horário), e não de `paradas` (a
+   * lista crua): é sobre essa mesma sequência que `useRotaOsrm` mede o tempo ATUAL e que
+   * `useMelhorOrdem` calcula a melhor ordem — comparando maçã com maçã, e com índices que
+   * `aplicarOrdemMantendoHorarios` sabe aplicar de volta.
+   */
+  const pontosDaRota = useMemo(
+    () =>
+      pontosDaRotaEmOrdem(
+        paradasEmOrdem,
+        obras as Array<{ id: string; latitude?: number | null; longitude?: number | null }>,
+      ),
+    [paradasEmOrdem, obras],
+  );
+  const { data: trajetoAtual } = useRotaOsrm(pontosDaRota);
+  const { data: melhorOrdem } = useMelhorOrdem(pontosDaRota);
+  const avaliacaoDaOrdem = useMemo(
+    () => avaliarOrdemDaRota({ duracaoAtualS: trajetoAtual?.duracaoS, melhorOrdem }),
+    [trajetoAtual, melhorOrdem],
+  );
 
   const janelaDaParada = (parada: Parada) => {
     const inicio = new Date(`${format(data, 'yyyy-MM-dd')}T${parada.horario}:00`);
@@ -753,6 +784,41 @@ export function NovaRotaVisitaDialog({
                 </Command>
               </PopoverContent>
             </Popover>
+
+            {/* O aviso da melhor ordem, logo acima da lista de paradas — decisão 3 do desenho:
+                aparece ao montar/editar a rota, onde dá para trocar antes de salvar e antes de
+                combinar horário com o cliente. Nada aparece em `sem_sugestao` (menos de 3
+                paradas com localização, obra sem localização, ou serviço fora/lento/carregando
+                — `avaliarOrdemDaRota` cai em `sem_sugestao` enquanto os dois números não
+                chegam, então o carregamento também fica em silêncio). */}
+            {avaliacaoDaOrdem.caso === 'ja_otima' && (
+              <p className="rounded-lg border border-green-500/40 bg-green-500/5 px-3 py-2 text-xs text-foreground">
+                Perfeito, nosso sistema de rotas aponta esse caminho como o mais produtivo.
+              </p>
+            )}
+            {avaliacaoDaOrdem.caso === 'ordem_melhor' && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2">
+                <p className="text-xs text-foreground">
+                  Há uma ordem mais rápida: economiza cerca de{' '}
+                  <span className="font-semibold">{duracaoLegivel(avaliacaoDaOrdem.ganhoS)}</span>. Os
+                  horários continuam os mesmos — muda só qual obra fica em cada um.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    // `avaliacaoDaOrdem.ordem` refere-se aos índices das paradas EM ORDEM DE
+                    // HORÁRIO (`paradasEmOrdem`), e `aplicarOrdemMantendoHorarios` já ordena de
+                    // novo por dentro antes de aplicar — mantendo a grade de horários, só troca
+                    // quem ocupa cada um.
+                    setParadas((prev) => aplicarOrdemMantendoHorarios(prev, avaliacaoDaOrdem.ordem!))
+                  }
+                >
+                  Usar esta ordem
+                </Button>
+              </div>
+            )}
 
             {paradas.length === 0 ? (
               <p className="pt-1 text-xs text-muted-foreground">Nenhuma obra adicionada ainda.</p>

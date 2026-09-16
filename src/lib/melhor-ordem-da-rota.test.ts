@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { avaliarOrdemDaRota, GANHO_MINIMO_S } from './melhor-ordem-da-rota';
+import { avaliarOrdemDaRota, GANHO_MINIMO_S, pontosDaRotaEmOrdem } from './melhor-ordem-da-rota';
 
 describe('avaliarOrdemDaRota', () => {
   it('ordem diferente com ganho relevante: sugere, com o ganho em segundos', () => {
@@ -47,5 +47,43 @@ describe('avaliarOrdemDaRota', () => {
 
     const r2 = avaliarOrdemDaRota({ duracaoAtualS: 3600, melhorOrdem: { ordem: [0, 2, 1], duracaoS: Infinity } });
     expect(r2.caso).toBe('sem_sugestao');
+  });
+});
+
+describe('pontosDaRotaEmOrdem', () => {
+  // Coordenadas inventadas (Natal/RN) — nunca dado real (CLAUDE.md §6.9). Propositalmente
+  // fora de ordem alfabética/numérica, para provar que a função segue a ordem das PARADAS.
+  const OBRAS = [
+    { id: 'obra-c', latitude: -5.75, longitude: -35.25 },
+    { id: 'obra-a', latitude: -5.79, longitude: -35.21 },
+    { id: 'obra-b', latitude: -5.81, longitude: -35.23 },
+  ];
+
+  it('devolve um ponto por parada, na ordem das PARADAS — não na ordem da lista de obras', () => {
+    const paradas = [{ obraId: 'obra-a' }, { obraId: 'obra-b' }, { obraId: 'obra-c' }];
+    expect(pontosDaRotaEmOrdem(paradas, OBRAS)).toEqual([
+      { lat: -5.79, lng: -35.21 },
+      { lat: -5.81, lng: -35.23 },
+      { lat: -5.75, lng: -35.25 },
+    ]);
+  });
+
+  it('🔴 uma parada sem localização derruba a ROTA INTEIRA — filtrar deslocaria os índices que `aplicarOrdemMantendoHorarios` espera', () => {
+    const comUmaObraSemLocal = [
+      OBRAS[0],
+      OBRAS[1],
+      { id: 'obra-b', latitude: null, longitude: null },
+    ];
+    const paradas = [{ obraId: 'obra-a' }, { obraId: 'obra-b' }, { obraId: 'obra-c' }];
+    expect(pontosDaRotaEmOrdem(paradas, comUmaObraSemLocal)).toBeNull();
+  });
+
+  it('parada cuja obra não está na lista de obras: null', () => {
+    const paradas = [{ obraId: 'obra-a' }, { obraId: 'obra-fantasma' }];
+    expect(pontosDaRotaEmOrdem(paradas, OBRAS)).toBeNull();
+  });
+
+  it('sem paradas: lista vazia — não é erro, `urlDaMelhorOrdem` já devolve vazio sozinho', () => {
+    expect(pontosDaRotaEmOrdem([], OBRAS)).toEqual([]);
   });
 });
