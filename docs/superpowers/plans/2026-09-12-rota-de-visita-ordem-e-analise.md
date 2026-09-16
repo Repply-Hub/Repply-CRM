@@ -893,6 +893,24 @@ Mensagem: `feat(obras): visita concluída pergunta fase, concorrente, com quem f
 
 ### Task 7: O próximo passo vira tarefa
 
+> 🔴 **REVISADO 16/09/2026 (decisão do Lucas, revisão da 6b).** Esta tarefa cresceu e foi
+> dividida em duas partes, e a criação da tarefa deixou de ser automática:
+>
+> - **A criação da tarefa é OPCIONAL, com uma caixinha "criar tarefa" MARCADA por padrão** —
+>   o mesmo padrão do `DialogoRetorno` (pauta do "Hoje"). A caixinha vive em
+>   `PerguntasDaVisita` (componente único → aparece nos três lugares) e só aparece quando há
+>   próximo passo **com data**. `criarTarefa` entra em `RespostasDaVisita` como campo
+>   transitório: **nunca vira coluna**, o mapeamento de gravação já escolhe só os cinco campos.
+> - **O GATILHO é a visita TRANSICIONAR para realizada** nesta operação — nunca a cada edição
+>   de uma visita que já estava concluída (senão editar o horário recriaria a tarefa).
+> - **Task 7a** (esta): a caixinha em `PerguntasDaVisita` + a tarefa no painel da obra
+>   (`useMarcarVisitaRealizada`), gated por `respostas.criarTarefa`.
+> - **Task 7b** (nova, abaixo): a tarefa também nasce pela janela da rota (criar com "essas
+>   visitas já aconteceram", e editar quando uma parada passa a realizada).
+>
+> Os passos abaixo continuam valendo para o painel da obra; some só o "sempre que houver data",
+> que passa a ser "quando houver data **e** a caixinha estiver marcada".
+
 **Files:**
 - Modify: `src/hooks/use-obra-visitas.ts`
 - Test: `src/hooks/use-obra-visitas.test.tsx` (crie; espelhe o padrão de `src/hooks/use-responsaveis-do-negocio.test.tsx`)
