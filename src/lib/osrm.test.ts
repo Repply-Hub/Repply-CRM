@@ -23,6 +23,7 @@ describe('urlDaMelhorOrdem', () => {
     expect(url).toContain('roundtrip=false');
     // 🔴 lng antes de lat — a ordem do OSRM, o contrário do Leaflet.
     expect(url).toContain('-35.21,-5.79;-35.23,-5.81;-35.25,-5.75');
+    expect(url).toContain('destination=any');
   });
 
   it('não pede nada com menos de 3 paradas — com 2 não existe ordem melhor', () => {
@@ -45,6 +46,17 @@ describe('lerRespostaDaMelhorOrdem', () => {
 
   it('devolve a ordem das paradas e a duração', () => {
     expect(lerRespostaDaMelhorOrdem(resposta, 3)).toEqual({ ordem: [0, 2, 1], duracaoS: 1800 });
+  });
+
+  it('inverte waypoint_index que não é o próprio inverso', () => {
+    // A resposta anterior usa [0, 2, 1] — se intertemos, volta [0, 2, 1] igual. Esse caso
+    // seria insuficiente: um `return { ordem: posicoes, ... }` sem a inversão passaria verde.
+    const resposta = {
+      code: 'Ok',
+      trips: [{ duration: 2400, distance: 25000 }],
+      waypoints: [{ waypoint_index: 0 }, { waypoint_index: 3 }, { waypoint_index: 1 }, { waypoint_index: 2 }],
+    };
+    expect(lerRespostaDaMelhorOrdem(resposta, 4)).toEqual({ ordem: [0, 2, 3, 1], duracaoS: 2400 });
   });
 
   it.each([
