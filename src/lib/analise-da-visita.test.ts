@@ -126,7 +126,9 @@ describe('respostasDaVisita — o rascunho a partir do que já está gravado', (
       proximoPasso: 'Mandar proposta de louças',
       proximoPassoEm: '2026-09-20',
       observacao: 'Obra parada por chuva',
-      criarTarefa: true,
+      // Já tinha próximo passo COM data gravado — a caixinha nasce DESMARCADA para remarcar a
+      // visita não duplicar a tarefa. Ver o teste dedicado logo abaixo.
+      criarTarefa: false,
     });
   });
 
@@ -147,15 +149,25 @@ describe('respostasDaVisita — o rascunho a partir do que já está gravado', (
     expect(respostasDaVisita(null)).toEqual(RESPOSTAS_VAZIAS);
   });
 
-  it('🔴 a visita gravada NÃO guarda a escolha da caixinha — reabrir sempre volta marcado', () => {
-    // A tarefa só nasce quando a visita PASSA a realizada (useMarcarVisitaRealizada), nunca a
-    // cada reedição — então não há como (nem por quê) a gravação lembrar se a caixinha estava
-    // marcada da última vez.
+  it('🔴 visita que JÁ tinha próximo passo com data reabre com a caixinha DESMARCADA (não duplica a tarefa)', () => {
+    // O caminho real da duplicata é desmarcar → remarcar: a regra "desmarcar não apaga" mantém
+    // o próximo passo e a data gravados, e ao remarcar eles voltam preenchidos. Se a caixinha
+    // voltasse marcada, salvar de novo criaria uma segunda tarefa idêntica. Nasce desmarcada.
     expect(
       respostasDaVisita({
         visitaProximoPasso: 'Mandar proposta de louças',
         visitaProximoPassoEm: '2026-09-20',
       }).criarTarefa,
+    ).toBe(false);
+  });
+
+  it('próximo passo SEM data ainda não pôde virar tarefa — a caixinha volta MARCADA', () => {
+    // Sem data nenhuma tarefa nasceu antes; quando a pessoa der a data agora, ela é a primeira
+    // vez de verdade e o padrão é criar. (E marcar sem data segue sem criar nada — `PerguntasDaVisita`
+    // só mostra a caixinha com data, e `tarefaDoProximoPasso` exige as duas.)
+    expect(
+      respostasDaVisita({ visitaProximoPasso: 'Mandar proposta de louças' }).criarTarefa,
     ).toBe(true);
+    expect(respostasDaVisita({ visitaProximoPassoEm: '2026-09-20' }).criarTarefa).toBe(true);
   });
 });

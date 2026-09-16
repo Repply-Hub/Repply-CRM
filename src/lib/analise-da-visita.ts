@@ -43,9 +43,10 @@ export interface RespostasDaVisita {
    * 🔴 CAMPO TRANSITÓRIO — decisão passageira da TELA (criar ou não a tarefa do próximo
    * passo), NUNCA uma coluna do banco. `eventos` guarda só as cinco respostas acima;
    * `useMarcarVisitaRealizada` lê esta chave para decidir se monta `tarefaDoProximoPasso`, mas
-   * ela não entra no `payload` de gravação da visita. Por isso `respostasDaVisita` (o rascunho
-   * a partir do que já está gravado) sempre devolve `true` aqui: não há valor anterior para
-   * lembrar, e reabrir uma visita para editar não pode herdar a decisão da vez passada.
+   * ela não entra no `payload` de gravação da visita. A visita gravada não guarda esta escolha:
+   * `respostasDaVisita` a REDECIDE ao reabrir — marcada quando ainda não havia próximo passo com
+   * data (a tarefa é a novidade), desmarcada quando já havia (a tarefa já pôde nascer antes, e
+   * remarcar a visita não pode duplicá-la). Ver o comentário em `respostasDaVisita`.
    */
   criarTarefa: boolean;
 }
@@ -83,11 +84,14 @@ export function respostasDaVisita(
     proximoPasso: v?.visitaProximoPasso ?? '',
     proximoPassoEm: v?.visitaProximoPassoEm ?? '',
     observacao: v?.visitaObservacao ?? '',
-    // Sempre marcada ao reabrir: a visita gravada não guarda esta escolha (ver o comentário na
-    // interface). Isso é seguro porque a tarefa só nasce quando a visita PASSA a realizada,
-    // nunca a cada reedição — reabrir uma visita já realizada não dispara `tarefaDoProximoPasso`
-    // de novo.
-    criarTarefa: true,
+    // 🔴 A CAIXINHA NASCE DESMARCADA quando a visita JÁ TINHA um próximo passo COM DATA — porque
+    // então a tarefa já pôde ser criada uma vez, e oferecer marcada de novo duplicaria. O caminho
+    // real é desmarcar → remarcar (a regra "desmarcar não apaga" de 16/09 mantém as respostas
+    // gravadas): ao remarcar, a data e o passo voltam preenchidos, e uma segunda tarefa idêntica
+    // nasceria sem ninguém pedir. Quem quiser mesmo uma nova tarefa remarca a caixinha — um clique.
+    // Nasce MARCADA quando ainda não havia próximo passo com data (primeira vez de verdade, ou a
+    // visita ganhando a data agora): aí a tarefa é a novidade que este trabalho veio criar.
+    criarTarefa: !(v?.visitaProximoPasso && v?.visitaProximoPassoEm),
   };
 }
 

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { recusaSemErro } from '@/lib/recusa-do-banco';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { tarefaDoProximoPasso, type RespostasDaVisita } from '@/lib/analise-da-visita';
 import { useCreateTarefa } from '@/hooks/use-tarefas';
 
@@ -315,12 +316,15 @@ export function useMarcarVisitaRealizada() {
         if (tarefa) {
           try {
             await criarTarefa.mutateAsync(tarefa);
-          } catch {
+          } catch (e) {
             // A visita já gravou — este `catch` não pode virar `throw`, ou a pessoa em campo
             // veria a gravação inteira falhar por causa de uma tarefa que ela nem escolheu
-            // conferir agora.
-            avisoDaTarefa =
-              'A visita foi gravada, mas a tarefa do próximo passo não. Crie-a pela tela de Tarefas.';
+            // conferir agora. Mas contamos o MOTIVO com `mensagemDeErro` (§4.6/§6.6): sem ele,
+            // uma recusa por permissão em `tarefas` e uma falha de rede viram a mesma frase muda.
+            avisoDaTarefa = `A visita foi gravada, mas a tarefa do próximo passo não: ${mensagemDeErro(
+              e,
+              'crie-a pela tela de Tarefas',
+            )}`;
           }
         }
       }

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, cleanup, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { RESPOSTAS_VAZIAS, type RespostasDaVisita } from '@/lib/analise-da-visita';
+import { RESPOSTAS_VAZIAS, respostasDaVisita, type RespostasDaVisita } from '@/lib/analise-da-visita';
 
 /**
  * `useMarcarVisitaRealizada` grava (ou apaga) as respostas da visita — e, desde a Tarefa 7a
@@ -287,6 +287,9 @@ describe('useMarcarVisitaRealizada — a tarefa do próximo passo (Tarefa 7a)', 
     // A visita gravou — o `update` de `eventos` rodou e a promessa não foi rejeitada.
     expect(atualizou).toHaveBeenCalled();
     expect(retorno?.avisoDaTarefa).toMatch(/tarefa do próximo passo não/i);
+    // E o aviso chega à tela: o `onSuccess` dispara `toast.warning`. Sem fechar este laço, o
+    // teste passaria mesmo se a pessoa nunca soubesse que a tarefa falhou.
+    await waitFor(() => expect(toastAviso).toHaveBeenCalledWith(expect.stringMatching(/tarefa do próximo passo não/i)));
   });
 
   it('sem data, nenhuma tarefa é criada', async () => {
@@ -342,5 +345,37 @@ describe('useMarcarVisitaRealizada — a tarefa do próximo passo (Tarefa 7a)', 
 
     expect(inseriuTarefa).not.toHaveBeenCalled();
     expect(atualizou).toHaveBeenCalled();
+  });
+
+  it('🔴 remarcar uma visita que JÁ tinha próximo passo com data NÃO duplica a tarefa', async () => {
+    // O ciclo real: a visita foi marcada realizada com próximo passo + data (tarefa criada),
+    // depois DESMARCADA (as respostas continuam gravadas — regra "desmarcar não apaga"), e agora
+    // é REMARCADA. A tela remonta o rascunho com `respostasDaVisita(visita)`, exatamente como o
+    // painel faz — e é isso que segura a duplicata: a caixinha volta DESMARCADA, então salvar de
+    // novo não cria uma segunda tarefa idêntica.
+    const rascunhoAoRemarcar = respostasDaVisita({
+      visitaProximoPasso: 'Mandar proposta de louças',
+      visitaProximoPassoEm: '2026-09-20',
+    });
+    expect(rascunhoAoRemarcar.criarTarefa).toBe(false);
+
+    const { wrapper } = envolver();
+    const { result } = renderHook(() => useMarcarVisitaRealizada(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        grupoId: 'grupo-1',
+        obraId: 'obra-1',
+        realizada: true,
+        observacao: '',
+        respostas: rascunhoAoRemarcar,
+        nomeObra: NOME_OBRA,
+        clienteId: CLIENTE_ID,
+      });
+    });
+
+    // A visita regravou como realizada, mas NENHUMA tarefa nova nasceu.
+    expect(atualizou).toHaveBeenCalled();
+    expect(inseriuTarefa).not.toHaveBeenCalled();
   });
 });
