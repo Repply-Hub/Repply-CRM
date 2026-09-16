@@ -305,6 +305,18 @@ export interface ParadaRotaVisita {
   obraId: string;
   nomeObra: string;
   observacao?: string;
+  /**
+   * As cinco respostas da visita concluída (fase, concorrente, contato, próximo passo e a data
+   * dele) — mesma regra da `observacao` acima: só chegam preenchidas quando a rota nasce
+   * `jaRealizada`. `NovaRotaVisitaDialog.tsx` já manda `undefined` para as duas quando a rota
+   * ainda não aconteceu, e é isso que faz uma parada nova gravar as cinco colunas como nulo,
+   * igual sempre foi.
+   */
+  visitaFase?: string | null;
+  visitaConcorrentes?: string | null;
+  visitaContatoId?: string | null;
+  visitaProximoPasso?: string | null;
+  visitaProximoPassoEm?: string | null;
   horario: string; // HH:mm — cada parada tem seu próprio horário, editado à mão
 }
 
@@ -467,6 +479,14 @@ export function useCreateRotaVisita() {
           rota_titulo: rotaTitulo,
           visita_realizada: jaRealizada,
           visita_observacao: parada.observacao || null,
+          // Mesmo caminho de `visita_observacao`: `parada.visitaX` só vem preenchido quando a
+          // rota nasce `jaRealizada` (o diálogo manda `undefined` nas outras cinco quando não),
+          // então `|| null` grava nulo em qualquer rota que ainda não aconteceu — igual hoje.
+          visita_fase: parada.visitaFase || null,
+          visita_concorrentes: parada.visitaConcorrentes || null,
+          visita_contato_id: parada.visitaContatoId || null,
+          visita_proximo_passo: parada.visitaProximoPasso || null,
+          visita_proximo_passo_em: parada.visitaProximoPassoEm || null,
         }));
       });
 
@@ -600,6 +620,26 @@ export function useEditarRotaDeVisita() {
         }
         if (parada.visitaObservacao !== undefined) {
           camposDaParada.visita_observacao = parada.visitaObservacao || null;
+        }
+        // As cinco respostas da visita concluída (16/09/2026) seguem o MESMO mecanismo:
+        // `diferencaDaRota` só as põe em `parada` quando mudaram, e o `if` aqui só escreve a
+        // chave que veio. Engordar isto para um objeto que sempre carrega as cinco apagaria a
+        // resposta de toda parada que ninguém tocou nesta edição — o mesmo risco que
+        // `visitaObservacao` corre, um comentário acima.
+        if (parada.visitaFase !== undefined) {
+          camposDaParada.visita_fase = parada.visitaFase || null;
+        }
+        if (parada.visitaConcorrentes !== undefined) {
+          camposDaParada.visita_concorrentes = parada.visitaConcorrentes || null;
+        }
+        if (parada.visitaContatoId !== undefined) {
+          camposDaParada.visita_contato_id = parada.visitaContatoId || null;
+        }
+        if (parada.visitaProximoPasso !== undefined) {
+          camposDaParada.visita_proximo_passo = parada.visitaProximoPasso || null;
+        }
+        if (parada.visitaProximoPassoEm !== undefined) {
+          camposDaParada.visita_proximo_passo_em = parada.visitaProximoPassoEm || null;
         }
 
         const { error } = await supabase

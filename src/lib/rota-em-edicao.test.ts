@@ -31,6 +31,11 @@ function gravada(
     inicio: new Date(2026, 7, 27, hora, minuto),
     visitaRealizada: false,
     visitaObservacao: null,
+    visitaFase: null,
+    visitaConcorrentes: null,
+    visitaContatoId: null,
+    visitaProximoPasso: null,
+    visitaProximoPassoEm: null,
     ...extras,
   };
 }
@@ -758,5 +763,181 @@ describe('diferencaDaRota — registro de campo (realizada e observação)', () 
     expect(diff.semMudanca).toBe(true);
     expect(diff.alterar).toEqual([]);
     expect(diff.remover).toEqual([]);
+  });
+});
+
+/**
+ * AS CINCO RESPOSTAS DA VISITA CONCLUÍDA (16/09/2026)
+ *
+ * `visitaFase`, `visitaConcorrentes`, `visitaContatoId`, `visitaProximoPasso` e
+ * `visitaProximoPassoEm` são a extensão direta do mecanismo acima: mesmo contrato,
+ * campo por campo, de `visitaObservacao`. Estes testes replicam os dois que protegem
+ * aquele campo — "ausente não apaga" e "mudar entra sozinho em alterar" — para os cinco.
+ */
+describe('diferencaDaRota — as cinco respostas da visita concluída', () => {
+  it('🔴 mudar só o horário não leva NENHUMA das cinco respostas, nem a observação, para o alterar', () => {
+    // A parada já tem as cinco respostas gravadas (e a observação). A pessoa abre a rota só
+    // para corrigir o horário desta MESMA parada — se o diff citasse qualquer uma das seis
+    // chaves, o UPDATE as sobrescreveria com o que a tela tinha em memória e a análise salva
+    // desapareceria em silêncio.
+    const antes = [
+      gravada('g1', MARES, 9, 0, {
+        visitaRealizada: true,
+        visitaObservacao: 'cliente pediu orçamento de porcelanato',
+        visitaFase: 'estrutura',
+        visitaConcorrentes: 'Marca Exemplo',
+        visitaContatoId: 'contato-exemplo-1',
+        visitaProximoPasso: 'enviar tabela de preços',
+        visitaProximoPassoEm: '2026-09-20',
+      }),
+    ];
+    const depois: ParadaEditada[] = [editada(MARES, '10:30', 'g1')];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.alterar).toHaveLength(1);
+    expect(Object.keys(diff.alterar[0]).sort()).toEqual(['fim', 'grupoId', 'inicio']);
+    const serializado = JSON.stringify(diff);
+    expect(serializado).not.toMatch(/visita(Realizada|Observacao|Fase|Concorrentes|ContatoId|ProximoPasso)/);
+    expect(serializado).not.toContain('porcelanato');
+    expect(serializado).not.toContain('Marca Exemplo');
+    expect(serializado).not.toContain('contato-exemplo-1');
+    expect(serializado).not.toContain('tabela de preços');
+    expect(serializado).not.toContain('2026-09-20');
+  });
+
+  it('mudar a fase entra em alterar, sozinha — as outras quatro respostas ficam de fora', () => {
+    const antes = [
+      gravada('g1', MARES, 9, 0, { visitaRealizada: true, visitaFase: 'estrutura' }),
+    ];
+    const depois: ParadaEditada[] = [
+      { ...editada(MARES, '09:00', 'g1'), visitaRealizada: true, visitaFase: 'acabamento' },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.alterar).toHaveLength(1);
+    expect(diff.alterar[0].visitaFase).toBe('acabamento');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaConcorrentes');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaContatoId');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaProximoPasso');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaProximoPassoEm');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaObservacao');
+  });
+
+  it('mudar o concorrente visto entra em alterar, sozinho', () => {
+    const antes = [
+      gravada('g1', MARES, 9, 0, { visitaRealizada: true, visitaConcorrentes: 'Nenhum' }),
+    ];
+    const depois: ParadaEditada[] = [
+      {
+        ...editada(MARES, '09:00', 'g1'),
+        visitaRealizada: true,
+        visitaConcorrentes: 'Marca Exemplo',
+      },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.alterar).toHaveLength(1);
+    expect(diff.alterar[0].visitaConcorrentes).toBe('Marca Exemplo');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaFase');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaContatoId');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaProximoPasso');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaProximoPassoEm');
+  });
+
+  it('mudar com quem falou entra em alterar, sozinho', () => {
+    const antes = [
+      gravada('g1', MARES, 9, 0, { visitaRealizada: true, visitaContatoId: 'contato-exemplo-1' }),
+    ];
+    const depois: ParadaEditada[] = [
+      {
+        ...editada(MARES, '09:00', 'g1'),
+        visitaRealizada: true,
+        visitaContatoId: 'contato-exemplo-2',
+      },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.alterar).toHaveLength(1);
+    expect(diff.alterar[0].visitaContatoId).toBe('contato-exemplo-2');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaFase');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaConcorrentes');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaProximoPasso');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaProximoPassoEm');
+  });
+
+  it('mudar o próximo passo entra em alterar, sozinho', () => {
+    const antes = [
+      gravada('g1', MARES, 9, 0, { visitaRealizada: true, visitaProximoPasso: 'texto antigo' }),
+    ];
+    const depois: ParadaEditada[] = [
+      {
+        ...editada(MARES, '09:00', 'g1'),
+        visitaRealizada: true,
+        visitaProximoPasso: 'enviar tabela de preços',
+      },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.alterar).toHaveLength(1);
+    expect(diff.alterar[0].visitaProximoPasso).toBe('enviar tabela de preços');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaFase');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaConcorrentes');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaContatoId');
+    expect(diff.alterar[0]).not.toHaveProperty('visitaProximoPassoEm');
+  });
+
+  it('mudar a data do próximo passo entra em alterar, sozinha', () => {
+    const antes = [
+      gravada('g1', MARES, 9, 0, {
+        visitaRealizada: true,
+        visitaProximoPasso: 'enviar tabela de preços',
+        visitaProximoPassoEm: '2026-09-20',
+      }),
+    ];
+    const depois: ParadaEditada[] = [
+      {
+        ...editada(MARES, '09:00', 'g1'),
+        visitaRealizada: true,
+        visitaProximoPasso: 'enviar tabela de preços',
+        visitaProximoPassoEm: '2026-09-25',
+      },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.alterar).toHaveLength(1);
+    expect(diff.alterar[0].visitaProximoPassoEm).toBe('2026-09-25');
+    // `visitaProximoPasso` não mudou (mesmo texto), então fica de fora — só a data entra.
+    expect(diff.alterar[0]).not.toHaveProperty('visitaProximoPasso');
+  });
+
+  it('apagar uma resposta de propósito é `null`, e isso É uma mudança', () => {
+    const antes = [
+      gravada('g1', MARES, 9, 0, { visitaRealizada: true, visitaConcorrentes: 'Marca Exemplo' }),
+    ];
+    const depois: ParadaEditada[] = [
+      { ...editada(MARES, '09:00', 'g1'), visitaRealizada: true, visitaConcorrentes: null },
+    ];
+
+    const diff = diferencaDaRota(antes, depois, DIA);
+
+    expect(diff.alterar).toHaveLength(1);
+    expect(diff.alterar[0].visitaConcorrentes).toBeNull();
+  });
+
+  it('mandar a MESMA resposta que já está gravada não conta como mudança', () => {
+    const antes = [
+      gravada('g1', MARES, 9, 0, { visitaRealizada: true, visitaFase: 'acabamento' }),
+    ];
+    const depois: ParadaEditada[] = [
+      { ...editada(MARES, '09:00', 'g1'), visitaRealizada: true, visitaFase: 'acabamento' },
+    ];
+
+    expect(diferencaDaRota(antes, depois, DIA).semMudanca).toBe(true);
   });
 });

@@ -277,6 +277,32 @@ describe('agruparEmRotasDoDia', () => {
     expect(rotas[0].paradas.map((p) => p.id)).toEqual(['boa', 'outra-boa']);
   });
 
+  it('🔴 as cinco respostas da visita concluída sobrevivem ao agrupamento, junto com a observação', () => {
+    // `agruparEmRotasDoDia` empurra a visita inteira para dentro da rota — não reconstrói um
+    // objeto campo a campo. Se um dia alguém trocar isso por uma cópia seletiva de campos, as
+    // cinco respostas (e a edição da rota, que compara contra elas) somem em silêncio.
+    const rotas = agruparEmRotasDoDia([
+      visita('a', 27, 9, 0, {
+        visitaRealizada: true,
+        visitaObservacao: 'cliente pediu orçamento de porcelanato',
+        visitaFase: 'acabamento',
+        visitaConcorrentes: 'Marca Exemplo',
+        visitaContatoId: 'contato-exemplo-1',
+        visitaProximoPasso: 'enviar tabela de preços',
+        visitaProximoPassoEm: '2026-09-20',
+      }),
+    ]);
+
+    expect(rotas[0].paradas[0]).toMatchObject({
+      visitaObservacao: 'cliente pediu orçamento de porcelanato',
+      visitaFase: 'acabamento',
+      visitaConcorrentes: 'Marca Exemplo',
+      visitaContatoId: 'contato-exemplo-1',
+      visitaProximoPasso: 'enviar tabela de preços',
+      visitaProximoPassoEm: '2026-09-20',
+    });
+  });
+
   it('não mexe no array que recebeu, nem nos horários das visitas', () => {
     const entrada = [visita('c', 27, 11), visita('a', 27, 9), visita('b', 27, 10)];
     const ordemOriginal = entrada.map((v) => v.id);

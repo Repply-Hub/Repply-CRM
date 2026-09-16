@@ -141,6 +141,15 @@ export function VisitasObrasPainel({
         visitaRealizada: v.visitaRealizada,
         // Vai junto para a edição saber o que já está escrito e não passar por cima.
         visitaObservacao: v.visitaObservacao,
+        // As cinco respostas da visita concluída (16/09/2026) vão pelo MESMO motivo da
+        // observação acima: sem elas, `NovaRotaVisitaDialog.tsx` abriria para editar sem saber
+        // o que já está gravado, e QUALQUER edição pareceria "a resposta virou vazia" —
+        // apagando em silêncio o que a pessoa já tinha respondido.
+        visitaFase: v.visitaFase,
+        visitaConcorrentes: v.visitaConcorrentes,
+        visitaContatoId: v.visitaContatoId,
+        visitaProximoPasso: v.visitaProximoPasso,
+        visitaProximoPassoEm: v.visitaProximoPassoEm,
         latitude: v.latitude,
         longitude: v.longitude,
         // A identidade e o título da rota. Nulos nas paradas antigas — nesse caso o

@@ -66,6 +66,19 @@ export interface VisitaParaRota {
    * numa parada que é TRABALHO e não agendamento.
    */
   visitaObservacao?: string | null;
+  /**
+   * As cinco respostas da visita concluída (fase da obra, concorrente visto, com quem falou, o
+   * próximo passo e a data dele) — as mesmas cinco colunas que `src/lib/analise-da-visita.ts`
+   * descreve. MESMO PAPEL de `visitaObservacao` acima: chegam aqui para a EDIÇÃO da rota poder
+   * comparar o que já está gravado com o que a tela mostra, campo por campo, sem tratar
+   * "não mexi nisso" como "apague". `respostasDaVisita` (em `analise-da-visita.ts`) é quem
+   * transforma nulo/indefinido em string vazia para o rascunho da tela.
+   */
+  visitaFase?: string | null;
+  visitaConcorrentes?: string | null;
+  visitaContatoId?: string | null;
+  visitaProximoPasso?: string | null;
+  visitaProximoPassoEm?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   /**
