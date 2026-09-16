@@ -130,6 +130,34 @@ export function estaEmOrdemCrescente(paradas: readonly ParadaOrdenavel[]): boole
   return true;
 }
 
+/**
+ * Reordena as paradas seguindo uma sequência sugerida, **mantendo a grade de horários**.
+ *
+ * É a mesma promessa de `moverParadaMantendoHorarios`, feita de uma vez para a rota inteira: a
+ * pessoa montou as faixas (09:00, 09:30, 15:00 — a terceira obra é longe), e o que muda é quem
+ * ocupa cada uma. Inventar horário novo seria decidir pela pessoa algo que ela combinou fora do
+ * sistema.
+ *
+ * Ordem inválida (tamanho diferente, índice repetido ou fora da faixa) devolve a lista como
+ * estava: melhor não fazer nada do que embaralhar a rota de alguém.
+ */
+export function aplicarOrdemMantendoHorarios<T extends ParadaOrdenavel>(
+  paradas: readonly T[],
+  ordem: readonly number[],
+): T[] {
+  if (!Array.isArray(ordem) || ordem.length !== paradas.length) return [...paradas];
+  const vistos = new Set<number>();
+  for (const indice of ordem) {
+    if (!Number.isInteger(indice) || indice < 0 || indice >= paradas.length || vistos.has(indice)) {
+      return [...paradas];
+    }
+    vistos.add(indice);
+  }
+
+  const grade = ordenarPorHorario(paradas).map((p) => p.horario);
+  return ordem.map((indice, lugar) => ({ ...paradas[indice], horario: grade[lugar] }));
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
  * A MESMA REGRA, do outro lado: o CARD da aba Visitas.
  *
