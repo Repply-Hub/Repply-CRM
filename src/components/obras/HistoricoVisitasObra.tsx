@@ -48,6 +48,12 @@ export function HistoricoVisitasObra({
   const marcarRealizada = useMarcarVisitaRealizada();
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [rascunho, setRascunho] = useState<RespostasDaVisita>(respostasDaVisita());
+  // A visita que ACABOU de ser marcada, para o botão "Marcar como realizada" não voltar a
+  // aparecer na janela entre a gravação e o cache atualizar (a busca é refeita em segundo plano
+  // e pode demorar). Sem isto, o botão pisca de volta com a visita ainda "Planejada" na tela, e
+  // um clique reabriria o formulário. Depois que o cache mostra `visitaRealizada`, a própria
+  // condição do botão já o esconde — então este id pode ficar guardado sem efeito nenhum.
+  const [recemSalvaId, setRecemSalvaId] = useState<string | null>(null);
 
   // A fase mais recente que ALGUÉM respondeu — não a da última visita, porque a última pode ter
   // sido registrada sem responder nada. As visitas já chegam da mais nova para a mais antiga
@@ -172,7 +178,12 @@ export function HistoricoVisitasObra({
                           nomeObra,
                           clienteId,
                         },
-                        { onSuccess: () => setEditandoId(null) },
+                        {
+                          onSuccess: () => {
+                            setEditandoId(null);
+                            setRecemSalvaId(visita.id);
+                          },
+                        },
                       );
                     }}
                   >
@@ -182,7 +193,7 @@ export function HistoricoVisitasObra({
               </div>
             )}
 
-            {podeMarcar && !editando && !visita.visitaRealizada && (
+            {podeMarcar && !editando && !visita.visitaRealizada && recemSalvaId !== visita.id && (
               <Button
                 variant="outline"
                 size="sm"
