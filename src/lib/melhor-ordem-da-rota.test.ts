@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { avaliarOrdemDaRota, GANHO_MINIMO_S, pontosDaRotaEmOrdem } from './melhor-ordem-da-rota';
+import { avaliarOrdemDaRota, GANHO_MINIMO_S, pontosDaRotaEmOrdem, rotaAceitaSugestaoDeOrdem } from './melhor-ordem-da-rota';
 
 describe('avaliarOrdemDaRota', () => {
   it('ordem diferente com ganho relevante: sugere, com o ganho em segundos', () => {
@@ -85,5 +85,48 @@ describe('pontosDaRotaEmOrdem', () => {
 
   it('sem paradas: lista vazia — não é erro, `urlDaMelhorOrdem` já devolve vazio sozinho', () => {
     expect(pontosDaRotaEmOrdem([], OBRAS)).toEqual([]);
+  });
+});
+
+describe('rotaAceitaSugestaoDeOrdem', () => {
+  it('sem parada realizada: aceita sugestão', () => {
+    const paradas = [
+      { realizada: false },
+      { realizada: false },
+      { realizada: false },
+    ];
+    expect(rotaAceitaSugestaoDeOrdem(paradas)).toBe(true);
+  });
+
+  it('uma parada realizada entre outras: rejeita sugestão — rota é história', () => {
+    const paradas = [
+      { realizada: false },
+      { realizada: true },
+      { realizada: false },
+    ];
+    expect(rotaAceitaSugestaoDeOrdem(paradas)).toBe(false);
+  });
+
+  it('todas as paradas realizadas: rejeita sugestão', () => {
+    const paradas = [
+      { realizada: true },
+      { realizada: true },
+      { realizada: true },
+    ];
+    expect(rotaAceitaSugestaoDeOrdem(paradas)).toBe(false);
+  });
+
+  it('lista vazia: aceita sugestão — não há nada a rejeitar', () => {
+    expect(rotaAceitaSugestaoDeOrdem([])).toBe(true);
+  });
+
+  it('parada com `realizada` ausente: trata como não realizada', () => {
+    const paradas = [{ realizada: undefined }, { realizada: false }];
+    expect(rotaAceitaSugestaoDeOrdem(paradas)).toBe(true);
+  });
+
+  it('parada com `realizada` null: trata como não realizada', () => {
+    const paradas = [{ realizada: null }, { realizada: false }];
+    expect(rotaAceitaSugestaoDeOrdem(paradas)).toBe(true);
   });
 });

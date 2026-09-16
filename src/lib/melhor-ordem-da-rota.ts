@@ -49,6 +49,26 @@ export function avaliarOrdemDaRota({
 }
 
 /**
+ * A rota aceita sugestão de reordenação? Rota com visita já realizada é história — não
+ * reordene.
+ *
+ * 🔴 DECISÃO DO DONO DO PRODUTO — 16/09/2026. A ordem só é flexível enquanto a rota está
+ * sendo montada. Uma vez que qualquer parada já aconteceu (`realizada === true`), mudanças
+ * de ordem reassociariam o time a um horário que já correu — o calendário dos participantes
+ * teria de ser refeito, conflitos teriam de ser re-averiguados, a hora que o cliente já
+ * recebeu viraria mentira. Rota com parada realizada é passado, não esboço.
+ *
+ * Parada com `realizada` ausente ou `null` é tratada como `false` (nunca foi visitada).
+ * Lista vazia (rota sem paradas) devolve `true` — não há nada para rejeitar; o limiar de
+ * 3 paradas é conferido em outro lugar.
+ */
+export function rotaAceitaSugestaoDeOrdem(
+  paradas: ReadonlyArray<{ realizada?: boolean | null }>,
+): boolean {
+  return !paradas.some((p) => p.realizada === true);
+}
+
+/**
  * Os pontos da rota para o OSRM, um por parada, NA MESMA ORDEM que `paradasEmOrdem` — prontos
  * para `urlDaRota` e `urlDaMelhorOrdem`. A localização vem da OBRA de cada parada (`obraId`),
  * não da parada — `Parada`, no formulário da rota, não guarda coordenada nenhuma.
@@ -69,7 +89,7 @@ export function avaliarOrdemDaRota({
  * "serviço fora do ar, lento, ou obra sem localização: nenhuma sugestão".
  *
  * Lista de paradas vazia devolve lista vazia — não é erro, é "nada para sugerir", e
- * `urlDaMelhorOrdem` já devolve string vazia sozinho para menos de 3 pontos.
+ * `urlDaMelhorOrdem` já devolve string vazio sozinho para menos de 3 pontos.
  */
 export function pontosDaRotaEmOrdem(
   paradasEmOrdem: ReadonlyArray<{ obraId: string }>,

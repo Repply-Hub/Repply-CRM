@@ -58,6 +58,7 @@ Dois pedidos do Lucas:
    passo. O texto livre de hoje continua, como "mais alguma coisa".
 5. **O próximo passo vira tarefa**, com a data marcada.
 6. **O envio é o resumo do dia**, pelo botão de enviar rota que já existe.
+7. **Rota com visita já realizada não recebe sugestão de ordem** (16/09/2026). Uma parada marcada como realizada é passado — reordená-la reassociaria o time a um horário que já correu, quebraria a agenda dos participantes e tornaria mentira a hora que o cliente recebeu. Nenhuma parada da rota pode ter `realizada === true`.
 
 ### Decisões do desenho, apresentadas e aprovadas
 
@@ -93,6 +94,7 @@ responde `NoRoute`, `TooBig` ou HTML quando está sobrecarregado).
 | Existe ordem melhor, com ganho relevante | "Esta ordem economiza cerca de **X min**." + botão **Usar esta ordem** |
 | Ganho abaixo de 5 minutos | trata como já ótima (a frase acima) — mexer na rota por 2 minutos é conselho que atrapalha |
 | Serviço fora, lento, ou menos de 3 obras com localização | nada aparece |
+| Alguma parada da rota já foi marcada como realizada | nada aparece |
 
 **O que o botão faz:** troca **quem ocupa cada horário**, na grade que a pessoa já montou — a
 mesma mecânica de arrastar uma parada (`ordem-das-paradas.ts`). Ninguém ganha horário novo: se a

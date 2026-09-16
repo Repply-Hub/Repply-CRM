@@ -14,7 +14,7 @@ import {
   moverParadaMantendoHorarios,
   ultimoHorarioUtilizavel,
 } from '@/lib/ordem-das-paradas';
-import { pontosDaRotaEmOrdem, avaliarOrdemDaRota } from '@/lib/melhor-ordem-da-rota';
+import { pontosDaRotaEmOrdem, avaliarOrdemDaRota, rotaAceitaSugestaoDeOrdem } from '@/lib/melhor-ordem-da-rota';
 import { duracaoLegivel } from '@/lib/osrm';
 import { useRotaOsrm } from '@/hooks/use-rota-osrm';
 import { useMelhorOrdem } from '@/hooks/use-melhor-ordem';
@@ -358,14 +358,19 @@ export function NovaRotaVisitaDialog({
    * lista crua): é sobre essa mesma sequência que `useRotaOsrm` mede o tempo ATUAL e que
    * `useMelhorOrdem` calcula a melhor ordem — comparando maçã com maçã, e com índices que
    * `aplicarOrdemMantendoHorarios` sabe aplicar de volta.
+   *
+   * 🔴 Decisão do dono do produto — 16/09/2026: rota com visita já realizada não recebe
+   * sugestão de ordem. Nenhuma parada pode ter `realizada === true`.
    */
   const pontosDaRota = useMemo(
-    () =>
-      pontosDaRotaEmOrdem(
+    () => {
+      if (!rotaAceitaSugestaoDeOrdem(paradas)) return null;
+      return pontosDaRotaEmOrdem(
         paradasEmOrdem,
         obras as Array<{ id: string; latitude?: number | null; longitude?: number | null }>,
-      ),
-    [paradasEmOrdem, obras],
+      );
+    },
+    [paradasEmOrdem, obras, paradas],
   );
   const { data: trajetoAtual } = useRotaOsrm(pontosDaRota);
   const { data: melhorOrdem } = useMelhorOrdem(pontosDaRota);
