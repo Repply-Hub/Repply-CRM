@@ -125,6 +125,77 @@ export function urlDaRota(pontos: PontoNoMapa[]): string {
 }
 
 /**
+ * 🔴 OUTRO SERVIÇO DO MESMO SERVIDOR. `/route` traça o caminho NA ORDEM DADA; `/trip` resolve
+ * qual é a melhor ordem. Trocar um pelo outro sem querer devolve resposta parecida e conselho
+ * errado, então os dois endereços ficam separados e cada um tem a sua leitura.
+ */
+const BASE_TRIP_OSRM = 'https://router.project-osrm.org/trip/v1/driving';
+
+export interface MelhorOrdemDoServico {
+  /** Os índices das paradas de ENTRADA, na ordem sugerida. Sempre começa em 0. */
+  ordem: number[];
+  duracaoS: number;
+}
+
+/**
+ * A pergunta "qual é a sequência mais rápida?", saindo da PRIMEIRA parada e sem voltar para ela
+ * (decisão 2 do desenho: a primeira visita é a combinada, ou a mais perto de casa).
+ *
+ * Menos de 3 paradas devolve vazio: com 2 não existe ordem melhor, e o hook usa isso para não
+ * bater no servidor de graça.
+ */
+export function urlDaMelhorOrdem(pontos: PontoNoMapa[]): string {
+  if (!Array.isArray(pontos) || pontos.length < 3) return '';
+
+  const coordenadas: string[] = [];
+  for (const ponto of pontos) {
+    if (!ponto || !ehNumeroFinito(ponto.lat) || !ehNumeroFinito(ponto.lng)) return '';
+    // 🔴 lng ANTES de lat, como em `urlDaRota`.
+    coordenadas.push(`${ponto.lng},${ponto.lat}`);
+  }
+
+  // `overview=false`: aqui só interessa a ORDEM e o tempo. O traçado quem desenha é `urlDaRota`,
+  // depois, com a ordem já escolhida — pedir geometria duas vezes é peso à toa num servidor de
+  // demonstração.
+  return `${BASE_TRIP_OSRM}/${coordenadas.join(';')}?source=first&roundtrip=false&destination=any&overview=false`;
+}
+
+/**
+ * Lê a resposta do `/trip`. Devolve `null` para tudo que não sirva — e aqui isso vale dobrado:
+ * uma ordem lida errado não quebra a tela, ela ENSINA O CAMINHO ERRADO para quem vai dirigir.
+ *
+ * As conferências: código `Ok`, uma viagem com duração numérica, um ponto para cada parada
+ * mandada, posições sem repetição dentro da faixa, e a primeira parada continuando em primeiro
+ * (foi o que pedimos com `source=first`; se o servidor ignorar, a sugestão não vale).
+ */
+export function lerRespostaDaMelhorOrdem(json: unknown, totalDePontos: number): MelhorOrdemDoServico | null {
+  if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
+  const resposta = json as Record<string, unknown>;
+  if (resposta.code !== 'Ok') return null;
+
+  const viagens = resposta.trips;
+  if (!Array.isArray(viagens) || viagens.length === 0) return null;
+  const duracaoS = (viagens[0] as Record<string, unknown>)?.duration;
+  if (!ehNumeroFinito(duracaoS)) return null;
+
+  const pontos = resposta.waypoints;
+  if (!Array.isArray(pontos) || pontos.length !== totalDePontos) return null;
+
+  const posicoes: number[] = [];
+  for (const ponto of pontos) {
+    const posicao = (ponto as Record<string, unknown>)?.waypoint_index;
+    if (!ehNumeroFinito(posicao) || !Number.isInteger(posicao) || posicao < 0 || posicao >= totalDePontos) return null;
+    if (posicoes.includes(posicao)) return null;
+    posicoes.push(posicao);
+  }
+  if (posicoes[0] !== 0) return null;
+
+  // `posicoes[i]` diz em que lugar da viagem a parada `i` entrou; a ordem é o caminho inverso.
+  const ordem = posicoes.map((_, lugar) => posicoes.indexOf(lugar));
+  return { ordem, duracaoS };
+}
+
+/**
  * Lê a resposta do OSRM. Devolve `null` quando a resposta não serve.
  *
  * 🔴 O servidor é público e de demonstração: ele pode responder `{code:"NoRoute"}` (obras em

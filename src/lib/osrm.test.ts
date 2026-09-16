@@ -2,10 +2,63 @@ import { describe, it, expect } from 'vitest';
 import {
   urlDaRota,
   lerRespostaDaRota,
+  urlDaMelhorOrdem,
+  lerRespostaDaMelhorOrdem,
   duracaoLegivel,
   distanciaLegivel,
   type PontoNoMapa,
 } from './osrm';
+
+const TRES_OBRAS = [
+  { lat: -5.79, lng: -35.21 },
+  { lat: -5.81, lng: -35.23 },
+  { lat: -5.75, lng: -35.25 },
+];
+
+describe('urlDaMelhorOrdem', () => {
+  it('pede a melhor sequência saindo da primeira parada e sem voltar para ela', () => {
+    const url = urlDaMelhorOrdem(TRES_OBRAS);
+    expect(url).toContain('/trip/v1/driving/');
+    expect(url).toContain('source=first');
+    expect(url).toContain('roundtrip=false');
+    // 🔴 lng antes de lat — a ordem do OSRM, o contrário do Leaflet.
+    expect(url).toContain('-35.21,-5.79;-35.23,-5.81;-35.25,-5.75');
+  });
+
+  it('não pede nada com menos de 3 paradas — com 2 não existe ordem melhor', () => {
+    expect(urlDaMelhorOrdem(TRES_OBRAS.slice(0, 2))).toBe('');
+    expect(urlDaMelhorOrdem([])).toBe('');
+  });
+
+  it('não pede nada quando alguma obra está sem localização', () => {
+    expect(urlDaMelhorOrdem([...TRES_OBRAS.slice(0, 2), { lat: null as never, lng: -35.2 }])).toBe('');
+  });
+});
+
+describe('lerRespostaDaMelhorOrdem', () => {
+  const resposta = {
+    code: 'Ok',
+    trips: [{ duration: 1800, distance: 15000 }],
+    // `waypoint_index` é a posição de cada ponto NA VIAGEM; a lista vem na ordem de entrada.
+    waypoints: [{ waypoint_index: 0 }, { waypoint_index: 2 }, { waypoint_index: 1 }],
+  };
+
+  it('devolve a ordem das paradas e a duração', () => {
+    expect(lerRespostaDaMelhorOrdem(resposta, 3)).toEqual({ ordem: [0, 2, 1], duracaoS: 1800 });
+  });
+
+  it.each([
+    ['sem code Ok', { ...resposta, code: 'NoRoute' }],
+    ['sem viagem', { ...resposta, trips: [] }],
+    ['com pontos a menos', { ...resposta, waypoints: [{ waypoint_index: 0 }] }],
+    ['com posição repetida', { ...resposta, waypoints: [{ waypoint_index: 0 }, { waypoint_index: 0 }, { waypoint_index: 1 }] }],
+    ['sem começar na primeira parada', { ...resposta, waypoints: [{ waypoint_index: 1 }, { waypoint_index: 0 }, { waypoint_index: 2 }] }],
+    ['página de erro em vez de resposta', '<html>503</html>'],
+    ['nada', null],
+  ])('devolve null quando a resposta não serve (%s)', (_caso, json) => {
+    expect(lerRespostaDaMelhorOrdem(json, 3)).toBeNull();
+  });
+});
 
 /**
  * Três obras reais de Natal/RN, conferidas contra o servidor de verdade em 27/08/2026:
