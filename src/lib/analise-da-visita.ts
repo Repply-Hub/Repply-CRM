@@ -27,6 +27,53 @@ export function rotuloDaFase(chave?: string | null): string {
   return FASES_DA_OBRA.find((f) => f.chave === (chave ?? '').trim())?.rotulo ?? '';
 }
 
+/**
+ * O rascunho das respostas na tela — o que `PerguntasDaVisita` lê e escreve, antes de virar
+ * as cinco colunas gravadas em `eventos`. Fica aqui, e não no componente: `useMarcarVisitaRealizada`
+ * (um hook, não um componente) também precisa do tipo para aceitar `respostas` no `mutate`.
+ */
+export interface RespostasDaVisita {
+  fase: string;
+  concorrentes: string;
+  contatoId: string;
+  proximoPasso: string;
+  proximoPassoEm: string;
+  observacao: string;
+}
+
+export const RESPOSTAS_VAZIAS: RespostasDaVisita = {
+  fase: '',
+  concorrentes: '',
+  contatoId: '',
+  proximoPasso: '',
+  proximoPassoEm: '',
+  observacao: '',
+};
+
+/**
+ * Monta o rascunho a partir do que a visita já tem gravado — nulo e indefinido viram string
+ * vazia, nunca a palavra "null" (o `<Input>` mostraria isso literalmente na tela).
+ */
+export function respostasDaVisita(
+  v?: {
+    visitaFase?: string | null;
+    visitaConcorrentes?: string | null;
+    visitaContatoId?: string | null;
+    visitaProximoPasso?: string | null;
+    visitaProximoPassoEm?: string | null;
+    visitaObservacao?: string | null;
+  } | null,
+): RespostasDaVisita {
+  return {
+    fase: v?.visitaFase ?? '',
+    concorrentes: v?.visitaConcorrentes ?? '',
+    contatoId: v?.visitaContatoId ?? '',
+    proximoPasso: v?.visitaProximoPasso ?? '',
+    proximoPassoEm: v?.visitaProximoPassoEm ?? '',
+    observacao: v?.visitaObservacao ?? '',
+  };
+}
+
 export interface AnaliseDaVisita {
   fase?: string | null;
   concorrentes?: string | null;

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { FASES_DA_OBRA, rotuloDaFase, resumoDaAnalise, tarefaDoProximoPasso } from './analise-da-visita';
+import {
+  FASES_DA_OBRA,
+  rotuloDaFase,
+  resumoDaAnalise,
+  tarefaDoProximoPasso,
+  RESPOSTAS_VAZIAS,
+  respostasDaVisita,
+} from './analise-da-visita';
 
 describe('fases da obra', () => {
   it('são as seis do ramo, na ordem do canteiro', () => {
@@ -80,5 +87,57 @@ describe('tarefaDoProximoPasso', () => {
     expect(
       tarefaDoProximoPasso({ proximoPasso: 'Voltar lá', proximoPassoEm: '2026-09-20' })?.titulo,
     ).toBe('Próximo passo — obra sem nome');
+  });
+});
+
+describe('RESPOSTAS_VAZIAS', () => {
+  it('as seis respostas começam vazias', () => {
+    expect(RESPOSTAS_VAZIAS).toEqual({
+      fase: '',
+      concorrentes: '',
+      contatoId: '',
+      proximoPasso: '',
+      proximoPassoEm: '',
+      observacao: '',
+    });
+  });
+});
+
+describe('respostasDaVisita — o rascunho a partir do que já está gravado', () => {
+  it('lê as cinco colunas gravadas na visita, mais a observação', () => {
+    expect(
+      respostasDaVisita({
+        visitaFase: 'acabamento',
+        visitaConcorrentes: 'Marca Exemplo',
+        visitaContatoId: 'contato-1',
+        visitaProximoPasso: 'Mandar proposta de louças',
+        visitaProximoPassoEm: '2026-09-20',
+        visitaObservacao: 'Obra parada por chuva',
+      }),
+    ).toEqual({
+      fase: 'acabamento',
+      concorrentes: 'Marca Exemplo',
+      contatoId: 'contato-1',
+      proximoPasso: 'Mandar proposta de louças',
+      proximoPassoEm: '2026-09-20',
+      observacao: 'Obra parada por chuva',
+    });
+  });
+
+  it('🔴 nulo e indefinido viram vazio, nunca a palavra "null"', () => {
+    expect(
+      respostasDaVisita({
+        visitaFase: null,
+        visitaConcorrentes: null,
+        visitaContatoId: null,
+        visitaProximoPasso: null,
+        visitaProximoPassoEm: null,
+        visitaObservacao: null,
+      }),
+    ).toEqual(RESPOSTAS_VAZIAS);
+
+    expect(respostasDaVisita({})).toEqual(RESPOSTAS_VAZIAS);
+    expect(respostasDaVisita(undefined)).toEqual(RESPOSTAS_VAZIAS);
+    expect(respostasDaVisita(null)).toEqual(RESPOSTAS_VAZIAS);
   });
 });

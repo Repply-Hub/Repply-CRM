@@ -6,7 +6,6 @@ import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { Loader2, CheckCircle2, Circle, MapPin, Building2, HardHat, Route, Send, Trash2, Pencil } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { type DateRange } from '@/components/shared/DateRangePicker';
 import { useAuth } from '@/hooks/use-auth';
 import { useVendedores } from '@/hooks/use-clientes';
@@ -15,6 +14,8 @@ import { agruparEmRotasDoDia, type RotaDoDia } from '@/lib/rota-do-dia';
 import { normalizarTexto } from '@/lib/busca-de-obras';
 import { agruparVisitasPorDia } from '@/lib/ordem-das-paradas';
 import { linkDoGoogleMaps, mensagemDaRota } from '@/lib/rota-no-whatsapp';
+import { RESPOSTAS_VAZIAS, respostasDaVisita, type RespostasDaVisita } from '@/lib/analise-da-visita';
+import { PerguntasDaVisita } from './PerguntasDaVisita';
 import { EnviarRotaDialog } from './EnviarRotaDialog';
 import { RotaNoMapaDialog } from './RotaNoMapaDialog';
 import { useExcluirRotaDeVisita } from '@/hooks/use-eventos';
@@ -53,7 +54,7 @@ export function VisitasObrasPainel({
   const { data: usuarios = [] } = useVendedores();
   const marcarRealizada = useMarcarVisitaRealizada();
   const [editandoId, setEditandoId] = useState<string | null>(null);
-  const [observacaoRascunho, setObservacaoRascunho] = useState('');
+  const [rascunho, setRascunho] = useState<RespostasDaVisita>(RESPOSTAS_VAZIAS);
   const [rotaParaEnviar, setRotaParaEnviar] = useState<RotaDoDia | null>(null);
   // 🔴 A rota abre em JANELA PRÓPRIA, não no mapa geral de obras. O mapa geral tem 74 pinos e a
   // rota do dia tem três: procurar o trajeto no meio deles é trabalho, e trocar de aba ainda
@@ -358,19 +359,28 @@ export function VisitasObrasPainel({
                 visita={visita}
                 podeMarcar={profile?.user_id === visita.criadoPor}
                 editando={editandoId === visita.id}
-                observacaoRascunho={observacaoRascunho}
-                onObservacaoChange={setObservacaoRascunho}
+                rascunho={rascunho}
+                onRascunhoChange={setRascunho}
                 nomeCriador={nomePor(visita.criadoPor)}
                 onSelectObra={onSelectObra}
                 onIniciarEdicao={() => {
-                  setObservacaoRascunho(visita.visitaObservacao || '');
+                  setRascunho(respostasDaVisita(visita));
                   setEditandoId(visita.id);
                 }}
                 onCancelarEdicao={() => setEditandoId(null)}
                 onSalvar={() =>
                   marcarRealizada.mutate(
-                    { grupoId: visita.grupoId, obraId: visita.obraId, realizada: true, observacao: observacaoRascunho },
-                    { onSuccess: () => setEditandoId(null) },
+                    {
+                      grupoId: visita.grupoId,
+                      obraId: visita.obraId,
+                      realizada: true,
+                      observacao: rascunho.observacao,
+                      respostas: rascunho,
+                    },
+                    {
+                      onSuccess: () => setEditandoId(null),
+                      onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível salvar a visita.')),
+                    },
                   )
                 }
                 podeAlternar={profile?.user_id === visita.criadoPor}
@@ -391,15 +401,19 @@ export function VisitasObrasPainel({
                  */
                 onAlternarStatus={() => {
                   if (visita.visitaRealizada) {
-                    marcarRealizada.mutate({
-                      grupoId: visita.grupoId,
-                      obraId: visita.obraId,
-                      realizada: false,
-                      observacao: visita.visitaObservacao ?? '',
-                    });
+                    // 🔴 DESMARCAR NÃO APAGA A ANOTAÇÃO (decisão do dono do produto de
+                    // 16/09/2026). O `mutate` abaixo NÃO manda `observacao` nem `respostas` —
+                    // `useMarcarVisitaRealizada` grava só `visita_realizada: false` quando
+                    // `realizada` é falso, e as cinco respostas mais a observação ficam como
+                    // estavam. Quem quer apagar de propósito marca de novo, limpa os campos e
+                    // salva; aí sim vira `null`.
+                    marcarRealizada.mutate(
+                      { grupoId: visita.grupoId, obraId: visita.obraId, realizada: false },
+                      { onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível desmarcar a visita.')) },
+                    );
                     return;
                   }
-                  setObservacaoRascunho(visita.visitaObservacao || '');
+                  setRascunho(respostasDaVisita(visita));
                   setEditandoId(visita.id);
                 }}
                 salvando={marcarRealizada.isPending}
@@ -453,8 +467,8 @@ function VisitaCard({
   visita,
   podeMarcar,
   editando,
-  observacaoRascunho,
-  onObservacaoChange,
+  rascunho,
+  onRascunhoChange,
   nomeCriador,
   onSelectObra,
   onIniciarEdicao,
@@ -467,8 +481,8 @@ function VisitaCard({
   visita: VisitaObraListagem;
   podeMarcar: boolean;
   editando: boolean;
-  observacaoRascunho: string;
-  onObservacaoChange: (v: string) => void;
+  rascunho: RespostasDaVisita;
+  onRascunhoChange: (v: RespostasDaVisita) => void;
   nomeCriador: string;
   onSelectObra: (obraId: string) => void;
   onIniciarEdicao: () => void;
@@ -557,12 +571,13 @@ function VisitaCard({
       )}
 
       {podeMarcar && editando && (
-        <div className="mt-2 space-y-2">
-          <Textarea
-            value={observacaoRascunho}
-            onChange={(e) => onObservacaoChange(e.target.value)}
-            placeholder="O que você viu na obra?"
-            className="min-h-20 text-sm"
+        <div className="mt-2 space-y-3">
+          <PerguntasDaVisita
+            valor={rascunho}
+            onChange={onRascunhoChange}
+            clienteId={visita.clienteId}
+            clienteEmpresa={visita.clienteEmpresa}
+            disabled={salvando}
           />
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={onCancelarEdicao}>
