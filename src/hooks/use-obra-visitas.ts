@@ -23,6 +23,8 @@ export interface ObraVisita {
   visitaContatoId: string | null;
   visitaProximoPasso: string | null;
   visitaProximoPassoEm: string | null;
+  /** O nome de quem a visita marca como "com quem falou" (`visitaContatoId`). Nulo sem resposta. */
+  contatoNome: string | null;
   criadoPor: string;
 }
 
@@ -81,12 +83,16 @@ export function useObraVisitas(obraId?: string | null) {
       const { data, error } = await supabase
         .from('eventos')
         .select(
-          'id, grupo_id, user_id, titulo, inicio, fim, dia_inteiro, visita_realizada, visita_observacao, visita_fase, visita_concorrentes, visita_contato_id, visita_proximo_passo, visita_proximo_passo_em, criado_por',
+          // O nome de "com quem falou" vem por embed com ALIAS nomeado pela chave estrangeira —
+          // mesma sintaxe de `useTodasVisitasObras`; o PostgREST precisa do caminho explícito.
+          'id, grupo_id, user_id, titulo, inicio, fim, dia_inteiro, visita_realizada, visita_observacao, visita_fase, visita_concorrentes, visita_contato_id, visita_proximo_passo, visita_proximo_passo_em, criado_por, contato_da_visita:contatos!eventos_visita_contato_id_fkey(nome_contato)',
         )
         .eq('obra_id', obraId!)
         .order('inicio', { ascending: false });
       if (error) throw error;
-      const linhas = (data as EventoVisitaRow[]).map((e) => ({
+      const linhas = (data as unknown as (EventoVisitaRow & {
+        contato_da_visita: { nome_contato: string | null } | null;
+      })[]).map((e) => ({
         id: e.id,
         grupoId: e.grupo_id,
         titulo: e.titulo,
@@ -100,6 +106,7 @@ export function useObraVisitas(obraId?: string | null) {
         visitaContatoId: e.visita_contato_id,
         visitaProximoPasso: e.visita_proximo_passo,
         visitaProximoPassoEm: e.visita_proximo_passo_em,
+        contatoNome: e.contato_da_visita?.nome_contato ?? null,
         criadoPor: e.criado_por,
       })) as ObraVisita[];
       return dedupPorGrupo(linhas);

@@ -1152,7 +1152,12 @@ export default function Obras() {
 
                 <div className="border-t pt-6">
                   <h3 className="mb-3 text-sm font-semibold">Histórico de visitas</h3>
-                  <HistoricoVisitasObra obraId={selectedObra.id} />
+                  <HistoricoVisitasObra
+                    obraId={selectedObra.id}
+                    nomeObra={selectedObra.nome_obra}
+                    clienteId={selectedObra.cliente_id}
+                    clienteEmpresa={selectedObra.clientes?.empresa}
+                  />
                 </div>
 
                 <div className="border-t pt-6">
