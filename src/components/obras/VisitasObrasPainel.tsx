@@ -14,7 +14,7 @@ import { agruparEmRotasDoDia, type RotaDoDia } from '@/lib/rota-do-dia';
 import { normalizarTexto } from '@/lib/busca-de-obras';
 import { agruparVisitasPorDia } from '@/lib/ordem-das-paradas';
 import { linkDoGoogleMaps, mensagemDaRota } from '@/lib/rota-no-whatsapp';
-import { RESPOSTAS_VAZIAS, respostasDaVisita, type RespostasDaVisita } from '@/lib/analise-da-visita';
+import { RESPOSTAS_VAZIAS, respostasDaVisita, resumoDaAnalise, type RespostasDaVisita } from '@/lib/analise-da-visita';
 import { PerguntasDaVisita } from './PerguntasDaVisita';
 import { ResumoDaVisita } from './ResumoDaVisita';
 import { EnviarRotaDialog } from './EnviarRotaDialog';
@@ -150,6 +150,8 @@ export function VisitasObrasPainel({
         visitaContatoId: v.visitaContatoId,
         visitaProximoPasso: v.visitaProximoPasso,
         visitaProximoPassoEm: v.visitaProximoPassoEm,
+        // O NOME de "com quem falou", para a análise na mensagem do WhatsApp mostrar "Falou com".
+        contatoNome: v.contatoNome,
         latitude: v.latitude,
         longitude: v.longitude,
         // A identidade e o título da rota. Nulos nas paradas antigas — nesse caso o
@@ -188,6 +190,19 @@ export function VisitasObrasPainel({
       horario: p.inicio,
       lat: p.latitude,
       lng: p.longitude,
+      // A análise entra SÓ quando a obra já foi visitada — a rota da manhã, de obra ainda não
+      // visitada, sai idêntica à de antes. `resumoDaAnalise` já monta cada linha (inclusive
+      // "Obs.: …") e devolve vazio quando nada foi respondido.
+      analise: p.visitaRealizada
+        ? resumoDaAnalise({
+            fase: p.visitaFase,
+            concorrentes: p.visitaConcorrentes,
+            contatoNome: p.contatoNome,
+            proximoPasso: p.visitaProximoPasso,
+            proximoPassoEm: p.visitaProximoPassoEm,
+            observacao: p.visitaObservacao,
+          })
+        : [],
     }));
     return mensagemDaRota({ data: rota.data, paradas, link: linkDoGoogleMaps(paradas) });
   };

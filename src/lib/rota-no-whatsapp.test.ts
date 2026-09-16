@@ -335,3 +335,63 @@ describe('mensagemDaRota', () => {
     expect(texto).toContain(`1. ${nome}`);
   });
 });
+
+describe('mensagemDaRota — a análise da visita embaixo da obra', () => {
+  it('obra já visitada leva a análise indentada embaixo do nome', () => {
+    const texto = mensagemDaRota({
+      data: new Date('2026-09-12T12:00:00'),
+      paradas: [
+        {
+          nome: 'Obra Exemplo',
+          horario: new Date('2026-09-12T09:00:00'),
+          analise: ['Fase: Acabamento', 'Concorrente: Marca Exemplo'],
+        },
+      ],
+    });
+    expect(texto).toContain('1. 09:00 — Obra Exemplo');
+    expect(texto).toContain('   Fase: Acabamento');
+    expect(texto).toContain('   Concorrente: Marca Exemplo');
+  });
+
+  it('🔴 obra sem análise sai EXATAMENTE como antes (rota da manhã não muda)', () => {
+    const paradas: ParadaDaRota[] = [
+      { nome: 'Obra Exemplo', horario: new Date('2026-09-12T09:00:00') },
+    ];
+    const comCampoVazio = mensagemDaRota({
+      data: new Date('2026-09-12T12:00:00'),
+      paradas: [{ ...paradas[0], analise: [] }],
+    });
+    const semCampo = mensagemDaRota({ data: new Date('2026-09-12T12:00:00'), paradas });
+    expect(comCampoVazio).toBe(semCampo);
+  });
+
+  it('a análise não indenta com "-" (no WhatsApp o hífen viraria lista)', () => {
+    const texto = mensagemDaRota({
+      data: new Date('2026-09-12T12:00:00'),
+      paradas: [
+        { nome: 'Obra Exemplo', horario: new Date('2026-09-12T09:00:00'), analise: ['Fase: Estrutura'] },
+      ],
+    });
+    const linhaDaAnalise = texto.split('\n').find((l) => l.includes('Fase: Estrutura'))!;
+    expect(linhaDaAnalise.startsWith('   ')).toBe(true);
+    expect(linhaDaAnalise.trimStart().startsWith('-')).toBe(false);
+  });
+
+  it('o link continua sozinho na última linha, DEPOIS da análise', () => {
+    const texto = mensagemDaRota({
+      data: new Date('2026-09-12T12:00:00'),
+      paradas: [
+        { nome: 'Obra A', horario: new Date('2026-09-12T09:00:00'), lat: -5.79, lng: -35.21, analise: ['Fase: Estrutura'] },
+        { nome: 'Obra B', horario: new Date('2026-09-12T10:00:00'), lat: -5.8, lng: -35.2, analise: ['Fase: Acabamento'] },
+      ],
+      link: {
+        url: 'https://www.google.com/maps/dir/?api=1&origin=-5.79,-35.21&destination=-5.8,-35.2',
+        incluidas: 2,
+        cortadas: 0,
+        semCoordenada: 0,
+      },
+    });
+    const linhas = texto.split('\n');
+    expect(linhas[linhas.length - 1]).toContain('https://www.google.com/maps/dir/');
+  });
+});

@@ -79,6 +79,11 @@ export interface VisitaParaRota {
   visitaContatoId?: string | null;
   visitaProximoPasso?: string | null;
   visitaProximoPassoEm?: string | null;
+  /**
+   * O NOME de "com quem falou" (resolvido de `visitaContatoId`) — só para a leitura: é o que a
+   * análise na mensagem do WhatsApp mostra em "Falou com: …". A gravação usa o id, não o nome.
+   */
+  contatoNome?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   /**

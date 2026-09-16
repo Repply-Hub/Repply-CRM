@@ -27,6 +27,13 @@ export interface ParadaDaRota {
   horario: Date | null;
   lat?: number | null;
   lng?: number | null;
+  /**
+   * As linhas da análise da visita (`resumoDaAnalise`, em `analise-da-visita.ts`), quando a obra
+   * JÁ foi visitada — cada string é uma linha pronta ("Fase: Acabamento", "Obs.: …"). Vazio ou
+   * ausente deixa a mensagem EXATAMENTE como era: quem recebe a rota de manhã, para uma obra
+   * ainda não visitada, não pode notar diferença nenhuma.
+   */
+  analise?: string[] | null;
 }
 
 export interface LinkDeRota {
@@ -229,7 +236,16 @@ export function mensagemDaRota(dados: DadosDaMensagem): string {
     linhas.push('', 'Nenhuma parada nesta rota.');
   } else {
     linhas.push('');
-    paradas.forEach((parada, indice) => linhas.push(linhaDaParada(parada, indice + 1)));
+    paradas.forEach((parada, indice) => {
+      linhas.push(linhaDaParada(parada, indice + 1));
+      // A análise da visita entra logo abaixo do nome da obra, indentada por ESPAÇOS — nunca por
+      // "-": no WhatsApp o hífen no começo da linha vira marcador de lista e come o alinhamento
+      // com a parada de cima. Obra sem análise não acrescenta nada, e a mensagem sai idêntica à
+      // de antes (a rota da manhã, de obra ainda não visitada, não muda em nada).
+      for (const linha of parada?.analise ?? []) {
+        if (typeof linha === 'string' && linha.trim()) linhas.push(`   ${linha.trim()}`);
+      }
+    });
   }
 
   const total = linhaDeTotal(dados?.distancia, dados?.duracao);
