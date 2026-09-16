@@ -33,7 +33,7 @@ export interface ParadaGravadaParaTarefa {
   visitaRealizada?: boolean | null;
 }
 
-type EspecificacaoDeTarefa = NonNullable<ReturnType<typeof tarefaDoProximoPasso>>;
+export type EspecificacaoDeTarefa = NonNullable<ReturnType<typeof tarefaDoProximoPasso>>;
 
 /**
  * Devolve uma especificação de tarefa (`{ titulo, descricao, prazo_final, cliente_id }`) por
@@ -71,10 +71,16 @@ export function tarefasDaRotaConcluida({
     const realizadaAgora = editando ? parada.realizada : jaRealizada;
     if (!realizadaAgora) continue;
 
-    // A transição: só conta quem NÃO estava realizada antes. Parada nova (sem grupo) nunca
-    // esteve realizada; parada gravada olha o que o banco tinha.
-    const eraRealizada =
-      editando && parada.grupoId ? (eraRealizadaPorGrupo.get(parada.grupoId) ?? false) : false;
+    // 🔴 Parada NOVA acrescentada durante a edição (sem `grupoId`) NÃO gera tarefa: ela é gravada
+    // pelo caminho de INSERIR, que a força a NÃO realizada (conserto de 16/09 em
+    // NovaRotaVisitaDialog). A tela já esconde o "já realizada" dela — esta linha é a rede se a
+    // tela regredir, para a função pura nunca criar uma tarefa por uma visita que na verdade
+    // ficou planejada. (Ao CRIAR, parada sem grupo é o normal e `jaRealizada` já governa acima.)
+    if (editando && !parada.grupoId) continue;
+
+    // A transição: só conta quem NÃO estava realizada antes. Parada gravada olha o que o banco
+    // tinha; se o grupo não aparece em `paradasGravadas`, trata como "não era" (transição).
+    const eraRealizada = editando ? (eraRealizadaPorGrupo.get(parada.grupoId!) ?? false) : false;
     if (eraRealizada) continue;
 
     if (!parada.respostas?.criarTarefa) continue;

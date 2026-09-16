@@ -44,7 +44,6 @@ import { useObras } from '@/hooks/use-obras';
 import { useCreateRotaVisita, useEditarRotaDeVisita, useEventoParticipantes, buscarConflitosDeVisita, type ConflitoVisita } from '@/hooks/use-eventos';
 import { RESPOSTAS_VAZIAS, respostasDaVisita, type RespostasDaVisita } from '@/lib/analise-da-visita';
 import { tarefasDaRotaConcluida } from '@/lib/rota-tarefas';
-import { useCreateTarefa } from '@/hooks/use-tarefas';
 import { PerguntasDaVisita } from './PerguntasDaVisita';
 
 interface ObraOpcao {
@@ -181,7 +180,6 @@ export function NovaRotaVisitaDialog({
   const { data: usuarios, refetch: refetchUsuarios } = useVendedores();
   const criarRota = useCreateRotaVisita();
   const editarRota = useEditarRotaDeVisita();
-  const criarTarefa = useCreateTarefa();
 
   // Os participantes da rota vêm da PRIMEIRA parada: a rota inteira é criada de uma vez, com a
   // mesma gente em todas. Ler de uma só evita uma consulta por parada para chegar à mesma lista.
@@ -415,35 +413,29 @@ export function NovaRotaVisitaDialog({
   };
 
   /**
-   * Cria as tarefas do próximo passo DEPOIS que a rota já foi gravada — a rota é o trabalho, a
-   * tarefa é a consequência (mesmo espírito da Tarefa 7a no painel da obra). A falha de uma
-   * tarefa NÃO derruba nada: a rota já está salva. Devolve quantas falharam, para a tela avisar.
-   * `tarefasDaRotaConcluida` já filtra: só a parada que PASSOU a realizada agora, com próximo
-   * passo + data e a caixinha marcada — reeditar ou remarcar não duplica.
+   * As tarefas do próximo passo desta rota, decididas a partir do que está na tela e do que
+   * estava gravado (só as paradas que PASSAM a realizadas agora, com data e a caixinha marcada).
+   * A criação em si acontece DENTRO da mutação (`useCreateRotaVisita`/`useEditarRotaDeVisita`),
+   * para o botão Salvar ficar travado até o fim — ver o comentário lá.
    */
-  const criarTarefasDaRota = async (
-    tarefas: ReturnType<typeof tarefasDaRotaConcluida>,
-  ): Promise<number> => {
-    let falhas = 0;
-    for (const tarefa of tarefas) {
-      try {
-        await criarTarefa.mutateAsync(tarefa);
-      } catch {
-        falhas += 1;
-      }
-    }
-    return falhas;
-  };
-
-  const avisarTarefasQueFalharam = (falhas: number) => {
-    if (falhas > 0) {
-      toast.warning(
-        falhas === 1
-          ? 'A rota foi salva, mas a tarefa do próximo passo não. Crie-a pela tela de Tarefas.'
-          : `A rota foi salva, mas ${falhas} tarefas do próximo passo não. Crie-as pela tela de Tarefas.`,
-      );
-    }
-  };
+  const tarefasDaRota = (editandoAgora: boolean) =>
+    tarefasDaRotaConcluida({
+      editando: editandoAgora,
+      jaRealizada,
+      paradas: paradasEmOrdem.map((p) => ({
+        grupoId: p.grupoId,
+        nomeObra: p.nomeObra,
+        clienteId: obraPorId.get(p.obraId)?.cliente_id ?? null,
+        realizada: p.realizada,
+        respostas: p.respostas,
+      })),
+      paradasGravadas: editandoAgora
+        ? (rotaParaEditar?.paradas ?? []).map((p) => ({
+            grupoId: p.grupoId,
+            visitaRealizada: p.visitaRealizada,
+          }))
+        : undefined,
+    });
 
   const salvarEdicao = () => {
     if (!rotaParaEditar) return;
@@ -524,9 +516,12 @@ export function NovaRotaVisitaDialog({
         gruposDaRota: (rotaParaEditar?.paradas ?? [])
           .map((p) => p.grupoId)
           .filter((g): g is string => !!g),
+        // As tarefas do próximo passo das paradas que passaram a realizadas nesta edição. A
+        // criação acontece DENTRO da mutação, então o botão fica travado até o fim.
+        tarefasDoProximoPasso: tarefasDaRota(true),
       },
       {
-        onSuccess: async (r) => {
+        onSuccess: (r) => {
           toast.success(
             r.mudou
               ? `Rota atualizada: ${[
@@ -538,26 +533,7 @@ export function NovaRotaVisitaDialog({
                   .join(', ')}.`
               : 'Rota atualizada.',
           );
-          // A tarefa nasce só para a parada que PASSOU a realizada nesta edição (comparando com o
-          // que estava gravado) — nunca para uma que já era realizada, senão reeditar duplicaria.
-          const falhas = await criarTarefasDaRota(
-            tarefasDaRotaConcluida({
-              editando: true,
-              jaRealizada: false,
-              paradas: paradasEmOrdem.map((p) => ({
-                grupoId: p.grupoId,
-                nomeObra: p.nomeObra,
-                clienteId: obraPorId.get(p.obraId)?.cliente_id ?? null,
-                realizada: p.realizada,
-                respostas: p.respostas,
-              })),
-              paradasGravadas: (rotaParaEditar?.paradas ?? []).map((p) => ({
-                grupoId: p.grupoId,
-                visitaRealizada: p.visitaRealizada,
-              })),
-            }),
-          );
-          avisarTarefasQueFalharam(falhas);
+          if (r.avisoDaTarefa) toast.warning(r.avisoDaTarefa);
           onOpenChange(false);
         },
         onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível salvar a rota.')),
@@ -591,30 +567,19 @@ export function NovaRotaVisitaDialog({
           visitaProximoPasso: jaRealizada ? p.respostas.proximoPasso : undefined,
           visitaProximoPassoEm: jaRealizada ? p.respostas.proximoPassoEm : undefined,
         })),
+        // Só quando a rota nasce "essas visitas já aconteceram" (`jaRealizada`) haverá tarefas —
+        // `tarefasDaRota(false)` já devolve vazio quando a chave está desligada. Criadas dentro da
+        // mutação, com o botão travado até o fim.
+        tarefasDoProximoPasso: tarefasDaRota(false),
       },
       {
-        onSuccess: async () => {
+        onSuccess: (r) => {
           toast.success(
             paradas.length === 1
               ? 'Visita registrada no calendário.'
               : `Rota criada com ${paradas.length} visitas no calendário.`,
           );
-          // Só quando a rota nasce "essas visitas já aconteceram" (`jaRealizada`): aí cada parada
-          // é uma visita realizada agora, e o próximo passo com data + caixinha marcada vira tarefa.
-          const falhas = await criarTarefasDaRota(
-            tarefasDaRotaConcluida({
-              editando: false,
-              jaRealizada,
-              paradas: paradasEmOrdem.map((p) => ({
-                grupoId: p.grupoId,
-                nomeObra: p.nomeObra,
-                clienteId: obraPorId.get(p.obraId)?.cliente_id ?? null,
-                realizada: p.realizada,
-                respostas: p.respostas,
-              })),
-            }),
-          );
-          avisarTarefasQueFalharam(falhas);
+          if (r.avisoDaTarefa) toast.warning(r.avisoDaTarefa);
           onOpenChange(false);
         },
         onError: () => toast.error('Não foi possível criar a rota de visita.'),

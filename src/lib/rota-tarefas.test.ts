@@ -117,6 +117,20 @@ describe('tarefasDaRotaConcluida — ao EDITAR a rota (transição)', () => {
     expect(tarefas).toEqual([]);
   });
 
+  it('🔴 parada NOVA (sem grupoId) marcada realizada na edição NÃO gera tarefa', () => {
+    // Rede de defesa: uma parada acrescentada durante a edição é gravada pelo caminho de INSERIR,
+    // que a força a não-realizada. A tela já esconde o "já realizada" dela; mesmo que isso
+    // regredisse e ela chegasse aqui como realizada, a função não pode inventar uma tarefa para
+    // uma visita que ficou planejada.
+    const tarefas = tarefasDaRotaConcluida({
+      editando: true,
+      jaRealizada: false,
+      paradas: [parada({ grupoId: undefined, realizada: true })],
+      paradasGravadas: [],
+    });
+    expect(tarefas).toEqual([]);
+  });
+
   it('numa rota mista, só a parada que passou a realizada gera tarefa', () => {
     const tarefas = tarefasDaRotaConcluida({
       editando: true,
