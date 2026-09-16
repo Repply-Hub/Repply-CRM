@@ -230,14 +230,15 @@ describe('a tabela do time', () => {
   }, 15_000);
 
   /**
-   * Sem a chave `pauta_de_todos` o servidor só manda os negócios da própria pessoa, então a
-   * coluna repetiria o mesmo nome em todas as linhas. Esconder aqui é COSMÉTICO — o corte de
-   * verdade é o da função de banco (CLAUDE.md §6.1).
+   * Desde 16/09/2026 a coluna Responsável aparece SEMPRE (pedido do Lucas), com e sem a chave
+   * `pauta_de_todos`. Sem a chave, o servidor só manda os negócios da própria pessoa, então a
+   * coluna mostra o rosto dela mesma em toda linha — que é o que o Lucas pediu ver. O corte de
+   * quem vê o quê continua sendo o da função de banco (CLAUDE.md §6.1), não esta coluna.
    */
-  it('a coluna Responsável só existe para quem tem a chave', async () => {
+  it('a coluna Responsável aparece com e sem a chave', async () => {
     montar({}, false);
     await screen.findByText('Negócio 0');
-    expect(screen.queryByRole('columnheader', { name: 'Responsável' })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: 'Responsável' })).toBeInTheDocument();
 
     cleanup();
     montar({}, true);
@@ -373,10 +374,12 @@ describe('a tabela do time', () => {
       }
     });
 
-    it('sem a chave, não há círculo de dono', async () => {
+    it('sem a chave, o círculo do dono também aparece — é o próprio usuário', async () => {
       montar({}, false);
       await screen.findByText('Negócio 0');
-      expect(screen.queryByText('AS')).toBeNull();
+      // Sem a chave o servidor manda só os negócios da própria pessoa, então o rosto (aqui, as
+      // iniciais, porque o jsdom não carrega a foto) aparece em toda linha — o que o Lucas pediu.
+      expect(await screen.findAllByText('AS')).toHaveLength(10);
     });
 
     it('"Abrir negócio" é o botão principal, laranja como na pauta', async () => {
@@ -405,14 +408,15 @@ describe('as larguras da tabela do time', () => {
     return Array.from(container.querySelectorAll('col')) as HTMLElement[];
   }
 
-  it('🔴 por padrão a soma cabe no espaço da tabela na página: 926 px, com e sem a coluna Responsável', async () => {
+  it('🔴 por padrão a soma cabe no espaço da tabela na página: 926 px', async () => {
     const com = montar({}, true);
     expect(await colunas(com.container)).toHaveLength(7);
     expect((com.container.querySelector('table') as HTMLElement).style.width).toBe('926px');
 
     cleanup();
+    // A coluna Responsável aparece sempre agora: sem a chave a tabela tem a MESMA forma (7 colunas).
     const sem = montar({}, false);
-    expect(await colunas(sem.container)).toHaveLength(6);
+    expect(await colunas(sem.container)).toHaveLength(7);
     expect((sem.container.querySelector('table') as HTMLElement).style.width).toBe('926px');
   });
 

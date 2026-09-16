@@ -39,8 +39,10 @@ import { useNegociosEmRisco, type NegocioEmRisco } from '@/hooks/use-dashboard';
  *
  * 🔴 QUEM VÊ O QUÊ É DECIDIDO NO SERVIDOR. A função pergunta `eu_vejo_pauta_de_todos()`: com a
  * chave `pauta_de_todos`, a empresa inteira; sem ela, só os próprios negócios. A coluna
- * "Responsável" some quando a pessoa não tem a chave, mas isso é COSMÉTICO (CLAUDE.md §6.1) —
- * sem a chave ela repetiria o mesmo nome em todas as linhas, porque só vêm os negócios dela.
+ * "Responsável" aparece nos DOIS casos (pedido do Lucas, 16/09/2026): sem a chave ela mostra o
+ * rosto da própria pessoa em toda linha — o servidor já devolve `responsavel`/`responsavel_avatar`
+ * de todo jeito. O que muda com a chave é só o TÍTULO do cartão ("Seus negócios" x "Negócios da
+ * equipe"), nunca o corte de acesso — esse é da função de banco (CLAUDE.md §6.1).
  *
  * Sem filtro de período, igual ao resto do painel "No geral": negócio aberto parado há meses
  * continua sendo risco hoje.
@@ -92,24 +94,16 @@ const COLUNAS_COM_RESPONSAVEL: ColunaAjustavel[] = [
   { chave: 'acoes', padrao: 260, minima: 260 },
 ];
 
-const COLUNAS_SEM_RESPONSAVEL: ColunaAjustavel[] = [
-  { chave: 'negocio', padrao: 238, minima: 120 },
-  { chave: 'fabricante', padrao: 100, minima: 56 },
-  { chave: 'etapa', padrao: 100, minima: 56 },
-  { chave: 'valor', padrao: 144, minima: 110 },
-  { chave: 'dias', padrao: 84, minima: 70 },
-  { chave: 'acoes', padrao: 260, minima: 260 },
-];
-
 /**
- * Uma chave por forma da tabela: as larguras de uma não servem na outra.
+ * A chave onde este navegador guarda as larguras que a pessoa ajustou. Como a coluna Responsável
+ * aparece sempre (16/09/2026), há uma forma só de tabela.
  *
- * Mudou um `padrao` ali em cima (`COLUNAS_COM_RESPONSAVEL` ou `COLUNAS_SEM_RESPONSAVEL`)? Suba o
- * `_v1` das duas chaves para `_v2`: quem já ajustou a coluna tem a largura ANTIGA guardada neste
- * navegador, e ela continuaria valendo por cima do padrão novo sem a troca.
+ * Mudou um `padrao` de `COLUNAS_COM_RESPONSAVEL` ali em cima? Suba o `_v1` para `_v2`: quem já
+ * ajustou a coluna tem a largura ANTIGA guardada neste navegador, e ela continuaria valendo por
+ * cima do padrão novo sem a troca. O nome mantém o sufixo `_com_responsavel` de propósito — é onde
+ * as larguras já estão guardadas, e trocá-lo zeraria o ajuste de quem já mexeu.
  */
 const CHAVE_COM_RESPONSAVEL = 'repply_hoje_larguras_tabela_do_time_com_responsavel_v1';
-const CHAVE_SEM_RESPONSAVEL = 'repply_hoje_larguras_tabela_do_time_sem_responsavel_v1';
 
 /** Quanto cada toque de seta anda, para quem ajusta pelo teclado. */
 const PASSO_DO_TECLADO = 16;
@@ -221,10 +215,10 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
   // graça: `ordem` entra na `chaveDoRecorte` abaixo, que já zera o "Ver mais" quando ela muda.
   const ordenarPor = (coluna: string, ascendente: boolean) => setOrdem({ coluna, ascendente });
 
-  // As larguras das colunas: uma lista para cada forma da tabela, e o ajuste guardado neste
-  // navegador. Ver `COLUNAS_COM_RESPONSAVEL` e `src/lib/larguras-de-colunas.ts`.
-  const colunas = podeVerDeTodos ? COLUNAS_COM_RESPONSAVEL : COLUNAS_SEM_RESPONSAVEL;
-  const chaveGuardada = podeVerDeTodos ? CHAVE_COM_RESPONSAVEL : CHAVE_SEM_RESPONSAVEL;
+  // As larguras das colunas, com o ajuste guardado neste navegador. A coluna Responsável aparece
+  // sempre, então há uma forma só. Ver `COLUNAS_COM_RESPONSAVEL` e `src/lib/larguras-de-colunas.ts`.
+  const colunas = COLUNAS_COM_RESPONSAVEL;
+  const chaveGuardada = CHAVE_COM_RESPONSAVEL;
   const [larguras, setLarguras] = useState(() => lerLarguras(chaveGuardada, colunas));
 
   // A forma da tabela muda quando a chave `pauta_de_todos` chega depois da primeira pintura ou
@@ -434,8 +428,8 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
         ) : (
           <>
             {/* 🔴 A ROLAGEM HORIZONTAL É DESTA CAIXA, NUNCA DA PÁGINA. Desde 14/09/2026 cada coluna
-                tem largura própria (`table-layout: fixed`, larguras em `COLUNAS_COM_RESPONSAVEL` e
-                `COLUNAS_SEM_RESPONSAVEL`), escolhidas para a soma caber no espaço da tabela na
+                tem largura própria (`table-layout: fixed`, larguras em `COLUNAS_COM_RESPONSAVEL`),
+                escolhidas para a soma caber no espaço da tabela na
                 página. A caixa só rola quando a pessoa alarga colunas além desse espaço — e rola por
                 dentro, com o resto da tela parado (parente do CLAUDE.md §7.11: transbordo é o que
                 prende o usuário). Antes, com a largura automática, o navegador repartia o espaço
@@ -462,8 +456,7 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
                     {titulo(coluna('negocio'), 'Negócio', 'left', 'negocio', 'A → Z', 'Z → A')}
                     {titulo(coluna('fabricante'), 'Fabricante', 'left', 'fabricante', 'A → Z', 'Z → A')}
                     {titulo(coluna('etapa'), 'Etapa', 'left', 'etapa', 'A → Z', 'Z → A')}
-                    {podeVerDeTodos &&
-                      titulo(coluna('responsavel'), 'Responsável', 'left', 'responsavel', 'A → Z', 'Z → A')}
+                    {titulo(coluna('responsavel'), 'Responsável', 'left', 'responsavel', 'A → Z', 'Z → A')}
                     {titulo(coluna('valor'), 'Valor', 'right', 'valor', 'Menor valor primeiro', 'Maior valor primeiro')}
                     {titulo(coluna('dias'), 'Sem mexer há', 'right', 'dias', 'Menos dias primeiro', 'Mais dias primeiro')}
                     <th className="px-2 py-2 text-right font-semibold">
@@ -498,26 +491,24 @@ export function TabelaDoTime({ empresaId, filtros, podeVerDeTodos, onAbrir, onRe
                       <td className="truncate px-2 py-2 text-muted-foreground" title={n.etapa ?? undefined}>
                         {n.etapa ?? '—'}
                       </td>
-                      {podeVerDeTodos && (
-                        <td className="px-2 py-2 text-card-foreground">
-                          {/* O rosto do dono; sem foto, as iniciais — o mesmo círculo do campo de
-                              responsáveis do negócio (`CampoDeResponsaveis`). `AvatarFallback`
-                              também cobre a foto que demora ou falha ao carregar. */}
-                          <span className="flex min-w-0 items-center gap-2">
-                            <Avatar className="h-7 w-7 shrink-0">
-                              {n.responsavel_avatar && (
-                                <AvatarImage src={n.responsavel_avatar} alt="" className="h-full w-full object-cover" />
-                              )}
-                              <AvatarFallback className="bg-muted text-[10px] font-medium text-muted-foreground">
-                                {iniciais(n.responsavel ?? '')}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="truncate" title={n.responsavel ?? undefined}>
-                              {n.responsavel ?? '—'}
-                            </span>
+                      <td className="px-2 py-2 text-card-foreground">
+                        {/* O rosto do dono; sem foto, as iniciais — o mesmo círculo do campo de
+                            responsáveis do negócio (`CampoDeResponsaveis`). `AvatarFallback`
+                            também cobre a foto que demora ou falha ao carregar. */}
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Avatar className="h-7 w-7 shrink-0">
+                            {n.responsavel_avatar && (
+                              <AvatarImage src={n.responsavel_avatar} alt="" className="h-full w-full object-cover" />
+                            )}
+                            <AvatarFallback className="bg-muted text-[10px] font-medium text-muted-foreground">
+                              {iniciais(n.responsavel ?? '')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="truncate" title={n.responsavel ?? undefined}>
+                            {n.responsavel ?? '—'}
                           </span>
-                        </td>
-                      )}
+                        </span>
+                      </td>
                       <td
                         className="truncate px-2 py-2 text-right font-mono font-semibold tabular-nums text-card-foreground"
                         title={n.valor === null ? undefined : formatarMoedaBRL(n.valor)}
