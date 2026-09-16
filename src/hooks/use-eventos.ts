@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { DiferencaDaRota } from '@/lib/rota-em-edicao';
 import type { PeriodoDoCalendario } from '@/lib/periodo-do-calendario';
+import { contatoApareceNoCalendario } from '@/lib/contato-no-calendario';
 import { useAuth } from './use-auth';
 import type { CalendarEvent, CalendarType, EventoForm } from '@/components/calendar/types';
 import { CALENDAR_COLORS } from '@/components/calendar/types';
@@ -202,6 +203,9 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>, periodo: 
       // Próximos contatos
       (contatos as unknown as ContatoCalendario[])?.forEach((c) => {
         if (!c.proximo_contato_em) return;
+        // O "Retomar depois" (tipo='retorno') não vira mais marcador no calendário — só
+        // sincroniza com Tarefas. A coluna segue gravada (é o que devolve o negócio à pauta).
+        if (!contatoApareceNoCalendario(c.tipo)) return;
         const start = new Date(c.proximo_contato_em);
         const end = new Date(start.getTime() + 30 * 60 * 1000);
         result.push({
