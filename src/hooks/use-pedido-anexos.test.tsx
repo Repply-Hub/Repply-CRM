@@ -151,7 +151,8 @@ describe('useAnexosDoNegocio', () => {
 
 describe('useAdicionarAnexo', () => {
   it('o arquivo sobe para a pasta da empresa e a linha guarda nome, tipo e tamanho', async () => {
-    const { wrapper } = envolver();
+    const { wrapper, client } = envolver();
+    const invalidou = vi.spyOn(client, 'invalidateQueries');
     const { result } = renderHook(() => useAdicionarAnexo(PEDIDO), { wrapper });
 
     const arquivoEnviado = arquivo('Orçamento Obra Exemplo.pdf', 2 * 1024 * 1024, 'application/pdf');
@@ -182,6 +183,9 @@ describe('useAdicionarAnexo', () => {
       criadoEm: '2026-09-17T10:00:00.000Z',
     });
     expect(toastSucesso).toHaveBeenCalled();
+    // A lista da tela precisa se atualizar — sem esta invalidação, o anexo novo não aparece até
+    // recarregar. Sem este assert, apagar a invalidação passaria despercebido.
+    expect(invalidou).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['pedido_anexos', PEDIDO] }));
   });
 
   it('🔴 arquivo recusado não sobe nem grava linha', async () => {
@@ -244,17 +248,34 @@ describe('useAdicionarAnexo', () => {
     expect(toastErro.mock.calls[0][0]).toMatch(/foi enviado/i);
     expect(toastErro.mock.calls[0][0]).toMatch(/não ficou/i);
   });
+
+  it('🔴 upload falhou: não grava linha nenhuma (não deixa negócio apontando para arquivo que não subiu)', async () => {
+    respostaDoEnvio = { error: { message: 'balde fora do ar' } };
+    const { wrapper } = envolver();
+    const { result } = renderHook(() => useAdicionarAnexo(PEDIDO), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync(arquivo('orcamento.pdf', 10_000, 'application/pdf')).catch(() => {});
+    });
+
+    expect(enviou).toHaveBeenCalled();
+    expect(gravouLinha).not.toHaveBeenCalled();
+    expect(toastSucesso).not.toHaveBeenCalled();
+  });
 });
 
 describe('useRemoverAnexo', () => {
   it('remove a linha e invalida a lista', async () => {
-    const { wrapper } = envolver();
+    const { wrapper, client } = envolver();
+    const invalidou = vi.spyOn(client, 'invalidateQueries');
     const { result } = renderHook(() => useRemoverAnexo(PEDIDO), { wrapper });
 
     await act(async () => { await result.current.mutateAsync('anexo-1'); });
 
     expect(pediuRemocao).toHaveBeenCalledWith({ count: 'exact' });
     expect(toastSucesso).toHaveBeenCalled();
+    // A lista se atualiza depois de tirar — o teste prova a invalidação, não só o nome dele.
+    expect(invalidou).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['pedido_anexos', PEDIDO] }));
   });
 
   it('🔴 tirar anexo que a regra do banco recusa NÃO diz que removeu', async () => {
