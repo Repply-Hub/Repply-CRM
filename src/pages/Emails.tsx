@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import {
   Mail,
   MailOpen,
+  MailCheck,
   Send,
   Inbox,
   Search,
@@ -2685,7 +2686,11 @@ const Emails = () => {
                               selectedIds.includes(email.id) && "sm:opacity-100",
                             )}
                           >
-                            {email.lido && (
+                            {/* Alterna lido/não-lido no hover, à esquerda do
+                              excluir: e-mail lido ganha "marcar não lida", e o
+                              não-lido ganha o inverso, "marcar lida" (padrão
+                              Gmail — a ação oposta ao estado atual). */}
+                            {email.lido ? (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -2698,6 +2703,20 @@ const Emails = () => {
                                 aria-label="Marcar como não lida"
                               >
                                 <MailOpen className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  marcarLido(email.id);
+                                }}
+                                title="Marcar como lida"
+                                aria-label="Marcar como lida"
+                              >
+                                <MailCheck className="h-4 w-4" />
                               </Button>
                             )}
                             <Button
