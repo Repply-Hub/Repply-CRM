@@ -377,6 +377,42 @@ describe('mensagemDaRota — a análise da visita embaixo da obra', () => {
     expect(linhaDaAnalise.trimStart().startsWith('-')).toBe(false);
   });
 
+  it('🔴 observação com várias linhas indenta CADA linha (nenhuma solta começando com "-")', () => {
+    // `visitaObservacao` é um campo de texto multi-linha; quem escreve em tópicos gera uma string
+    // só com `\n` dentro. Cada linha tem de sair com recuo — senão a de dentro fica colada à
+    // esquerda e, se começar com "-", o WhatsApp a transforma em item de lista solto.
+    const texto = mensagemDaRota({
+      data: new Date('2026-09-12T12:00:00'),
+      paradas: [
+        {
+          nome: 'Obra Exemplo',
+          horario: new Date('2026-09-12T09:00:00'),
+          analise: ['Obs.: Obra parada, motivos:\n- falta material\n- cliente sem verba'],
+        },
+      ],
+    });
+    const linhas = texto.split('\n');
+    const daAnalise = linhas.filter(
+      (l) => l.includes('Obra parada') || l.includes('falta material') || l.includes('cliente sem verba'),
+    );
+    expect(daAnalise).toHaveLength(3);
+    for (const l of daAnalise) {
+      // O que impede o WhatsApp de virar lista é a linha COMEÇAR com espaço, não com "-". O "-"
+      // que o vendedor digitou como tópico continua ali no meio do texto — não pode sumir; só
+      // não pode estar no começo da linha crua.
+      expect(l.startsWith('   ')).toBe(true);
+      expect(l.startsWith('-')).toBe(false);
+    }
+  });
+
+  it('análise que não é array não derruba a mensagem (sai como sem análise)', () => {
+    const paradas: ParadaDaRota[] = [{ nome: 'Obra Exemplo', horario: new Date('2026-09-12T09:00:00') }];
+    // @ts-expect-error — de propósito: valor não-iterável vindo "de fora".
+    const comLixo = mensagemDaRota({ data: new Date('2026-09-12T12:00:00'), paradas: [{ ...paradas[0], analise: {} }] });
+    const semCampo = mensagemDaRota({ data: new Date('2026-09-12T12:00:00'), paradas });
+    expect(comLixo).toBe(semCampo);
+  });
+
   it('o link continua sozinho na última linha, DEPOIS da análise', () => {
     const texto = mensagemDaRota({
       data: new Date('2026-09-12T12:00:00'),
