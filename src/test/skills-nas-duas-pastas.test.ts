@@ -39,6 +39,10 @@ describe("as skills estão iguais nas duas pastas", () => {
     expect(dosAgents).toEqual(daClaude);
   });
 
+  // Folga de 20s (3º argumento do it): este caso lê o conteúdo de dezenas de
+  // arquivos de skill. Sob carga (bateria inteira + tsc em paralelo) a leitura
+  // passa dos 5s padrão do vitest, e o guarda derrubava a bateria por flake de
+  // I/O, não por diferença real de conteúdo.
   it("cada arquivo tem o mesmo conteúdo nas duas pastas", () => {
     // Só confere os que existem nas duas (o teste acima cobre os que faltam),
     // para a mensagem de erro apontar a DIFERENÇA de conteúdo, não a ausência.
@@ -51,7 +55,7 @@ describe("as skills estão iguais nas duas pastas", () => {
     // Se falhar: editaram uma skill numa pasta e não na outra.
     // Rode `npm run skills:sincronizar` e commite as duas.
     expect(diferentes).toEqual([]);
-  });
+  }, 20000);
 
   it("há pelo menos uma skill em cada pasta (a trava não está medindo o vazio)", () => {
     expect(daClaude.length).toBeGreaterThan(0);
