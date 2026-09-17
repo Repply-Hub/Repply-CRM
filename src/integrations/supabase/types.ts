@@ -4715,6 +4715,26 @@ export type Database = {
           usuario_nome: string
         }[]
       }
+      cancelar_retorno: {
+        Args: { p_pedido_id: string }
+        Returns: {
+          retornos_removidos: number
+          tarefas_removidas: number
+        }[]
+      }
+      dashboard_agendados: {
+        Args: {
+          p_etapas?: string[]
+          p_fabricante_ids?: string[]
+          p_funil_id?: string
+          p_usuario_ids?: string[]
+        }
+        Returns: {
+          agendados_por_vendedor: Json
+          qtd_total: number
+          valor_total: number
+        }[]
+      }
       dashboard_negocios_risco: {
         Args: {
           p_data_ate?: string
@@ -4813,6 +4833,59 @@ export type Database = {
       montar_permissoes_preset_padrao: {
         Args: { p_preset_key: string }
         Returns: Json
+      }
+      negocios_agendados: {
+        Args: {
+          p_ascendente?: boolean
+          p_deslocamento?: number
+          p_etapas?: string[]
+          p_fabricante_ids?: string[]
+          p_funil_id?: string
+          p_limite?: number
+          p_ordenar_por?: string
+          p_usuario_ids?: string[]
+        }
+        Returns: {
+          data_retorno: string | null
+          etapa: string | null
+          fabrica: string | null
+          id: string
+          nome: string
+          responsavel: string | null
+          responsavel_avatar: string | null
+          responsavel_id: string
+          tentativas: number
+          total_geral: number
+          valor: number
+          valor_geral: number
+        }[]
+      }
+      negocios_agendados_de: {
+        Args: {
+          p_ascendente?: boolean
+          p_deslocamento?: number
+          p_etapas?: string[]
+          p_fabricante_ids?: string[]
+          p_funil_id?: string
+          p_limite?: number
+          p_ordenar_por?: string
+          p_usuario_id: string
+          p_usuario_ids?: string[]
+        }
+        Returns: {
+          data_retorno: string | null
+          etapa: string | null
+          fabrica: string | null
+          id: string
+          nome: string
+          responsavel: string | null
+          responsavel_avatar: string | null
+          responsavel_id: string
+          tentativas: number
+          total_geral: number
+          valor: number
+          valor_geral: number
+        }[]
       }
       negocios_em_risco: {
         Args: {

@@ -158,3 +158,40 @@ export function useRegistrarRetorno() {
     },
   });
 }
+
+/**
+ * "Trazer de volta agora" — o inverso do `useRegistrarRetorno`. Desfaz o "Retomar depois" ATIVO
+ * de um negócio: a função de banco `cancelar_retorno` apaga o(s) registro(s) de retorno com data
+ * futura e a tarefa que eles criaram, e o negócio volta na hora para "pedem atenção" (a contagem
+ * de tentativas cai o tanto que foi desfeito). A permissão é conferida no servidor
+ * (`posso_agir_no_negocio`), como no registrar.
+ *
+ * Sobe o erro do Supabase CRU, de propósito: a tela traduz com `mensagemDeErroDaFunction`, e é o
+ * `code` que separa "empresa bloqueada" (42501) de "não havia agendamento" (P0001).
+ */
+export function useCancelarRetorno() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (args: { pedidoId: string }) => {
+      const { error } = await supabase.rpc('cancelar_retorno', { p_pedido_id: args.pedidoId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      // As mesmas telas que o `registrar_retorno` mexe, agora ao contrário: o negócio SAI dos
+      // agendados e VOLTA para a pauta / "pedem atenção", a tarefa some, e o retorno some do
+      // histórico e do calendário. As chaves são o par que `useRegistrarRetorno` invalida, mais
+      // as duas do bloco de agendados.
+      qc.invalidateQueries({ queryKey: ['pauta-do-dia'] });
+      qc.invalidateQueries({ queryKey: ['historico_contatos'] });
+      qc.invalidateQueries({ queryKey: ['contatos-calendario'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_negocios_risco'] });
+      qc.invalidateQueries({ queryKey: ['negocios_em_risco'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_agendados'] });
+      qc.invalidateQueries({ queryKey: ['negocios_agendados'] });
+      qc.invalidateQueries({ queryKey: ['tarefas'] });
+      qc.invalidateQueries({ queryKey: ['tarefas_por_pedido'] });
+      qc.invalidateQueries({ queryKey: ['notificacoes'] });
+    },
+  });
+}

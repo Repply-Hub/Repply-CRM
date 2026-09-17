@@ -9,6 +9,7 @@ import { formatarMoedaBRL } from '@/lib/moeda';
 import { useDashboardNegociosRisco, type NegocioEmRisco } from '@/hooks/use-dashboard';
 import { BarraDeFiltros } from '@/components/pauta/BarraDeFiltros';
 import { TabelaDoTime } from '@/components/pauta/TabelaDoTime';
+import { AgendadosParaRetornar } from '@/components/pauta/AgendadosParaRetornar';
 import { MOLDURA_DA_PAUTA } from '@/components/pauta/moldura-da-pauta';
 import { recorteParaOServidor, type FiltrosDoPainel } from '@/lib/filtros-do-painel';
 
@@ -316,6 +317,16 @@ export function RadarDeRisco({
           </CardContent>
         </Card>
       </div>
+
+      {/* A faixa "Agendados para retornar", no FIM do Radar (pedido do dono do produto, 17/09):
+          os negócios adiados por "Retomar depois", recolhidos numa sanfona. É o outro lado da
+          moeda de "pedem atenção". Mesmo recorte e mesmo `onAbrir` da tabela do time. */}
+      <AgendadosParaRetornar
+        empresaId={empresaId}
+        filtros={recorte}
+        podeVerDeTodos={podeFiltrarPorResponsavel}
+        onAbrir={onAbrirNegocio}
+      />
     </div>
     </section>
   );

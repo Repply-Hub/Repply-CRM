@@ -29,6 +29,9 @@ vi.mock('@/hooks/use-dashboard', () => ({
 vi.mock('@/components/pauta/TabelaDoTime', () => ({
   TabelaDoTime: () => <div data-testid="tabela-do-time" />,
 }));
+vi.mock('@/components/pauta/AgendadosParaRetornar', () => ({
+  AgendadosParaRetornar: () => <div data-testid="agendados-para-retornar" />,
+}));
 vi.mock('@/components/pauta/BarraDeFiltros', () => ({
   BarraDeFiltros: () => <div data-testid="barra-de-filtros" />,
 }));
@@ -66,6 +69,13 @@ describe('a ordem do Radar', () => {
   it('os três cartões de risco continuam no topo, antes da tabela', () => {
     desenhar();
     expect(vemAntes(screen.getByText('Negócios Parados'), screen.getByTestId('tabela-do-time'))).toBe(true);
+  });
+
+  it('a faixa de "Agendados para retornar" vem DEPOIS dos dois gráficos, no fim', () => {
+    desenhar();
+    const agendados = screen.getByTestId('agendados-para-retornar');
+    expect(vemAntes(screen.getByText(/Risco por Vendedor/), agendados)).toBe(true);
+    expect(vemAntes(screen.getByText(/Resumo por fabricante/), agendados)).toBe(true);
   });
 });
 

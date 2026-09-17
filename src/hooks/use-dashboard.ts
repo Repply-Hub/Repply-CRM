@@ -310,6 +310,94 @@ export function useNegociosEmRisco(
   });
 }
 
+// ── Agendados para retornar ────────────────────────────────────────────────
+// Os negócios adiados por "Retomar depois" (com data de retorno FUTURA). É o outro lado da moeda
+// de `useNegociosEmRisco`/`useDashboardNegociosRisco`: quem sai de "pedem atenção" por ter um
+// retorno agendado aparece AQUI, até a data chegar. Espelha aquelas duas, trocando "dias parado"
+// por "data de retorno". O corte por chave `pauta_de_todos` fica no servidor (a função devolve só
+// os próprios para quem não vê a pauta toda, e o resumo por vendedor vem vazio).
+
+export interface DashboardAgendados {
+  qtd_total: number;
+  valor_total: number;
+  // Vem vazio ([]) para quem não vê a pauta toda — a RPC filtra por `eu_vejo_pauta_de_todos()`,
+  // não é omissão do front. Mesmo contrato de `risco_por_vendedor`.
+  agendados_por_vendedor: { vendedor: string; qtd: number; valor: number }[];
+}
+
+export function useDashboardAgendados(
+  empresaId?: string,
+  filters?: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; etapas?: string[] },
+) {
+  const { usuarioIds, fabricanteIds, funilId, etapas } = filters ?? {};
+  return useQuery({
+    queryKey: ['dashboard_agendados', empresaId, usuarioIds, fabricanteIds, funilId, etapas],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('dashboard_agendados', {
+        p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
+        p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
+        p_funil_id: funilId ?? null,
+        p_etapas: etapas && etapas.length > 0 ? etapas : null,
+      });
+      if (error) throw error;
+      const row = (data as unknown as DashboardAgendados[] | null)?.[0];
+      return (row ?? { qtd_total: 0, valor_total: 0, agendados_por_vendedor: [] }) as DashboardAgendados;
+    },
+    enabled: !!empresaId,
+    placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTS,
+  });
+}
+
+// Uma linha da tabela de agendados. Espelha `NegocioEmRisco`, trocando `dias_parado` por
+// `data_retorno` (a data em que o negócio volta). `valor_geral` é o "valor guardado" do recorte.
+export type NegocioAgendado = {
+  id: string;
+  nome: string;
+  fabrica: string | null;
+  etapa: string | null;
+  responsavel: string | null;
+  responsavel_id?: string | null;
+  responsavel_avatar?: string | null;
+  valor: number | null;
+  /** A data em que o negócio volta (o `proximo_contato_em` futuro mais distante). */
+  data_retorno: string | null;
+  total_geral: number;
+  /** O valor "guardado" do recorte inteiro (soma), repetido em toda linha. */
+  valor_geral?: number;
+  tentativas?: number;
+};
+
+export function useNegociosAgendados(
+  empresaId: string | undefined,
+  filtros: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; etapas?: string[]; ordenarPor?: string; ascendente?: boolean },
+  quantos: number,
+) {
+  const { usuarioIds, fabricanteIds, funilId, etapas, ordenarPor, ascendente } = filtros;
+  return useQuery({
+    queryKey: ['negocios_agendados', empresaId, usuarioIds, fabricanteIds, funilId, etapas, ordenarPor, ascendente, quantos],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('negocios_agendados', {
+        p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
+        p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
+        p_funil_id: funilId ?? null,
+        p_etapas: etapas && etapas.length > 0 ? etapas : null,
+        p_limite: quantos,
+        p_deslocamento: 0,
+        // Padrão: quem volta antes primeiro (data de retorno crescente).
+        p_ordenar_por: ordenarPor ?? 'data_retorno',
+        p_ascendente: ascendente ?? true,
+      });
+      if (error) throw error;
+      const linhas = (data ?? []) as NegocioAgendado[];
+      return { linhas, total: Number(linhas[0]?.total_geral ?? 0) };
+    },
+    enabled: !!empresaId,
+    placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTS,
+  });
+}
+
 export interface DashboardWhatsappStats {
   conversas_abertas: number;
   conversas_fechadas: number;
