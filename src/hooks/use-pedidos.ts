@@ -677,20 +677,19 @@ export function usePedidosPorCliente(clienteId?: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pedidos')
-        .select(`
-          id, status, nome, valor_total, data_pedido, created_at, observacoes,
-          cliente_id, fabricante_id, usuario_id, obra_id, funil_id, endereco_entrega, campos_extras, prazo_resposta, pdf_url, marcador_id,
-          cliente:clientes(id, empresa),
-          fabricante:fabricantes(id, nome),
-          vendedor:usuarios!pedidos_vendedor_id_fkey(id, nome, empresa_id),
-          obra:obras(id, nome_obra),
-          marcador:marcadores(id, nome, cor)
-        `)
+        // O MESMO select da lista principal (`montarSelectDeNegocios`), não uma cópia à mão. Era
+        // uma cópia que ficou para trás: sem o embed `anexos`, a coluna "Anexo" da ficha do
+        // cliente/contato mostraria "—" mesmo com anexo, e sem `origem_lead` a cópia do negócio
+        // (`copiaDe`) abriria com a origem em branco. Divergir de novo é o buraco que a função
+        // compartilhada fecha (AGENTS.md §2).
+        .select(montarSelectDeNegocios())
         .eq('cliente_id', clienteId!)
         .order('created_at', { ascending: false })
         .order('id', { ascending: false });
       if (error) throw error;
-      return (data ?? []) as PedidoWithRelations[];
+      // `as unknown as`: o texto do `select` agora vem de `montarSelectDeNegocios()`, montado em
+      // tempo de execução, então o PostgREST não infere o tipo do retorno (mesmo motivo da lista).
+      return (data ?? []) as unknown as PedidoWithRelations[];
     },
   });
 }
