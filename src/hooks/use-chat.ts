@@ -55,10 +55,18 @@ async function fetchMessages(grupoId: string | null, recipientId: string | null 
   const { data: me } = await supabase.from('usuarios').select('id').eq('user_id', user.id).single();
   if (!me) return [];
 
+  // 🔴 As 200 mensagens MAIS RECENTES, não as mais antigas. Antes era
+  // `ascending: true` + `limit(200)`, que traz as 200 PRIMEIRAS da conversa —
+  // e numa conversa com mais de 200 mensagens as novas caíam fora da janela e
+  // nunca apareciam no histórico (a pessoa enviava, o tempo real mostrava por
+  // um instante, o refetch invalidava e a mensagem "sumia"). Aconteceu no grupo
+  // "Notícias da empresa" da MD, o primeiro a passar de 200 (17/09/2026).
+  // Buscamos em ordem decrescente e invertemos abaixo, para a tela continuar
+  // recebendo em ordem cronológica (mais antiga em cima, mais nova embaixo).
   let query = supabase
     .from('chat_mensagens')
     .select('*, vendedor:usuarios!chat_mensagens_vendedor_id_fkey(id, nome, email, avatar_url)')
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(200);
 
   if (grupoId) {
@@ -73,7 +81,9 @@ async function fetchMessages(grupoId: string | null, recipientId: string | null 
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data as any) ?? [];
+  // Veio da mais nova para a mais antiga (ver o `order` acima); a tela espera o
+  // contrário. Inverter uma lista de no máximo 200 itens é irrelevante.
+  return ((data as any[]) ?? []).slice().reverse();
 }
 
 export function useChatMessages(grupoId: string | null = null, recipientId: string | null = null) {
