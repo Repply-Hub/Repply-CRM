@@ -3259,6 +3259,54 @@ export type Database = {
           },
         ]
       }
+      pedido_anexos: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          id: string
+          nome: string
+          pedido_id: string
+          tamanho_bytes: number | null
+          tipo: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          nome: string
+          pedido_id: string
+          tamanho_bytes?: number | null
+          tipo?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          nome?: string
+          pedido_id?: string
+          tamanho_bytes?: number | null
+          tipo?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_anexos_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_anexos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedido_responsaveis: {
         Row: {
           created_at: string
