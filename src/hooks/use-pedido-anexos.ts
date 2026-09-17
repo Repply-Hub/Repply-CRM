@@ -157,8 +157,9 @@ export function useHerdarAnexos(pedidoId: string) {
       // sem anexo nenhum é o caso mais comum.
       if (anexos.length === 0) return;
 
+      // `profile.id` é quem vai em `criado_por` (não é a empresa — o balde não é tocado aqui).
       if (!profile?.id) {
-        throw new Error('Sua empresa não foi identificada. Recarregue a página e tente de novo.');
+        throw new Error('Seu usuário não foi identificado. Recarregue a página e tente de novo.');
       }
 
       const { error } = await supabase.from('pedido_anexos').insert(

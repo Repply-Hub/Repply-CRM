@@ -889,11 +889,16 @@ function NovoNegocioFormContent({
                     <span className="text-xs font-normal text-muted-foreground">(Obrigatório)</span>
                   )}
                 </Label>
+                {/* 🔴 Travado (`somenteLeitura`) enquanto os anexos sobem depois de criar o negócio:
+                    o envio é um efeito que roda UMA vez com a lista daquele instante. Acrescentar um
+                    arquivo nessa janela o deixaria em `arquivosPendentes` sem nunca subir — e sem
+                    entrar no aviso de falha, porque ele nem chegou a ser tentado. */}
                 <CampoDeAnexos
                   anexos={anexosParaExibir}
                   onAdicionar={adicionarArquivoPendente}
                   onRemover={removerAnexoDoCadastro}
                   obrigatorio={obrigatorio('anexo_pdf', true)}
+                  somenteLeitura={isUploading}
                 />
               </div>
 

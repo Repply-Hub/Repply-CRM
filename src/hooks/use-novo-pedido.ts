@@ -56,7 +56,6 @@ export interface NovoPedidoPayload {
   origem_lead?: string;
   endereco_entrega?: string;
   observacoes?: string;
-  pdf_url?: string;
   valor_total?: number;
   proximo_contato?: string;
   campos_extras?: Record<string, string>;
@@ -85,9 +84,12 @@ export function useCreatePedidoCompleto() {
           status: payload.status || 'novo_lead',
           marcador_id: payload.marcador_id || null,
           observacoes: payload.observacoes || null,
-          pdf_url: payload.pdf_url || null,
-          // Aqui o `null` é seguro (diferente do formulário de edição): o campo "Data de
-          // Fechamento" é opcional e o negócio pode nascer já em Fechamento/Perdido. Se
+          // `pdf_url` NÃO é mais escrita: os anexos têm tabela própria (`pedido_anexos`), e o
+          // cadastro os grava depois de criar o negócio (pacote "vários anexos", 17/09/2026).
+
+          // O comentário abaixo é do `prazo_resposta`: aqui o `null` é seguro (diferente do
+          // formulário de edição). O campo "Data de Fechamento" é opcional e o negócio pode
+          // nascer já em Fechamento/Perdido. Se
           // vier vazio nessa situação, o gatilho `fn_set_pedido_fechado_em` (migration
           // 20260821120100) carimba a data de hoje no INSERT — sem isso o negócio nasceria
           // ganho e sem data, invisível em qualquer relatório por fechamento.
