@@ -4,6 +4,8 @@ import { useToast } from '@/hooks/use-toast';
 import { resolveClienteId, resolveFabricanteId, resolveMarcadorId, resetResolveCache, preloadResolveCache } from '@/lib/import/resolve-entities';
 import { computeRowHash } from '@/lib/import/row-hash';
 import { resolveEspelhoPdfUrls, type ResolvePdfResult } from '@/lib/import/resolve-pedido-pdf';
+import { enderecosDeAnexo, reagruparPorLinha } from '@/lib/import/anexos-da-planilha';
+import { nomeDoAnexo } from '@/lib/anexos-do-negocio';
 import { matchPedidoStatusToColuna, type ImportKanbanColuna } from '@/components/import-pedidos/importPedidosUtils';
 import type { AlteracaoDeNegocio } from '@/lib/import/alteracoes-por-codigo';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
@@ -52,6 +54,20 @@ export interface ImportSummary {
   ignored: number;
   motivosFalha: Record<string, number>;
 }
+
+/** Um anexo pronto para gravar: o endereço final (resolvido ou o cru) e se o download falhou. */
+interface AnexoImportado {
+  url: string;
+  falhaDownload: boolean;
+}
+
+/**
+ * O motivo com que um anexo não-gravado entra no relatório. 🔴 É AVISO, não recusa: o negócio
+ * FOI importado (por isso não conta em `ignored`), só o anexo não colou. Negócio sem anexo se
+ * recupera anexando pela tela; negócio não importado, não — por isso a falha do anexo nunca
+ * derruba a linha.
+ */
+const MOTIVO_ANEXO_NAO_GRAVADO = 'Anexo não gravado (o negócio foi importado; anexe pela tela)';
 
 /**
  * Extrai uma mensagem de erro legível de um erro do Postgres/PostgREST (ou de uma
@@ -181,16 +197,23 @@ export function useBulkImport() {
     // importação — usado pelo filtro `p_hide_importados`; NÃO é mais usado para deduplicar:
     // linha repetida é cadastrada mesmo assim), pré-carrega entidades, resolve PDFs de
     // cotação do Bitrix e busca as colunas do funil em paralelo — são independentes entre si.
+    // Um negócio pode ter VÁRIOS anexos: cada célula da coluna "Anexo" traz uma lista de
+    // endereços separados por vírgula. `resolveEspelhoPdfUrls` recebe uma lista achatada (um
+    // endereço por posição), então acho todos, resolvo de uma vez, e reagrupo por linha — o
+    // índice de cada endereço é quem diz a que linha ele volta.
+    const enderecosPorLinha = payload.map(r => enderecosDeAnexo(r.pdf_url));
+    const todosEnderecos = enderecosPorLinha.flat();
+
     let rowHashes: string[] = [];
-    let pdfResults: Array<ResolvePdfResult | undefined> = [];
+    let resolvidosAchatados: Array<ResolvePdfResult | undefined> = [];
     try {
-      [rowHashes, , pdfResults, kanbanColunas] = await Promise.all([
+      [rowHashes, , resolvidosAchatados, kanbanColunas] = await Promise.all([
         Promise.all(payload.map(computeRowHash)),
         preloadResolveCache(payload, vendedorId).catch((err: Error) => {
           console.error('Preload de entidades falhou, resolução linha-a-linha será usada como fallback:', err.message);
         }),
         empresaId
-          ? resolveEspelhoPdfUrls(payload.map(r => r.pdf_url as string | undefined), empresaId).catch((err: Error) => {
+          ? resolveEspelhoPdfUrls(todosEnderecos, empresaId).catch((err: Error) => {
               console.error('Resolução de PDFs de cotação falhou, links originais do Bitrix serão mantidos:', err.message);
               return [] as Array<ResolvePdfResult | undefined>;
             })
@@ -208,6 +231,19 @@ export function useBulkImport() {
       console.error('Erro ao computar hashes ou pré-carregar entidades:', (err as Error).message);
     }
 
+    // De volta por linha, cada endereço já no formato de gravação: o endereço final (o resolvido
+    // do Storage ou, quando não é do Bitrix / o download falhou, o cru — que ainda abre com o
+    // balde público) e se o download falhou (só para avisar em `campos_extras`).
+    const anexosPorLinha: AnexoImportado[][] = reagruparPorLinha(
+      enderecosPorLinha.map(l => l.length),
+      resolvidosAchatados,
+    ).map((resolvidos, li) =>
+      enderecosPorLinha[li].map((raw, ai) => {
+        const resolvido = resolvidos[ai];
+        return { url: resolvido?.url ?? raw, falhaDownload: resolvido?.falhaDownload ?? false };
+      }),
+    );
+
     let inserted = 0;
     let ignored = 0;
     const motivosFalha: Record<string, number> = {};
@@ -217,13 +253,13 @@ export function useBulkImport() {
       motivosFalha[key] = (motivosFalha[key] || 0) + 1;
     };
 
-    // Divide o payload (e os hashes/PDFs correspondentes) em lotes de PEDIDO_BATCH linhas
-    const batches: Array<{ rows: Record<string, unknown>[]; hashes: string[]; pdfResults: Array<ResolvePdfResult | undefined> }> = [];
+    // Divide o payload (e os hashes/anexos correspondentes) em lotes de PEDIDO_BATCH linhas
+    const batches: Array<{ rows: Record<string, unknown>[]; hashes: string[]; anexos: AnexoImportado[][] }> = [];
     for (let i = 0; i < payload.length; i += PEDIDO_BATCH) {
       batches.push({
         rows: payload.slice(i, i + PEDIDO_BATCH),
         hashes: rowHashes.slice(i, i + PEDIDO_BATCH),
-        pdfResults: pdfResults.slice(i, i + PEDIDO_BATCH),
+        anexos: anexosPorLinha.slice(i, i + PEDIDO_BATCH),
       });
     }
 
@@ -232,13 +268,19 @@ export function useBulkImport() {
      * e em caso de erro faz retry linha-a-linha.
      * Retorna os resultados parciais sem modificar estado React (thread-safe para Promise.all).
      */
-    async function processBatch(batch: Record<string, unknown>[], batchHashes: string[], batchPdfResults: Array<ResolvePdfResult | undefined>): Promise<{
+    async function processBatch(batch: Record<string, unknown>[], batchHashes: string[], batchAnexos: AnexoImportado[][]): Promise<{
       inserted: number;
       failures: Array<{ row: Record<string, unknown>; motivo: string; logToIgnoradas: boolean }>;
+      /** Anexos que não gravaram — o negócio ENTROU, só o anexo não (aviso, não recusa). */
+      anexosNaoGravados: number;
     }> {
       let batchInserted = 0;
+      let anexosNaoGravados = 0;
       const failures: Array<{ row: Record<string, unknown>; motivo: string; logToIgnoradas: boolean }> = [];
       const batchPayloads: Record<string, unknown>[] = [];
+      // Paralelo a `batchPayloads`: os anexos de cada negócio que passou na validação, para
+      // prendê-los DEPOIS que o negócio existir (o anexo precisa do id do negócio).
+      const anexosDosPayloads: AnexoImportado[][] = [];
 
       // Resolução de entidades por linha (sequencial dentro do lote; após preload são cache hits)
       for (let ri = 0; ri < batch.length; ri++) {
@@ -266,13 +308,13 @@ export function useBulkImport() {
           const marcadorNome = String(row.marcador ?? '').trim();
           const marcadorId = marcadorNome && empresaId ? await resolveMarcadorId(marcadorNome, empresaId) : undefined;
 
-          // Anexo do negócio: se veio do Bitrix, resolveEspelhoPdfUrls já tentou baixar e
-          // reidratar no Storage (resolveEspelhoPdfUrl). Falha no download não trava a
-          // linha — mantém o link original do Bitrix e sinaliza em campos_extras.
-          const rawPdfUrl = String(row.pdf_url ?? '').trim();
-          const pdfResult = batchPdfResults[ri];
+          // Anexos do negócio: se vieram do Bitrix, resolveEspelhoPdfUrls já tentou baixar e
+          // reidratar no Storage. Falha no download não trava a linha — mantém o link original e
+          // sinaliza em campos_extras. Eles são GRAVADOS depois do INSERT do negócio (precisam do
+          // id), como linhas de `pedido_anexos` — não mais na coluna `pdf_url`.
+          const anexosDaLinha = batchAnexos[ri] ?? [];
           const camposExtras: Record<string, string> = { ...(row.campos_extras as Record<string, string> ?? {}) };
-          if (pdfResult?.falhaDownload) {
+          if (anexosDaLinha.some(a => a.falhaDownload)) {
             camposExtras['Falha Anexo'] = 'Não foi possível baixar automaticamente o anexo do Bitrix; link original mantido.';
           }
 
@@ -291,21 +333,46 @@ export function useBulkImport() {
             usuario_id: (row.usuario_id as string | undefined) ?? vendedorId,
             campos_extras: camposExtras,
             import_hash: hash || null,
-            pdf_url: pdfResult?.url ?? (rawPdfUrl || null),
+            // 🔴 `pdf_url` NÃO é mais escrita: os anexos têm tabela própria (`pedido_anexos`) e
+            // são gravados abaixo, com o id do negócio. A coluna fica como rota de volta.
           });
+          anexosDosPayloads.push(anexosDaLinha);
         } catch (err) {
           failures.push({ row, motivo: (err as Error).message, logToIgnoradas: true });
         }
       }
 
-      if (batchPayloads.length === 0) return { inserted: batchInserted, failures };
+      if (batchPayloads.length === 0) return { inserted: batchInserted, failures, anexosNaoGravados };
 
-      // INSERT em lote — se lançar (não só retornar {error}), cai no retry linha-a-linha
-      // abaixo em vez de propagar e abortar o import inteiro silenciosamente.
+      // Prende os anexos de UM negócio recém-criado (uma linha de `pedido_anexos` por endereço).
+      // 🔴 Falha aqui NÃO derruba o negócio: ele já existe. Devolve quantos anexos não colaram,
+      // para virar aviso no relatório (o `criado_por` fica nulo e o `tipo` desconhecido, como na
+      // cópia que a migration fez dos anexos antigos — é dado importado, sem autor na tela).
+      async function gravarAnexos(pedidoId: string, anexos: AnexoImportado[]): Promise<number> {
+        if (anexos.length === 0) return 0;
+        const linhas = anexos.map(a => ({ pedido_id: pedidoId, url: a.url, nome: nomeDoAnexo(a.url) }));
+        try {
+          const { error } = await supabase.from('pedido_anexos').insert(linhas);
+          if (error) {
+            console.error('[import-pedidos] Anexos não gravados para o negócio', pedidoId, ':', error.message);
+            return anexos.length;
+          }
+          return 0;
+        } catch (err) {
+          console.error('[import-pedidos] Exceção ao gravar anexos do negócio', pedidoId, ':', (err as Error).message);
+          return anexos.length;
+        }
+      }
+
+      // INSERT em lote — pedindo os ids de volta (`.select('id')`), na ORDEM de entrada, para
+      // prender os anexos ao negócio certo. Se lançar (não só retornar {error}), cai no retry
+      // linha-a-linha abaixo em vez de propagar e abortar o import inteiro silenciosamente.
       let batchError: { message?: string; code?: string; details?: string; hint?: string } | null = null;
+      let idsInseridos: Array<{ id: string }> = [];
       try {
-        const { error } = await supabase.from('pedidos').insert(batchPayloads);
+        const { data, error } = await supabase.from('pedidos').insert(batchPayloads).select('id');
         batchError = error;
+        idsInseridos = (data ?? []) as Array<{ id: string }>;
       } catch (err) {
         console.error('[import-pedidos] INSERT em lote lançou exceção, caindo para retry linha-a-linha:', (err as Error).message);
         batchError = err as Error;
@@ -314,13 +381,15 @@ export function useBulkImport() {
       if (batchError) {
         // Lote falhou: retry linha-a-linha, cada uma isolada em seu próprio try/catch,
         // para que uma falha não impeça as demais linhas do lote de serem inseridas.
-        for (const pedidoRow of batchPayloads) {
+        for (let k = 0; k < batchPayloads.length; k++) {
+          const pedidoRow = batchPayloads[k];
           try {
-            const { error: rowError } = await supabase.from('pedidos').insert(pedidoRow);
+            const { data, error: rowError } = await supabase.from('pedidos').insert(pedidoRow).select('id').single();
             if (rowError) {
               failures.push({ row: pedidoRow, motivo: errorToMotivo(rowError, 'Falha desconhecida ao inserir negócio'), logToIgnoradas: true });
             } else {
               batchInserted++;
+              if (data?.id) anexosNaoGravados += await gravarAnexos(data.id, anexosDosPayloads[k]);
             }
           } catch (err) {
             failures.push({ row: pedidoRow, motivo: errorToMotivo(err, 'Falha desconhecida ao inserir negócio'), logToIgnoradas: true });
@@ -328,9 +397,15 @@ export function useBulkImport() {
         }
       } else {
         batchInserted += batchPayloads.length;
+        // Liga os anexos pelos ids devolvidos, na MESMA ordem do INSERT (o PostgREST devolve na
+        // ordem de entrada). Se vier menos id que payload — não deveria —, o que sobrar fica sem
+        // anexo: melhor o negócio sem anexo do que travar o import.
+        for (let k = 0; k < idsInseridos.length; k++) {
+          anexosNaoGravados += await gravarAnexos(idsInseridos[k].id, anexosDosPayloads[k]);
+        }
       }
 
-      return { inserted: batchInserted, failures };
+      return { inserted: batchInserted, failures, anexosNaoGravados };
     }
 
     setImporting(true);
@@ -343,7 +418,7 @@ export function useBulkImport() {
 
         const groupResults = await Promise.all(group.map(async (b) => {
           try {
-            return await processBatch(b.rows, b.hashes, b.pdfResults);
+            return await processBatch(b.rows, b.hashes, b.anexos);
           } catch (err) {
             // Defesa extra: mesmo um erro totalmente inesperado dentro de processBatch não
             // deve abortar os outros lotes em voo nem o restante do import. Isola o lote e
@@ -356,6 +431,7 @@ export function useBulkImport() {
                 motivo: errorToMotivo(err, 'Falha inesperada ao processar o lote'),
                 logToIgnoradas: true,
               })),
+              anexosNaoGravados: 0,
             };
           }
         }));
@@ -369,6 +445,11 @@ export function useBulkImport() {
             ignored++;
             trackFalha(motivo);
             if (logToIgnoradas) await logLinhaIgnorada('negocios', row, motivo, nomeArquivo);
+          }
+          // Anexos que não colaram entram no relatório como AVISO — sem `ignored++`, porque o
+          // negócio foi importado. A pessoa vê "N anexos não gravados" e anexa pela tela.
+          if (result.anexosNaoGravados > 0) {
+            motivosFalha[MOTIVO_ANEXO_NAO_GRAVADO] = (motivosFalha[MOTIVO_ANEXO_NAO_GRAVADO] ?? 0) + result.anexosNaoGravados;
           }
         }
 

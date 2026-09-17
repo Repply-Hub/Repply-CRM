@@ -1075,6 +1075,20 @@ export function ImportPedidosDialog({ open, onOpenChange }: ImportPedidosDialogP
                     {textoDoResumoDeAlteracoes(reencontro.resumo).map(frase => (
                       <p key={frase} className="text-[11px] leading-relaxed text-foreground">{frase}</p>
                     ))}
+                    {/* 🔴 A coluna Anexo vale só para negócio NOVO. Quando ela está mapeada e há
+                        linhas que já existem, a pessoa precisa saber, ANTES de confirmar, que os
+                        anexos desses negócios não serão tocados — é a garantia contra reimportar
+                        uma planilha antiga e apagar anexos acrescentados pela tela. */}
+                    {!!mapping.pdf_url && (
+                      <p className="text-[11px] leading-relaxed font-medium text-foreground">
+                        {reencontro.resumo.negocios.length === 1
+                          ? '1 negócio já existe e será atualizado: '
+                          : `${reencontro.resumo.negocios.length} negócios já existem e serão atualizados: `}
+                        <span className="text-primary">
+                          os anexos {reencontro.resumo.negocios.length === 1 ? 'dele' : 'deles'} não serão alterados.
+                        </span>
+                      </p>
+                    )}
                     <details className="text-[11px] text-muted-foreground">
                       <summary className="cursor-pointer select-none font-medium text-primary">
                         Ver o que muda nas primeiras linhas

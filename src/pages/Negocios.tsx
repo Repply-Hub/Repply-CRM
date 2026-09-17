@@ -1859,20 +1859,20 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         data_pedido: p => p.data_pedido ?? '',
         prazo_resposta: p => p.prazo_resposta ?? '',
         observacoes: p => p.observacoes ?? '',
-        // 🔴 NÃO ASSINE ESTE ENDEREÇO. Vai o valor gravado, cru, de propósito.
+        // 🔴 TODOS os anexos, separados por vírgula, CRUS — nunca assinados. Um negócio pode ter
+        // vários agora, e a coluna leva todos (a importação divide pela vírgula do outro lado).
         //
-        // Os cabeçalhos desta planilha são os mesmos que o assistente de importação
-        // reconhece — é isso que deixa exportar, ajustar no Excel e reimportar. E a
-        // importação GRAVA de volta em `pedidos.pdf_url` o que encontrar aqui
-        // (`resolve-pedido-pdf.ts`: endereço que não é do Bitrix passa intacto).
-        // Exportar um link assinado plantaria no banco, para sempre, um endereço que
-        // morre em uma hora — e ninguém veria, porque a importação não reclama.
+        // Os cabeçalhos desta planilha são os mesmos que o assistente de importação reconhece — é
+        // isso que deixa exportar, ajustar no Excel e reimportar. E a importação, ao CRIAR negócio
+        // novo, grava cada endereço como um anexo (`pedido_anexos`); para negócio que já existe,
+        // ignora a coluna (não mexe nos anexos dele). Endereço que não é do Bitrix passa intacto
+        // (`resolve-pedido-pdf.ts`). Exportar um link assinado plantaria no banco, para sempre, um
+        // endereço que morre em uma hora — e ninguém veria, porque a importação não reclama.
         //
-        // Consequência aceita: quando o balde fechar (Passo 7), este endereço deixa de
-        // abrir para quem receber a planilha. É o objetivo, não um efeito colateral —
-        // hoje qualquer pessoa com a planilha na mão baixa o orçamento sem estar logada.
-        // A ida e volta exportar → editar → reimportar continua funcionando.
-        pdf_url: p => p.pdf_url ?? '',
+        // Ordenado (mais novo em cima, como a coluna) para a exportação do mesmo negócio sair
+        // sempre igual. Consequência aceita: quando o balde fechar (Passo 7), estes endereços
+        // deixam de abrir para quem receber a planilha — é o objetivo, não efeito colateral.
+        pdf_url: p => ordenarAnexos(p.anexos ?? []).map(a => a.url).filter(Boolean).join(', '),
         // O identificador permanente do negócio. É o que permite exportar, anotar no Excel e
         // devolver ao CRM sem duplicar: sem esta coluna, a importação não tem como saber que a
         // linha é a mesma, e desde 03/09/2026 (23b3d6c9) não há mais deduplicação por conteúdo
