@@ -50,17 +50,15 @@ export function ehImagem(tipo?: string | null): boolean {
 
 /**
  * Tira o nome do arquivo do fim do endereço, com os espaços de volta.
- * `filenameFromUrl` já desfaz a codificação do último segmento; o `decodeURIComponent` extra
- * aqui é rede de segurança própria da lista de anexos — endereço herdado pode ter porcentagem
- * solta (`%` sozinho, sem dois dígitos depois) e isso não pode quebrar a lista inteira.
+ *
+ * 🔴 UMA decodificação só. `filenameFromUrl` já desfaz a codificação do último segmento (com o
+ * próprio `try/catch`, que devolve o rótulo de reserva quando o endereço tem porcentagem solta —
+ * `%` sem dois dígitos —, então a lista não quebra). Decodificar DE NOVO aqui corromperia, em
+ * silêncio, qualquer nome que contenha literalmente um escape: o arquivo `invoice%20discount.pdf`
+ * (gravado no endereço como `invoice%2520discount.pdf`) voltaria como `invoice discount.pdf`.
  */
 export function nomeDoAnexo(url: string): string {
-  const nome = filenameFromUrl(url, 'anexo.pdf');
-  try {
-    return decodeURIComponent(nome);
-  } catch {
-    return nome;
-  }
+  return filenameFromUrl(url, 'anexo.pdf');
 }
 
 /**
@@ -76,6 +74,8 @@ export function tamanhoLegivel(bytes?: number | null): string {
   }
 
   const kb = Math.round(bytes / 1024);
+  // Logo abaixo de 1 MB o arredondamento do KB chega a 1024 — aí "1,0 MB" lê melhor que "1024 KB".
+  if (kb >= 1024) return '1,0 MB';
   return `${kb} KB`;
 }
 

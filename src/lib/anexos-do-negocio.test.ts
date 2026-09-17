@@ -27,6 +27,12 @@ describe('recusaDoAnexo', () => {
     expect(recusaDoAnexo({ name: 'planilha.xlsx', size: 10_000, type: '' })).not.toBeNull();
     expect(recusaDoAnexo({ name: 'orcamento.pdf', size: 10_000, type: '' })).toBeNull();
   });
+
+  it('🔴 extensão ruim NÃO passa nem quando o navegador informa um tipo aceito', () => {
+    // O `type` do navegador é forjável: um arquivo renomeado pode chegar com `type: image/png`.
+    // A extensão precisa barrar sozinha, senão um `.exe` disfarçado sobe para o balde.
+    expect(recusaDoAnexo({ name: 'virus.exe', size: 1000, type: 'image/png' })).not.toBeNull();
+  });
 });
 
 describe('ehImagem', () => {
@@ -44,6 +50,13 @@ describe('nomeDoAnexo', () => {
   });
   it('endereço sem nome utilizável vira rótulo honesto', () => {
     expect(nomeDoAnexo('https://exemplo.co/storage/v1/object/public/pedido-anexos/')).toBe('anexo.pdf');
+  });
+  it('🔴 nome que contém literalmente um escape não é decodificado duas vezes', () => {
+    // O arquivo se chama de verdade "invoice%20discount.pdf"; no endereço isso vira `%2520`.
+    // Uma decodificação só (a de `filenameFromUrl`) devolve o nome certo; duas virariam
+    // "invoice discount.pdf", trocando o texto do arquivo em silêncio.
+    expect(nomeDoAnexo('https://exemplo.co/storage/v1/object/public/pedido-anexos/empresa-1/abc/invoice%2520discount.pdf'))
+      .toBe('invoice%20discount.pdf');
   });
 });
 
@@ -66,6 +79,8 @@ describe('ordenarAnexos', () => {
       { id: 'c', created_at: '2026-09-11T10:00:00Z' },
     ];
     expect(ordenarAnexos(anexos).map((a) => a.id)).toEqual(['b', 'c', 'a']);
+    // E não muta o array recebido: a lista da tela é reordenada sem a de origem mudar embaixo.
+    expect(anexos.map((a) => a.id)).toEqual(['a', 'b', 'c']);
   });
 });
 
