@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogTitle } from '@/components/ui/dialog';
 import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
 import { useClientes, useFabricantes, useVendedores } from '@/hooks/use-clientes';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
@@ -23,25 +23,22 @@ import { opcoesDeObra, avisoDaListaDeObras } from '@/lib/opcoes-de-obra';
 import { useCreateObra } from '@/hooks/use-mutations';
 import { usePedidoCompleto, useUpdatePedidoCompleto } from '@/hooks/use-edit-pedido';
 import { usePedidoHistoricoStatus } from '@/hooks/use-pedidos';
+import { useAnexosDoNegocio, useAdicionarAnexo, useRemoverAnexo } from '@/hooks/use-pedido-anexos';
 import { useAuth } from '@/hooks/use-auth';
 import { useConfiguracoesCampos, resolveFieldLabel, isCampoObrigatorioNaEtapa } from '@/hooks/use-configuracoes-campos';
 import { useSecaoLigada } from '@/hooks/use-secoes';
-import { supabase } from '@/integrations/supabase/client';
-import { sanitizeFileName } from '@/lib/file-validation';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, Loader2, FileText, Upload, History, MessageSquare } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Save, Loader2, FileText, History, MessageSquare } from 'lucide-react';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { FabricanteSelector } from '@/components/pedidos/FabricanteSelector';
 import { NomeNegocioField } from '@/components/pedidos/NomeNegocioField';
+import { CampoDeAnexos } from '@/components/pedidos/CampoDeAnexos';
 import { HistoricoMovimentacaoNegocio } from '@/components/pedidos/HistoricoMovimentacaoNegocio';
 import { ComentariosNegocio } from '@/components/pedidos/ComentariosNegocio';
 import { getNomeNegocioAutomatico } from '@/lib/nome-negocio';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { repairCorruptedBitrixUrl } from '@/lib/repair-bitrix-url';
-import { filenameFromUrl } from '@/lib/download-file';
-import { FilePreviewDialog, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
 import { Badge } from '@/components/ui/badge';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { CampoDeResponsaveis, type ResponsavelSelecionado } from '@/components/pedidos/CampoDeResponsaveis';
@@ -51,7 +48,6 @@ import { CampoCnpj } from '@/components/shared/CampoCnpj';
 import { SeletorMarcadorObra } from '@/components/obras/SeletorMarcadorObra';
 import { validarCnpjDaObra } from '@/lib/obra-cnpj';
 import type { CnpjData } from '@/lib/cnpj';
-import { enderecoDoArquivo } from '@/lib/arquivo-privado';
 import { OrigemLeadSelect } from '@/components/shared/OrigemLeadSelect';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -79,6 +75,12 @@ const EditarPedido = () => {
   const { data: historicoStatus } = usePedidoHistoricoStatus(id ?? null);
   const updatePedido = useUpdatePedidoCompleto();
   const { data: responsaveisGravados } = useResponsaveisDoNegocio(id ?? null);
+  // Os anexos do negócio (Tarefa 3): aqui o negócio já existe, então cada gesto (acrescentar ou
+  // remover) grava na hora pelos ganchos próprios — igual à ficha (PainelDoNegocio.tsx) — em vez
+  // de esperar o botão "Salvar Alterações", que só grava os campos do negócio em si.
+  const { data: anexos } = useAnexosDoNegocio(id ?? null);
+  const adicionarAnexo = useAdicionarAnexo(id ?? '');
+  const removerAnexo = useRemoverAnexo(id ?? '');
   const createObraMutation = useCreateObra();
   // Cascata da secao Obras. `=== true` e deliberado: enquanto a resposta nao chega, o
   // campo fica escondido — campo que aparece e some no meio da edicao e pior de usar que
@@ -133,15 +135,6 @@ const EditarPedido = () => {
 
   // Step 2 fields
   const [observacoes, setObservacoes] = useState('');
-  const [pdfUrl, setPdfUrl] = useState('');
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
-  const [pdfPreview, setPdfPreview] = useState<FilePreviewTarget | null>(null);
-  // Confirmação de remoção do anexo já salvo. Remover aqui apenas DESVINCULA: grava
-  // pdf_url = null no negócio. O arquivo continua no bucket "pedido-anexos" e o link
-  // antigo fica registrado no Histórico de Alterações, então um clique errado é
-  // reversível.
-  const [removerAnexoOpen, setRemoverAnexoOpen] = useState(false);
   const [camposExtras, setCamposExtras] = useState<Record<string, string>>({});
   // Valor de negociação: por padrão espelha a soma dos itens; quando o usuário digita,
   // passa a valer o número digitado. Mesmo par de estados do cadastro novo
@@ -168,7 +161,6 @@ const EditarPedido = () => {
       setNome(p.nome || '');
       setNomeAutomatico(!p.nome);
       setObservacoes(p.observacoes || '');
-      setPdfUrl(p.pdf_url || '');
       setCamposExtras((p.campos_extras as Record<string, string> | null) || {});
       // 🔴 O valor salvo É o valor. Ponto.
       //
@@ -256,7 +248,7 @@ const EditarPedido = () => {
       fabricante_id: fabricanteId,
       vendedor_id: vendedorId,
       status: status,
-      anexo_pdf: (pdfFile || pdfUrl) ? 'ok' : undefined,
+      anexo_pdf: (anexos?.length ?? 0) > 0 ? 'ok' : undefined,
       data_pedido: dataPedido ? 'ok' : undefined,
       obra_id: obraId,
       origem_lead: origemLead,
@@ -292,37 +284,7 @@ const EditarPedido = () => {
   const handleSubmit = async () => {
     if (!validateStep2() || !id) return;
 
-    setIsUploadingPdf(true);
     try {
-      let newPdfUrl = pdfUrl;
-
-      if (pdfFile) {
-        // O anexo nasce DENTRO da pasta da empresa — Passo 5 do plano dos baldes privados.
-        //
-        // Antes era só `{uuid}/{nome}`, e a pasta aleatória não diz de quem é o arquivo. A
-        // regra de leitura que vai fechar o balde (Passo 6) lê a PRIMEIRA pasta do caminho
-        // como o dono: arquivo fora dela fica invisível para todo mundo, inclusive para quem
-        // o enviou. Medido em 27/08/2026: 22 anexos já estavam nessa situação, e o número
-        // crescia a cada upload feito pela tela.
-        //
-        // O `uuid` continua no meio, isolando cada upload — é ele que evita colisão quando
-        // duas pessoas mandam arquivos de mesmo nome.
-        //
-        // Sem empresa não há onde gravar: recusar aqui é melhor que gravar num lugar que a
-        // regra nova não vai conseguir atribuir a ninguém.
-        if (!profile?.empresa_id) throw new Error('Sua empresa não foi identificada. Recarregue a página e tente de novo.');
-        const filePath = `${profile.empresa_id}/${crypto.randomUUID()}/${sanitizeFileName(pdfFile.name)}`;
-        const { error: uploadError } = await supabase.storage
-          .from('pedido-anexos')
-          .upload(filePath, pdfFile);
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('pedido-anexos')
-          .getPublicUrl(filePath);
-        newPdfUrl = publicUrl;
-      }
-
       await updatePedido.mutateAsync({
         pedido_id: id,
         cliente_id: clienteId,
@@ -338,7 +300,8 @@ const EditarPedido = () => {
         origem_lead: origemLead || undefined,
         endereco_entrega: enderecoEntrega || undefined,
         observacoes: observacoes || undefined,
-        pdf_url: newPdfUrl,
+        // Sem `pdf_url`: os anexos agora têm tabela própria (`pedido_anexos`) e cada gesto do
+        // <CampoDeAnexos> abaixo grava na hora, pelos ganchos da Tarefa 3 — não pelo Salvar.
         campos_extras: camposExtras,
         // Vai SEMPRE. O gatilho `trg_recalcular_valor_total` só dispara por escrita em
         // `itens_pedido`, e esta tela não escreve mais lá — então não há mais a corrida que
@@ -349,14 +312,10 @@ const EditarPedido = () => {
         // deixou de escrever nela, o que também desarmou o gatilho que recalculava o valor.
         // Ver use-edit-pedido.ts e docs/operacao/catalogo-de-produtos-removido.md.
       });
-      setPdfUrl(newPdfUrl);
-      setPdfFile(null);
       toast.success('Negócio atualizado com sucesso!');
       closeEditor();
     } catch (err: any) {
       toast.error(err.message);
-    } finally {
-      setIsUploadingPdf(false);
     }
   };
 
@@ -720,7 +679,9 @@ const EditarPedido = () => {
 
                 {Object.entries((pedidoData.pedido.campos_extras as Record<string, string> | null) || {}).map(([key, value]) => {
                   if (!value) return null;
-                  if (key === 'pdf_url') return null; // já exibido acima em "Arquivo PDF", com correção de link corrompido
+                  // pdf_url legado: a coluna continua no banco (decisão 4), mas nenhuma tela
+                  // escreve mais nela — os anexos vêm da lista em "Anexos", não daqui.
+                  if (key === 'pdf_url') return null;
                   if ((camposConfig ?? []).some(c => c.origem === 'customizado' && c.campo_key === key)) return null;
                   const strValue = String(value).trim();
                   const isUrl = /^https?:\/\//i.test(strValue);
@@ -756,80 +717,19 @@ const EditarPedido = () => {
                     de produtos. O catálogo saiu em 26/08/2026 (nunca teve dado real) e o passo
                     virou o que o representante faz de verdade: anexar o orçamento e dizer
                     quanto é. Mesma mudança do NovoNegocioDialog — as duas telas têm que contar
-                    a mesma história sobre o mesmo negócio. */}
+                    a mesma história sobre o mesmo negócio.
+
+                    Cada anexo grava (ou some) na hora, pelos ganchos da Tarefa 3 — igual à ficha
+                    (PainelDoNegocio.tsx). Não depende do botão "Salvar Alterações" lá embaixo,
+                    que só grava os campos do negócio em si. */}
                 <div className="space-y-2">
-                  <Label>Arquivo PDF</Label>
-                  <div className={cn(
-                    "relative border-2 border-dashed rounded-lg p-4 transition-colors",
-                    pdfFile ? "border-primary/50 bg-primary/5" : "border-muted hover:border-primary/30"
-                  )}>
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    <div className="flex items-center justify-center gap-3">
-                      {pdfFile ? (
-                        <>
-                          <FileText className="h-6 w-6 text-primary" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{pdfFile.name}</p>
-                            <p className="text-xs text-muted-foreground">{(pdfFile.size / 1024 / 1024).toFixed(2)} MB · substituirá o PDF atual</p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="relative z-10 h-8 w-8 text-destructive"
-                            onClick={(e) => { e.stopPropagation(); setPdfFile(null); }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : pdfUrl ? (
-                        <>
-                          <FileText className="h-6 w-6 text-primary" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium">PDF do Negócio</p>
-                            <p className="text-xs text-muted-foreground">Clique ou arraste um novo arquivo para substituir</p>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="relative z-10"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              const original = repairCorruptedBitrixUrl(pdfUrl);
-                              const nome = filenameFromUrl(original, 'anexo.pdf');
-                              // Assina no clique. O nome sai do endereço ORIGINAL, onde o caminho está
-                              // limpo, sem a assinatura pendurada no fim.
-                              setPdfPreview({ url: (await enderecoDoArquivo(original)) ?? original, nome });
-                            }}
-                          >
-                            Ver PDF
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="relative z-10 h-8 w-8 text-destructive"
-                            title="Remover anexo"
-                            aria-label="Remover anexo"
-                            onClick={(e) => { e.stopPropagation(); setRemoverAnexoOpen(true); }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="h-6 w-6 text-muted-foreground" />
-                          <div className="text-center">
-                            <p className="text-sm font-medium">Clique ou arraste o PDF aqui</p>
-                            <p className="text-xs text-muted-foreground">Apenas arquivos PDF são aceitos</p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                  <Label>Anexos</Label>
+                  <CampoDeAnexos
+                    anexos={anexos ?? []}
+                    onAdicionar={(arquivo) => adicionarAnexo.mutate(arquivo)}
+                    onRemover={(anexoId) => removerAnexo.mutate(anexoId)}
+                    enviando={adicionarAnexo.isPending}
+                  />
                 </div>
 
                 <div className="space-y-2 p-4 border rounded-xl bg-muted/10 max-w-sm">
@@ -846,9 +746,9 @@ const EditarPedido = () => {
                   <Button variant="outline" onClick={() => setStep(1)}>
                     <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
                   </Button>
-                  <Button onClick={handleSubmit} disabled={updatePedido.isPending || isUploadingPdf}>
+                  <Button onClick={handleSubmit} disabled={updatePedido.isPending}>
                     <Save className="h-4 w-4 mr-1" />
-                    {updatePedido.isPending || isUploadingPdf ? 'Salvando...' : 'Salvar Alterações'}
+                    {updatePedido.isPending ? 'Salvando...' : 'Salvar Alterações'}
                   </Button>
                 </div>
               </div>
@@ -936,34 +836,6 @@ const EditarPedido = () => {
           </RodapeDialogo>
         </ConteudoDialogo>
       </Dialog>
-
-      <Dialog open={removerAnexoOpen} onOpenChange={setRemoverAnexoOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remover o anexo deste negócio?</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 py-2 text-sm text-muted-foreground">
-            <p>O negócio vai ficar sem anexo assim que você salvar as alterações.</p>
-            <p>O arquivo não é apagado do sistema — ele só deixa de ficar ligado a este negócio.</p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRemoverAnexoOpen(false)}>Cancelar</Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setPdfUrl('');
-                setPdfFile(null);
-                setRemoverAnexoOpen(false);
-                toast.success('Anexo removido. Salve as alterações para confirmar.');
-              }}
-            >
-              Remover anexo
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <FilePreviewDialog file={pdfPreview} onClose={() => setPdfPreview(null)} />
     </AppLayout>
   );
 };

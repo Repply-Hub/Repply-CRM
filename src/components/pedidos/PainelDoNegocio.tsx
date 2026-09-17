@@ -18,9 +18,10 @@ import { ContatosDoNegocio } from '@/components/pedidos/ContatosDoNegocio';
 import { HistoricoDoNegocio } from '@/components/pedidos/HistoricoDoNegocio';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
-import { FilePreviewDialog, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
+import { CampoDeAnexos } from '@/components/pedidos/CampoDeAnexos';
 import { usePedidoPorId, usePedidoHistoricoStatus, type PedidoWithRelations } from '@/hooks/use-pedidos';
 import { useTarefasPorPedido, type Tarefa } from '@/hooks/use-tarefas';
+import { useAnexosDoNegocio, useAdicionarAnexo, useRemoverAnexo } from '@/hooks/use-pedido-anexos';
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { useSecaoLigada } from '@/hooks/use-secoes';
@@ -30,8 +31,6 @@ import { getNomeNegocio } from '@/lib/nome-negocio';
 import { alvoDaTarefaDoNegocio, type AlvoDaTarefaDoNegocio } from '@/lib/alvo-da-tarefa-do-negocio';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { repairCorruptedBitrixUrl } from '@/lib/repair-bitrix-url';
-import { filenameFromUrl } from '@/lib/download-file';
-import { enderecoDoArquivo } from '@/lib/arquivo-privado';
 
 // Cópia da mesma linha de `Negocios.tsx`. É uma função pura de uma linha, e trazê-la para cá é o
 // que permite ao painel desenhar o crachá da etapa sem depender da tela que o monta.
@@ -132,6 +131,14 @@ export function PainelDoNegocio({
   // Espelho da política de UPDATE do banco. Não protege nada — quem recusa é o Postgres.
   const { permitido: podeEditar } = useMinhaPermissao('pedidos', 'editar');
 
+  // Os anexos do negócio (Tarefa 3): a lista e as duas mutações. Chamados aqui incondicionalmente
+  // — regra dos hooks — mesmo com o painel fechado (`pedidoId` nulo): a consulta já nasce
+  // desligada nesse caso (`enabled: !!pedidoId`, dentro do próprio gancho), e as mutações só
+  // fazem algo quando `CampoDeAnexos`, lá embaixo, de fato aciona uma delas.
+  const { data: anexos } = useAnexosDoNegocio(pedidoId);
+  const adicionarAnexo = useAdicionarAnexo(pedidoId);
+  const removerAnexo = useRemoverAnexo(pedidoId);
+
   // As etapas saem do funil DO PRÓPRIO NEGÓCIO (`pedidos.funil_id`), nunca do funil que a tela
   // que montou o painel está mostrando. Achado 🟠 A1 da revisão da Tarefa 1: a versão anterior
   // resolvia pelo funil do QUADRO (guardado no navegador, com fallback pro padrão da empresa) —
@@ -170,7 +177,6 @@ export function PainelDoNegocio({
 
   const [addTarefaOpen, setAddTarefaOpen] = useState(false);
   const [editingTarefaNegocio, setEditingTarefaNegocio] = useState<Tarefa | null>(null);
-  const [pdfPreview, setPdfPreview] = useState<FilePreviewTarget | null>(null);
 
   // O negócio a que a tarefa deste formulário pertence, congelado no clique que o abriu.
   // Ver `alvoDaTarefaDoNegocio`.
@@ -377,26 +383,18 @@ export function PainelDoNegocio({
                     </p>
                   </div>
                 )}
-                {negocio.pdf_url && (
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <FileText className="h-3 w-3" /> Anexo
-                    </p>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const original = repairCorruptedBitrixUrl(negocio.pdf_url);
-                        const nome = filenameFromUrl(original, 'anexo.pdf');
-                        // Assina no clique, não ao desenhar a lista: só paga pelo anexo que alguém
-                        // de fato abre. O nome sai do endereço ORIGINAL, onde o caminho está limpo.
-                        setPdfPreview({ url: (await enderecoDoArquivo(original)) ?? original, nome });
-                      }}
-                      className="inline-flex items-center gap-2 p-2.5 rounded-lg border bg-muted/30 text-sm font-medium text-primary hover:underline w-fit"
-                    >
-                      <FileText className="h-4 w-4" /> Ver PDF anexado
-                    </button>
-                  </div>
-                )}
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="h-3 w-3" /> Anexos
+                  </p>
+                  <CampoDeAnexos
+                    anexos={anexos ?? []}
+                    onAdicionar={(arquivo) => adicionarAnexo.mutate(arquivo)}
+                    onRemover={(anexoId) => removerAnexo.mutate(anexoId)}
+                    enviando={adicionarAnexo.isPending}
+                    somenteLeitura={!podeEditar}
+                  />
+                </div>
                 {/* Renderização de Campos Extras dinâmicos */}
                 {(camposExtras ?? []).map(({ id: colId, rotulo }) => {
                   // Quais colunas chegam aqui (as extras visíveis, já sem as padrão, sem "acoes"
@@ -405,8 +403,9 @@ export function PainelDoNegocio({
                   const value = negocio.campos_extras?.[colId] ?? negocio.campos_extras?.[rotulo];
                   if (!value) return null;
 
-                  // Evita duplicar a exibição quando o mesmo link já aparece na seção "Anexo"
-                  // estruturada abaixo (importações antigas guardavam o PDF só como campo extra).
+                  // Evita duplicar a exibição quando o mesmo link já aparece na lista de
+                  // "Anexos" estruturada acima (importações antigas guardavam o PDF só como
+                  // campo extra).
                   // Compara após reparo, pois o valor bruto em campos_extras pode ter a corrupção
                   // de locale (pontos trocados por vírgulas) que o pdf_url estruturado já corrige.
                   if (
@@ -677,7 +676,6 @@ export function PainelDoNegocio({
           />
         </>
       )}
-      <FilePreviewDialog file={pdfPreview} onClose={() => setPdfPreview(null)} />
     </>
   );
 }

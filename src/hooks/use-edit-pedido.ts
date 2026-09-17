@@ -44,7 +44,8 @@ export interface UpdatePedidoPayload {
   origem_lead?: string;
   endereco_entrega?: string;
   observacoes?: string;
-  pdf_url?: string;
+  // Sem `pdf_url`: os anexos agora têm tabela própria (`pedido_anexos`), lida e gravada pelos
+  // ganchos de `use-pedido-anexos.ts` — nenhuma tela escreve mais nesta coluna (Tarefa 5).
   campos_extras?: Record<string, string>;
   /** Valor de negociação. Ausente = não mexe no que está gravado. */
   valor_total?: number;
@@ -91,7 +92,8 @@ export function useUpdatePedidoCompleto() {
           origem_lead: payload.origem_lead || null,
           endereco_entrega: payload.endereco_entrega || null,
           observacoes: payload.observacoes || null,
-          ...(payload.pdf_url !== undefined ? { pdf_url: payload.pdf_url || null } : {}),
+          // Sem `pdf_url` aqui: os anexos agora têm tabela própria (`pedido_anexos`), fora
+          // deste `update` — ver o comentário em `UpdatePedidoPayload` acima.
           ...(payload.campos_extras ? { campos_extras: payload.campos_extras } : {}),
           ...(payload.valor_total !== undefined ? { valor_total: payload.valor_total } : {}),
         })
