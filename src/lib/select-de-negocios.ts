@@ -22,6 +22,7 @@ export function montarSelectDeNegocios(relacoesInternas: RelacaoInterna[] = []):
   fabricante:fabricantes${j('fabricante')}(id, nome),
   vendedor:usuarios!pedidos_vendedor_id_fkey${j('vendedor')}(id, nome, empresa_id),
   obra:obras(id, nome_obra),
-  marcador:marcadores(id, nome, cor)
+  marcador:marcadores(id, nome, cor),
+  anexos:pedido_anexos(id, url, nome, tipo, created_at)
 `;
 }

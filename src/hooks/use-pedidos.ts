@@ -4,6 +4,20 @@ import { useAuth } from './use-auth';
 import { useRegistrarAtividade } from './use-historico-alteracoes';
 import { montarSelectDeNegocios, type RelacaoInterna } from '@/lib/select-de-negocios';
 
+/**
+ * Um anexo do negócio como a LISTA o traz (embed `anexos:pedido_anexos(...)` de
+ * `montarSelectDeNegocios`). É de leitura: quem envia/tira usa `use-pedido-anexos.ts`. A coluna
+ * "Anexo" mostra o primeiro (com "+N") e a exportação leva todos — as duas ordenam por
+ * `created_at` com `ordenarAnexos`, então o campo tem de vir junto.
+ */
+export interface AnexoDoNegocioNaLista {
+  id: string;
+  url: string;
+  nome: string;
+  tipo: string | null;
+  created_at: string;
+}
+
 export interface PedidoWithRelations {
   id: string;
   status: string;
@@ -30,6 +44,8 @@ export interface PedidoWithRelations {
   vendedor: { id: string; nome: string } | null;
   obra: { id: string; nome_obra: string } | null;
   marcador: { id: string; nome: string; cor: string } | null;
+  /** Os anexos deste negócio (embed da lista). A coluna "Anexo" e a exportação leem daqui. */
+  anexos?: AnexoDoNegocioNaLista[] | null;
 }
 
 /**

@@ -19,7 +19,7 @@ import { useMarcadores } from '@/hooks/use-marcadores';
 import { MarcadoresDialog } from '@/components/pedidos/MarcadoresDialog';
 import { useFunis } from '@/hooks/use-funis';
 import { useConfiguracoesCampos, isCampoObrigatorioNaEtapa, resolveFieldLabel } from '@/hooks/use-configuracoes-campos';
-import { usePedidos, usePedidosStats, useSearchMatches, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, buscarNegociosDoRecorte, PEDIDOS_EXPORTACAO_AVISO, PEDIDOS_LOTE_EXPORTACAO, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField, type PedidosSort, type PedidosSortColumn } from '@/hooks/use-pedidos';
+import { usePedidos, usePedidosStats, useSearchMatches, useUpdatePedidoStatus, useBulkDeletePedidos, useBulkUpdatePedidos, buscarNegociosDoRecorte, PEDIDOS_EXPORTACAO_AVISO, PEDIDOS_LOTE_EXPORTACAO, type PedidosFilters, type PedidoWithRelations, type PeriodoDateField, type PedidosSort, type PedidosSortColumn, type AnexoDoNegocioNaLista } from '@/hooks/use-pedidos';
 import { useSecaoLigada } from '@/hooks/use-secoes';
 import { mapPedidoToOrder } from '@/lib/pedido-to-order';
 import { getNomeNegocio } from '@/lib/nome-negocio';
@@ -65,6 +65,7 @@ import { cn } from '@/lib/utils';
 import { acaoDaCaixaDoCabecalho } from '@/lib/selecao-em-massa';
 import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 import { LinkAnexoPrivado } from '@/components/shared/LinkAnexoPrivado';
+import { ordenarAnexos, resumoDaColunaDeAnexos } from '@/lib/anexos-do-negocio';
 
 const ImportPedidosDialog = lazy(() =>
   import('@/components/pedidos/ImportPedidosDialog').then(m => ({ default: m.ImportPedidosDialog }))
@@ -309,6 +310,28 @@ const PedidoRow = memo(({
   const isEtapaFinal = pedido.status === 'fechamento' || pedido.status === 'perdido';
   const isAlert = !isEtapaFinal && daysInStage >= 7;
 
+  // A coluna "Anexo" chega por dois ids — o legado `pdf_url` e o `anexo` — e os dois desenham a
+  // MESMA célula. Um helper só para não divergirem: o primeiro anexo (mais novo em cima, como a
+  // ficha) com "+N" ao lado quando há mais. Abrir o nome abre o arquivo; o "+N" é só a contagem
+  // do resto (clicar na linha abre o negócio). Lê a lista embutida (`pedido.anexos`), não o
+  // `pdf_url` legado — negócio criado depois da migração tem anexo sem `pdf_url`.
+  const celulaDeAnexo = (colId: string) => {
+    // A anotação de tipo é o que mantém a inferência: `pedido` é `any` aqui e `?? []` viraria
+    // uma união de arrays que faz o genérico perder `url`/`nome`.
+    const lista: AnexoDoNegocioNaLista[] = pedido.anexos ?? [];
+    const { primeiro, extras } = resumoDaColunaDeAnexos(ordenarAnexos(lista));
+    return (
+      <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5" onClick={e => e.stopPropagation()}>
+        {primeiro ? (
+          <span className="inline-flex items-center gap-1.5">
+            <LinkAnexoPrivado url={primeiro.url} title={primeiro.nome} />
+            {extras > 0 && <span className="text-[10px] text-muted-foreground">+{extras}</span>}
+          </span>
+        ) : '—'}
+      </TableCell>
+    );
+  };
+
   return (
     <TableRow className={`cursor-pointer hover:bg-muted/30 ${selected ? 'bg-primary/5' : ''}`} onClick={onClick}>
       <TableCell className="w-10 py-2 px-2.5" onClick={e => e.stopPropagation()}>
@@ -322,13 +345,7 @@ const PedidoRow = memo(({
         // Coluna legada "pdf_url" (renomeada só no label para "Anexo", nunca no id)
         // — trata como alias de "anexo" para nunca ler o valor bruto de campos_extras.
         if (colId === 'pdf_url') {
-          return (
-            <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5" onClick={e => e.stopPropagation()}>
-              {pedido.pdf_url ? (
-                <LinkAnexoPrivado url={pedido.pdf_url} />
-              ) : '—'}
-            </TableCell>
-          );
+          return celulaDeAnexo(colId);
         }
 
         if (!isDefault) {
@@ -373,13 +390,7 @@ const PedidoRow = memo(({
               </TableCell>
             );
           case 'anexo':
-            return (
-              <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5" onClick={e => e.stopPropagation()}>
-                {pedido.pdf_url ? (
-                  <LinkAnexoPrivado url={pedido.pdf_url} />
-                ) : '—'}
-              </TableCell>
-            );
+            return celulaDeAnexo(colId);
           case 'endereco_entrega':
             // Esta coluna é meio endereço, meio obra: o endereço de entrega é texto livre do
             // próprio negócio (vem inclusive da importação de planilha) e não pertence à seção

@@ -9,6 +9,8 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components
 import { ColumnSettings, type ColumnDefinition } from '@/components/shared/ColumnSettings';
 import { ListPagination } from '@/components/shared/ListPagination';
 import { LinkAnexoPrivado } from '@/components/shared/LinkAnexoPrivado';
+import { ordenarAnexos, resumoDaColunaDeAnexos } from '@/lib/anexos-do-negocio';
+import type { AnexoDoNegocioNaLista } from '@/hooks/use-pedidos';
 import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
 import { PainelDoNegocio } from '@/components/pedidos/PainelDoNegocio';
 import { useAuth } from '@/hooks/use-auth';
@@ -250,6 +252,10 @@ type NegocioDaFicha = PedidoComEmbeds & {
   endereco_entrega?: string | null;
   observacoes?: string | null;
   pdf_url?: string | null;
+  // Os anexos que a lista embute (o mais novo em cima ao mostrar). A coluna "Anexo" mostra o
+  // primeiro com "+N", e a ordenação por presença conta esta lista — não o `pdf_url` legado,
+  // que fica vazio em negócio criado depois da migração.
+  anexos?: AnexoDoNegocioNaLista[] | null;
   cliente?: { empresa?: string | null } | null;
   marcador?: { nome?: string | null; cor?: string | null } | null;
   campos_extras?: Record<string, unknown> | null;
@@ -417,8 +423,9 @@ export function PainelDeNegocios({
       case 'data_pedido': return p.data_pedido ?? null;
       case 'prazo_resposta': return p.prazo_resposta ?? null;
       // 0 = tem anexo. Assim "Ordenar crescente" (o `asc` do menu) é literalmente
-      // "Com anexo primeiro", que é o rótulo que a pessoa lê.
-      case 'anexo': return p.pdf_url ? 0 : 1;
+      // "Com anexo primeiro", que é o rótulo que a pessoa lê. Conta a lista embutida (vários
+      // anexos por negócio), não o `pdf_url` legado.
+      case 'anexo': return (p.anexos?.length ?? 0) > 0 ? 0 : 1;
       default: return null;
     }
   }, [getNegociosLabel, stageLabel, temObras]);
@@ -521,12 +528,23 @@ export function PainelDeNegocios({
             {p.observacoes || '—'}
           </TableCell>
         );
-      case 'anexo':
+      case 'anexo': {
+        // O primeiro anexo (mais novo em cima) com "+N" ao lado quando há mais — igual à lista
+        // de Negócios. Abrir o nome abre o arquivo; o "+N" é só a contagem do resto. A anotação
+        // preserva a inferência: `?? []` viraria união de arrays e o genérico perderia `url`.
+        const lista: AnexoDoNegocioNaLista[] = p.anexos ?? [];
+        const { primeiro, extras } = resumoDaColunaDeAnexos(ordenarAnexos(lista));
         return (
           <TableCell key={colId} onClick={e => e.stopPropagation()}>
-            {p.pdf_url ? <LinkAnexoPrivado url={p.pdf_url} /> : '—'}
+            {primeiro ? (
+              <span className="inline-flex items-center gap-1.5">
+                <LinkAnexoPrivado url={primeiro.url} title={primeiro.nome} />
+                {extras > 0 && <span className="text-[10px] text-muted-foreground">+{extras}</span>}
+              </span>
+            ) : '—'}
           </TableCell>
         );
+      }
       default:
         return <TableCell key={colId}>—</TableCell>;
     }

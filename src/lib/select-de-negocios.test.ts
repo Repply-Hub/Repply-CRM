@@ -52,4 +52,11 @@ describe('montarSelectDeNegocios', () => {
   it('traz a origem do lead, que a cópia do negócio leva', () => {
     expect(montarSelectDeNegocios()).toContain('origem_lead');
   });
+
+  // A coluna "Anexo" da lista mostra o primeiro anexo com "+N", e a exportação leva todos — as
+  // duas leem esta lista embutida, não mais só o `pdf_url` legado. Sem o embed, a coluna volta a
+  // mostrar só o anexo antigo (e a de negócio criado depois da migração ficaria vazia).
+  it('embute os anexos do negócio, que a coluna Anexo e a exportação leem', () => {
+    expect(montarSelectDeNegocios()).toContain('anexos:pedido_anexos(');
+  });
 });
