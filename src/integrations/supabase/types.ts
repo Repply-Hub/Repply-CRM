@@ -1453,6 +1453,7 @@ export type Database = {
           nylas_message_id: string
           nylas_thread_id: string | null
           pastas: string[]
+          prioritaria: boolean
           remetente_email: string | null
           remetente_nome: string | null
           reply_to: Json
@@ -1483,6 +1484,7 @@ export type Database = {
           nylas_message_id: string
           nylas_thread_id?: string | null
           pastas?: string[]
+          prioritaria?: boolean
           remetente_email?: string | null
           remetente_nome?: string | null
           reply_to?: Json
@@ -1513,6 +1515,7 @@ export type Database = {
           nylas_message_id?: string
           nylas_thread_id?: string | null
           pastas?: string[]
+          prioritaria?: boolean
           remetente_email?: string | null
           remetente_nome?: string | null
           reply_to?: Json

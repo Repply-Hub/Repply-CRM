@@ -113,6 +113,13 @@ function normalizarEnderecos(valor: unknown): EnderecoDoEmail[] {
 interface MensagemRecebida {
   id: string;
   lido: boolean;
+  /**
+   * Regra fixa do sistema (gatilho no banco, ver migration
+   * `email_mensagens_prioritaria`): verdadeiro quando o remetente já é
+   * cliente/contato cadastrado na empresa OU o assunto traz uma palavra de
+   * urgência. Só destaca com um ponto laranja; não reordena a lista.
+   */
+  prioritaria: boolean;
   criado_em: string | null;
   data_recebimento: string | null;
   snippet: string;
@@ -798,7 +805,7 @@ const Emails = () => {
       let consulta = supabase
         .from("email_mensagens")
         .select(
-          "id, lido, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, cc, assunto, caixa_origem, pastas",
+          "id, lido, prioritaria, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, cc, assunto, caixa_origem, pastas",
           { count: "exact" },
         )
         .eq("direcao", "recebido")
@@ -854,6 +861,10 @@ const Emails = () => {
       const emails = (data ?? []).map((m) => ({
         id: m.id,
         lido: m.lido,
+        // Regra fixa do sistema (gatilho no banco). Ausente em linhas antigas,
+        // que nasceram antes da coluna — daí o `?? false`: e-mail sem a marca
+        // simplesmente não recebe o ponto laranja.
+        prioritaria: m.prioritaria ?? false,
         criado_em: m.data_mensagem,
         data_recebimento: m.data_mensagem,
         // A listagem do Nylas devolve snippet, não body — e é o snippet que a
@@ -884,6 +895,17 @@ const Emails = () => {
 
   const receivedEmails = receivedData?.emails || [];
   const totalReceived = receivedData?.count || 0;
+
+  // Botão de leitura em massa (barra de seleção): se TODA a seleção já está
+  // lida, ele oferece "Marcar não lido"; senão, "Lido". Antes o botão era fixo
+  // em "Lido" e nunca virava o inverso ao selecionar um e-mail já lido. Padrão
+  // Gmail. Só faz sentido na aba Recebidos, a única com estado de leitura.
+  const selecaoTodaLida =
+    activeTab === "received" &&
+    selectedIds.length > 0 &&
+    selectedIds.every((id) =>
+      receivedEmails.some((e) => e.id === id && e.lido),
+    );
 
   /**
    * Ids de conversa (`nylas_thread_id`) que já têm alguma mensagem ENVIADA —
@@ -1499,19 +1521,16 @@ const Emails = () => {
 
   /** Marca como lida sem segurar a abertura da mensagem. */
   const marcarLido = (id: string) => {
-    // Escreve direto na lista que já está na tela, em vez de invalidar a
+    // Escreve direto nas listas que já estão na tela, em vez de invalidar a
     // consulta: trocar um booleano não justifica refazer a busca inteira.
-    // A chave tem de ser a MESMA da consulta que alimenta a lista, item por
-    // item: `setQueryData` com uma chave a menos escreve num cache que ninguém
-    // lê, e o selo de não-lida ficava na tela até a próxima busca.
-    queryClient.setQueryData<PaginaRecebidos>(
-      [
-        "received_emails",
-        pageReceived,
-        pastaSelecionada,
-        buscaAplicada,
-        somenteNaoLidas,
-      ],
+    // Por PREFIXO (`setQueriesData` só com `["received_emails"]`), e NÃO por
+    // chave exata: a chave real da consulta tem mais campos (página, pasta,
+    // marcadores, busca, só-não-lidas) e um `setQueryData` com um campo a menos
+    // escrevia num cache que ninguém lê — a linha não virava lida ao abrir e
+    // voltar, nem ao clicar. O prefixo acerta todas as variações abertas e não
+    // volta a quebrar se a chave ganhar mais um campo amanhã.
+    queryClient.setQueriesData<PaginaRecebidos>(
+      { queryKey: ["received_emails"] },
       (antigo) =>
         antigo
           ? {
@@ -1546,16 +1565,10 @@ const Emails = () => {
       });
   };
 
-  /** Inverso de `marcarLido`: mesma escrita otimista, mesmo espelho no provedor. */
+  /** Inverso de `marcarLido`: mesma escrita otimista por prefixo, mesmo espelho no provedor. */
   const marcarNaoLido = (id: string) => {
-    queryClient.setQueryData<PaginaRecebidos>(
-      [
-        "received_emails",
-        pageReceived,
-        pastaSelecionada,
-        buscaAplicada,
-        somenteNaoLidas,
-      ],
+    queryClient.setQueriesData<PaginaRecebidos>(
+      { queryKey: ["received_emails"] },
       (antigo) =>
         antigo
           ? {
@@ -2009,12 +2022,16 @@ const Emails = () => {
                     onClick={() =>
                       bulkUpdateReadStatusMutation.mutate({
                         ids: selectedIds,
-                        lido: true,
+                        lido: !selecaoTodaLida,
                       })
                     }
                   >
-                    <CheckSquare className="h-4 w-4" />
-                    Lido
+                    {selecaoTodaLida ? (
+                      <MailOpen className="h-4 w-4" />
+                    ) : (
+                      <CheckSquare className="h-4 w-4" />
+                    )}
+                    {selecaoTodaLida ? "Marcar não lido" : "Lido"}
                   </Button>
                 )}
                 {/* Mensagem enviada também guarda `pastas` (a Edge Function de
@@ -2576,8 +2593,16 @@ const Emails = () => {
                               quatro informações disputavam a mesma linha, todas em
                               text-sm — nada se destacava. */}
                             <div className="flex items-center gap-1.5">
-                              {!email.lido && (
-                                <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
+                              {/* Ponto laranja = PRIORIDADE (remetente já
+                                cadastrado ou assunto urgente), não "não lido".
+                                O não-lido é marcado pelo negrito abaixo e pelo
+                                avatar em tom laranja claro — padrão Gmail. */}
+                              {email.prioritaria && (
+                                <span
+                                  className="h-2 w-2 shrink-0 rounded-full bg-primary"
+                                  title="Prioritário: remetente conhecido ou assunto urgente"
+                                  aria-label="E-mail prioritário"
+                                />
                               )}
                               <span
                                 className={cn(
