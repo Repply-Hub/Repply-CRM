@@ -21,6 +21,8 @@ export function mapPedidoToOrder(p: PedidoWithRelations): Order {
     contato: p.campos_extras?.['Contato'] ?? null,
     observacoes: p.observacoes,
     prazoResposta: p.prazo_resposta,
-    pdfUrl: p.pdf_url,
+    // Presença de anexo, não o `pdf_url` legado: negócio novo guarda o anexo em `pedido_anexos`
+    // (com `pdf_url` nula), e o indicador do cartão precisa refletir isso.
+    temAnexo: (p.anexos?.length ?? 0) > 0 || !!p.pdf_url,
   };
 }

@@ -78,7 +78,7 @@ const FIELD_HINTS: Record<string, { desc: string; example?: string; storage?: st
   contato: { desc: 'Nome do contato relacionado ao negócio.', example: 'João Silva', storage: 'pedidos.contato_id', synonyms: ['contato', 'nome contato', 'contact'] },
   vendedor: { desc: 'Vendedor/usuário responsável pelo negócio.', example: 'Maria Souza', storage: 'pedidos.usuario_id', synonyms: ['vendedor', 'responsavel', 'responsável', 'usuario', 'usuário', 'seller'] },
   prazo_resposta: { desc: 'Data prevista de fechamento do negócio.', example: '2024-02-28', storage: 'pedidos.prazo_resposta', synonyms: ['prazo resposta', 'fechamento', 'data fechamento', 'deadline'], type: 'date' },
-  pdf_url: { desc: 'Link do anexo do negócio (PDF de cotação, espelho ou outro arquivo). Links do Bitrix24 são baixados e salvos no Storage automaticamente durante a importação.', example: 'https://cdn.bitrix24.com.br/.../anexo.pdf', storage: 'pedidos.pdf_url', synonyms: ['anexo', 'pdf', 'espelho', 'link pdf', 'cotacao', 'arquivo', 'documento'] },
+  pdf_url: { desc: 'Anexos do negócio (PDF de cotação, espelho ou outro arquivo). Vários endereços na mesma célula, separados por vírgula, viram vários anexos. Links do Bitrix24 são baixados e salvos no Storage automaticamente. Só ao CRIAR negócio novo — negócio que já existe não tem os anexos alterados.', example: 'https://cdn.bitrix24.com.br/.../anexo.pdf', storage: 'pedido_anexos', synonyms: ['anexo', 'pdf', 'espelho', 'link pdf', 'cotacao', 'arquivo', 'documento'] },
 };
 
 function normalizeText(value: unknown): string {

@@ -146,7 +146,7 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
                       <span className="line-clamp-2">{order.observacoes}</span>
                     </div>
                   )}
-                  {order.pdfUrl && (!visibleColumns || visibleColumns.includes('anexo')) && (
+                  {order.temAnexo && (!visibleColumns || visibleColumns.includes('anexo')) && (
                     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <FileText className="h-3 w-3 shrink-0 text-muted-foreground/70" />
                       <span className="truncate">Anexo disponível</span>

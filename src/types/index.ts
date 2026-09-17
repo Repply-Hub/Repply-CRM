@@ -25,7 +25,9 @@ export interface Order {
   contato?: string | null;
   observacoes?: string | null;
   prazoResposta?: string | null;
-  pdfUrl?: string | null;
+  /** Se o negócio tem ALGUM anexo (a lista `pedido_anexos` ou o `pdf_url` legado). Só presença:
+   *  o cartão do Kanban mostra "Anexo disponível", não um link. */
+  temAnexo?: boolean;
 }
 
 export interface Client {

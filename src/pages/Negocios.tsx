@@ -1371,7 +1371,10 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         obra_id: pedido.obra_id,
         endereco_entrega: pedido.endereco_entrega,
         prazo_resposta: pedido.prazo_resposta,
-        anexo_pdf: pedido.pdf_url,
+        // Presença de anexo, não o `pdf_url` legado: negócio criado depois da migração guarda o
+        // anexo em `pedido_anexos` (com `pdf_url` nula) e seria barrado numa etapa que exige
+        // "Anexar PDF" mesmo TENDO anexo. Mesmo critério das telas de criar/editar.
+        anexo_pdf: (pedido.anexos?.length ?? 0) > 0 ? 'ok' : undefined,
         data_pedido: pedido.data_pedido,
         observacoes: pedido.observacoes,
         valor_manual: pedido.valor_total,
