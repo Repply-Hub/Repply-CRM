@@ -344,23 +344,26 @@ export function useBulkImport() {
 
       if (batchPayloads.length === 0) return { inserted: batchInserted, failures, anexosNaoGravados };
 
-      // Prende os anexos de UM negócio recém-criado (uma linha de `pedido_anexos` por endereço).
-      // 🔴 Falha aqui NÃO derruba o negócio: ele já existe. Devolve quantos anexos não colaram,
-      // para virar aviso no relatório (o `criado_por` fica nulo e o `tipo` desconhecido, como na
-      // cópia que a migration fez dos anexos antigos — é dado importado, sem autor na tela).
-      async function gravarAnexos(pedidoId: string, anexos: AnexoImportado[]): Promise<number> {
-        if (anexos.length === 0) return 0;
-        const linhas = anexos.map(a => ({ pedido_id: pedidoId, url: a.url, nome: nomeDoAnexo(a.url) }));
+      // As linhas de `pedido_anexos` de UM negócio (uma por endereço). `criado_por` fica nulo e o
+      // `tipo` desconhecido, como na cópia que a migration fez dos anexos antigos — é dado
+      // importado, sem autor na tela.
+      const linhasDeAnexo = (pedidoId: string, anexos: AnexoImportado[]) =>
+        anexos.map(a => ({ pedido_id: pedidoId, url: a.url, nome: nomeDoAnexo(a.url) }));
+
+      // Grava um lote de linhas de `pedido_anexos` de uma vez. 🔴 Falha NÃO derruba negócio: ele
+      // já existe. Devolve quantas linhas não colaram, para virar aviso no relatório.
+      async function gravarLinhasDeAnexo(linhas: Array<{ pedido_id: string; url: string; nome: string }>): Promise<number> {
+        if (linhas.length === 0) return 0;
         try {
           const { error } = await supabase.from('pedido_anexos').insert(linhas);
           if (error) {
-            console.error('[import-pedidos] Anexos não gravados para o negócio', pedidoId, ':', error.message);
-            return anexos.length;
+            console.error('[import-pedidos] Anexos não gravados:', error.message);
+            return linhas.length;
           }
           return 0;
         } catch (err) {
-          console.error('[import-pedidos] Exceção ao gravar anexos do negócio', pedidoId, ':', (err as Error).message);
-          return anexos.length;
+          console.error('[import-pedidos] Exceção ao gravar anexos:', (err as Error).message);
+          return linhas.length;
         }
       }
 
@@ -389,7 +392,7 @@ export function useBulkImport() {
               failures.push({ row: pedidoRow, motivo: errorToMotivo(rowError, 'Falha desconhecida ao inserir negócio'), logToIgnoradas: true });
             } else {
               batchInserted++;
-              if (data?.id) anexosNaoGravados += await gravarAnexos(data.id, anexosDosPayloads[k]);
+              if (data?.id) anexosNaoGravados += await gravarLinhasDeAnexo(linhasDeAnexo(data.id, anexosDosPayloads[k]));
             }
           } catch (err) {
             failures.push({ row: pedidoRow, motivo: errorToMotivo(err, 'Falha desconhecida ao inserir negócio'), logToIgnoradas: true });
@@ -398,10 +401,17 @@ export function useBulkImport() {
       } else {
         batchInserted += batchPayloads.length;
         // Liga os anexos pelos ids devolvidos, na MESMA ordem do INSERT (o PostgREST devolve na
-        // ordem de entrada). Se vier menos id que payload — não deveria —, o que sobrar fica sem
-        // anexo: melhor o negócio sem anexo do que travar o import.
-        for (let k = 0; k < idsInseridos.length; k++) {
-          anexosNaoGravados += await gravarAnexos(idsInseridos[k].id, anexosDosPayloads[k]);
+        // ordem de entrada, e a RLS de INSERT de `pedidos` é tudo-ou-nada — não pula linha do
+        // meio). 🔴 O pareamento é POSICIONAL, então só é seguro com um id por payload: se o
+        // RETURNING vier de tamanho diferente do esperado, NÃO pareio (um anexo no negócio errado
+        // é pior que anexo faltando) — trato os anexos do lote inteiro como aviso. Depois, um
+        // INSERT só para todos os anexos do lote (não um por negócio): menos idas ao banco.
+        if (idsInseridos.length !== batchPayloads.length) {
+          console.error('[import-pedidos] RETURNING de tamanho inesperado (', idsInseridos.length, 'ids para', batchPayloads.length, 'negócios); anexos do lote viram aviso para não parear errado.');
+          anexosNaoGravados += anexosDosPayloads.reduce((soma, a) => soma + a.length, 0);
+        } else {
+          const linhas = idsInseridos.flatMap((idRow, k) => linhasDeAnexo(idRow.id, anexosDosPayloads[k]));
+          anexosNaoGravados += await gravarLinhasDeAnexo(linhas);
         }
       }
 
