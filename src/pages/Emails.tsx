@@ -69,7 +69,11 @@ import {
 import { erroLegivelDaFunction } from "@/lib/erro-edge-function";
 import { parseEnderecos } from "@/lib/enderecos-email";
 import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
-import { LeitorEmail, type EmailAberto } from "@/components/email/LeitorEmail";
+import {
+  LeitorEmail,
+  type EmailAberto,
+  type EnderecoDoEmail,
+} from "@/components/email/LeitorEmail";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
 import { ConfirmarEnviarEmailDialog } from "@/components/email/ConfirmarEnviarEmailDialog";
 import {
@@ -93,6 +97,18 @@ import {
 } from "@/hooks/use-email-pastas";
 import { MoverParaMarcadorDialog } from "@/components/email/MoverParaMarcadorDialog";
 
+/**
+ * Normaliza a coluna `destinatarios`/`cc`/`bcc` de `email_mensagens` (jsonb,
+ * array do Nylas no formato `{name?, email}` — ver migration
+ * `20260804121322_email_nylas.sql` e `mensagemParaLinha` em
+ * `supabase/functions/_shared/nylas.ts`) para o tipo que `LeitorEmail` espera.
+ * A coluna chega tipada como `Json` (`types.ts` é gerado solto — CLAUDE.md §2),
+ * daí o cast explícito em vez de confiar na inferência.
+ */
+function normalizarEnderecos(valor: unknown): EnderecoDoEmail[] {
+  return Array.isArray(valor) ? (valor as EnderecoDoEmail[]) : [];
+}
+
 /** Uma linha da caixa de entrada, no formato que a listagem devolve. */
 interface MensagemRecebida {
   id: string;
@@ -106,7 +122,14 @@ interface MensagemRecebida {
   /** Id da conversa no provedor — liga esta mensagem às respostas enviadas na mesma conversa. */
   threadId: string | null;
   remetente: string;
-  destinatarios: string[];
+  /**
+   * Cru, no formato do Nylas (`{name?, email}[]`) — não mais reduzido a
+   * `string[]` de endereços: é o que permite `LeitorEmail` mostrar a lista
+   * INTEIRA de "Para" (não só o primeiro) ao abrir a mensagem.
+   */
+  destinatarios: EnderecoDoEmail[];
+  /** Mesmo formato, para "Cc" no leitor. Cco não é buscado aqui: nunca aparece em mensagem recebida (é oculta por natureza). */
+  cc: EnderecoDoEmail[];
   assunto: string | null;
   /** Ids de pasta/marcador do provedor — mistura pasta de sistema com marcador real. */
   pastas: string[];
@@ -701,7 +724,7 @@ const Emails = () => {
       let query = supabase
         .from("email_mensagens")
         .select(
-          "id, assunto, snippet, destinatarios, remetente_email, envio_status, data_mensagem, caixa_origem, nylas_thread_id, nylas_message_id, pastas",
+          "id, assunto, snippet, destinatarios, cc, bcc, remetente_email, envio_status, data_mensagem, caixa_origem, nylas_thread_id, nylas_message_id, pastas",
           { count: "exact" },
         )
         .eq("direcao", "enviado")
@@ -721,13 +744,18 @@ const Emails = () => {
       // Remapeia para o formato que o JSX já consome, para a troca de origem
       // não obrigar a reescrever a renderização inteira.
       const emails = (data ?? []).map((m) => {
-        const dest = Array.isArray(m.destinatarios) ? m.destinatarios : [];
+        const dest = normalizarEnderecos(m.destinatarios);
         return {
           id: m.id,
           destinatario: dest
-            .map((d: { email?: string }) => d?.email)
+            .map((d) => d?.email)
             .filter(Boolean)
             .join(", "),
+          // Cru, para o leitor mostrar a lista inteira de Para/Cc/Cco em vez
+          // do `destinatario` singular acima (ver `EmailAberto` em LeitorEmail.tsx).
+          destinatarios: dest,
+          cc: normalizarEnderecos(m.cc),
+          bcc: normalizarEnderecos(m.bcc),
           remetente: m.remetente_email,
           assunto: m.assunto,
           corpo: m.snippet ?? "",
@@ -770,7 +798,7 @@ const Emails = () => {
       let consulta = supabase
         .from("email_mensagens")
         .select(
-          "id, lido, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, assunto, caixa_origem, pastas",
+          "id, lido, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, cc, assunto, caixa_origem, pastas",
           { count: "exact" },
         )
         .eq("direcao", "recebido")
@@ -840,11 +868,11 @@ const Emails = () => {
         remetente: m.remetente_nome
           ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
           : (m.remetente_email ?? ""),
-        destinatarios: Array.isArray(m.destinatarios)
-          ? m.destinatarios
-              .map((d: { email?: string }) => d?.email)
-              .filter(Boolean)
-          : [],
+        // Cru (Nylas), não mais reduzido a `string[]` — é o que deixa o leitor
+        // mostrar a lista INTEIRA de "Para" (ver `abrirRecebido`, mais abaixo,
+        // e `EmailAberto` em LeitorEmail.tsx).
+        destinatarios: normalizarEnderecos(m.destinatarios),
+        cc: normalizarEnderecos(m.cc),
         assunto: m.assunto,
         pastas: (m.pastas ?? []) as string[],
       }));
@@ -1581,8 +1609,11 @@ const Emails = () => {
   const abrirRecebido = (email: MensagemRecebida) => {
     if (!email.lido) marcarLido(email.id);
     void abrirComCorpo({
+      // `...email` já leva `destinatarios`/`cc` crus (Nylas) para o leitor
+      // mostrar a lista inteira — só o `destinatario` singular abaixo precisa
+      // de tradução, porque hoje é string e a lista é `{name?, email}[]`.
       ...email,
-      destinatario: email.destinatarios?.[0] || "",
+      destinatario: email.destinatarios?.[0]?.email || "",
       remetente: email.remetente,
       corpo: email.snippet ?? "",
       created_at: email.criado_em,
@@ -1618,7 +1649,7 @@ const Emails = () => {
       const { data, error } = await supabase
         .from("email_mensagens")
         .select(
-          "id, lido, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, assunto, caixa_origem",
+          "id, lido, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, cc, bcc, assunto, caixa_origem",
         )
         .eq("id", alvo)
         .maybeSingle();
@@ -1628,9 +1659,7 @@ const Emails = () => {
         // Sem acesso à caixa a RLS não devolve linha — e aí não há o que abrir.
         toast.error("Não encontrei esta mensagem, ou você não tem acesso a ela.");
       } else {
-        const destinatarios = (data.destinatarios ?? []) as Array<{
-          email?: string;
-        }>;
+        const destinatarios = normalizarEnderecos(data.destinatarios);
         void abrirComCorpoRef.current({
           id: data.id,
           lido: data.lido,
@@ -1639,6 +1668,9 @@ const Emails = () => {
           corpo: data.snippet ?? "",
           remetente: data.remetente_nome || data.remetente_email || "",
           destinatario: destinatarios[0]?.email ?? "",
+          destinatarios,
+          cc: normalizarEnderecos(data.cc),
+          bcc: normalizarEnderecos(data.bcc),
           created_at: data.data_mensagem,
           criado_em: data.data_mensagem,
           threadId: data.nylas_thread_id ?? null,
@@ -1711,7 +1743,7 @@ const Emails = () => {
     const { data: m, error } = await supabase
       .from("email_mensagens")
       .select(
-        "id, direcao, data_mensagem, remetente_nome, remetente_email, destinatarios, assunto, snippet, lido, nylas_message_id, nylas_thread_id, caixa_origem",
+        "id, direcao, data_mensagem, remetente_nome, remetente_email, destinatarios, cc, bcc, assunto, snippet, lido, nylas_message_id, nylas_thread_id, caixa_origem",
       )
       .eq("id", id)
       .maybeSingle();
@@ -1721,11 +1753,8 @@ const Emails = () => {
     }
 
     const enviado = m.direcao === "enviado";
-    const destEmails = Array.isArray(m.destinatarios)
-      ? m.destinatarios
-          .map((d: { email?: string }) => d?.email)
-          .filter(Boolean)
-      : [];
+    const destinatarios = normalizarEnderecos(m.destinatarios);
+    const destEmails = destinatarios.map((d) => d?.email).filter(Boolean);
     if (!enviado && !m.lido) marcarLido(m.id);
 
     void abrirComCorpo({
@@ -1736,6 +1765,12 @@ const Emails = () => {
           ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
           : (m.remetente_email ?? ""),
       destinatario: enviado ? destEmails.join(", ") : (destEmails[0] ?? ""),
+      // Cru, para o leitor mostrar a lista inteira — igual aos outros
+      // caminhos que abrem uma mensagem (ver `abrirRecebido`/o efeito de
+      // `mensagemId`, acima).
+      destinatarios,
+      cc: normalizarEnderecos(m.cc),
+      bcc: normalizarEnderecos(m.bcc),
       assunto: m.assunto,
       corpo: m.snippet ?? "",
       created_at: m.data_mensagem,
@@ -2125,20 +2160,36 @@ const Emails = () => {
                   />
                 </Button>
               )}
-              {/* Único caminho para trocar de caixa. O card de conexão — que tem
-                  o botão de desconectar — só aparece quando NÃO há caixa
-                  conectada, então depois de conectar não sobrava saída.
-                  Escondido de quem não é dono nem gestor só para não oferecer
-                  uma ação que o servidor vai recusar; a barreira real está na
-                  Edge Function. */}
-              {isConnected && podeGerenciarCaixa && (
+              {/* Engrenagem para TODOS (decisão do Lucas, 16/09/2026 — tela mais
+                  limpa, sem botão novo). Quem gerencia a caixa (dono/gestor)
+                  clica e abre "Gerenciar caixa" — único caminho para trocar de
+                  caixa; o card de conexão, que tem o botão de desconectar, só
+                  aparece quando NÃO há caixa conectada, então depois de
+                  conectar não sobrava outra saída. Quem NÃO gerencia vai direto
+                  para a própria assinatura em Configurações: a ação de
+                  gerenciar continua escondida dela só para não oferecer o que o
+                  servidor recusaria (a barreira real está na Edge Function),
+                  não porque ela não tenha nada para fazer aqui. */}
+              {isConnected && (
                 <Button
                   variant="ghost"
                   size="icon"
                   className="rounded-full hover:bg-muted shrink-0"
-                  onClick={() => setGerenciarCaixaAberto(true)}
-                  title={`Gerenciar a caixa conectada (${connectedEmail ?? ""})`}
-                  aria-label="Gerenciar a caixa de e-mail da empresa"
+                  onClick={() =>
+                    podeGerenciarCaixa
+                      ? setGerenciarCaixaAberto(true)
+                      : navigate("/configuracoes?tab=perfil")
+                  }
+                  title={
+                    podeGerenciarCaixa
+                      ? `Gerenciar a caixa conectada (${connectedEmail ?? ""})`
+                      : "Configurar assinatura"
+                  }
+                  aria-label={
+                    podeGerenciarCaixa
+                      ? "Gerenciar a caixa de e-mail da empresa"
+                      : "Configurar assinatura"
+                  }
                 >
                   <Settings className="h-5 w-5 text-muted-foreground" />
                 </Button>

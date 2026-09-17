@@ -4,13 +4,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { tamanhoLegivel } from '@/lib/fabricante-arquivos';
+import { Dialog, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+// 🔴 CLAUDE.md §7.11: `<DialogContent>` cru não tem teto de altura nem
+// rolagem própria — em janela baixa o botão Enviar sai da tela. `ConteudoDialogo`
+// substitui o `<DialogContent>`; `CabecalhoDialogo` é o mesmo `DialogHeader` com
+// `shrink-0`; `CorpoDialogo` é o único pedaço que rola (ver o comentário grande
+// no formulário, mais abaixo).
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  ConteudoDialogo,
+  CabecalhoDialogo,
+  CorpoDialogo,
+} from '@/components/shared/DialogoResponsivo';
 
 export interface RascunhoEmail {
   destinatario: string;
@@ -150,20 +154,36 @@ export function CompositorEmail({
           linha cedo demais, e o trecho citado do e-mail original (que já vem com
           as quebras do remetente) ficava picotado. É a largura de leitura de um
           e-mail, não a de um formulário. */}
-      <DialogContent className="sm:max-w-[820px] gap-0 overflow-hidden p-0 shadow-2xl">
+      <ConteudoDialogo className="sm:max-w-[820px] gap-0 overflow-hidden p-0 shadow-2xl">
         {/* Cabeçalho no padrão das telas de importação do app: token com faixa
-            (`bg-muted`) + `border-b`, título herdando --foreground. Usar o
-            DialogHeader de verdade (e não uma <div>) preserva a estrutura que o
-            Radix associa ao aria-labelledby/aria-describedby. O `pr-12` reserva a
-            coluna do botão de fechar para o título não passar por baixo dele. */}
-        <DialogHeader className="space-y-0 border-b bg-muted px-6 py-4 pr-12">
+            (`bg-muted`) + `border-b`, título herdando --foreground. O
+            CabecalhoDialogo por baixo é o DialogHeader de verdade (só com
+            `shrink-0` a mais), então preserva a estrutura que o Radix associa
+            ao aria-labelledby/aria-describedby — e agora também FICA FIXO no
+            topo, porque só o miolo (`CorpoDialogo`, abaixo) rola. O `pr-12`
+            reserva a coluna do botão de fechar para o título não passar por
+            baixo dele. */}
+        <CabecalhoDialogo className="space-y-0 border-b bg-muted px-6 py-4 pr-12">
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription className="sr-only">
             Preencha destinatário, assunto e mensagem para enviar pela caixa da empresa.
           </DialogDescription>
-        </DialogHeader>
+        </CabecalhoDialogo>
 
-        <form onSubmit={onEnviar} className="flex flex-col">
+        {/* CLAUDE.md §7.11: o `<form>` estica para ocupar o espaço entre o
+            cabeçalho e o rodapé (os dois `shrink-0`, fixos) — `flex-1 min-h-0`
+            é o que deixa o `CorpoDialogo` de dentro (também `flex-1 min-h-0`,
+            com rolagem própria) encolher de verdade em vez de estourar a
+            janela. Sem o `min-h-0` aqui, um item de flex se recusa a ficar
+            menor que o próprio conteúdo e a rolagem do `CorpoDialogo` nunca
+            aparece — a mesma armadilha que o comentário dele já explica. */}
+        <form onSubmit={onEnviar} className="flex min-h-0 flex-1 flex-col">
+          {/* `mx-0 px-0`: cancela o `-mx-6 px-6` padrão do CorpoDialogo, que
+              pressupõe um pai com `p-6` — este `ConteudoDialogo` é `p-0` (cada
+              linha abaixo já tem o próprio `px-6`, ver comentário de "Campos
+              sem moldura" a seguir). Sem isto o miolo ficaria 48px mais largo
+              que o modal de cada lado (medido em `DialogoResponsivo.tsx`). */}
+          <CorpoDialogo className="mx-0 px-0">
           {/* Campos sem moldura (silhueta de compositor), mas COM anel de foco: a
               className não pode voltar a trazer `focus-visible:ring-0`. O cn() usa
               tailwind-merge, então aquele ring-0 apagava o `ring-2 ring-ring` do
@@ -434,6 +454,7 @@ export function CompositorEmail({
               </div>
             )}
           </div>
+          </CorpoDialogo>
 
           {/* Rodapé no padrão do app (NovoNegocioDialog/EventDialog): `border-t` e
               nada de fundo. O `bg-muted/10` de antes era 10% de um token que no
@@ -446,8 +467,14 @@ export function CompositorEmail({
               canto direito juntos. Aqui é `justify-between` de propósito —
               Descartar fica ancorado à esquerda e Enviar/Conectar à direita,
               não colados um no outro. DialogFooter não carrega semântica de
-              acessibilidade — é só um div com classes. */}
-          <div className="flex flex-row items-center justify-between gap-2 border-t px-6 py-4">
+              acessibilidade — é só um div com classes.
+
+              `shrink-0` (novo, §7.11): sem ele este rodapé é só mais um item do
+              `<form>` flex-col e cederia espaço para o miolo crescer — exatamente
+              o "some por baixo" que o `CorpoDialogo` existe para evitar. Fixo
+              aqui, junto com o cabeçalho, é o que garante o Enviar visível em
+              janela baixa (1366x600), com só o meio (`CorpoDialogo`) rolando. */}
+          <div className="flex shrink-0 flex-row items-center justify-between gap-2 border-t px-6 py-4">
             {/* Ghost puro: sem `hover:text-destructive`. O tailwind-merge derrubava
                 só a cor do texto da variante e mantinha o `hover:bg-accent`, então
                 no tema escuro o hover pintava vermelho-escuro (--destructive 40%)
@@ -505,7 +532,7 @@ export function CompositorEmail({
             )}
           </div>
         </form>
-      </DialogContent>
+      </ConteudoDialogo>
     </Dialog>
   );
 }
