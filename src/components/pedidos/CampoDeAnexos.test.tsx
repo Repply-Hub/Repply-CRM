@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import type { AnexoDoNegocio } from '@/hooks/use-pedido-anexos';
+import { ACCEPT_DO_CAMPO } from '@/lib/anexos-do-negocio';
 
 /**
  * O campo de anexos da tela — Tarefa 4 do desenho "Vários anexos por negócio"
@@ -138,5 +139,13 @@ describe('CampoDeAnexos', () => {
     expect(onAdicionar).toHaveBeenCalledWith(pdf);
     expect(screen.getByText('orcamento.pdf')).toBeInTheDocument();
     expect(screen.getByText(/enviando/i)).toBeInTheDocument();
+  });
+
+  it('o campo de arquivo sugere só os tipos aceitos (accept)', () => {
+    // `accept` é só sugestão do navegador (a recusa de verdade é `recusaDoAnexo`), mas é o único
+    // requisito literal do campo; sem este teste, remover o atributo passaria despercebido.
+    render(<CampoDeAnexos anexos={[]} onAdicionar={vi.fn()} onRemover={vi.fn()} />);
+    const input = screen.getByTestId('input-anexo') as HTMLInputElement;
+    expect(input.accept).toBe(ACCEPT_DO_CAMPO);
   });
 });

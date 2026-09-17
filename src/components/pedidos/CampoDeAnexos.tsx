@@ -106,8 +106,9 @@ export function CampoDeAnexos({
                 data-testid="anexo-linha"
                 className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm"
               >
-                {/* O nome (e a miniatura/ícone) inteiros clicáveis: assina o endereço só quando
-                    alguém de fato clica, como o resto do sistema já faz (LinkAnexoPrivado). */}
+                {/* O nome (e a miniatura/ícone) inteiros clicáveis, abrindo o arquivo por
+                    `LinkAnexoPrivado` — o mesmo componente que o resto do sistema já usa para
+                    anexo privado (ele assina o endereço e abre no aplicativo do aparelho). */}
                 <LinkAnexoPrivado
                   url={anexo.url}
                   title={anexo.nome}
@@ -180,7 +181,7 @@ export function CampoDeAnexos({
       {/* Só um lembrete visual — a validação de verdade é de quem usa o campo (ex.: o cadastro
           olha `arquivosPendentes.length > 0` antes de deixar salvar), porque só ele sabe se o
           negócio pode ser salvo sem anexo nenhum. */}
-      {obrigatorio && editavel && ordenados.length === 0 && !mensagemRecusa && (
+      {obrigatorio && editavel && ordenados.length === 0 && !mensagemRecusa && !enviando && (
         <p className="text-xs text-muted-foreground">Pelo menos um anexo é obrigatório.</p>
       )}
     </div>
