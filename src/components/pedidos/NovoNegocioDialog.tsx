@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,13 +21,13 @@ import { useCreateObra } from '@/hooks/use-mutations';
 import { useAuth } from '@/hooks/use-auth';
 import { useConfiguracoesCampos, resolveFieldLabel, isCampoObrigatorioNaEtapa } from '@/hooks/use-configuracoes-campos';
 import { useSecaoLigada } from '@/hooks/use-secoes';
-import { supabase } from '@/integrations/supabase/client';
-import { sanitizeFileName } from '@/lib/file-validation';
+import { useAdicionarAnexo, useHerdarAnexos, type AnexoDoNegocio } from '@/hooks/use-pedido-anexos';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Trash2, Save, FileText, Upload } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarIcon, Plus, Save } from 'lucide-react';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
 import { FabricanteSelector } from '@/components/pedidos/FabricanteSelector';
 import { NomeNegocioField } from '@/components/pedidos/NomeNegocioField';
+import { CampoDeAnexos } from '@/components/pedidos/CampoDeAnexos';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -41,7 +41,6 @@ import type { CnpjData } from '@/lib/cnpj';
 
 import { getNomeNegocioAutomatico } from '@/lib/nome-negocio';
 import { OrigemLeadSelect } from '@/components/shared/OrigemLeadSelect';
-import { filenameFromUrl } from '@/lib/download-file';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import type { CopiaDeNegocio } from '@/lib/copia-de-negocio';
 
@@ -152,15 +151,114 @@ function NovoNegocioFormContent({
   const [prazoResposta, setPrazoResposta] = useState<Date | undefined>();
   const [origemLead, setOrigemLead] = useState(copiaDe?.origemLead ?? '');
   const [enderecoEntrega, setEnderecoEntrega] = useState(copiaDe?.enderecoEntrega ?? '');
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  // O anexo do original, pelo LINK: a cópia aponta para o mesmo arquivo, sem duplicar nada no
-  // armazenamento. Tirar o anexo aqui mexe só nesta cópia — nenhum gesto de tela apaga arquivo.
-  const [pdfUrlHerdado, setPdfUrlHerdado] = useState<string | null>(copiaDe?.pdfUrl ?? null);
+  // O negócio AINDA NÃO EXISTE quando a pessoa escolhe os arquivos aqui — ficam em memória e só
+  // sobem depois de criado (`pedido_anexos.pedido_id` exige a linha do negócio). `CampoDeAnexos`
+  // já filtra tipo/tamanho antes de chamar `onAdicionar`.
+  const [arquivosPendentes, setArquivosPendentes] = useState<File[]>([]);
+  // Os anexos do original, pelo LINK: a cópia aponta para os MESMOS arquivos, sem duplicar nada
+  // no armazenamento. Tirar um daqui mexe só nesta cópia — nenhum gesto de tela apaga arquivo.
+  const [anexosHerdados, setAnexosHerdados] = useState(copiaDe?.anexos ?? []);
   const [status, setStatus] = useState(statusProp ?? copiaDe?.status ?? 'novo_lead');
   const [marcadorId, setMarcadorId] = useState(copiaDe?.marcadorId ?? '');
+  // Cobre só o envio dos anexos, DEPOIS que o negócio nasce — a criação em si já tem o próprio
+  // indicador (`createPedido.isPending`).
   const [isUploading, setIsUploading] = useState(false);
   const [nome, setNome] = useState(copiaDe?.nome ?? '');
   const [nomeAutomatico, setNomeAutomatico] = useState(copiaDe ? copiaDe.nomeAutomatico : true);
+  // O id do negócio recém-criado — nasce `null` e só troca uma vez. É o gatilho do efeito que
+  // sobe os anexos: eles não podem ir junto do `INSERT` de `pedidos` porque `pedido_anexos`
+  // exige a chave estrangeira do negócio já existindo.
+  const [pedidoIdCriado, setPedidoIdCriado] = useState<string | null>(null);
+  const herdarAnexos = useHerdarAnexos(pedidoIdCriado ?? '');
+  const adicionarAnexo = useAdicionarAnexo(pedidoIdCriado ?? '');
+
+  // A "chave" que identifica um `File` pendente sem precisar guardar um id à parte — o estado
+  // continua sendo `File[]` puro (é o pedido: o negócio ainda não existe, não há onde gravar um
+  // id de verdade). Colisão exigiria dois arquivos com nome, tamanho E carimbo de modificação
+  // idênticos — não é o caso real que este campo precisa cobrir.
+  const chaveDoArquivoPendente = (arquivo: File) => `${arquivo.name}:${arquivo.size}:${arquivo.lastModified}`;
+
+  // As miniaturas dos arquivos pendentes são `URL.createObjectURL`, e cada uma PRECISA ser
+  // revogada — senão o navegador segura o arquivo inteiro na memória até a aba fechar. O Map
+  // (por referência do `File`, não por chave de texto) deixa reaproveitar a MESMA URL entre
+  // renderizações do mesmo arquivo, em vez de criar uma nova a cada vez.
+  const urlsObjetoRef = useRef<Map<File, string>>(new Map());
+
+  function urlDoArquivoPendente(arquivo: File): string {
+    let url = urlsObjetoRef.current.get(arquivo);
+    if (!url) {
+      url = URL.createObjectURL(arquivo);
+      urlsObjetoRef.current.set(arquivo, url);
+    }
+    return url;
+  }
+
+  // Revoga tudo que sobrou ao desmontar — a pessoa pode fechar o diálogo sem criar o negócio,
+  // e as URLs dos arquivos escolhidos até ali ficariam presas na memória para sempre.
+  useEffect(() => {
+    const mapaDeUrls = urlsObjetoRef.current;
+    return () => {
+      mapaDeUrls.forEach((url) => URL.revokeObjectURL(url));
+      mapaDeUrls.clear();
+    };
+  }, []);
+
+  // A lista que o `<CampoDeAnexos>` do passo 2 mostra: os anexos herdados da cópia (se houver)
+  // mais os arquivos pendentes escolhidos agora, convertidos só para exibir — nenhum dos dois
+  // grava nada no banco antes de "Criar Negócio".
+  //
+  // 🔴 O `criadoEm` é SINTÉTICO — nenhum dos dois lados tem um carimbo de verdade ainda. Ele só
+  // existe para a ordenação do `CampoDeAnexos` ("mais novo em cima"): um pendente escolhido
+  // agora é sempre mais novo que qualquer herdado, e entre os herdados a ordem que já vinha do
+  // original (mais novo primeiro) se preserva.
+  const anexosParaExibir = useMemo<AnexoDoNegocio[]>(() => {
+    const herdadosParaExibir: AnexoDoNegocio[] = anexosHerdados.map((a, indice) => ({
+      id: `herdado:${a.url}`,
+      url: a.url,
+      nome: a.nome,
+      tipo: a.tipo,
+      tamanhoBytes: null,
+      criadoEm: new Date((anexosHerdados.length - indice) * 1000).toISOString(),
+    }));
+    const pendentesParaExibir: AnexoDoNegocio[] = arquivosPendentes.map((arquivo, indice) => ({
+      id: `pendente:${chaveDoArquivoPendente(arquivo)}`,
+      url: urlDoArquivoPendente(arquivo),
+      nome: arquivo.name,
+      tipo: arquivo.type || null,
+      tamanhoBytes: arquivo.size,
+      // Base bem acima de qualquer `criadoEm` de herdado (o comentário acima já garante isso
+      // por construção — a base só precisa ser maior que `anexosHerdados.length * 1000`).
+      criadoEm: new Date(1_000_000_000 + indice * 1000).toISOString(),
+    }));
+    return [...herdadosParaExibir, ...pendentesParaExibir];
+  }, [anexosHerdados, arquivosPendentes]);
+
+  const adicionarArquivoPendente = (arquivo: File) => {
+    // A recusa de tipo/tamanho já aconteceu dentro do `CampoDeAnexos` antes de chegar aqui.
+    setArquivosPendentes((prev) => [...prev, arquivo]);
+  };
+
+  const removerAnexoDoCadastro = (anexoId: string) => {
+    if (anexoId.startsWith('herdado:')) {
+      const url = anexoId.slice('herdado:'.length);
+      // Só tira da LISTA desta cópia — nenhum gesto de tela apaga arquivo do armazenamento
+      // nem mexe no negócio original.
+      setAnexosHerdados((prev) => prev.filter((a) => a.url !== url));
+      return;
+    }
+    const chave = anexoId.slice('pendente:'.length);
+    setArquivosPendentes((prev) => {
+      const alvo = prev.find((arquivo) => chaveDoArquivoPendente(arquivo) === chave);
+      if (alvo) {
+        const url = urlsObjetoRef.current.get(alvo);
+        if (url) {
+          URL.revokeObjectURL(url);
+          urlsObjetoRef.current.delete(alvo);
+        }
+      }
+      return prev.filter((arquivo) => chaveDoArquivoPendente(arquivo) !== chave);
+    });
+  };
 
   // Step 2 fields
   const [observacoes, setObservacoes] = useState('');
@@ -240,9 +338,9 @@ function NovoNegocioFormContent({
       fabricante_id: fabricanteId,
       vendedor_id: vendedorId,
       status: status,
-      // O anexo herdado da cópia vale como anexo para a exigência de campo obrigatório: ele já
-      // é um PDF de verdade, só que enviado antes.
-      anexo_pdf: pdfFile || pdfUrlHerdado ? 'ok' : undefined,
+      // Qualquer anexo conta — herdado da cópia ou escolhido agora. O herdado já é um
+      // arquivo de verdade, só que enviado antes.
+      anexo_pdf: arquivosPendentes.length > 0 || anexosHerdados.length > 0 ? 'ok' : undefined,
       data_pedido: dataPedido ? 'ok' : undefined,
       obra_id: obraId,
       origem_lead: origemLead,
@@ -318,43 +416,8 @@ function NovoNegocioFormContent({
     if (!validateStep1() || !validateStep2()) return;
     if (!resolvedFunilId) { toast.error('Não foi possível identificar o funil de destino. Tente novamente em instantes.'); return false; }
 
-    setIsUploading(true);
-    // Começa no anexo herdado da cópia; um arquivo novo, se houver, toma o lugar dele abaixo.
-    let pdfUrl = pdfUrlHerdado ?? '';
-
     try {
-      if (pdfFile) {
-        // 1. Upload PDF (nome sanitizado — o Storage rejeita chaves com acentos e espaços)
-        // O anexo nasce DENTRO da pasta da empresa — Passo 5 do plano dos baldes privados.
-        //
-        // Antes era só `{uuid}/{nome}`, e a pasta aleatória não diz de quem é o arquivo. A
-        // regra de leitura que vai fechar o balde (Passo 6) lê a PRIMEIRA pasta do caminho
-        // como o dono: arquivo fora dela fica invisível para todo mundo, inclusive para quem
-        // o enviou. Medido em 27/08/2026: 22 anexos já estavam nessa situação, e o número
-        // crescia a cada upload feito pela tela.
-        //
-        // O `uuid` continua no meio, isolando cada upload — é ele que evita colisão quando
-        // duas pessoas mandam arquivos de mesmo nome.
-        //
-        // Sem empresa não há onde gravar: recusar aqui é melhor que gravar num lugar que a
-        // regra nova não vai conseguir atribuir a ninguém.
-        if (!profile?.empresa_id) throw new Error('Sua empresa não foi identificada. Recarregue a página e tente de novo.');
-        const filePath = `${profile.empresa_id}/${crypto.randomUUID()}/${sanitizeFileName(pdfFile.name)}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('pedido-anexos')
-          .upload(filePath, pdfFile);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('pedido-anexos')
-          .getPublicUrl(filePath);
-
-        pdfUrl = publicUrl;
-      }
-
-      // 2. Create Pedido
+      // 1. Create Pedido
       const created = await createPedido.mutateAsync({
         cliente_id: clienteId,
         fabricante_id: fabricanteId,
@@ -370,7 +433,9 @@ function NovoNegocioFormContent({
         origem_lead: origemLead || undefined,
         endereco_entrega: enderecoEntrega || undefined,
         observacoes: observacoes || undefined,
-        pdf_url: pdfUrl,
+        // Sem `pdf_url`: os anexos agora têm tabela própria (`pedido_anexos`), gravada no
+        // efeito abaixo — DEPOIS que o negócio existe, é o único jeito de satisfazer a chave
+        // estrangeira.
         campos_extras: camposExtras,
         // Sem `itens`: o módulo de catálogo de produtos saiu em 26/08/2026 e o negócio passou
         // a ter só o valor e o PDF do orçamento. A tabela `itens_pedido` CONTINUA existindo,
@@ -382,15 +447,76 @@ function NovoNegocioFormContent({
         valor_total: valorFinal,
       });
       toast.success('Negócio criado com sucesso!');
-      onCreated?.(created?.id);
+      // 2. Os anexos sobem a seguir, no efeito ligado a `pedidoIdCriado` — sem id ainda não há
+      // negócio para `pedido_anexos.pedido_id` apontar. Sem `created?.id` (não deveria
+      // acontecer), não há como anexar nada mesmo: avisa quem chamou direto.
+      if (created?.id) {
+        setPedidoIdCriado(created.id);
+      } else {
+        onCreated?.(created?.id);
+      }
     } catch (err) {
       // CLAUDE.md §4.6: erro do Supabase não é um `Error` — é `{ message, details, hint, code }`
       // —, e `err.message` cru pulava a parte que o banco escreve em `details`/`hint`.
       toast.error(mensagemDeErro(err, 'Não foi possível criar o negócio.'));
-    } finally {
-      setIsUploading(false);
     }
   };
+
+  // O negócio já existe a partir daqui — sobe os anexos: primeiro os herdados da cópia (só a
+  // referência, sem upload — `useHerdarAnexos`), depois os pendentes, um a um, com upload de
+  // verdade (`useAdicionarAnexo`, a mesma mutação que a ficha usa).
+  //
+  // 🔴 Falha AQUI NÃO desfaz o negócio: ele já foi criado. Mesmo desenho do aviso de
+  // participantes de `useCreatePedidoCompleto` — soma quantos ficaram de fora e avisa uma vez
+  // só, sem travar a criação nem listar anexo por anexo.
+  useEffect(() => {
+    if (!pedidoIdCriado) return;
+
+    if (anexosHerdados.length === 0 && arquivosPendentes.length === 0) {
+      onCreated?.(pedidoIdCriado);
+      return;
+    }
+
+    let cancelado = false;
+    setIsUploading(true);
+
+    (async () => {
+      let falharam = 0;
+
+      if (anexosHerdados.length > 0) {
+        try {
+          await herdarAnexos.mutateAsync(anexosHerdados);
+        } catch {
+          falharam += anexosHerdados.length;
+        }
+      }
+
+      for (const arquivo of arquivosPendentes) {
+        try {
+          await adicionarAnexo.mutateAsync(arquivo);
+        } catch {
+          falharam += 1;
+        }
+      }
+
+      if (cancelado) return;
+      setIsUploading(false);
+
+      if (falharam > 0) {
+        toast.warning(
+          `O negócio foi criado, mas ${falharam} anexo(s) não subiram — acrescente pela ficha.`,
+          { duration: 8000 },
+        );
+      }
+      onCreated?.(pedidoIdCriado);
+    })();
+
+    return () => { cancelado = true; };
+    // Só reage à CHEGADA do id (nasce uma vez, nunca volta a `null`). `herdarAnexos` e
+    // `adicionarAnexo` mudam de identidade a cada render (o `mutationFn` deles fecha sobre
+    // `pedidoIdCriado`) — colocá-los aqui repetiria o envio a cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidoIdCriado]);
 
   /**
    * Limpa o atalho inteiro ao sair dele. Com três campos (CNPJ, nome e marcador) deixar
@@ -755,71 +881,20 @@ function NovoNegocioFormContent({
 
                   O anexo vem ANTES do valor de propósito: é a ordem do trabalho real, em que
                   a pessoa olha o PDF que montou e então digita o número. */}
-              {/* Anexo PDF */}
+              {/* Anexos */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
-                  Anexar PDF{obrigatorio('anexo_pdf', true) && ' *'}
+                  Anexos{obrigatorio('anexo_pdf', true) && ' *'}
                   {obrigatorio('anexo_pdf', true) && (
                     <span className="text-xs font-normal text-muted-foreground">(Obrigatório)</span>
                   )}
                 </Label>
-                <div className={cn(
-                  "relative border-2 border-dashed rounded-lg p-4 transition-colors",
-                  pdfFile || pdfUrlHerdado ? "border-primary/50 bg-primary/5" : "border-muted hover:border-primary/30"
-                )}>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <div className="flex items-center justify-center gap-3">
-                    {pdfFile ? (
-                      <>
-                        <FileText className="h-6 w-6 text-primary" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{pdfFile.name}</p>
-                          <p className="text-xs text-muted-foreground">{(pdfFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive"
-                          onClick={(e) => { e.stopPropagation(); setPdfFile(null); }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : pdfUrlHerdado ? (
-                      /* O anexo veio do negócio copiado: é o MESMO arquivo, e por isso não tem
-                         tamanho para mostrar (ele não passou por aqui). Tirar daqui não mexe no
-                         original — nenhum gesto de tela apaga arquivo do armazenamento. */
-                      <>
-                        <FileText className="h-6 w-6 text-primary" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{filenameFromUrl(pdfUrlHerdado, 'anexo.pdf')}</p>
-                          <p className="text-xs text-muted-foreground">Anexo do negócio copiado</p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive"
-                          onClick={(e) => { e.stopPropagation(); setPdfUrlHerdado(null); }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-6 w-6 text-muted-foreground" />
-                        <div className="text-center">
-                          <p className="text-sm font-medium">Clique ou arraste o PDF aqui</p>
-                          <p className="text-xs text-muted-foreground">Apenas arquivos PDF são aceitos</p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
+                <CampoDeAnexos
+                  anexos={anexosParaExibir}
+                  onAdicionar={adicionarArquivoPendente}
+                  onRemover={removerAnexoDoCadastro}
+                  obrigatorio={obrigatorio('anexo_pdf', true)}
+                />
               </div>
 
               <div className="space-y-2 p-4 border rounded-xl bg-muted/10 max-w-sm">
@@ -866,7 +941,7 @@ function NovoNegocioFormContent({
           ) : (
             <Button onClick={handleSubmit} disabled={createPedido.isPending || isUploading || !isStep2Complete}>
               <Save className="h-4 w-4 mr-1" />
-              {isUploading ? 'Enviando PDF...' : createPedido.isPending ? 'Criando...' : 'Criar Negócio'}
+              {isUploading ? 'Enviando anexos...' : createPedido.isPending ? 'Criando...' : 'Criar Negócio'}
             </Button>
           )}
         </RodapeAssistente>

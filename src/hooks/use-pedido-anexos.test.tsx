@@ -55,6 +55,9 @@ let respostaDoInsert: { data: unknown; error: unknown } = {
   error: null,
 };
 let respostaDoDelete: { error: unknown; count: number | null } = { error: null, count: 1 };
+/** A resposta de `insert(...)` quando NADA o encadeia — o caso de `useHerdarAnexos`, que só lê
+ *  `{ error }` do `INSERT` em lote (sem `.select().single()`, que é coisa de `useAdicionarAnexo`). */
+let respostaDoInsertDireto: { error: unknown } = { error: null };
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -71,7 +74,14 @@ vi.mock('@/integrations/supabase/client', () => ({
       select: () => ({ eq: async () => respostaDaLista }),
       insert: (payload: unknown) => {
         gravouLinha(payload);
-        return { select: () => ({ single: async () => respostaDoInsert }) };
+        return {
+          select: () => ({ single: async () => respostaDoInsert }),
+          // `useHerdarAnexos` não encadeia `.select()`: só dá `await` direto no `insert(...)` e
+          // lê `{ error }`. Sem este `then`, o objeto plano devolveria `error: undefined` — e o
+          // teste de recusa da regra de segurança passaria mesmo sem o gancho conferir nada.
+          then: (resolve: (v: { data: null; error: unknown }) => void) =>
+            resolve({ data: null, error: respostaDoInsertDireto.error }),
+        };
       },
       delete: (opcoes?: { count?: string }) => {
         pediuRemocao(opcoes);
@@ -81,7 +91,7 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
-import { useAnexosDoNegocio, useAdicionarAnexo, useRemoverAnexo } from './use-pedido-anexos';
+import { useAnexosDoNegocio, useAdicionarAnexo, useHerdarAnexos, useRemoverAnexo } from './use-pedido-anexos';
 
 const PEDIDO = 'negocio-1';
 
@@ -116,6 +126,7 @@ beforeEach(() => {
     error: null,
   };
   respostaDoDelete = { error: null, count: 1 };
+  respostaDoInsertDireto = { error: null };
 });
 
 afterEach(() => {
@@ -261,6 +272,55 @@ describe('useAdicionarAnexo', () => {
     expect(enviou).toHaveBeenCalled();
     expect(gravouLinha).not.toHaveBeenCalled();
     expect(toastSucesso).not.toHaveBeenCalled();
+  });
+});
+
+describe('useHerdarAnexos', () => {
+  it('insere uma linha por anexo, sem upload nenhum — o mesmo link do original', async () => {
+    const { wrapper, client } = envolver();
+    const invalidou = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useHerdarAnexos(PEDIDO), { wrapper });
+
+    const anexosDoOriginal = [
+      { url: 'https://balde/empresa-1/aaa/orcamento.pdf', nome: 'orcamento.pdf', tipo: 'application/pdf' },
+      { url: 'https://balde/empresa-1/bbb/planta.png', nome: 'planta.png', tipo: 'image/png' },
+    ];
+
+    await act(async () => { await result.current.mutateAsync(anexosDoOriginal); });
+
+    // Nenhum arquivo sobe: a cópia aponta para o MESMO arquivo do negócio original.
+    expect(enviou).not.toHaveBeenCalled();
+    expect(gravouLinha).toHaveBeenCalledWith([
+      { pedido_id: PEDIDO, url: anexosDoOriginal[0].url, nome: 'orcamento.pdf', tipo: 'application/pdf', criado_por: 'usuario-1' },
+      { pedido_id: PEDIDO, url: anexosDoOriginal[1].url, nome: 'planta.png', tipo: 'image/png', criado_por: 'usuario-1' },
+    ]);
+    // A ficha do negócio novo precisa mostrar os anexos herdados sem recarregar a página.
+    expect(invalidou).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['pedido_anexos', PEDIDO] }));
+  });
+
+  it('lista vazia não faz nada: sem insert, sem invalidar', async () => {
+    const { wrapper, client } = envolver();
+    const invalidou = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useHerdarAnexos(PEDIDO), { wrapper });
+
+    await act(async () => { await result.current.mutateAsync([]); });
+
+    expect(gravouLinha).not.toHaveBeenCalled();
+    expect(invalidou).not.toHaveBeenCalled();
+  });
+
+  it('🔴 recusado pela regra de segurança do banco: avisa e não invalida', async () => {
+    respostaDoInsertDireto = { error: { message: 'linha recusada' } };
+    const { wrapper, client } = envolver();
+    const invalidou = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useHerdarAnexos(PEDIDO), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync([{ url: 'https://balde/a.pdf', nome: 'a.pdf', tipo: 'application/pdf' }]).catch(() => {});
+    });
+
+    expect(toastErro).toHaveBeenCalled();
+    expect(invalidou).not.toHaveBeenCalled();
   });
 });
 

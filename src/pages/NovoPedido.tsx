@@ -11,6 +11,7 @@ import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
 import { useKanbanColunas } from '@/hooks/use-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
 import { useMyVendedorId, useIsGestor } from '@/hooks/use-novo-pedido';
+import { useAnexosDoNegocio } from '@/hooks/use-pedido-anexos';
 import { getNomeNegocio } from '@/lib/nome-negocio';
 import { montarCopiaDeNegocio, type NegocioParaCopiar } from '@/lib/copia-de-negocio';
 
@@ -39,6 +40,9 @@ const NovoPedido = () => {
   // `vendedorId`/`usuario_id` usam em toda parte.
   const { data: isGestor, isLoading: carregandoIsGestor } = useIsGestor();
   const { data: myVendedorId, isLoading: carregandoMyVendedorId } = useMyVendedorId();
+  // Os anexos do negócio ORIGINAL — a cópia leva a lista inteira, cada um apontando para o
+  // MESMO arquivo (sem duplicar nada no armazenamento). Mesmo gancho que a ficha usa.
+  const { data: anexosOriginais, isLoading: carregandoAnexosOriginais } = useAnexosDoNegocio(copiaDeId);
 
   const copia = useMemo(() => {
     if (!copiaDeId || !original) return undefined;
@@ -49,28 +53,31 @@ const NovoPedido = () => {
       primeiraEtapa: colunas?.[0]?.slug,
       rotulo: getNomeNegocio(original),
       quemDuplica: { usuarioId: myVendedorId, ehGestor: !!isGestor },
+      anexos: (anexosOriginais ?? []).map((a) => ({ url: a.url, nome: a.nome, tipo: a.tipo })),
     });
-  }, [copiaDeId, original, responsaveis, camposConfig, colunas, myVendedorId, isGestor]);
+  }, [copiaDeId, original, responsaveis, camposConfig, colunas, myVendedorId, isGestor, anexosOriginais]);
 
   // 🔴 A JANELA SÓ MONTA COM A CÓPIA PRONTA. O preenchimento dela é estado inicial, lido uma
   // vez dentro de NovoNegocioDialog (Tarefa 2): montar antes e preencher depois deixaria a
   // janela vazia para sempre — sem erro nenhum, só um formulário incompleto.
   //
-  // Por isso espera as SEIS consultas que alimentam a cópia — original, responsáveis, campos
-  // customizados da empresa, etapas, e (Correção da revisão final, 15/09/2026) se quem duplica
-  // é gestor e qual é o `usuarioId` dela —, sempre pelo `isLoading` de cada uma, nunca por "o
-  // dado ainda não chegou": uma consulta que falha deixa `data` undefined para sempre, e
-  // travaria a tela girando (ver CLAUDE.md §7.15). Sem esperar as duas últimas, a cópia podia
-  // nascer tratando a pessoa como gestor (ou com o `vendedorId` vazio) e travar assim para
-  // sempre — a regra D1 só se aplica depois que as duas respondem.
+  // Por isso espera as SETE consultas que alimentam a cópia — original, responsáveis, campos
+  // customizados da empresa, etapas, se quem duplica é gestor e qual é o `usuarioId` dela
+  // (Correção da revisão final, 15/09/2026), e os anexos do original (pacote 5) —, sempre pelo
+  // `isLoading` de cada uma, nunca por "o dado ainda não chegou": uma consulta que falha deixa
+  // `data` undefined para sempre, e travaria a tela girando (ver CLAUDE.md §7.15). Sem esperar
+  // os anexos, a cópia nasceria sem nenhum deles mesmo quando o original tem — a janela só lê
+  // `copiaDe?.anexos` uma vez, no `useState` inicial (Tarefa 2/5), então chegar depois é o
+  // mesmo que nunca chegar.
   //
   // `colunas` só liga quando `original.funil_id` existe — medido que, no React Query 5.83
   // instalado aqui, o próprio `isLoading` dela já nasce `true` na MESMA renderização em que
   // `funilId` deixa de ser undefined (o cálculo "otimista" da biblioteca cobre a troca de
-  // habilitada; não há brecha de uma renderização sem essa marca).
+  // habilitada; não há brecha de uma renderização sem essa marca). `anexosOriginais` segue a
+  // mesma regra: a consulta só liga quando `copiaDeId` existe.
   const esperandoACopia = !!copiaDeId && (
     carregandoOriginal || carregandoResponsaveis || carregandoCampos || carregandoColunas ||
-    carregandoIsGestor || carregandoMyVendedorId
+    carregandoIsGestor || carregandoMyVendedorId || carregandoAnexosOriginais
   );
 
   // Decisão D2 do dono do produto (15/09/2026): `?copiaDe=` aponta para um negócio que não

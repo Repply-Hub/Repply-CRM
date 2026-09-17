@@ -24,9 +24,17 @@ const ORIGINAL: NegocioParaCopiar = {
   },
 };
 
+// Os anexos do original não vêm de `NegocioParaCopiar` — `pdf_url` ali é histórico (a coluna
+// que `pedido_anexos` substituiu). Quem chama busca a lista (`useAnexosDoNegocio`) e entrega
+// aqui; esta função só repassa.
+const ANEXOS_DO_ORIGINAL = [
+  { url: 'https://exemplo.supabase.co/storage/v1/object/public/pedido-anexos/empresa-1/abc/orcamento.pdf', nome: 'orcamento.pdf', tipo: 'application/pdf' },
+  { url: 'https://exemplo.supabase.co/storage/v1/object/public/pedido-anexos/empresa-1/def/planta.png', nome: 'planta.png', tipo: 'image/png' },
+];
+
 describe('montarCopiaDeNegocio — o que a cópia leva', () => {
-  it('leva cliente, obra, fábrica, responsável principal, marcador, origem, endereço, valor e anexo', () => {
-    const copia = montarCopiaDeNegocio({ negocio: ORIGINAL, primeiraEtapa: 'novo_lead' });
+  it('leva cliente, obra, fábrica, responsável principal, marcador, origem, endereço, valor e a lista de anexos', () => {
+    const copia = montarCopiaDeNegocio({ negocio: ORIGINAL, primeiraEtapa: 'novo_lead', anexos: ANEXOS_DO_ORIGINAL });
     expect(copia.clienteId).toBe('cliente-1');
     expect(copia.obraId).toBe('obra-1');
     expect(copia.fabricanteId).toBe('fab-1');
@@ -36,7 +44,8 @@ describe('montarCopiaDeNegocio — o que a cópia leva', () => {
     expect(copia.origemLead).toBe('Indicação');
     expect(copia.enderecoEntrega).toBe('Rua Exemplo, 100');
     expect(copia.valor).toBe(180000);
-    expect(copia.pdfUrl).toBe(ORIGINAL.pdf_url);
+    // A lista inteira viaja — não só o primeiro anexo.
+    expect(copia.anexos).toEqual(ANEXOS_DO_ORIGINAL);
   });
 
   it('leva os outros responsáveis como participantes, sem repetir o principal', () => {
@@ -60,7 +69,11 @@ describe('montarCopiaDeNegocio — o que a cópia leva', () => {
     expect(copia.origemLead).toBe('');
     expect(copia.enderecoEntrega).toBe('');
     expect(copia.valor).toBeNull();
-    expect(copia.pdfUrl).toBeNull();
+  });
+
+  it('sem `anexos`, a cópia nasce com a lista vazia — nunca undefined', () => {
+    const copia = montarCopiaDeNegocio({ negocio: ORIGINAL });
+    expect(copia.anexos).toEqual([]);
   });
 });
 

@@ -135,6 +135,51 @@ export function useAdicionarAnexo(pedidoId: string) {
   });
 }
 
+export interface AnexoParaHerdar {
+  url: string;
+  nome: string;
+  tipo: string | null;
+}
+
+/**
+ * Herda anexos de outro negócio — insere uma linha por item, apontando para o MESMO arquivo do
+ * original. SEM upload: é a cópia do "Duplicar negócio" (pacote 3) reaproveitando os arquivos
+ * que já estão no balde, nunca duplicando-os. É o irmão do `useAdicionarAnexo`, mas para anexo
+ * que JÁ tem URL — pense num `INSERT` em lote no lugar do `INSERT` de um só.
+ */
+export function useHerdarAnexos(pedidoId: string) {
+  const qc = useQueryClient();
+  const { profile } = useAuth();
+
+  return useMutation({
+    mutationFn: async (anexos: AnexoParaHerdar[]): Promise<void> => {
+      // Lista vazia não faz nada — nem checa empresa, nem toca o banco. Duplicar um negócio
+      // sem anexo nenhum é o caso mais comum.
+      if (anexos.length === 0) return;
+
+      if (!profile?.id) {
+        throw new Error('Sua empresa não foi identificada. Recarregue a página e tente de novo.');
+      }
+
+      const { error } = await supabase.from('pedido_anexos').insert(
+        anexos.map((a) => ({
+          pedido_id: pedidoId,
+          url: a.url,
+          nome: a.nome,
+          tipo: a.tipo,
+          criado_por: profile.id,
+        })),
+      );
+      if (error) throw error;
+    },
+    onSuccess: (_data, anexos) => {
+      if (anexos.length === 0) return;
+      invalidarLista(qc, pedidoId);
+    },
+    onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível herdar os anexos.')),
+  });
+}
+
 /** Tira um anexo do negócio — só a linha; o arquivo no balde fica (não é este o passo que o apaga). */
 export function useRemoverAnexo(pedidoId: string) {
   const qc = useQueryClient();

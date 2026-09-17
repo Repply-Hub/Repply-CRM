@@ -51,8 +51,13 @@ export interface CopiaDeNegocio {
   origemLead: string;
   enderecoEntrega: string;
   valor: number | null;
-  /** O MESMO arquivo do original, pelo link. Não há cópia de arquivo no armazenamento. */
-  pdfUrl: string | null;
+  /**
+   * As referências para os MESMOS arquivos do original, pelo link — um por anexo. Não há
+   * cópia de arquivo no armazenamento (desenho de 12/09/2026, pacote "vários anexos por
+   * negócio"): `useHerdarAnexos` insere uma linha por item apontando para o endereço que já
+   * está no balde.
+   */
+  anexos: { url: string; nome: string; tipo: string | null }[];
   nome: string;
   nomeAutomatico: boolean;
   camposExtras: Record<string, string>;
@@ -68,6 +73,7 @@ export function montarCopiaDeNegocio({
   primeiraEtapa,
   rotulo,
   quemDuplica,
+  anexos = [],
 }: {
   negocio: NegocioParaCopiar;
   responsaveis?: ResponsavelParaCopiar[];
@@ -80,6 +86,9 @@ export function montarCopiaDeNegocio({
    * é o que protege quem ainda chama esta função sem saber da regra D1 abaixo.
    */
   quemDuplica?: QuemDuplica;
+  /** Os anexos do negócio ORIGINAL — quem chama busca (`useAnexosDoNegocio`) e entrega aqui;
+   *  esta função só repassa a lista, ela não fala com o banco. */
+  anexos?: { url: string; nome: string; tipo: string | null }[];
 }): CopiaDeNegocio {
   // 🔴 Só o que a empresa criou. O resto de `campos_extras` é rastro da importação do Bitrix
   // ("Negócio", "Contato", "Vendedor Original", "responsavel_corrigido", "_lote", "_demo"): ele
@@ -130,7 +139,7 @@ export function montarCopiaDeNegocio({
     origemLead: negocio.origem_lead ?? '',
     enderecoEntrega: negocio.endereco_entrega ?? '',
     valor: negocio.valor_total ?? null,
-    pdfUrl: negocio.pdf_url || null,
+    anexos,
     nome: negocio.nome ?? '',
     nomeAutomatico: !negocio.nome,
     camposExtras,

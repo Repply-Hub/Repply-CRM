@@ -182,8 +182,22 @@ vi.mock('@/integrations/supabase/client', () => {
 
 import { NovoNegocioDialog } from './NovoNegocioDialog';
 
-// Aponta para o MESMO arquivo do negócio original, pelo link — é o contrato de
-// `CopiaDeNegocio.pdfUrl` (src/lib/copia-de-negocio.ts): a cópia nunca duplica arquivo.
+// Aponta para os MESMOS arquivos do negócio original, pelo link — é o contrato de
+// `CopiaDeNegocio.anexos` (src/lib/copia-de-negocio.ts): a cópia nunca duplica arquivo. Dois
+// itens, de propósito: prova que a lista INTEIRA viaja, não só o primeiro.
+const ANEXOS_DA_COPIA = [
+  {
+    url: 'https://exemplo.test/storage/v1/object/public/pedido-anexos/empresa-1/aaa/orcamento-exemplo.pdf',
+    nome: 'orcamento-exemplo.pdf',
+    tipo: 'application/pdf',
+  },
+  {
+    url: 'https://exemplo.test/storage/v1/object/public/pedido-anexos/empresa-1/bbb/planta-exemplo.png',
+    nome: 'planta-exemplo.png',
+    tipo: 'image/png',
+  },
+];
+
 const COPIA_DE_EXEMPLO: CopiaDeNegocio = {
   rotuloDoOriginal: 'Empresa Exemplo Ltda | Fábrica Exemplo',
   clienteId: 'cliente-1',
@@ -197,7 +211,7 @@ const COPIA_DE_EXEMPLO: CopiaDeNegocio = {
   origemLead: '',
   enderecoEntrega: '',
   valor: 180000,
-  pdfUrl: 'https://exemplo.test/storage/v1/object/public/pedido-anexos/empresa-1/aaa/orcamento-exemplo.pdf',
+  anexos: ANEXOS_DA_COPIA,
   nome: '',
   nomeAutomatico: true,
   camposExtras: {},
@@ -251,42 +265,41 @@ describe('NovoNegocioDialog — nasce preenchido por uma cópia', () => {
     expect(createPedidoMock).not.toHaveBeenCalled();
   });
 
-  it('o anexo herdado aparece no passo 2, com o nome tirado da URL e o aviso de onde veio', () => {
+  it('os DOIS anexos herdados aparecem no passo 2, com o nome que veio do negócio original', () => {
     desenhar();
 
     // Config de campos vazia (mock acima) deixa "Próximo" sempre habilitado — não há campo
     // obrigatório nenhum para preencher antes de avançar.
     fireEvent.click(screen.getByRole('button', { name: /próximo/i }));
 
-    expect(screen.getByText('orcamento-exemplo.pdf')).toBeInTheDocument();
-    expect(screen.getByText('Anexo do negócio copiado')).toBeInTheDocument();
+    expect(screen.getByText(ANEXOS_DA_COPIA[0].nome)).toBeInTheDocument();
+    expect(screen.getByText(ANEXOS_DA_COPIA[1].nome)).toBeInTheDocument();
+    expect(screen.getAllByTestId('anexo-linha')).toHaveLength(2);
   });
 
-  it('a lixeira do anexo herdado só tira da tela — não apaga nada no banco nem no armazenamento', () => {
+  it('a lixeira de um anexo herdado só tira ELE da tela — o outro fica, e nada muda no banco', () => {
     desenhar();
     fireEvent.click(screen.getByRole('button', { name: /próximo/i }));
 
-    const linhaDeOrigem = screen.getByText('Anexo do negócio copiado');
-    const botaoRemover = linhaDeOrigem.closest('div')?.nextElementSibling as HTMLElement | null;
-    expect(botaoRemover).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`remover ${ANEXOS_DA_COPIA[0].nome}`, 'i') }));
 
-    fireEvent.click(botaoRemover!);
-
-    expect(screen.queryByText('orcamento-exemplo.pdf')).toBeNull();
-    expect(screen.queryByText('Anexo do negócio copiado')).toBeNull();
-    // Some o anexo herdado, e o campo volta ao convite normal de anexar um PDF.
-    expect(screen.getByText('Clique ou arraste o PDF aqui')).toBeInTheDocument();
+    expect(screen.queryByText(ANEXOS_DA_COPIA[0].nome)).toBeNull();
+    // O outro anexo herdado continua na lista — tirar um não mexe nos demais.
+    expect(screen.getByText(ANEXOS_DA_COPIA[1].nome)).toBeInTheDocument();
+    expect(screen.getAllByTestId('anexo-linha')).toHaveLength(1);
 
     // O original não pode ser afetado: nenhuma chamada de banco ou de armazenamento.
     expect(storageUploadSpy).not.toHaveBeenCalled();
     expect(supabaseDeleteSpy).not.toHaveBeenCalled();
     expect(supabaseUpdateSpy).not.toHaveBeenCalled();
+    expect(supabaseInsertSpy).not.toHaveBeenCalled();
     expect(createPedidoMock).not.toHaveBeenCalled();
   });
 
-  // M1-T2 da revisão final (15/09/2026): criar a partir de uma cópia com anexo herdado manda o
-  // MESMO link ao gravar — nunca sobe arquivo, porque não há arquivo novo nenhum.
-  it('(M1-T2) "Criar Negócio" manda o mesmo link do anexo herdado, sem subir arquivo', async () => {
+  // Pacote 5 (17/09/2026): a cópia leva a LISTA de anexos, não mais um único `pdf_url`. Criar a
+  // partir dela herda os dois — uma linha em `pedido_anexos` por item, apontando para o MESMO
+  // arquivo — sem subir nada. Sucede o antigo teste "M1-T2" da revisão de 15/09/2026.
+  it('"Criar Negócio" herda os DOIS anexos da cópia, sem subir arquivo nenhum', async () => {
     createPedidoMock.mockResolvedValue({ id: 'negocio-2' });
     const { onCreated } = desenhar();
 
@@ -294,11 +307,28 @@ describe('NovoNegocioDialog — nasce preenchido por uma cópia', () => {
     fireEvent.click(screen.getByRole('button', { name: /criar negócio/i }));
 
     await waitFor(() => expect(createPedidoMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith('negocio-2'));
 
+    // Sem `pdf_url`: os anexos têm tabela própria agora, gravada DEPOIS que o negócio existe.
     const payloadEnviado = createPedidoMock.mock.calls[0][0];
-    expect(payloadEnviado.pdf_url).toBe(COPIA_DE_EXEMPLO.pdfUrl);
+    expect(payloadEnviado.pdf_url).toBeUndefined();
     expect(storageUploadSpy).not.toHaveBeenCalled();
-    expect(onCreated).toHaveBeenCalledWith('negocio-2');
+    expect(supabaseInsertSpy).toHaveBeenCalledWith([
+      expect.objectContaining({
+        pedido_id: 'negocio-2',
+        url: ANEXOS_DA_COPIA[0].url,
+        nome: ANEXOS_DA_COPIA[0].nome,
+        tipo: ANEXOS_DA_COPIA[0].tipo,
+        criado_por: 'user-1',
+      }),
+      expect.objectContaining({
+        pedido_id: 'negocio-2',
+        url: ANEXOS_DA_COPIA[1].url,
+        nome: ANEXOS_DA_COPIA[1].nome,
+        tipo: ANEXOS_DA_COPIA[1].tipo,
+        criado_por: 'user-1',
+      }),
+    ]);
   });
 
   // CLAUDE.md §4.6: erro do Supabase NÃO é um `Error` — é `{ message, details, hint, code }` —,

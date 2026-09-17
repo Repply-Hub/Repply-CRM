@@ -30,6 +30,7 @@ const {
   useAuthMock,
   useMyVendedorIdMock,
   useIsGestorMock,
+  useAnexosDoNegocioMock,
   toastErrorMock,
   propsRecebidas,
   montagens,
@@ -41,6 +42,7 @@ const {
   useAuthMock: vi.fn(),
   useMyVendedorIdMock: vi.fn(),
   useIsGestorMock: vi.fn(),
+  useAnexosDoNegocioMock: vi.fn(),
   toastErrorMock: vi.fn(),
   propsRecebidas: [] as NovoNegocioDialogProps[],
   montagens: { current: 0 },
@@ -52,6 +54,7 @@ vi.mock('@/hooks/use-configuracoes-campos', () => ({ useConfiguracoesCampos: use
 vi.mock('@/hooks/use-kanban-colunas', () => ({ useKanbanColunas: useKanbanColunasMock }));
 vi.mock('@/hooks/use-auth', () => ({ useAuth: useAuthMock }));
 vi.mock('@/hooks/use-novo-pedido', () => ({ useMyVendedorId: useMyVendedorIdMock, useIsGestor: useIsGestorMock }));
+vi.mock('@/hooks/use-pedido-anexos', () => ({ useAnexosDoNegocio: useAnexosDoNegocioMock }));
 vi.mock('sonner', () => ({ toast: { error: toastErrorMock, success: vi.fn(), warning: vi.fn(), info: vi.fn() } }));
 
 vi.mock('@/components/layout/AppLayout', () => ({
@@ -145,6 +148,13 @@ const COLUNAS_PADRAO = [
   { id: 'col-2', empresa_id: 'empresa-1', funil_id: 'funil-1', slug: 'negociacao', nome: 'Negociação', cor: 'kanban-negotiation', ordem: 1, is_sistema: true, created_at: '', updated_at: '' },
 ];
 
+// Os anexos do negócio original (pacote 5: um negócio aceita vários). `useAnexosDoNegocio` já
+// devolve mais novo em cima — é essa ordem que a cópia recebe.
+const ANEXOS_PADRAO = [
+  { id: 'anexo-2', url: 'https://exemplo.test/pedido-anexos/empresa-1/bbb/planta.png', nome: 'planta.png', tipo: 'image/png', tamanhoBytes: 2048, criadoEm: '2026-09-02T10:00:00Z' },
+  { id: 'anexo-1', url: 'https://exemplo.test/pedido-anexos/empresa-1/aaa/orcamento.pdf', nome: 'orcamento.pdf', tipo: 'application/pdf', tamanhoBytes: 1024, criadoEm: '2026-09-01T10:00:00Z' },
+];
+
 function configurarHooks(overrides: {
   original?: EstadoConsulta<typeof ORIGINAL_PADRAO | null>;
   responsaveis?: EstadoConsulta<typeof RESPONSAVEIS_PADRAO>;
@@ -155,6 +165,7 @@ function configurarHooks(overrides: {
   // (escritos antes de D1) continuam esperando.
   isGestor?: EstadoConsulta<boolean>;
   myVendedorId?: EstadoConsulta<string>;
+  anexos?: EstadoConsulta<typeof ANEXOS_PADRAO>;
 } = {}) {
   useAuthMock.mockReturnValue({ profile: { id: 'user-1', empresa_id: 'empresa-1', role: 'vendedor' } });
   usePedidoPorIdMock.mockReturnValue(overrides.original ?? resolvido(ORIGINAL_PADRAO));
@@ -163,6 +174,7 @@ function configurarHooks(overrides: {
   useKanbanColunasMock.mockReturnValue(overrides.colunas ?? resolvido(COLUNAS_PADRAO));
   useIsGestorMock.mockReturnValue(overrides.isGestor ?? resolvido(true));
   useMyVendedorIdMock.mockReturnValue(overrides.myVendedorId ?? resolvido('user-1'));
+  useAnexosDoNegocioMock.mockReturnValue(overrides.anexos ?? resolvido(ANEXOS_PADRAO));
 }
 
 function montar(path = '/pedidos/novo?copiaDe=negocio-1') {
@@ -231,6 +243,16 @@ describe('NovoPedido — o endereço ?copiaDe= monta a cópia', () => {
       expect(screen.queryByTestId('novo-negocio-dialog-stub')).not.toBeInTheDocument();
       expect(montagens.current).toBe(0);
     });
+
+    // A fresta do pacote 5: sem esperar os anexos do original, a cópia nasceria sem nenhum
+    // deles — `copiaDe?.anexos` só alimenta `useState` inicial dentro da janela (Tarefa 2/5),
+    // então chegar depois é o mesmo que nunca chegar.
+    it('anexos do negócio original ainda carregando', () => {
+      configurarHooks({ anexos: carregando() });
+      montar();
+      expect(screen.queryByTestId('novo-negocio-dialog-stub')).not.toBeInTheDocument();
+      expect(montagens.current).toBe(0);
+    });
   });
 
   it('quando responsáveis chegam depois do resto, a janela só nasce depois — nunca vazia', () => {
@@ -269,6 +291,19 @@ describe('NovoPedido — o endereço ?copiaDe= monta a cópia', () => {
     expect(props.status).toBe('contato_inicial');
     expect(props.funilId).toBe('funil-1');
     expect(props.clienteId).toBe('cliente-1');
+    // A lista inteira de anexos do original viaja — na mesma ordem (mais novo em cima).
+    expect(props.copiaDe?.anexos).toEqual([
+      { url: ANEXOS_PADRAO[0].url, nome: 'planta.png', tipo: 'image/png' },
+      { url: ANEXOS_PADRAO[1].url, nome: 'orcamento.pdf', tipo: 'application/pdf' },
+    ]);
+  });
+
+  it('negócio original sem anexo nenhum: a cópia nasce com a lista vazia', () => {
+    configurarHooks({ anexos: resolvido([]) });
+    montar();
+
+    const props = propsRecebidas[propsRecebidas.length - 1];
+    expect(props.copiaDe?.anexos).toEqual([]);
   });
 
   it('negócio original numa etapa de fechamento: a cópia nasce na primeira etapa mesmo assim', () => {
