@@ -31,10 +31,10 @@ import { EmpresasTab } from '@/components/configuracoes/EmpresasTab';
 import { AutomacaoTab } from '@/components/configuracoes/AutomacaoTab';
 import { AssinaturaEmailEditor } from '@/components/configuracoes/AssinaturaEmailEditor';
 import {
-  montarRodapeEmailHtml,
   normalizarAssinaturaAntiga,
   sanitizarAssinaturaEmail,
 } from '@/lib/assinatura-email';
+import { sanitizarHtmlEmail } from '@/lib/sanitizar-html-email';
 
 const themeOptions = [
   { value: 'light' as const, label: 'Claro', icon: Sun, desc: 'Tema claro padrão' },
@@ -138,6 +138,9 @@ function ProfileTab() {
   // (a aba "Empresa") — antes esta tela tinha um upload próprio, num caminho global que uma
   // empresa sobrescrevia da outra.
   const marcaDaMinhaEmpresa = marcaDaEmpresa(profile);
+  // Upload de imagem da assinatura é por EMPRESA (caixa compartilhada), não
+  // por usuário — mesmo padrão de `CustomizeTab`/`AutomacaoTab` nesta tela.
+  const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   // A assinatura (e a logo do rodapé) só existem para serem anexadas ao e-mail
   // que o módulo de E-mail envia. Sem o módulo, é configuração sem efeito.
   const { ligada: temEmails, carregando: carregandoSecoes } = useSecaoLigada('emails');
@@ -151,9 +154,6 @@ function ProfileTab() {
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [assinaturaHtml, setAssinaturaHtml] = useState('');
-  const [assinaturaModo, setAssinaturaModo] = useState<'texto' | 'imagem'>('texto');
-  const [mostrarNomeImagem, setMostrarNomeImagem] = useState(true);
-  const [mostrarEmpresaImagem, setMostrarEmpresaImagem] = useState(true);
 
   const { data: perfil, isLoading } = useQuery({
     queryKey: ['meu_perfil', user?.id],
@@ -179,8 +179,6 @@ function ProfileTab() {
   useEffect(() => {
     if (perfil) {
       setAssinaturaHtml(normalizarAssinaturaAntiga(perfil.assinatura_email));
-      setMostrarNomeImagem(perfil.assinatura_imagem_mostrar_nome ?? true);
-      setMostrarEmpresaImagem(perfil.assinatura_imagem_mostrar_empresa ?? true);
     }
   }, [perfil?.id]);
 
@@ -443,12 +441,7 @@ function ProfileTab() {
                       name="assinatura_email"
                       value={assinaturaHtml}
                       onChange={setAssinaturaHtml}
-                      userId={user!.id}
-                      onModoChange={setAssinaturaModo}
-                      mostrarNomeImagem={mostrarNomeImagem}
-                      onMostrarNomeImagemChange={setMostrarNomeImagem}
-                      mostrarEmpresaImagem={mostrarEmpresaImagem}
-                      onMostrarEmpresaImagemChange={setMostrarEmpresaImagem}
+                      empresaId={empresaId ?? ''}
                     />
                   </div>
                   {(assinaturaHtml || perfil.nome) && (
@@ -471,20 +464,15 @@ function ProfileTab() {
                             Pré-visualização do e-mail
                           </span>
                         </div>
+                        {/* Desde 18/09/2026 não há mais "rodapé automático" (nome+logo
+                            somados no envio) — a assinatura é exatamente o que a pessoa
+                            monta no editor acima. A prévia mostra esse HTML autorado, só
+                            sanitizado, em fundo branco (o fundo real de um e-mail). */}
                         <div
                           className="bg-white p-3"
                           style={{ colorScheme: 'light' }}
                           dangerouslySetInnerHTML={{
-                            __html: montarRodapeEmailHtml({
-                              nome: perfil.nome ?? '',
-                              assinaturaHtml,
-                              logoUrl: marcaDaMinhaEmpresa.logoUrl,
-                              nomeDaEmpresa: marcaDaMinhaEmpresa.nome,
-                              mostrarLogo: assinaturaModo === 'texto',
-                              isolado: true,
-                              mostrarNome: assinaturaModo === 'texto' || mostrarNomeImagem,
-                              mostrarNomeEmpresa: assinaturaModo === 'texto' || mostrarEmpresaImagem,
-                            }),
+                            __html: sanitizarHtmlEmail(assinaturaHtml),
                           }}
                         />
                       </div>
@@ -497,12 +485,14 @@ function ProfileTab() {
                   nenhuma para o PDF — e esta gravava num caminho fixo, `logo-email.png`, o
                   MESMO para as dez empresas assinantes: uma sobrescrevia e APAGAVA a da outra,
                   e a regra do balde permitia isso a qualquer pessoa logada.
-                  Agora a assinatura usa a mesma logo do cabeçalho dos PDFs. */}
-              {temEmails === true && assinaturaModo === 'texto' && !marcaDaMinhaEmpresa.logoUrl && (
+                  Desde 18/09/2026 o "rodapé automático" do e-mail (que somava esta logo à
+                  assinatura no envio) deixou de existir — quem quiser a logo no e-mail
+                  insere a imagem no editor acima. A logo da empresa segue usada no topo
+                  dos PDFs exportados, e é só isso que este aviso promete agora. */}
+              {temEmails === true && !marcaDaMinhaEmpresa.logoUrl && (
                 <p className="text-xs text-muted-foreground">
                   Sua empresa ainda não tem logo. Quem for gestor pode enviá-la em
-                  Configurações › Empresa — ela aparece aqui no rodapé e no topo dos PDFs
-                  exportados.
+                  Configurações › Empresa — ela aparece no topo dos PDFs exportados.
                 </p>
               )}
 
