@@ -40,7 +40,6 @@ describe("sanitizarHtmlEmail", () => {
 
   it("lida com nulo/indefinido sem quebrar", () => {
     expect(sanitizarHtmlEmail("")).toBe("");
-    // @ts-expect-error valida entrada torta em runtime
-    expect(sanitizarHtmlEmail(undefined)).toBe("");
+    expect(sanitizarHtmlEmail(undefined as unknown as string)).toBe("");
   });
 });
