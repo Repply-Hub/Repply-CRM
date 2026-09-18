@@ -32,8 +32,6 @@ import {
   keepPreviousData,
 } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/use-auth";
-import { marcaDaEmpresa } from "@/lib/marca-da-empresa";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -77,11 +75,9 @@ import {
 } from "@/components/email/LeitorEmail";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
 import { ConfirmarEnviarEmailDialog } from "@/components/email/ConfirmarEnviarEmailDialog";
-import {
-  ehAssinaturaImagem,
-  montarRodapeEmailHtml,
-  normalizarAssinaturaAntiga,
-} from "@/lib/assinatura-email";
+import { normalizarAssinaturaAntiga } from "@/lib/assinatura-email";
+import { sanitizarHtmlEmail } from "@/lib/sanitizar-html-email";
+import { enviarImagemEmail } from "@/lib/imagem-email";
 import { GerenciarCaixaDialog } from "@/components/email/GerenciarCaixaDialog";
 import { BarraPastas } from "@/components/email/BarraPastas";
 import {
@@ -108,6 +104,19 @@ import { MoverParaMarcadorDialog } from "@/components/email/MoverParaMarcadorDia
  */
 function normalizarEnderecos(valor: unknown): EnderecoDoEmail[] {
   return Array.isArray(valor) ? (valor as EnderecoDoEmail[]) : [];
+}
+
+/** Escapa `&`, `<` e `>` — usado ao colocar texto solto (não HTML) dentro do corpo do editor. */
+function escaparHtml(t: string): string {
+  return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * Corpo inicial de uma composição: área de digitação em branco no topo, depois
+ * a assinatura, e por fim (em resposta/encaminhar) a citação do original.
+ */
+function montarCorpoInicial(assinaturaHtml: string, citacaoHtml = ""): string {
+  return `<p></p>${assinaturaHtml || ""}${citacaoHtml}`;
 }
 
 /** Uma linha da caixa de entrada, no formato que a listagem devolve. */
@@ -397,15 +406,6 @@ const Emails = () => {
   });
   /** Id do rascunho em `email_rascunhos` sendo editado; nulo enquanto o autosave ainda não gravou a primeira vez. */
   const [rascunhoId, setRascunhoId] = useState<string | null>(null);
-  /**
-   * Se a assinatura entra NESTE e-mail. Começa `true` em toda composição
-   * nova ou resposta; a pessoa pode remover e voltar atrás quantas vezes
-   * quiser antes de enviar. É por composição — não altera a assinatura
-   * salva em Configurações — e vale só enquanto o compositor está aberto:
-   * a escolha não é gravada no rascunho, então reabrir um rascunho salvo
-   * começa com a assinatura marcada de novo.
-   */
-  const [incluirAssinatura, setIncluirAssinatura] = useState(true);
 
   const { data: perfil } = useQuery({
     queryKey: ["meu_perfil"],
@@ -424,50 +424,13 @@ const Emails = () => {
   });
 
   /**
-   * A marca da empresa de quem envia — a MESMA que vai no topo dos PDFs.
-   *
-   * 🔴 Até 31/08/2026 o rodapé do e-mail escrevia "MD Representações" e apontava para uma logo
-   * de caminho único, igual para as dez empresas. Todo e-mail de todo cliente saía assinado
-   * com o nome de outra representação.
+   * Assinatura a semear no CORPO ao abrir uma composição (novo/responder) —
+   * a assinatura salva pela pessoa (`usuarios.assinatura_email`), crua, sem o
+   * rodapé de nome/logo/empresa que o envio montava antes (esse rodapé
+   * automático deixou de existir: a pessoa monta a assinatura inteira, se
+   * quiser, no editor de Configurações — ver Task 6). Vazia, nada é semeado.
    */
-  const { profile } = useAuth();
-  const marcaDaMinhaEmpresa = useMemo(() => marcaDaEmpresa(profile), [profile]);
-
-  /**
-   * Prévia da assinatura mostrada no compositor enquanto a pessoa escreve —
-   * MESMA regra do rodapé que `sendEmailMutation` monta no envio (nome/logo/
-   * imagem, com as preferências de mostrar-nome/mostrar-empresa), só que aqui
-   * não é gravado em lugar nenhum. `logoUrl` sem cache-bust por `Date.now()`
-   * (diferente do envio): ali o bust importa pra não mandar uma logo velha
-   * cacheada; aqui recalcular a cada re-render (a cada tecla digitada no
-   * corpo) recarregaria a imagem sem parar.
-   */
-  const assinaturaPreviewHtml = useMemo(() => {
-    const assinaturaNormalizada = normalizarAssinaturaAntiga(perfil?.assinatura_email);
-    return montarRodapeEmailHtml({
-      nome: perfil?.nome ?? "",
-      assinaturaHtml: assinaturaNormalizada,
-      logoUrl: marcaDaMinhaEmpresa.logoUrl,
-      nomeDaEmpresa: marcaDaMinhaEmpresa.nome,
-      mostrarLogo: !ehAssinaturaImagem(assinaturaNormalizada),
-      mostrarNome:
-        !ehAssinaturaImagem(assinaturaNormalizada) ||
-        (perfil?.assinatura_imagem_mostrar_nome ?? true),
-      mostrarNomeEmpresa:
-        !ehAssinaturaImagem(assinaturaNormalizada) ||
-        (perfil?.assinatura_imagem_mostrar_empresa ?? true),
-      isolado: true,
-    });
-  }, [
-    // A marca entra nas dependências: sem ela, trocar a logo da empresa não repintaria este
-    // preview até a página ser recarregada.
-    marcaDaMinhaEmpresa.logoUrl,
-    marcaDaMinhaEmpresa.nome,
-    perfil?.nome,
-    perfil?.assinatura_email,
-    perfil?.assinatura_imagem_mostrar_nome,
-    perfil?.assinatura_imagem_mostrar_empresa,
-  ]);
+  const assinaturaParaCorpo = normalizarAssinaturaAntiga(perfil?.assinatura_email) || "";
 
   /**
    * Rascunhos do usuário logado, mais recente primeiro. Alimenta a aba
@@ -490,14 +453,11 @@ const Emails = () => {
 
   useEffect(() => {
     const to = searchParams.get("to");
-    if (to) {
-      setFormData((prev) => ({ ...prev, destinatario: to }));
-      // Contexto novo (endereço veio de fora, não de um rascunho salvo): não
-      // continuar amarrado a um rascunho de uma composição anterior.
-      setRascunhoId(null);
-      setIncluirAssinatura(true);
-      setIsComposeOpen(true);
-    }
+    // Mesmo caminho de "escrever para": destinatário preenchido, corpo já
+    // com a assinatura semeada, sem amarrar a um rascunho de composição
+    // anterior — `enviarPara` já faz tudo isso (ver abaixo).
+    if (to) enviarPara(to);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const salvarRascunhoMutation = useMutation({
@@ -1079,42 +1039,15 @@ const Emails = () => {
         );
       }
 
-      // `assinatura_email` já sanitizada em Configurações antes de ser salva —
-      // normaliza aqui é só pra converter formato ANTIGO (texto puro com
-      // `\n`, de antes do editor de formatação existir). `montarRodapeEmailHtml`
-      // sanitiza de novo por conta própria, então dado antigo/legado também
-      // não passa cru.
-      const assinaturaNormalizada = normalizarAssinaturaAntiga(perfil?.assinatura_email);
-
-      // Quem escreve pode ter removido a assinatura DESTE e-mail (botão
-      // "Remover" no compositor). Nesse caso o e-mail sai só com o corpo
-      // digitado — sem rodapé de nome/logo/assinatura.
-      const rodapeHtml = incluirAssinatura
-        ? montarRodapeEmailHtml({
-            nome: perfil?.nome ?? "",
-            assinaturaHtml: assinaturaNormalizada,
-            // A logo já vem com `?v=` do momento em que foi enviada — ver `CampoDeLogoDaEmpresa`.
-            logoUrl: marcaDaMinhaEmpresa.logoUrl,
-            nomeDaEmpresa: marcaDaMinhaEmpresa.nome,
-            // Assinatura em modo imagem já é autossuficiente — mostrar a logo
-            // da empresa em cima dela seria redundante/poluído.
-            mostrarLogo: !ehAssinaturaImagem(assinaturaNormalizada),
-            // Só vale no modo imagem — no modo texto o nome e a empresa sempre
-            // aparecem, como sempre apareceram.
-            mostrarNome:
-              !ehAssinaturaImagem(assinaturaNormalizada) ||
-              (perfil?.assinatura_imagem_mostrar_nome ?? true),
-            mostrarNomeEmpresa:
-              !ehAssinaturaImagem(assinaturaNormalizada) ||
-              (perfil?.assinatura_imagem_mostrar_empresa ?? true),
-          })
-        : "";
-
+      // O corpo agora é HTML pronto do editor (a assinatura, se a pessoa não
+      // apagou, já está dentro dele — ver `montarCorpoInicial`). O rodapé
+      // automático (nome+logo+empresa, colado aqui no envio) deixou de
+      // existir: `sanitizarHtmlEmail` é a única defesa nesta etapa, e é a
+      // MESMA função que já limpa o HTML a cada `onChange` do editor.
       const htmlBody = `
         <div style="font-family: sans-serif; font-size: 16px; color: #333; line-height: 1.5;">
-          ${data.corpo.replace(/\n/g, "<br>")}
+          ${sanitizarHtmlEmail(data.corpo)}
         </div>
-        ${rodapeHtml}
       `;
 
       // O registro em email_mensagens é feito pela Edge Function, que é quem
@@ -1146,7 +1079,6 @@ const Emails = () => {
         cc: "",
         cco: "",
       });
-      setIncluirAssinatura(true);
       // Enviado com sucesso: o rascunho que o alimentava não serve mais.
       // Os anexos (balde + linhas) já foram apagados pela função de servidor
       // depois que o Nylas aceitou; aqui só cai a linha do rascunho.
@@ -1405,6 +1337,13 @@ const Emails = () => {
       : `Re: ${assunto}`;
     const quando = selectedEmail.created_at || selectedEmail.criado_em;
     const citado = selectedEmail.snippet || selectedEmail.corpo || "";
+    const cabecalho = `Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${selectedEmail.remetente} escreveu:`;
+    // Citação em HTML (o corpo agora é HTML, não texto puro) — escapa o texto
+    // do e-mail original antes de colocar dentro da tag, senão `<`/`>`/`&` que
+    // vierem no assunto ou no trecho citado quebrariam a marcação do corpo.
+    const citacaoHtml =
+      `<br><blockquote style="margin:0;border-left:2px solid #ccc;padding-left:12px;color:#555">` +
+      `${escaparHtml(cabecalho)}<br>${escaparHtml(citado).replace(/\n/g, "<br>")}</blockquote>`;
 
     setFormData({
       ...formData,
@@ -1414,7 +1353,7 @@ const Emails = () => {
         selectedEmail.remetente || selectedEmail.destinatario,
       ),
       assunto: replySubject,
-      corpo: `\n\n--- Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${selectedEmail.remetente} escreveu:\n\n${citado}`,
+      corpo: montarCorpoInicial(assinaturaParaCorpo, citacaoHtml),
       // Contexto novo: Cc/Cco de uma composição anterior não continuam numa
       // resposta diferente.
       cc: "",
@@ -1429,8 +1368,6 @@ const Emails = () => {
     // Contexto novo: uma resposta não continua o rascunho de outra
     // composição — o autosave (abaixo) cria uma linha própria para ela.
     setRascunhoId(null);
-    // Resposta também nasce com a assinatura incluída — a pessoa remove se quiser.
-    setIncluirAssinatura(true);
     // O e-mail aberto CONTINUA aberto atrás do compositor. Fechá-lo aqui era o
     // que jogava a pessoa de volta para a caixa de entrada no meio da resposta.
     setRespondendo(true);
@@ -1445,11 +1382,16 @@ const Emails = () => {
    * mensagem nova para aquele endereço, não uma resposta.
    */
   const enviarPara = (endereco: string) => {
-    setFormData({ destinatario: endereco, assunto: "", corpo: "", cc: "", cco: "" });
+    setFormData({
+      destinatario: endereco,
+      assunto: "",
+      corpo: montarCorpoInicial(assinaturaParaCorpo),
+      cc: "",
+      cco: "",
+    });
     setRespondendoA(null);
     setRespondendo(false);
     setRascunhoId(null);
-    setIncluirAssinatura(true);
     setIsComposeOpen(true);
   };
 
@@ -1477,13 +1419,16 @@ const Emails = () => {
         cco: "",
       });
       setRascunhoId(maisRecente.id);
-      // A escolha de assinatura não é gravada no rascunho — sempre começa incluída.
-      setIncluirAssinatura(true);
       toast.info("Rascunho recuperado.");
     } else {
-      setFormData({ destinatario: "", assunto: "", corpo: "", cc: "", cco: "" });
+      setFormData({
+        destinatario: "",
+        assunto: "",
+        corpo: montarCorpoInicial(assinaturaParaCorpo),
+        cc: "",
+        cco: "",
+      });
       setRascunhoId(null);
-      setIncluirAssinatura(true);
     }
     setRespondendoA(null);
     setRespondendo(false);
@@ -1505,7 +1450,6 @@ const Emails = () => {
       cco: "",
     });
     setRascunhoId(r.id);
-    setIncluirAssinatura(true);
     setRespondendoA(null);
     setRespondendo(false);
     setIsComposeOpen(true);
@@ -1839,20 +1783,17 @@ const Emails = () => {
         }
         setRascunhoId(null);
         setFormData({ destinatario: "", assunto: "", corpo: "", cc: "", cco: "" });
-        setIncluirAssinatura(true);
         fecharCompositor(false);
       }}
       isConnected={isConnected}
       isEnviando={sendEmailMutation.isPending}
       titulo={respondendo ? "Responder" : "Nova mensagem"}
-      assinaturaPreviewHtml={assinaturaPreviewHtml}
-      incluirAssinatura={incluirAssinatura}
-      onIncluirAssinaturaChange={setIncluirAssinatura}
       anexos={anexosCtrl.anexos}
       onAnexar={aoAnexar}
       onRemoverAnexo={aoRemoverAnexo}
       anexando={anexosCtrl.subindo}
       onConfigurarAssinatura={() => navigate("/configuracoes?tab=perfil")}
+      onEnviarImagemCorpo={(file) => enviarImagemEmail(file, perfil?.empresa_id ?? "")}
     />
   );
 

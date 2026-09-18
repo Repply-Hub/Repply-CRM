@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Mail, Paperclip, Send, Settings, Trash2, Undo2, X } from 'lucide-react';
+import { Loader2, Mail, Paperclip, Send, Settings, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { EditorTextoRico } from '@/components/shared/EditorTextoRico';
 import { tamanhoLegivel } from '@/lib/fabricante-arquivos';
 import { Dialog, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 // 🔴 CLAUDE.md §7.11: `<DialogContent>` cru não tem teto de altura nem
@@ -38,24 +38,6 @@ interface Props {
   /** "Nova mensagem" na caixa; "Responder" quando sai de dentro de um e-mail. */
   titulo?: string;
   /**
-   * HTML do rodapé (nome + assinatura + logo/empresa, conforme as
-   * preferências salvas em Configurações) exatamente como vai sair no
-   * e-mail — mostrado como prévia fixa abaixo da caixa de texto, não
-   * editável aqui. O corpo continua sendo só o que a pessoa digita; o
-   * rodapé é colado nele automaticamente no envio, como já era antes desta
-   * prévia existir.
-   */
-  assinaturaPreviewHtml: string;
-  /**
-   * Se a assinatura entra NESTE e-mail. Começa `true`; a pessoa pode
-   * remover e voltar atrás quantas vezes quiser antes de enviar. É escolha
-   * por composição — não altera a assinatura salva em Configurações — e
-   * vale só enquanto o compositor está aberto: reabrir um rascunho salvo
-   * volta com a assinatura marcada.
-   */
-  incluirAssinatura: boolean;
-  onIncluirAssinaturaChange: (incluir: boolean) => void;
-  /**
    * Anexos já presos ao rascunho deste e-mail. A lista vem do
    * `email_rascunho_anexos`; o binário mora no balde privado e só a função
    * de servidor `email-enviar` o alcança no envio.
@@ -72,6 +54,12 @@ interface Props {
    * própria assinatura, não só quem gerencia a caixa da empresa.
    */
   onConfigurarAssinatura?: () => void;
+  /**
+   * Sobe uma imagem inserida NO CORPO (não confundir com anexo) e devolve a
+   * URL pública. Passar esta prop habilita o botão Imagem na barra do
+   * editor; sem ela, o botão não aparece.
+   */
+  onEnviarImagemCorpo?: (file: File) => Promise<string>;
 }
 
 /**
@@ -104,14 +92,12 @@ export function CompositorEmail({
   isConnected,
   isEnviando,
   titulo = 'Nova mensagem',
-  assinaturaPreviewHtml,
-  incluirAssinatura,
-  onIncluirAssinaturaChange,
   anexos,
   onAnexar,
   onRemoverAnexo,
   anexando,
   onConfigurarAssinatura,
+  onEnviarImagemCorpo,
 }: Props) {
   const inputArquivoRef = useRef<HTMLInputElement>(null);
   // Começa aberto quando já chega preenchido (reabrir um rascunho com Cc/Cco
@@ -278,12 +264,13 @@ export function CompositorEmail({
           </div>
 
           <div className="px-6 py-4">
-            <Textarea
-              id="body"
-              placeholder="Escreva sua mensagem aqui..."
-              className="min-h-[380px] resize-none border-none bg-transparent p-0 text-base"
+            <EditorTextoRico
               value={valores.corpo}
-              onChange={(e) => onChange({ ...valores, corpo: e.target.value })}
+              onChange={(html) => onChange({ ...valores, corpo: html })}
+              onEnviarImagem={onEnviarImagemCorpo}
+              placeholder="Escreva sua mensagem aqui..."
+              minHeight={360}
+              aria-label="Corpo do e-mail"
             />
           </div>
 
@@ -305,22 +292,42 @@ export function CompositorEmail({
               }}
             />
             <div className="flex items-center justify-between gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
-                onClick={() => inputArquivoRef.current?.click()}
-                disabled={anexando}
-                title="Anexar arquivos a este e-mail"
-              >
-                {anexando ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Paperclip className="h-3.5 w-3.5" />
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                  onClick={() => inputArquivoRef.current?.click()}
+                  disabled={anexando}
+                  title="Anexar arquivos a este e-mail"
+                >
+                  {anexando ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Paperclip className="h-3.5 w-3.5" />
+                  )}
+                  {anexando ? 'Enviando arquivo…' : 'Anexar'}
+                </Button>
+                {/* Discreto e sem guarda de papel: qualquer pessoa que escreve
+                    e-mail chega direto na própria assinatura, sem depender de
+                    quem gerencia a caixa da empresa abrir "Gerenciar caixa".
+                    A assinatura agora vive dentro do corpo (editor acima) —
+                    este botão só leva para ajustar o texto salvo. */}
+                {onConfigurarAssinatura && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                    onClick={onConfigurarAssinatura}
+                    title="Editar a assinatura salva em Configurações"
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                    Configurar assinatura
+                  </Button>
                 )}
-                {anexando ? 'Enviando arquivo…' : 'Anexar'}
-              </Button>
+              </div>
               {anexos.length > 0 && (
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {anexos.length} {anexos.length === 1 ? 'anexo' : 'anexos'}
@@ -357,103 +364,6 @@ export function CompositorEmail({
             )}
           </div>
 
-          {/* Prévia fixa do rodapé — não é campo do formulário, só mostra o
-              que `sendEmailMutation` vai colar embaixo do corpo no envio.
-              `bg-white`/`colorScheme: light` fixos: o HTML do rodapé usa
-              cores hex pensadas pra fundo branco (é o mesmo que sai no
-              e-mail de verdade), então no tema escuro do app ficaria
-              ilegível sem isso — mesma solução já usada na prévia de
-              Configurações. `pointer-events-none` fica só no CONTEÚDO (o
-              `dangerouslySetInnerHTML` de dentro), não neste wrapper: um
-              link ou imagem da assinatura não deve ser clicável nesta tela,
-              mas o wrapper precisa continuar recebendo roda do mouse/arraste
-              pra rolar — `pointer-events-none` aqui fora desativava a régua
-              de rolagem inteira (aparecia a barrinha, mas nada respondia). */}
-          {/* A assinatura é colada no envio, não editada aqui — mas dá para
-              tirá-la DESTE e-mail. É escolha por composição: não mexe na
-              assinatura salva em Configurações, e volta a valer no próximo
-              e-mail (ou aqui mesmo, no "Adicionar de volta"). */}
-          <div className="border-t px-6 py-3">
-            {incluirAssinatura ? (
-              <>
-                <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Assinatura (adicionada automaticamente ao enviar)
-                  </p>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {/* Discreto e sem guarda de papel: qualquer pessoa que escreve
-                        e-mail chega direto na própria assinatura, sem depender de
-                        quem gerencia a caixa da empresa abrir "Gerenciar caixa". */}
-                    {onConfigurarAssinatura && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 gap-1 px-2 text-xs text-muted-foreground"
-                        onClick={onConfigurarAssinatura}
-                        title="Editar a assinatura salva em Configurações"
-                      >
-                        <Settings className="h-3.5 w-3.5" />
-                        Configurar assinatura
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 gap-1 px-2 text-xs text-muted-foreground"
-                      onClick={() => onIncluirAssinaturaChange(false)}
-                      title="Remover a assinatura deste e-mail"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                      Remover
-                    </Button>
-                  </div>
-                </div>
-                <div
-                  className="max-h-40 overflow-y-auto rounded-md border bg-white p-3 text-sm"
-                  style={{ colorScheme: 'light' }}
-                >
-                  <div
-                    className="pointer-events-none"
-                    dangerouslySetInnerHTML={{ __html: assinaturaPreviewHtml }}
-                  />
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
-                  Assinatura removida deste e-mail.
-                </p>
-                <div className="flex shrink-0 items-center gap-1">
-                  {onConfigurarAssinatura && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 gap-1 px-2 text-xs text-muted-foreground"
-                      onClick={onConfigurarAssinatura}
-                      title="Editar a assinatura salva em Configurações"
-                    >
-                      <Settings className="h-3.5 w-3.5" />
-                      Configurar assinatura
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 gap-1 px-2 text-xs text-muted-foreground"
-                    onClick={() => onIncluirAssinaturaChange(true)}
-                    title="Voltar a incluir a assinatura neste e-mail"
-                  >
-                    <Undo2 className="h-3.5 w-3.5" />
-                    Adicionar de volta
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
           </CorpoDialogo>
 
           {/* Rodapé no padrão do app (NovoNegocioDialog/EventDialog): `border-t` e
