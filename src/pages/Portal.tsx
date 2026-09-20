@@ -942,14 +942,14 @@ export default function Portal() {
                                           }
                                           if (site.id === 'idema' && h === 'Interessado') {
                                             return (
-                                              <td key={h} className="px-3 py-2.5 text-xs text-muted-foreground">
+                                              <td key={h} className="px-3 py-2.5 text-xs text-muted-foreground truncate" title={rawVal}>
                                                 {rawVal}
                                               </td>
                                             );
                                           }
                                           if (site.id === 'idema' && h === 'Fato Gerador') {
                                             return (
-                                              <td key={h} className="px-3 py-2.5 text-xs text-muted-foreground">
+                                              <td key={h} className="px-3 py-2.5 text-xs text-muted-foreground truncate" title={rawVal}>
                                                 {rawVal}
                                               </td>
                                             );

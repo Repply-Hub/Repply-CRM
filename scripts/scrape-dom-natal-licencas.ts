@@ -33,6 +33,21 @@
  *   --max N           teto de edições lidas nesta execução (padrão 45; o resto fica para
  *                     a próxima, com aviso de `restantes`)
  *   --dry-run         não grava nada: só lista o que faria
+ *
+ * ── Por que a rede passa por um relay quando roda no GitHub Actions ─────────────────────
+ * Medido em 10/09 e 14/09/2026 (três execuções, três falhas idênticas — ver
+ * docs/investigacao-falhas-scraper-dom-natal.md §5): o runner do GitHub Actions não
+ * consegue conectar em natal.rn.gov.br — `ConnectTimeoutError`, sempre no mesmo endereço.
+ * O site tem um firewall (FortiGate, cookie `FGTServer` na resposta) que bloqueia,
+ * aparentemente, a faixa de IP do GitHub Actions especificamente: uma Edge Function do
+ * Supabase (`diag-dom-natal-network`, mesma investigação) conectou sem problema nos
+ * mesmos endpoints — listagem e download de PDF completo.
+ *
+ * Por isso, quando `process.env.GITHUB_ACTIONS === 'true'`, toda chamada a
+ * natal.rn.gov.br passa pela Edge Function `relay-dom-natal` (só repassa bytes, não
+ * processa nada) em vez de `fetch` direto. Fora do GitHub Actions (rodando na sua
+ * máquina, por exemplo) o `fetch` continua direto, sem depender do relay — é só o runner
+ * do GitHub que está bloqueado, não a internet em geral.
  */
 import { createHash } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
@@ -41,6 +56,7 @@ import { extrairPublicacoesDeLicenca } from '../src/lib/dom-natal-licencas'
 
 const BASE_URL = 'https://www.natal.rn.gov.br'
 const STORAGE_BUCKET = 'dom-natal'
+const EM_GITHUB_ACTIONS = process.env.GITHUB_ACTIONS === 'true'
 
 // User-Agent de navegador. Um UA não-navegador é o primeiro a ser bloqueado no dia em que
 // o portal da Prefeitura ganhar um WAF.
@@ -64,7 +80,34 @@ interface Edicao {
   numero: string | null
 }
 
+interface RelayConfig {
+  base: string // `${SUPABASE_URL}/functions/v1/relay-dom-natal`
+  key: string // service_role_key — o relay só exige um JWT válido do projeto (verify_jwt padrão)
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** Busca uma URL do domínio da Prefeitura de Natal — direto, ou pelo relay do Supabase
+ *  quando `relay` não é null (GitHub Actions, bloqueado por firewall — ver cabeçalho do
+ *  arquivo). O relay não processa nada, só repassa a resposta; os headers de navegador só
+ *  precisam ir na chamada direta — o relay já os aplica do lado dele. */
+async function buscarDominioNatal(url: string, timeoutMs: number, relay: RelayConfig | null): Promise<Response> {
+  if (relay) {
+    return fetch(`${relay.base}?url=${encodeURIComponent(url)}`, {
+      headers: { Authorization: `Bearer ${relay.key}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+  }
+  return fetch(url, {
+    headers: {
+      Accept: 'application/json, text/javascript, application/pdf, */*; q=0.01',
+      'X-Requested-With': 'XMLHttpRequest',
+      Referer: `${BASE_URL}/dom`,
+      'User-Agent': BROWSER_UA,
+    },
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+}
 
 function requireEnv(name: string): string {
   const value = process.env[name]
@@ -111,16 +154,8 @@ function janelaDeMeses(mesesAtras: number): { mes: string; ano: string }[] {
 
 /** Lista as edições de um mês pela API JSON. O endpoint ignora query string e sempre
  *  devolve o mês inteiro. */
-async function listarEdicoes(mes: string, ano: string): Promise<Edicao[]> {
-  const resp = await fetch(`${BASE_URL}/api/dom/data/${mes}/${ano}`, {
-    headers: {
-      Accept: 'application/json, text/javascript, */*; q=0.01',
-      'X-Requested-With': 'XMLHttpRequest',
-      Referer: `${BASE_URL}/dom`,
-      'User-Agent': BROWSER_UA,
-    },
-    signal: AbortSignal.timeout(30_000),
-  })
+async function listarEdicoes(mes: string, ano: string, relay: RelayConfig | null): Promise<Edicao[]> {
+  const resp = await buscarDominioNatal(`${BASE_URL}/api/dom/data/${mes}/${ano}`, 30_000, relay)
   if (!resp.ok) {
     console.warn(`  API do DOM devolveu ${resp.status} para ${mes}/${ano} — mês ignorado`)
     return []
@@ -168,12 +203,19 @@ async function extrairTexto(bytes: Uint8Array): Promise<string> {
 async function main() {
   const { mesesAtras, mes, ano, max, dryRun } = parseArgs(process.argv.slice(2))
   // Em --dry-run nada é gravado nem lido do banco — roda offline, só para conferir o que
-  // seria processado e quantas publicações o reconhecedor acharia.
+  // seria processado e quantas publicações o reconhecedor acharia. Mesmo em --dry-run, se
+  // estiver rodando no GitHub Actions, a rede ainda precisa do relay (senão nem a listagem
+  // conecta) — por isso as credenciais do relay são exigidas independente do --dry-run.
   const supabase = dryRun
     ? null
     : createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), {
         auth: { persistSession: false },
       })
+
+  const relay: RelayConfig | null = EM_GITHUB_ACTIONS
+    ? { base: `${requireEnv('SUPABASE_URL')}/functions/v1/relay-dom-natal`, key: requireEnv('SUPABASE_SERVICE_ROLE_KEY') }
+    : null
+  if (relay) console.log('Rodando no GitHub Actions — rede via relay-dom-natal (ver cabeçalho do arquivo).')
 
   const meses = mes && ano
     ? [{ mes: String(mes).padStart(2, '0'), ano: String(ano) }]
@@ -183,7 +225,7 @@ async function main() {
   // 1. Descobre as edições da janela
   const todas: Edicao[] = []
   for (const { mes: mm, ano: aa } of meses) {
-    const lista = await listarEdicoes(mm, aa)
+    const lista = await listarEdicoes(mm, aa, relay)
     console.log(`  ${mm}/${aa}: ${lista.length} edições`)
     for (const e of lista) if (!todas.some((x) => x.url === e.url)) todas.push(e)
   }
@@ -219,10 +261,7 @@ async function main() {
     const rotulo = `[${processados}/${novas.length}] ${arquivo} (${edicao.dataIso ?? 'sem data'})`
 
     try {
-      const pdfResp = await fetch(edicao.url, {
-        headers: { 'User-Agent': BROWSER_UA },
-        signal: AbortSignal.timeout(60_000),
-      })
+      const pdfResp = await buscarDominioNatal(edicao.url, 60_000, relay)
       if (!pdfResp.ok) {
         console.warn(`${rotulo}: download falhou (${pdfResp.status}) — pulando`)
         continue

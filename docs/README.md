@@ -48,6 +48,7 @@ negócio, tela a tela, sem termo técnico.
 | [`modulos/whatsapp.md`](modulos/whatsapp.md) | Integração uazapi: banco, funções, provisionamento de instância, bugs |
 | [`modulos/email.md`](modulos/email.md) | Integração Nylas: conexão, sincronização, quem enxerga a caixa |
 | [`modulos/anexos.md`](modulos/anexos.md) | Arquivos anexados a negócio, e o armazenamento |
+| [`modulos/portal-diario-natal.md`](modulos/portal-diario-natal.md) | Portal de Consultas — automação do Diário Oficial de Natal: pipeline, cadência, reconhecedor de LP/LI/LO. 🔴 Estado medido em 14/09/2026: histórico de execuções sem sucesso |
 | [`modulos/landing-e-assinatura.md`](modulos/landing-e-assinatura.md) | A landing pública e o fluxo de cadastro com pagamento |
 
 ## Operação
