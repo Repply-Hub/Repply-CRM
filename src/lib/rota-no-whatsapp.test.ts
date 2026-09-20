@@ -335,3 +335,99 @@ describe('mensagemDaRota', () => {
     expect(texto).toContain(`1. ${nome}`);
   });
 });
+
+describe('mensagemDaRota — a análise da visita embaixo da obra', () => {
+  it('obra já visitada leva a análise indentada embaixo do nome', () => {
+    const texto = mensagemDaRota({
+      data: new Date('2026-09-12T12:00:00'),
+      paradas: [
+        {
+          nome: 'Obra Exemplo',
+          horario: new Date('2026-09-12T09:00:00'),
+          analise: ['Fase: Acabamento', 'Concorrente: Marca Exemplo'],
+        },
+      ],
+    });
+    expect(texto).toContain('1. 09:00 — Obra Exemplo');
+    expect(texto).toContain('   Fase: Acabamento');
+    expect(texto).toContain('   Concorrente: Marca Exemplo');
+  });
+
+  it('🔴 obra sem análise sai EXATAMENTE como antes (rota da manhã não muda)', () => {
+    const paradas: ParadaDaRota[] = [
+      { nome: 'Obra Exemplo', horario: new Date('2026-09-12T09:00:00') },
+    ];
+    const comCampoVazio = mensagemDaRota({
+      data: new Date('2026-09-12T12:00:00'),
+      paradas: [{ ...paradas[0], analise: [] }],
+    });
+    const semCampo = mensagemDaRota({ data: new Date('2026-09-12T12:00:00'), paradas });
+    expect(comCampoVazio).toBe(semCampo);
+  });
+
+  it('a análise não indenta com "-" (no WhatsApp o hífen viraria lista)', () => {
+    const texto = mensagemDaRota({
+      data: new Date('2026-09-12T12:00:00'),
+      paradas: [
+        { nome: 'Obra Exemplo', horario: new Date('2026-09-12T09:00:00'), analise: ['Fase: Estrutura'] },
+      ],
+    });
+    const linhaDaAnalise = texto.split('\n').find((l) => l.includes('Fase: Estrutura'))!;
+    expect(linhaDaAnalise.startsWith('   ')).toBe(true);
+    expect(linhaDaAnalise.trimStart().startsWith('-')).toBe(false);
+  });
+
+  it('🔴 observação com várias linhas indenta CADA linha (nenhuma solta começando com "-")', () => {
+    // `visitaObservacao` é um campo de texto multi-linha; quem escreve em tópicos gera uma string
+    // só com `\n` dentro. Cada linha tem de sair com recuo — senão a de dentro fica colada à
+    // esquerda e, se começar com "-", o WhatsApp a transforma em item de lista solto.
+    const texto = mensagemDaRota({
+      data: new Date('2026-09-12T12:00:00'),
+      paradas: [
+        {
+          nome: 'Obra Exemplo',
+          horario: new Date('2026-09-12T09:00:00'),
+          analise: ['Obs.: Obra parada, motivos:\n- falta material\n- cliente sem verba'],
+        },
+      ],
+    });
+    const linhas = texto.split('\n');
+    const daAnalise = linhas.filter(
+      (l) => l.includes('Obra parada') || l.includes('falta material') || l.includes('cliente sem verba'),
+    );
+    expect(daAnalise).toHaveLength(3);
+    for (const l of daAnalise) {
+      // O que impede o WhatsApp de virar lista é a linha COMEÇAR com espaço, não com "-". O "-"
+      // que o vendedor digitou como tópico continua ali no meio do texto — não pode sumir; só
+      // não pode estar no começo da linha crua.
+      expect(l.startsWith('   ')).toBe(true);
+      expect(l.startsWith('-')).toBe(false);
+    }
+  });
+
+  it('análise que não é array não derruba a mensagem (sai como sem análise)', () => {
+    const paradas: ParadaDaRota[] = [{ nome: 'Obra Exemplo', horario: new Date('2026-09-12T09:00:00') }];
+    // @ts-expect-error — de propósito: valor não-iterável vindo "de fora".
+    const comLixo = mensagemDaRota({ data: new Date('2026-09-12T12:00:00'), paradas: [{ ...paradas[0], analise: {} }] });
+    const semCampo = mensagemDaRota({ data: new Date('2026-09-12T12:00:00'), paradas });
+    expect(comLixo).toBe(semCampo);
+  });
+
+  it('o link continua sozinho na última linha, DEPOIS da análise', () => {
+    const texto = mensagemDaRota({
+      data: new Date('2026-09-12T12:00:00'),
+      paradas: [
+        { nome: 'Obra A', horario: new Date('2026-09-12T09:00:00'), lat: -5.79, lng: -35.21, analise: ['Fase: Estrutura'] },
+        { nome: 'Obra B', horario: new Date('2026-09-12T10:00:00'), lat: -5.8, lng: -35.2, analise: ['Fase: Acabamento'] },
+      ],
+      link: {
+        url: 'https://www.google.com/maps/dir/?api=1&origin=-5.79,-35.21&destination=-5.8,-35.2',
+        incluidas: 2,
+        cortadas: 0,
+        semCoordenada: 0,
+      },
+    });
+    const linhas = texto.split('\n');
+    expect(linhas[linhas.length - 1]).toContain('https://www.google.com/maps/dir/');
+  });
+});

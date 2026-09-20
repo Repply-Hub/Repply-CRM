@@ -5,6 +5,7 @@ import { sanitizeFileName } from '@/lib/file-validation';
 import { toast } from 'sonner';
 import { tocarEnvio } from '@/lib/som';
 import { somLigado } from '@/hooks/use-som-ligado';
+import { camposDeMencaoParaGravar } from '@/lib/mencao';
 
 export interface ChatMessage {
   id: string;
@@ -24,6 +25,8 @@ export interface ChatMessage {
   quoted_arquivo_nome?: string | null;
   quoted_arquivo_tipo?: string | null;
   quoted_remetente_nome?: string | null;
+  mencionados?: string[];
+  menciona_todos?: boolean;
   vendedor?: { id: string; nome: string; email: string; avatar_url?: string | null };
 }
 
@@ -52,10 +55,18 @@ async function fetchMessages(grupoId: string | null, recipientId: string | null 
   const { data: me } = await supabase.from('usuarios').select('id').eq('user_id', user.id).single();
   if (!me) return [];
 
+  // 🔴 As 200 mensagens MAIS RECENTES, não as mais antigas. Antes era
+  // `ascending: true` + `limit(200)`, que traz as 200 PRIMEIRAS da conversa —
+  // e numa conversa com mais de 200 mensagens as novas caíam fora da janela e
+  // nunca apareciam no histórico (a pessoa enviava, o tempo real mostrava por
+  // um instante, o refetch invalidava e a mensagem "sumia"). Aconteceu no grupo
+  // "Notícias da empresa" da MD, o primeiro a passar de 200 (17/09/2026).
+  // Buscamos em ordem decrescente e invertemos abaixo, para a tela continuar
+  // recebendo em ordem cronológica (mais antiga em cima, mais nova embaixo).
   let query = supabase
     .from('chat_mensagens')
     .select('*, vendedor:usuarios!chat_mensagens_vendedor_id_fkey(id, nome, email, avatar_url)')
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(200);
 
   if (grupoId) {
@@ -70,7 +81,9 @@ async function fetchMessages(grupoId: string | null, recipientId: string | null 
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data as any) ?? [];
+  // Veio da mais nova para a mais antiga (ver o `order` acima); a tela espera o
+  // contrário. Inverter uma lista de no máximo 200 itens é irrelevante.
+  return ((data as any[]) ?? []).slice().reverse();
 }
 
 export function useChatMessages(grupoId: string | null = null, recipientId: string | null = null) {
@@ -454,7 +467,7 @@ export function useSendMessage() {
   const [sending, setSending] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: async ({ conteudo, files, grupoId, recipientId, quoted }: { conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null, quoted?: QuotedMessage | null }) => {
+    mutationFn: async ({ conteudo, files, grupoId, recipientId, quoted, mencoes }: { conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null, quoted?: QuotedMessage | null, mencoes?: { ids: string[]; todos: boolean } | null }) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Usuário não autenticado');
 
@@ -474,6 +487,11 @@ export function useSendMessage() {
         quoted_remetente_nome: quoted.remetente_nome,
       } : {};
 
+      // Sem @, o payload não cita `mencionados`/`menciona_todos` — ver o comentário de
+      // `camposDeMencaoParaGravar` em src/lib/mencao.ts sobre por que isso importa
+      // enquanto a migration das menções não roda em produção.
+      const camposDeMencao = camposDeMencaoParaGravar(mencoes);
+
       // Se não houver arquivos, envia apenas a mensagem de texto
       if (!files || files.length === 0) {
         const newMsg = {
@@ -483,6 +501,7 @@ export function useSendMessage() {
           grupo_id: grupoId || null,
           recipient_id: recipientId || null,
           ...quotedFields,
+          ...camposDeMencao,
         };
 
         const { data: savedMsg, error } = await supabase
@@ -523,6 +542,7 @@ export function useSendMessage() {
           grupo_id: grupoId || null,
           recipient_id: recipientId || null,
           ...(i === 0 ? quotedFields : {}),
+          ...(i === 0 ? camposDeMencao : {}),
         };
 
         const { data: savedMsg, error } = await supabase
@@ -635,10 +655,10 @@ export function useSendMessage() {
     }
   });
 
-  const send = useCallback(async (conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null, quoted?: QuotedMessage | null) => {
+  const send = useCallback(async (conteudo: string, files?: File[], grupoId?: string | null, recipientId?: string | null, quoted?: QuotedMessage | null, mencoes?: { ids: string[]; todos: boolean } | null) => {
     setSending(true);
     try {
-      await mutation.mutateAsync({ conteudo, files, grupoId, recipientId, quoted });
+      await mutation.mutateAsync({ conteudo, files, grupoId, recipientId, quoted, mencoes });
     } finally {
       setSending(false);
     }

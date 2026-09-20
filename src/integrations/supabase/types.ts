@@ -415,6 +415,8 @@ export type Database = {
           id: string
           lida: boolean
           lida_em: string | null
+          menciona_todos: boolean | null
+          mencionados: string[] | null
           quoted_arquivo_nome: string | null
           quoted_arquivo_tipo: string | null
           quoted_conteudo: string | null
@@ -434,6 +436,8 @@ export type Database = {
           id?: string
           lida?: boolean
           lida_em?: string | null
+          menciona_todos?: boolean | null
+          mencionados?: string[] | null
           quoted_arquivo_nome?: string | null
           quoted_arquivo_tipo?: string | null
           quoted_conteudo?: string | null
@@ -453,6 +457,8 @@ export type Database = {
           id?: string
           lida?: boolean
           lida_em?: string | null
+          menciona_todos?: boolean | null
+          mencionados?: string[] | null
           quoted_arquivo_nome?: string | null
           quoted_arquivo_tipo?: string | null
           quoted_conteudo?: string | null
@@ -1447,6 +1453,7 @@ export type Database = {
           nylas_message_id: string
           nylas_thread_id: string | null
           pastas: string[]
+          prioritaria: boolean
           remetente_email: string | null
           remetente_nome: string | null
           reply_to: Json
@@ -1477,6 +1484,7 @@ export type Database = {
           nylas_message_id: string
           nylas_thread_id?: string | null
           pastas?: string[]
+          prioritaria?: boolean
           remetente_email?: string | null
           remetente_nome?: string | null
           reply_to?: Json
@@ -1507,6 +1515,7 @@ export type Database = {
           nylas_message_id?: string
           nylas_thread_id?: string | null
           pastas?: string[]
+          prioritaria?: boolean
           remetente_email?: string | null
           remetente_nome?: string | null
           reply_to?: Json
@@ -1824,7 +1833,12 @@ export type Database = {
           titulo: string
           updated_at: string
           user_id: string
+          visita_concorrentes: string | null
+          visita_contato_id: string | null
+          visita_fase: string | null
           visita_observacao: string | null
+          visita_proximo_passo: string | null
+          visita_proximo_passo_em: string | null
           visita_realizada: boolean
         }
         Insert: {
@@ -1850,7 +1864,12 @@ export type Database = {
           titulo: string
           updated_at?: string
           user_id: string
+          visita_concorrentes?: string | null
+          visita_contato_id?: string | null
+          visita_fase?: string | null
           visita_observacao?: string | null
+          visita_proximo_passo?: string | null
+          visita_proximo_passo_em?: string | null
           visita_realizada?: boolean
         }
         Update: {
@@ -1876,7 +1895,12 @@ export type Database = {
           titulo?: string
           updated_at?: string
           user_id?: string
+          visita_concorrentes?: string | null
+          visita_contato_id?: string | null
+          visita_fase?: string | null
           visita_observacao?: string | null
+          visita_proximo_passo?: string | null
+          visita_proximo_passo_em?: string | null
           visita_realizada?: boolean
         }
         Relationships: [
@@ -1885,6 +1909,13 @@ export type Database = {
             columns: ["obra_id"]
             isOneToOne: false
             referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "eventos_visita_contato_id_fkey"
+            columns: ["visita_contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
             referencedColumns: ["id"]
           },
         ]
@@ -2762,12 +2793,51 @@ export type Database = {
           },
         ]
       }
+      mencoes: {
+        Row: {
+          autor_id: string | null
+          autor_nome: string | null
+          chat_mensagem_id: string | null
+          conversa_chave: string
+          created_at: string
+          empresa_id: string
+          id: string
+          lida_em: string | null
+          link: string
+          lugar: string
+          mencionado_id: string
+          origem: string
+          previa: string | null
+          wa_mensagem_id: string | null
+        }
+        Insert: {
+          autor_id?: string | null
+          autor_nome?: string | null
+          chat_mensagem_id?: string | null
+          conversa_chave: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          lida_em?: string | null
+          link: string
+          lugar: string
+          mencionado_id: string
+          origem: string
+          previa?: string | null
+          wa_mensagem_id?: string | null
+        }
+        Update: {
+          lida_em?: string | null
+        }
+        Relationships: []
+      }
       notificacoes: {
         Row: {
           cliente_id: string | null
           created_at: string
           id: string
           lida: boolean
+          link: string | null
           mensagem: string | null
           pedido_id: string | null
           tipo: string
@@ -2779,6 +2849,7 @@ export type Database = {
           created_at?: string
           id?: string
           lida?: boolean
+          link?: string | null
           mensagem?: string | null
           pedido_id?: string | null
           tipo?: string
@@ -2790,6 +2861,7 @@ export type Database = {
           created_at?: string
           id?: string
           lida?: boolean
+          link?: string | null
           mensagem?: string | null
           pedido_id?: string | null
           tipo?: string
@@ -4359,6 +4431,8 @@ export type Database = {
           lida: boolean
           media_mime: string | null
           media_url: string | null
+          menciona_todos: boolean | null
+          mencionados: string[] | null
           quoted_conteudo: string | null
           quoted_remetente_nome: string | null
           quoted_tipo: string | null
@@ -4388,6 +4462,8 @@ export type Database = {
           lida?: boolean
           media_mime?: string | null
           media_url?: string | null
+          menciona_todos?: boolean | null
+          mencionados?: string[] | null
           quoted_conteudo?: string | null
           quoted_remetente_nome?: string | null
           quoted_tipo?: string | null
@@ -4417,6 +4493,8 @@ export type Database = {
           lida?: boolean
           media_mime?: string | null
           media_url?: string | null
+          menciona_todos?: boolean | null
+          mencionados?: string[] | null
           quoted_conteudo?: string | null
           quoted_remetente_nome?: string | null
           quoted_tipo?: string | null
@@ -4637,8 +4715,30 @@ export type Database = {
           usuario_nome: string
         }[]
       }
+      cancelar_retorno: {
+        Args: { p_pedido_id: string }
+        Returns: {
+          retornos_removidos: number
+          tarefas_removidas: number
+        }[]
+      }
+      dashboard_agendados: {
+        Args: {
+          p_etapas?: string[]
+          p_fabricante_ids?: string[]
+          p_funil_id?: string
+          p_usuario_ids?: string[]
+        }
+        Returns: {
+          agendados_por_vendedor: Json
+          qtd_total: number
+          valor_total: number
+        }[]
+      }
       dashboard_negocios_risco: {
         Args: {
+          p_data_ate?: string
+          p_data_de?: string
           p_dias_parado?: number
           p_etapas?: string[]
           p_fabricante_ids?: string[]
@@ -4734,14 +4834,71 @@ export type Database = {
         Args: { p_preset_key: string }
         Returns: Json
       }
+      negocios_agendados: {
+        Args: {
+          p_ascendente?: boolean
+          p_deslocamento?: number
+          p_etapas?: string[]
+          p_fabricante_ids?: string[]
+          p_funil_id?: string
+          p_limite?: number
+          p_ordenar_por?: string
+          p_usuario_ids?: string[]
+        }
+        Returns: {
+          data_retorno: string | null
+          etapa: string | null
+          fabrica: string | null
+          id: string
+          nome: string
+          responsavel: string | null
+          responsavel_avatar: string | null
+          responsavel_id: string
+          tentativas: number
+          total_geral: number
+          valor: number
+          valor_geral: number
+        }[]
+      }
+      negocios_agendados_de: {
+        Args: {
+          p_ascendente?: boolean
+          p_deslocamento?: number
+          p_etapas?: string[]
+          p_fabricante_ids?: string[]
+          p_funil_id?: string
+          p_limite?: number
+          p_ordenar_por?: string
+          p_usuario_id: string
+          p_usuario_ids?: string[]
+        }
+        Returns: {
+          data_retorno: string | null
+          etapa: string | null
+          fabrica: string | null
+          id: string
+          nome: string
+          responsavel: string | null
+          responsavel_avatar: string | null
+          responsavel_id: string
+          tentativas: number
+          total_geral: number
+          valor: number
+          valor_geral: number
+        }[]
+      }
       negocios_em_risco: {
         Args: {
+          p_ascendente?: boolean
+          p_data_ate?: string
+          p_data_de?: string
           p_deslocamento?: number
           p_dias_parado?: number
           p_etapas?: string[]
           p_fabricante_ids?: string[]
           p_funil_id?: string
           p_limite?: number
+          p_ordenar_por?: string
           p_usuario_ids?: string[]
         }
         Returns: {
@@ -4751,6 +4908,9 @@ export type Database = {
           id: string
           nome: string
           responsavel: string | null
+          responsavel_avatar: string | null
+          responsavel_id: string
+          tentativas: number
           total_geral: number
           valor: number
         }[]
@@ -4769,6 +4929,7 @@ export type Database = {
           dias_parado: number | null
           ordem: number
           responsavel: string | null
+          tentativas: number
         }[]
       }
       parse_endereco_livre: {
@@ -4781,6 +4942,14 @@ export type Database = {
           logradouro: string
           numero: string
           uf: string
+        }[]
+      }
+      pessoas_mencionaveis_na_conversa: {
+        Args: { p_conversa_id: string }
+        Returns: {
+          avatar_url: string | null
+          id: string
+          nome: string
         }[]
       }
       plano_vendas_progresso: {

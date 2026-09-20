@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CargoSelect } from '@/components/shared/CargoSelect';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
+import { CampoTelefones } from '@/components/shared/CampoTelefones';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { useClientes } from '@/hooks/use-clientes';
 import { useConfiguracoesCampos } from '@/hooks/use-configuracoes-campos';
@@ -178,11 +179,7 @@ export function CriarContatoDaConversaDialog({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="contato-telefone">Telefone *</Label>
-                  <Input
-                    id="contato-telefone"
-                    value={telefone}
-                    onChange={(e) => setTelefone(e.target.value)}
-                  />
+                  <CampoTelefones id="contato-telefone" value={telefone} onChange={setTelefone} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Cargo</Label>

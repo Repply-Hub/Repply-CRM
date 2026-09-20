@@ -4,7 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
+import { User, X, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import {
@@ -13,6 +16,8 @@ import {
   PADROES_DA_PAUTA,
   type ChaveDaPauta,
 } from '@/hooks/use-configuracoes-automacao';
+// A mesma consulta que a aba de Usuários usa (`UsuariosTab`); a RLS de `usuarios` isola por empresa.
+import { useVendedores } from '@/hooks/use-clientes';
 
 /**
  * A aba "Automação" das Configurações.
@@ -53,12 +58,14 @@ interface Props {
 export function AutomacaoTab({ empresaId }: Props) {
   const { data: config, isLoading } = useConfiguracoesAutomacao(empresaId);
   const salvar = useSalvarConfiguracaoAutomacao(empresaId);
+  const { data: equipe } = useVendedores();
 
   // Os campos de número são digitados: guardar em texto deixa o campo ficar vazio enquanto
   // a pessoa apaga para redigitar. Converter a cada tecla faria "" virar 0 e o cursor
   // saltar (a mesma armadilha do CLAUDE.md §7.10, do lado da quantidade).
   const [dias, setDias] = useState('');
   const [maximo, setMaximo] = useState('');
+  const [adicionarAberto, setAdicionarAberto] = useState(false);
 
   useEffect(() => {
     if (!config) return;
@@ -66,7 +73,7 @@ export function AutomacaoTab({ empresaId }: Props) {
     setMaximo(String(config.pauta_max_itens));
   }, [config]);
 
-  const gravar = async (chave: ChaveDaPauta, valor: number | boolean | number[]) => {
+  const gravar = async (chave: ChaveDaPauta, valor: number | boolean | number[] | string[]) => {
     try {
       await salvar.mutateAsync({ chave, valor });
     } catch (e) {
@@ -118,6 +125,17 @@ export function AutomacaoTab({ empresaId }: Props) {
     }
     void gravar('pauta_dias_da_semana', novo);
   };
+
+  // A preferência guardada é a lista de EXCLUÍDOS (quem o gestor tirou). Ausência = recebe, então
+  // "todos por padrão" vale inclusive para quem entra na equipe depois. Na TELA a coisa se inverte:
+  // mostramos a sequência de AUTORIZADOS (todos menos os excluídos), e o gestor remove/adiciona.
+  const excluidos = config.pauta_resumo_excluidos;
+  const autorizados = (equipe ?? []).filter((p) => !excluidos.includes(p.id));
+  const removidos = (equipe ?? []).filter((p) => excluidos.includes(p.id));
+
+  const remover = (id: string) => void gravar('pauta_resumo_excluidos', [...excluidos, id]);
+  const adicionar = (id: string) =>
+    void gravar('pauta_resumo_excluidos', excluidos.filter((x) => x !== id));
 
   return (
     <div className="grid gap-4">
@@ -223,6 +241,77 @@ export function AutomacaoTab({ empresaId }: Props) {
               Só o e-mail respeita esses dias. A tela "Hoje" continua mostrando a pauta de hoje
               todo dia, inclusive fim de semana, para quem escolher trabalhar.
             </p>
+          </div>
+
+          {/* QUEM RECEBE — uma sequência de pessoas autorizadas; o gestor remove (×) e adiciona de
+              volta (+), no estilo das configurações do WhatsApp (pedido de 15/09/2026). Todos
+              recebem por padrão. Some quando o resumo está desligado, como os dias acima. */}
+          <div className={cn('space-y-2', !config.pauta_resumo_email && 'opacity-50')}>
+            <Label>Quem recebe</Label>
+            <p className="text-xs text-muted-foreground">
+              Todos recebem por padrão. Remova quem não deve receber; dá para adicionar de volta.
+            </p>
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {autorizados.map((pessoa) => (
+                <span
+                  key={pessoa.id}
+                  className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 py-0.5 pl-2 pr-1 text-xs text-primary"
+                >
+                  <User className="h-2.5 w-2.5 shrink-0" />
+                  {pessoa.nome}
+                  <button
+                    type="button"
+                    aria-label={`Remover ${pessoa.nome}`}
+                    disabled={!config.pauta_resumo_email || salvar.isPending}
+                    onClick={() => remover(pessoa.id)}
+                    className="ml-0.5 rounded-full p-0.5 hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+              {autorizados.length === 0 && (
+                <span className="text-xs italic text-muted-foreground">
+                  Ninguém recebe — todos foram removidos.
+                </span>
+              )}
+              {removidos.length > 0 && (
+                <Popover open={adicionarAberto} onOpenChange={setAdicionarAberto}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!config.pauta_resumo_email || salvar.isPending}
+                      className="h-6 gap-1 rounded-full px-2 text-xs"
+                    >
+                      <Plus className="h-3 w-3" /> Adicionar
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-56 p-1">
+                    <p className="px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                      Removidos ({removidos.length})
+                    </p>
+                    <div className="max-h-56 overflow-y-auto">
+                      {removidos.map((pessoa) => (
+                        <button
+                          key={pessoa.id}
+                          type="button"
+                          onClick={() => {
+                            adicionar(pessoa.id);
+                            setAdicionarAberto(false);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+                        >
+                          <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                          {pessoa.nome}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

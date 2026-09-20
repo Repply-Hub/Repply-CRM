@@ -207,7 +207,8 @@ export function NotificationCenter() {
                     className="w-full text-left"
                     onClick={() => {
                       if (!n.lida) markRead.mutate(n.id);
-                      if (n.pedido_id) irPara(`/pedidos/${n.pedido_id}/editar`);
+                      if (n.link) irPara(n.link);
+                      else if (n.pedido_id) irPara(`/pedidos/${n.pedido_id}/editar`);
                     }}
                   >
                     <div className="flex items-start justify-between gap-2">

@@ -6,11 +6,41 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
+/**
+ * Um endereço no formato que o Nylas grava em `email_mensagens.destinatarios`/
+ * `cc`/`bcc` (jsonb): `{ name?, email }` — ver migration
+ * `20260804121322_email_nylas.sql` e `mensagemParaLinha` em
+ * `supabase/functions/_shared/nylas.ts`. `email` vem opcional aqui só porque a
+ * coluna é `Json` no tipo gerado (`types.ts`); item sem endereço é descartado
+ * na exibição.
+ */
+export interface EnderecoDoEmail {
+  name?: string | null;
+  email?: string | null;
+}
+
 export interface EmailAberto {
   id: string;
   assunto?: string | null;
   remetente?: string | null;
   destinatario?: string | null;
+  /**
+   * Lista completa de "Para", no formato do Nylas. Quando vem preenchida, o
+   * cabeçalho mostra TODOS os destinatários em vez do `destinatario` singular
+   * acima (que seguiu existindo por compatibilidade — nem todo caminho que
+   * abre um e-mail busca esta coluna). Sem isto, e-mail antigo ou consulta que
+   * não trouxe a coluna: a linha "Para" simplesmente cai no comportamento de
+   * sempre.
+   */
+  destinatarios?: EnderecoDoEmail[] | null;
+  /** Mesmo formato de `destinatarios`. Mostrado como "Cc:" quando houver algum. */
+  cc?: EnderecoDoEmail[] | null;
+  /**
+   * Mesmo formato. Mostrado como "Cco:" só quando `type === 'sent'` — em
+   * mensagem RECEBIDA, Cco nunca aparece (é oculta por natureza; quem recebeu
+   * não sabe quem mais estava em cópia oculta).
+   */
+  bcc?: EnderecoDoEmail[] | null;
   html?: string | null;
   corpo?: string | null;
   /** Prévia curta vinda do provedor; é o que aparece enquanto o corpo carrega. */
@@ -76,6 +106,72 @@ function separarRemetente(valor?: string | null): { nome: string; endereco: stri
   const m = bruto.match(/^(.*?)\s*<([^>]+)>$/);
   if (m) return { nome: m[1].trim() || m[2], endereco: m[2] };
   return { nome: bruto, endereco: bruto.includes('@') ? bruto : '' };
+}
+
+/**
+ * Converte a lista do Nylas (`EnderecoDoEmail[]`, `{name?, email}`) para
+ * `{nome, endereco}` — mesmo par que `separarRemetente` produz a partir de uma
+ * string única, usado para "Para"/"Cc"/"Cco" no cabeçalho do leitor. Item sem
+ * endereço é descartado (não há o que mostrar nem para onde clicar).
+ */
+function itensDeEndereco(
+  lista?: EnderecoDoEmail[] | null,
+): { nome: string; endereco: string }[] {
+  return (lista ?? [])
+    .map((item) => {
+      const endereco = (item?.email ?? '').trim();
+      const nome = (item?.name ?? '').trim();
+      return { nome: nome || endereco, endereco };
+    })
+    .filter((item) => item.endereco);
+}
+
+/**
+ * Uma linha de endereços (Para com vários destinatários, Cc, Cco) — cada um
+ * clicável, com o próprio endereço da caixa trocado por "mim". Mesma regra que
+ * "Para" já usava para um endereço só, agora para lista: por isso não é um
+ * componente do zero, é a mesma marcação (span clicável com `role="button"` e
+ * Enter/Espaço) reaplicada por item.
+ */
+function ListaDeEnderecos({
+  itens,
+  emailDaConta,
+  onClicarEndereco,
+}: {
+  itens: { nome: string; endereco: string }[];
+  emailDaConta: string | null;
+  onClicarEndereco?: (endereco: string) => void;
+}) {
+  return (
+    <>
+      {itens.map((item, i) => {
+        const rotulo = item.endereco === emailDaConta ? 'mim' : item.nome;
+        return (
+          <span key={`${item.endereco}-${i}`}>
+            {onClicarEndereco ? (
+              <span
+                className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-primary"
+                role="button"
+                tabIndex={0}
+                onClick={() => onClicarEndereco(item.endereco)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onClicarEndereco(item.endereco);
+                  }
+                }}
+              >
+                {rotulo}
+              </span>
+            ) : (
+              rotulo
+            )}
+            {i < itens.length - 1 ? ', ' : ''}
+          </span>
+        );
+      })}
+    </>
+  );
 }
 
 function tamanhoLegivel(bytes?: number): string {
@@ -508,6 +604,14 @@ export function LeitorEmail({
   const data = email.created_at ?? email.criado_em;
   const inicial = (nome || '?').trim()[0]?.toUpperCase() ?? '?';
   const anexos = email.anexos ?? [];
+  // Listas do cabeçalho (padrão Gmail — ver `docs/superpowers/specs/2026-09-16-
+  // email-grupo15-design.md`): "Para" só troca para a lista completa quando
+  // `destinatarios` vier preenchido (senão cai no `destinatario` singular de
+  // sempre, mais abaixo). Cco NUNCA em mensagem recebida — é oculta por
+  // natureza, e só quem enviou vê a própria cópia oculta.
+  const itensPara = itensDeEndereco(email.destinatarios);
+  const itensCc = itensDeEndereco(email.cc);
+  const itensCco = email.type === 'sent' ? itensDeEndereco(email.bcc) : [];
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -622,9 +726,17 @@ export function LeitorEmail({
               <div className="mt-0.5 truncate text-xs text-muted-foreground">
                 {/* "para mim" quando o destinatário é a própria caixa — é como o
                     Gmail escreve, e evita repetir o endereço que o usuário já
-                    sabe de cor. */}
+                    sabe de cor. Lista inteira quando `destinatarios` (Nylas) vier
+                    preenchida; senão, o `destinatario` singular de sempre — não
+                    quebra e-mail antigo nem consulta que não trouxe a coluna. */}
                 para{' '}
-                {email.destinatario && onClicarEndereco ? (
+                {itensPara.length > 0 ? (
+                  <ListaDeEnderecos
+                    itens={itensPara}
+                    emailDaConta={emailDaConta}
+                    onClicarEndereco={onClicarEndereco}
+                  />
+                ) : email.destinatario && onClicarEndereco ? (
                   <span
                     className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-primary"
                     role="button"
@@ -645,6 +757,33 @@ export function LeitorEmail({
                   email.destinatario || '—'
                 )}
               </div>
+              {/* "Cc" — mesma regra de "Para" (lista, "mim", clicável); só aparece
+                  quando há algum. */}
+              {itensCc.length > 0 && (
+                <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                  Cc:{' '}
+                  <ListaDeEnderecos
+                    itens={itensCc}
+                    emailDaConta={emailDaConta}
+                    onClicarEndereco={onClicarEndereco}
+                  />
+                </div>
+              )}
+              {/* "Cco" — só em mensagem ENVIADA por mim. `itensCco` já vem vazio
+                  quando `email.type !== 'sent'` (ver onde é calculado, acima),
+                  então este bloco nunca aparece numa mensagem recebida — Cco é
+                  oculta por natureza, quem recebeu não sabe quem mais estava
+                  em cópia oculta. */}
+              {itensCco.length > 0 && (
+                <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                  Cco:{' '}
+                  <ListaDeEnderecos
+                    itens={itensCco}
+                    emailDaConta={emailDaConta}
+                    onClicarEndereco={onClicarEndereco}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex shrink-0 flex-col items-end gap-1">

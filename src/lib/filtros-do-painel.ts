@@ -10,6 +10,12 @@ export interface FiltrosDoPainel {
   etapas: string[];       // slugs de kanban_colunas, que é o que `pedidos.status` guarda
   fabricantes: string[];  // ids
   responsaveis: string[]; // ids de usuarios.id
+  // Período OPCIONAL, por DATA DE CRIAÇÃO do negócio (`data_pedido`), texto `AAAA-MM-DD`. Vazio
+  // (undefined) = sem recorte, que é o padrão: o bloco "No geral" nasceu sem período de propósito,
+  // para não esconder os parados mais antigos (ver `RadarDeRisco.tsx`). Diferente do responsável, o
+  // período NÃO depende da chave `pauta_de_todos` — vale para quem vê a equipe e para quem vê só o seu.
+  dataDe?: string;
+  dataAte?: string;
 }
 
 const CHAVES = ['etapas', 'fabricantes', 'responsaveis'] as const;
@@ -28,6 +34,8 @@ export function lerFiltrosDoEndereco(params: URLSearchParams): FiltrosDoPainel {
     etapas: lerLista(params, 'etapas'),
     fabricantes: lerLista(params, 'fabricantes'),
     responsaveis: lerLista(params, 'responsaveis'),
+    dataDe: params.get('data_de') ?? undefined,
+    dataAte: params.get('data_ate') ?? undefined,
   };
 }
 
@@ -52,11 +60,20 @@ export function lerFiltrosDoEndereco(params: URLSearchParams): FiltrosDoPainel {
 export function recorteParaOServidor(
   filtros: FiltrosDoPainel,
   podeFiltrarPorResponsavel: boolean,
-): { etapas: string[]; fabricanteIds: string[]; usuarioIds: string[] | undefined } {
+): {
+  etapas: string[];
+  fabricanteIds: string[];
+  usuarioIds: string[] | undefined;
+  dataDe?: string;
+  dataAte?: string;
+} {
   return {
     etapas: filtros.etapas,
     fabricanteIds: filtros.fabricantes,
     usuarioIds: podeFiltrarPorResponsavel ? filtros.responsaveis : undefined,
+    // O período vai ao servidor para TODOS — não é gated pela chave, ao contrário de `usuarioIds`.
+    dataDe: filtros.dataDe,
+    dataAte: filtros.dataAte,
   };
 }
 
@@ -69,6 +86,11 @@ export function escreverFiltrosNoEndereco(
   for (const chave of CHAVES) {
     const valores = filtros[chave];
     if (valores.length > 0) saida.set(chave, valores.join(','));
+    else saida.delete(chave);
+  }
+  // As datas são valores únicos, não listas. Vazio some da URL, mesma regra das listas.
+  for (const [chave, valor] of [['data_de', filtros.dataDe], ['data_ate', filtros.dataAte]] as const) {
+    if (valor) saida.set(chave, valor);
     else saida.delete(chave);
   }
   return saida;

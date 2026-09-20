@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 
 /**
  * O QUE ESTE ARQUIVO PRENDE: a tela "Hoje" distingue TRÊS dias diferentes que hoje pareciam
@@ -19,8 +19,10 @@ vi.mock('@/hooks/use-pauta', () => ({
   usePauta: () => mockPauta(),
   useRegistrarRetorno: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+// Quantos negócios a tabela do time de baixo tem — cada teste do aviso da pauta vazia escolhe.
+const cenario = vi.hoisted(() => ({ totalDoTime: 0 }));
 vi.mock('@/hooks/use-dashboard', () => ({
-  useNegociosEmRisco: () => ({ data: { total: 0 }, isLoading: false, status: 'success' }),
+  useNegociosEmRisco: () => ({ data: { total: cenario.totalDoTime }, isLoading: false, status: 'success' }),
 }));
 vi.mock('@/components/pauta/RadarDeRisco', () => ({ RadarDeRisco: () => <div /> }));
 vi.mock('@/components/pedidos/PainelDoNegocio', () => ({ PainelDoNegocio: () => <div /> }));
@@ -53,6 +55,7 @@ import Hoje from './Hoje';
 afterEach(() => {
   cleanup();
   mockPauta.mockReset();
+  cenario.totalDoTime = 0;
 });
 
 const feito = (id: string) => ({
@@ -120,5 +123,42 @@ describe('os estados da tela "Hoje"', () => {
     mockPauta.mockReturnValue({ data: [parado('a')], isLoading: false });
     desenhar();
     expect(screen.queryByText('Ana Souza')).not.toBeInTheDocument();
+  });
+
+  it('🔴 zerou com negócios na tabela de baixo: aviso com botão que aponta a tabela', () => {
+    cenario.totalDoTime = 145;
+    mockPauta.mockReturnValue({ data: [feito('a')], isLoading: false });
+    desenhar();
+    expect(screen.getByText('Pauta de hoje zerada')).toBeInTheDocument();
+    // Este arquivo monta a tela COM a chave `pauta_de_todos`.
+    expect(
+      screen.getByText('Quer adiantar? Os 145 negócios que pedem atenção estão na tabela logo abaixo.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver a tabela' })).toBeInTheDocument();
+  });
+
+  it('zerou com a tabela de baixo vazia: nada para apontar, nenhum aviso', () => {
+    mockPauta.mockReturnValue({ data: [feito('a')], isLoading: false });
+    desenhar();
+    expect(screen.getByText('Pauta de hoje zerada')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ver a tabela' })).toBeNull();
+  });
+
+  it('"Ver a tabela" desce a tela até a tabela do time', () => {
+    cenario.totalDoTime = 145;
+    mockPauta.mockReturnValue({ data: [feito('a')], isLoading: false });
+    // O Radar é esboço neste arquivo: a âncora de verdade mora na `TabelaDoTime`, e aqui ela é posta
+    // à mão. O jsdom não implementa `scrollIntoView`.
+    const alvo = document.createElement('div');
+    alvo.id = 'tabela-do-time';
+    alvo.scrollIntoView = vi.fn();
+    document.body.appendChild(alvo);
+    try {
+      desenhar();
+      fireEvent.click(screen.getByRole('button', { name: 'Ver a tabela' }));
+      expect(alvo.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    } finally {
+      alvo.remove();
+    }
   });
 });

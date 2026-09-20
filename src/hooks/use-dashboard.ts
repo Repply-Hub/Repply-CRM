@@ -178,12 +178,12 @@ export interface DashboardNegociosRisco {
 // via diasParado) afetam este painel.
 export function useDashboardNegociosRisco(
   empresaId?: string,
-  filters?: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number; etapas?: string[] },
+  filters?: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number; etapas?: string[]; dataDe?: string; dataAte?: string },
 ) {
-  const { usuarioIds, fabricanteIds, funilId, diasParado = 7, etapas } = filters ?? {};
+  const { usuarioIds, fabricanteIds, funilId, diasParado = 7, etapas, dataDe, dataAte } = filters ?? {};
 
   return useQuery({
-    queryKey: ['dashboard_negocios_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado, etapas],
+    queryKey: ['dashboard_negocios_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado, etapas, dataDe, dataAte],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('dashboard_negocios_risco', {
         p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
@@ -194,6 +194,9 @@ export function useDashboardNegociosRisco(
         // não casa com nada, e o painel voltaria zerado em vez de "sem filtro". Mesma
         // conversão que os três filtros acima já fazem.
         p_etapas: etapas && etapas.length > 0 ? etapas : null,
+        // Período opcional por DATA DE CRIAÇÃO — vazio (null) = sem recorte, o padrão do bloco.
+        p_data_de: dataDe ?? null,
+        p_data_ate: dataAte ?? null,
       });
       if (error) throw error;
       const row = (data as unknown as DashboardNegociosRisco[] | null)?.[0];
@@ -213,7 +216,7 @@ export function useDashboardNegociosRisco(
   });
 }
 
-// Uma linha da tabela do time. Espelha `negocios_em_risco` (migration 20260909130000), coluna
+// Uma linha da tabela do time. Espelha `negocios_em_risco` (migrations 20260909130000 e 20260914153000), coluna
 // por coluna. `fabrica` e `responsavel` vêm de LEFT JOIN e podem ser nulos; `nome` nunca vem
 // vazio — a função já resolve a cadeia de alternativas antes de devolver.
 //
@@ -225,9 +228,24 @@ export type NegocioEmRisco = {
   fabrica: string | null;
   etapa: string | null;
   responsavel: string | null;
+  /**
+   * O `usuarios.id` do dono (migration 20260914153000). É com ele que a tela decide "é meu?" —
+   * comparar nome confundia homônimos (item 69 da dívida técnica, resolvido em 14/09/2026).
+   * Opcional porque some quando o site novo fala com o banco anterior à migration; aí a tela volta
+   * a comparar o nome.
+   */
+  responsavel_id?: string | null;
+  /** A foto do dono (`usuarios.avatar_url`). Sem foto, a tela desenha as iniciais. */
+  responsavel_avatar?: string | null;
   valor: number | null;
   dias_parado: number | null;
   total_geral: number;
+  /**
+   * Quantas retomadas ("Retomar depois") já foram registradas neste negócio. A tabela mostra a
+   * etiqueta "Nª tentativa" (`tentativas + 1`) a partir de 1. Opcional: cai em 0 quando o site novo
+   * fala com um banco anterior à migration das tentativas (15/09/2026).
+   */
+  tentativas?: number;
 };
 
 // A TABELA DO TIME da tela "Hoje": os negócios da equipe que pedem atenção — os mesmos
@@ -246,14 +264,14 @@ export type NegocioEmRisco = {
 // É por isso que o teto de 100 dentro da função importa — ver o cabeçalho da migration.
 export function useNegociosEmRisco(
   empresaId: string | undefined,
-  filtros: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number; etapas?: string[] },
+  filtros: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; diasParado?: number; etapas?: string[]; dataDe?: string; dataAte?: string; ordenarPor?: string; ascendente?: boolean },
   quantos: number,
 ) {
-  const { usuarioIds, fabricanteIds, funilId, diasParado = 7, etapas } = filtros;
+  const { usuarioIds, fabricanteIds, funilId, diasParado = 7, etapas, dataDe, dataAte, ordenarPor, ascendente } = filtros;
 
   return useQuery({
     // `quantos` entra na chave: cada "Ver mais" é uma consulta nova, e a anterior fica em cache.
-    queryKey: ['negocios_em_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado, etapas, quantos],
+    queryKey: ['negocios_em_risco', empresaId, usuarioIds, fabricanteIds, funilId, diasParado, etapas, dataDe, dataAte, ordenarPor, ascendente, quantos],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('negocios_em_risco', {
         // Array vazio em filtro de RPC filtra tudo fora (CLAUDE.md §7.8): `= ANY('{}')` não casa
@@ -267,6 +285,14 @@ export function useNegociosEmRisco(
         p_limite: quantos,
         // Sempre zero: ver o comentário sobre o `LIMIT` que cresce, acima.
         p_deslocamento: 0,
+        // Período opcional por DATA DE CRIAÇÃO (coluna única `data_pedido`, sem escolher entre duas
+        // colunas de data — §7.9). Vazio (null) = sem recorte, o padrão.
+        p_data_de: dataDe ?? null,
+        p_data_ate: dataAte ?? null,
+        // Ordenação por coluna, NO SERVIDOR (a tabela é paginada — ordenar só a página enganaria).
+        // A lista branca de colunas mora no SQL; aqui só o nome e a direção. Padrão: maior valor.
+        p_ordenar_por: ordenarPor ?? 'valor',
+        p_ascendente: ascendente ?? false,
       });
       if (error) throw error;
       const linhas = (data ?? []) as NegocioEmRisco[];
@@ -279,6 +305,94 @@ export function useNegociosEmRisco(
     // Mantém a lista anterior na tela enquanto o novo recorte carrega — sem isso, mexer num
     // filtro (ou clicar em "Ver mais") apagaria a tabela inteira por um instante, porque a
     // `queryKey` muda junto. Mesmo motivo de `useDashboardStats`.
+    placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTS,
+  });
+}
+
+// ── Agendados para retornar ────────────────────────────────────────────────
+// Os negócios adiados por "Retomar depois" (com data de retorno FUTURA). É o outro lado da moeda
+// de `useNegociosEmRisco`/`useDashboardNegociosRisco`: quem sai de "pedem atenção" por ter um
+// retorno agendado aparece AQUI, até a data chegar. Espelha aquelas duas, trocando "dias parado"
+// por "data de retorno". O corte por chave `pauta_de_todos` fica no servidor (a função devolve só
+// os próprios para quem não vê a pauta toda, e o resumo por vendedor vem vazio).
+
+export interface DashboardAgendados {
+  qtd_total: number;
+  valor_total: number;
+  // Vem vazio ([]) para quem não vê a pauta toda — a RPC filtra por `eu_vejo_pauta_de_todos()`,
+  // não é omissão do front. Mesmo contrato de `risco_por_vendedor`.
+  agendados_por_vendedor: { vendedor: string; qtd: number; valor: number }[];
+}
+
+export function useDashboardAgendados(
+  empresaId?: string,
+  filters?: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; etapas?: string[] },
+) {
+  const { usuarioIds, fabricanteIds, funilId, etapas } = filters ?? {};
+  return useQuery({
+    queryKey: ['dashboard_agendados', empresaId, usuarioIds, fabricanteIds, funilId, etapas],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('dashboard_agendados', {
+        p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
+        p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
+        p_funil_id: funilId ?? null,
+        p_etapas: etapas && etapas.length > 0 ? etapas : null,
+      });
+      if (error) throw error;
+      const row = (data as unknown as DashboardAgendados[] | null)?.[0];
+      return (row ?? { qtd_total: 0, valor_total: 0, agendados_por_vendedor: [] }) as DashboardAgendados;
+    },
+    enabled: !!empresaId,
+    placeholderData: keepPreviousData,
+    ...DASHBOARD_QUERY_OPTS,
+  });
+}
+
+// Uma linha da tabela de agendados. Espelha `NegocioEmRisco`, trocando `dias_parado` por
+// `data_retorno` (a data em que o negócio volta). `valor_geral` é o "valor guardado" do recorte.
+export type NegocioAgendado = {
+  id: string;
+  nome: string;
+  fabrica: string | null;
+  etapa: string | null;
+  responsavel: string | null;
+  responsavel_id?: string | null;
+  responsavel_avatar?: string | null;
+  valor: number | null;
+  /** A data em que o negócio volta (o `proximo_contato_em` futuro mais distante). */
+  data_retorno: string | null;
+  total_geral: number;
+  /** O valor "guardado" do recorte inteiro (soma), repetido em toda linha. */
+  valor_geral?: number;
+  tentativas?: number;
+};
+
+export function useNegociosAgendados(
+  empresaId: string | undefined,
+  filtros: { usuarioIds?: string[]; fabricanteIds?: string[]; funilId?: string; etapas?: string[]; ordenarPor?: string; ascendente?: boolean },
+  quantos: number,
+) {
+  const { usuarioIds, fabricanteIds, funilId, etapas, ordenarPor, ascendente } = filtros;
+  return useQuery({
+    queryKey: ['negocios_agendados', empresaId, usuarioIds, fabricanteIds, funilId, etapas, ordenarPor, ascendente, quantos],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('negocios_agendados', {
+        p_usuario_ids: usuarioIds && usuarioIds.length > 0 ? usuarioIds : null,
+        p_fabricante_ids: fabricanteIds && fabricanteIds.length > 0 ? fabricanteIds : null,
+        p_funil_id: funilId ?? null,
+        p_etapas: etapas && etapas.length > 0 ? etapas : null,
+        p_limite: quantos,
+        p_deslocamento: 0,
+        // Padrão: quem volta antes primeiro (data de retorno crescente).
+        p_ordenar_por: ordenarPor ?? 'data_retorno',
+        p_ascendente: ascendente ?? true,
+      });
+      if (error) throw error;
+      const linhas = (data ?? []) as NegocioAgendado[];
+      return { linhas, total: Number(linhas[0]?.total_geral ?? 0) };
+    },
+    enabled: !!empresaId,
     placeholderData: keepPreviousData,
     ...DASHBOARD_QUERY_OPTS,
   });

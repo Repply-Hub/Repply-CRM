@@ -23,9 +23,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TOGGLE_LIST_CLASS, TOGGLE_TRIGGER_CLASS } from '@/lib/toggle-group-styles';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, Building2, Store, User, MapPin, Loader2, CheckCircle2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ChevronDown, Briefcase, Tag, UserCheck } from 'lucide-react';
+import { Plus, Search, Building2, Store, User, MapPin, Loader2, Users, Phone, Mail, Trash2, Settings2, Upload, FileDown, FileSpreadsheet, FileText, Columns3, ListFilter, ChevronDown, Briefcase, Tag, UserCheck } from 'lucide-react';
 import { ImportClientesDialog } from '@/components/clientes/ImportClientesDialog';
 import { EmpresaSelector } from '@/components/shared/EmpresaSelector';
+import { CampoTelefones } from '@/components/shared/CampoTelefones';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { CargoSelect } from '@/components/shared/CargoSelect';
 import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
@@ -33,7 +34,19 @@ import { SearchWithRecent } from '@/components/shared/SearchWithRecent';
 import { toast } from 'sonner';
 import { ColumnSettings, type ColumnDefinition, ColumnSettingsItem, ColumnSettingsPopover } from '@/components/shared/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
-import { maskCnpj, unmaskCnpj, isValidCnpjDigits, fetchCnpjData, telefoneDaReceita } from '@/lib/cnpj';
+import {
+  unmaskCnpj,
+  telefoneDaReceita,
+  classificarDocumento,
+  resultadoPermiteSalvar,
+  mensagemDoDocumento,
+  ehDocumentoDuplicado,
+  MENSAGEM_DOCUMENTO_DUPLICADO,
+  type CnpjData,
+  type ResultadoDoDocumento,
+} from '@/lib/cnpj';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
+import { CampoCnpj } from '@/components/shared/CampoCnpj';
 import { EnderecoForm } from '@/components/clientes/EnderecoForm';
 import { ContatoSelector } from '@/components/clientes/ContatoSelector';
 import { emptyEndereco, enderecoToString, type EnderecoFields } from '@/lib/cep';
@@ -363,7 +376,6 @@ const Clientes = () => {
   // pode não existir mais lá, e o cadastro gravaria um tipo órfão.
   const [tipo, setTipo] = useState('');
   const [cnpj, setCnpj] = useState('');
-  const [cnpjStatus, setCnpjStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
   const [empresa, setEmpresa] = useState('');
   const [razaoSocial, setRazaoSocial] = useState('');
   const [endereco, setEndereco] = useState<EnderecoFields>(emptyEndereco);
@@ -553,54 +565,33 @@ const Clientes = () => {
   // existe, mas nenhuma opção do filtro a alcança.
   const tipoFilterOptions = opcoesDeFiltro(tipos, empresas.map((c: any) => c.tipo));
 
-  const handleCnpjChange = (value: string) => {
-    const masked = maskCnpj(value);
-    setCnpj(masked);
-    setCnpjStatus('idle');
-    if (unmaskCnpj(masked).length === 14) {
-      handleCnpjLookup(masked);
+  // A consulta à Receita mora no <CampoCnpj>, o único lugar do sistema que fala com ela
+  // (src/test/uma-consulta-de-cnpj-so.test.ts). Esta tela tinha a sua própria cópia, que dizia
+  // "CNPJ não encontrado na Receita Federal" para QUALQUER falha — inclusive serviço fora do ar.
+  // Era essa frase que fazia parecer que o CNPJ só funcionava para construtora (11/09/2026).
+  // Funções de atualização, e não o valor da hora: a resposta chega até 10 s depois.
+  const preencherComDadosDaReceita = (data: CnpjData) => {
+    if (data.razao_social) {
+      setEmpresa(atual => atual || data.razao_social);
+      setRazaoSocial(atual => atual || data.razao_social);
     }
-  };
-
-  const handleCnpjLookup = async (cnpjValue: string) => {
-    const digits = unmaskCnpj(cnpjValue);
-    if (digits.length !== 14) return;
-    if (!isValidCnpjDigits(digits)) {
-      setCnpjStatus('invalid');
-      toast.error('CNPJ inválido (dígitos verificadores incorretos)');
-      return;
-    }
-    setCnpjStatus('loading');
-    try {
-      const data = await fetchCnpjData(digits);
-      setCnpjStatus('valid');
-      if (data.razao_social && !empresa) setEmpresa(data.razao_social);
-      if (data.razao_social && !razaoSocial) setRazaoSocial(data.razao_social);
-      if (!endereco.logradouro) {
-        setEndereco(prev => ({
-          ...prev,
-          logradouro: data.logradouro || prev.logradouro,
-          numero: data.numero || prev.numero,
-          bairro: data.bairro || prev.bairro,
-          cidade: data.municipio || prev.cidade,
-          uf: data.uf || prev.uf,
-          cep: data.cep || prev.cep,
-        }));
-      }
-      // A Receita manda o telefone só em dígitos, com o DDD grudado ("2121660000"). Sem passar
-      // pelo formatador ele entrava cru no campo — ver `telefoneDaReceita` em src/lib/cnpj.ts.
-      const telefoneReceita = telefoneDaReceita(data);
-      if (telefoneReceita && !telefone) setTelefone(telefoneReceita);
-      toast.success('CNPJ validado! Dados preenchidos automaticamente.');
-    } catch {
-      setCnpjStatus('invalid');
-      toast.error('CNPJ não encontrado na Receita Federal');
-    }
+    setEndereco(prev => prev.logradouro ? prev : ({
+      ...prev,
+      logradouro: data.logradouro || prev.logradouro,
+      numero: data.numero || prev.numero,
+      bairro: data.bairro || prev.bairro,
+      cidade: data.municipio || prev.cidade,
+      uf: data.uf || prev.uf,
+      cep: data.cep || prev.cep,
+    }));
+    // A Receita manda o telefone só em dígitos, com o DDD grudado — ver `telefoneDaReceita`.
+    const telefoneReceita = telefoneDaReceita(data);
+    if (telefoneReceita) setTelefone(atual => atual || telefoneReceita);
   };
 
   const resetForm = () => {
     setCnpj(''); setEmpresa(''); setRazaoSocial(''); setEndereco(emptyEndereco);
-    setTelefone(''); setEmail(''); setCnpjStatus('idle'); setNomeContato(''); setCargo('');
+    setTelefone(''); setEmail(''); setNomeContato(''); setCargo('');
     setContatoMode('nenhum'); setSelectedContatoId(''); setContatoEmail(''); setContatoTelefone('');
     setCamposExtrasEmpresa({}); setCamposExtrasContato({});
     setStep(1);
@@ -616,17 +607,22 @@ const Clientes = () => {
         return false;
       }
       const cnpjObrigatorio = camposConfigClientes?.find(c => c.campo_key === 'cnpj')?.obrigatorio ?? true;
-      // Se o CNPJ não for obrigatório e o campo estiver vazio, pula a validação de
-      // formato; se foi preenchido (mesmo sem ser obrigatório), o formato ainda é validado.
-      if (cnpjObrigatorio || cnpj.trim()) {
-        if (unmaskCnpj(cnpj).length !== 14) {
-          toast.error('Informe um CNPJ válido.');
+      // CPF ou CNPJ, decidido pelos dígitos e nunca pelo tipo (decisão de 11/09/2026): é o que faz
+      // o campo valer para os tipos que as empresas ainda vão criar, e o que deixa pessoa física
+      // com CPF passar. A Receita não trava cliente — só número digitado errado trava.
+      // O cast é seguro: `resultadoPermiteSalvar`/`mensagemDoDocumento` não reconhecem o caso
+      // 'cnpj' (que só existe ANTES da consulta à Receita) e caem no comportamento padrão —
+      // permitir salvar, sem mensagem — que é exatamente o que um CNPJ com dígitos válidos
+      // deve fazer aqui, já que esta tela não espera a consulta.
+      const documento = classificarDocumento(cnpj, { aceitaCpf: true }) as ResultadoDoDocumento;
+      if (documento === 'vazio') {
+        if (cnpjObrigatorio) {
+          toast.error('Informe o CPF ou CNPJ.');
           return false;
         }
-        if (!isValidCnpjDigits(unmaskCnpj(cnpj))) {
-          toast.error('CNPJ inválido');
-          return false;
-        }
+      } else if (!resultadoPermiteSalvar(documento, 'avisar')) {
+        toast.error(mensagemDoDocumento(documento, { seNaoExistir: 'avisar', aceitaCpf: true })!.texto);
+        return false;
       }
       const razaoSocialObrigatoria = camposConfigClientes?.find(c => c.campo_key === 'razao_social')?.obrigatorio ?? false;
       if (razaoSocialObrigatoria && !razaoSocial.trim()) {
@@ -788,7 +784,7 @@ const Clientes = () => {
         empresa,
         razao_social: razaoSocial || undefined,
         tipo,
-        cnpj: cnpj || undefined,
+        cnpj: unmaskCnpj(cnpj) || undefined,
         email: email || undefined,
         telefone: telefone || undefined,
         endereco: enderecoStr || undefined,
@@ -810,8 +806,10 @@ const Clientes = () => {
       toast.success('Empresa cadastrada com sucesso!');
       resetForm();
       setDialogOpen(false);
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err) {
+      // A trava de duplicidade (`clientes_empresa_id_cnpj_key`) devolve o erro cru do banco,
+      // em inglês; `ehDocumentoDuplicado` reconhece esse caso e troca pela frase em português.
+      toast.error(ehDocumentoDuplicado(err) ? MENSAGEM_DOCUMENTO_DUPLICADO : mensagemDeErro(err));
     }
   };
 
@@ -1217,21 +1215,14 @@ const Clientes = () => {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div>
-                          <Label>CNPJ{empresaObrigatorio('cnpj', true) && ' *'}</Label>
-                          <div className="relative">
-                            <Input
-                              value={cnpj}
-                              onChange={(e) => handleCnpjChange(e.target.value)}
-                              placeholder="00.000.000/0000-00"
-                              className={cnpjStatus === 'invalid' ? 'border-destructive' : cnpjStatus === 'valid' ? 'border-green-500' : ''}
-                              required={empresaObrigatorio('cnpj', true)}
-                            />
-                            {cnpjStatus === 'loading' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
-                            {cnpjStatus === 'valid' && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
-                          </div>
-                          <p className="text-[10px] text-muted-foreground mt-1">Ao sair do campo, o CNPJ será validado e os dados preenchidos automaticamente</p>
-                        </div>
+                        <CampoCnpj
+                          aceitaCpf
+                          value={cnpj}
+                          onChange={setCnpj}
+                          onDadosEncontrados={preencherComDadosDaReceita}
+                          obrigatorio={empresaObrigatorio('cnpj', true)}
+                          descricao="Ao sair do campo, o CNPJ é conferido na Receita e os dados são preenchidos. CPF confere só os dígitos."
+                        />
                         <div><Label>Nome{empresaObrigatorio('nome', true) && ' *'}</Label><Input value={empresa} onChange={e => setEmpresa(e.target.value)} placeholder="Nome fantasia ou nome" required={empresaObrigatorio('nome', true)} /></div>
                         <div><Label>Razão Social{empresaObrigatorio('razao_social', false) && ' *'}</Label><Input value={razaoSocial} onChange={e => setRazaoSocial(e.target.value)} placeholder="Razão social da empresa" required={empresaObrigatorio('razao_social', false)} /></div>
                       </>
@@ -1240,7 +1231,7 @@ const Clientes = () => {
                     {step === 2 && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div><Label>Email{empresaObrigatorio('email', true) && ' *'}</Label><Input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="email@exemplo.com" required={empresaObrigatorio('email', true)} /></div>
-                        <div><Label>Telefone{empresaObrigatorio('telefone', true) && ' *'}</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" required={empresaObrigatorio('telefone', true)} /></div>
+                        <div><Label>Telefone{empresaObrigatorio('telefone', true) && ' *'}</Label><CampoTelefones value={telefone} onChange={setTelefone} obrigatorio={empresaObrigatorio('telefone', true)} /></div>
                       </div>
                     )}
 
@@ -1284,7 +1275,7 @@ const Clientes = () => {
                             <Input value={nomeContato} onChange={e => setNomeContato(e.target.value)} placeholder={`Nome do contato${contatoObrigatorio('nome_contato', true) ? ' *' : ''}`} required={contatoObrigatorio('nome_contato', true)} />
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <CargoSelect value={cargo} onValueChange={setCargo} />
-                              <Input value={contatoTelefone} onChange={e => setContatoTelefone(e.target.value)} placeholder={`Telefone do contato${contatoObrigatorio('telefone', true) ? ' *' : ''}`} required={contatoObrigatorio('telefone', true)} />
+                              <CampoTelefones value={contatoTelefone} onChange={setContatoTelefone} placeholder={`Telefone do contato${contatoObrigatorio('telefone', true) ? ' *' : ''}`} obrigatorio={contatoObrigatorio('telefone', true)} />
                             </div>
                             <Input value={contatoEmail} onChange={e => setContatoEmail(e.target.value)} type="email" placeholder={`Email do contato${contatoObrigatorio('email', true) ? ' *' : ''}`} required={contatoObrigatorio('email', true)} />
                             {(camposConfigContatos ?? []).filter(c => c.origem === 'customizado').map(campo => (
@@ -1310,7 +1301,7 @@ const Clientes = () => {
                     <div><Label>Cargo{contatoObrigatorio('cargo', false) && ' *'}</Label><CargoSelect value={cargo} onValueChange={setCargo} /></div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div><Label>Email{contatoObrigatorio('email', true) && ' *'}</Label><Input name="email" type="email" placeholder="email@exemplo.com" required={contatoObrigatorio('email', true)} /></div>
-                      <div><Label>Telefone{contatoObrigatorio('telefone', true) && ' *'}</Label><Input value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 0000-0000, (00) 00000-0000" required={contatoObrigatorio('telefone', true)} /></div>
+                      <div><Label>Telefone{contatoObrigatorio('telefone', true) && ' *'}</Label><CampoTelefones value={telefone} onChange={setTelefone} obrigatorio={contatoObrigatorio('telefone', true)} /></div>
                     </div>
                     {(camposConfigContatos ?? []).filter(c => c.origem === 'customizado').map(campo => (
                       <div key={campo.id}>

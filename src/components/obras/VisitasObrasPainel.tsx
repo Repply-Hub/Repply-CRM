@@ -6,7 +6,6 @@ import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { Loader2, CheckCircle2, Circle, MapPin, Building2, HardHat, Route, Send, Trash2, Pencil } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { type DateRange } from '@/components/shared/DateRangePicker';
 import { useAuth } from '@/hooks/use-auth';
 import { useVendedores } from '@/hooks/use-clientes';
@@ -15,6 +14,9 @@ import { agruparEmRotasDoDia, type RotaDoDia } from '@/lib/rota-do-dia';
 import { normalizarTexto } from '@/lib/busca-de-obras';
 import { agruparVisitasPorDia } from '@/lib/ordem-das-paradas';
 import { linkDoGoogleMaps, mensagemDaRota } from '@/lib/rota-no-whatsapp';
+import { RESPOSTAS_VAZIAS, respostasDaVisita, resumoDaAnalise, type RespostasDaVisita } from '@/lib/analise-da-visita';
+import { PerguntasDaVisita } from './PerguntasDaVisita';
+import { ResumoDaVisita } from './ResumoDaVisita';
 import { EnviarRotaDialog } from './EnviarRotaDialog';
 import { RotaNoMapaDialog } from './RotaNoMapaDialog';
 import { useExcluirRotaDeVisita } from '@/hooks/use-eventos';
@@ -53,7 +55,7 @@ export function VisitasObrasPainel({
   const { data: usuarios = [] } = useVendedores();
   const marcarRealizada = useMarcarVisitaRealizada();
   const [editandoId, setEditandoId] = useState<string | null>(null);
-  const [observacaoRascunho, setObservacaoRascunho] = useState('');
+  const [rascunho, setRascunho] = useState<RespostasDaVisita>(RESPOSTAS_VAZIAS);
   const [rotaParaEnviar, setRotaParaEnviar] = useState<RotaDoDia | null>(null);
   // 🔴 A rota abre em JANELA PRÓPRIA, não no mapa geral de obras. O mapa geral tem 74 pinos e a
   // rota do dia tem três: procurar o trajeto no meio deles é trabalho, e trocar de aba ainda
@@ -139,6 +141,17 @@ export function VisitasObrasPainel({
         visitaRealizada: v.visitaRealizada,
         // Vai junto para a edição saber o que já está escrito e não passar por cima.
         visitaObservacao: v.visitaObservacao,
+        // As cinco respostas da visita concluída (16/09/2026) vão pelo MESMO motivo da
+        // observação acima: sem elas, `NovaRotaVisitaDialog.tsx` abriria para editar sem saber
+        // o que já está gravado, e QUALQUER edição pareceria "a resposta virou vazia" —
+        // apagando em silêncio o que a pessoa já tinha respondido.
+        visitaFase: v.visitaFase,
+        visitaConcorrentes: v.visitaConcorrentes,
+        visitaContatoId: v.visitaContatoId,
+        visitaProximoPasso: v.visitaProximoPasso,
+        visitaProximoPassoEm: v.visitaProximoPassoEm,
+        // O NOME de "com quem falou", para a análise na mensagem do WhatsApp mostrar "Falou com".
+        contatoNome: v.contatoNome,
         latitude: v.latitude,
         longitude: v.longitude,
         // A identidade e o título da rota. Nulos nas paradas antigas — nesse caso o
@@ -177,6 +190,19 @@ export function VisitasObrasPainel({
       horario: p.inicio,
       lat: p.latitude,
       lng: p.longitude,
+      // A análise entra SÓ quando a obra já foi visitada — a rota da manhã, de obra ainda não
+      // visitada, sai idêntica à de antes. `resumoDaAnalise` já monta cada linha (inclusive
+      // "Obs.: …") e devolve vazio quando nada foi respondido.
+      analise: p.visitaRealizada
+        ? resumoDaAnalise({
+            fase: p.visitaFase,
+            concorrentes: p.visitaConcorrentes,
+            contatoNome: p.contatoNome,
+            proximoPasso: p.visitaProximoPasso,
+            proximoPassoEm: p.visitaProximoPassoEm,
+            observacao: p.visitaObservacao,
+          })
+        : [],
     }));
     return mensagemDaRota({ data: rota.data, paradas, link: linkDoGoogleMaps(paradas) });
   };
@@ -358,19 +384,33 @@ export function VisitasObrasPainel({
                 visita={visita}
                 podeMarcar={profile?.user_id === visita.criadoPor}
                 editando={editandoId === visita.id}
-                observacaoRascunho={observacaoRascunho}
-                onObservacaoChange={setObservacaoRascunho}
+                rascunho={rascunho}
+                onRascunhoChange={setRascunho}
                 nomeCriador={nomePor(visita.criadoPor)}
                 onSelectObra={onSelectObra}
                 onIniciarEdicao={() => {
-                  setObservacaoRascunho(visita.visitaObservacao || '');
+                  setRascunho(respostasDaVisita(visita));
                   setEditandoId(visita.id);
                 }}
                 onCancelarEdicao={() => setEditandoId(null)}
                 onSalvar={() =>
                   marcarRealizada.mutate(
-                    { grupoId: visita.grupoId, obraId: visita.obraId, realizada: true, observacao: observacaoRascunho },
-                    { onSuccess: () => setEditandoId(null) },
+                    {
+                      grupoId: visita.grupoId,
+                      obraId: visita.obraId,
+                      realizada: true,
+                      observacao: rascunho.observacao,
+                      respostas: rascunho,
+                      // Para a tarefa do próximo passo (Tarefa 7a): título com o nome da obra,
+                      // ligada ao cliente dono dela. Os dois já vêm prontos em `visita`
+                      // (`VisitaObraListagem`), sem consulta extra.
+                      nomeObra: visita.nomeObra,
+                      clienteId: visita.clienteId,
+                    },
+                    {
+                      onSuccess: () => setEditandoId(null),
+                      onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível salvar a visita.')),
+                    },
                   )
                 }
                 podeAlternar={profile?.user_id === visita.criadoPor}
@@ -391,15 +431,19 @@ export function VisitasObrasPainel({
                  */
                 onAlternarStatus={() => {
                   if (visita.visitaRealizada) {
-                    marcarRealizada.mutate({
-                      grupoId: visita.grupoId,
-                      obraId: visita.obraId,
-                      realizada: false,
-                      observacao: visita.visitaObservacao ?? '',
-                    });
+                    // 🔴 DESMARCAR NÃO APAGA A ANOTAÇÃO (decisão do dono do produto de
+                    // 16/09/2026). O `mutate` abaixo NÃO manda `observacao` nem `respostas` —
+                    // `useMarcarVisitaRealizada` grava só `visita_realizada: false` quando
+                    // `realizada` é falso, e as cinco respostas mais a observação ficam como
+                    // estavam. Quem quer apagar de propósito marca de novo, limpa os campos e
+                    // salva; aí sim vira `null`.
+                    marcarRealizada.mutate(
+                      { grupoId: visita.grupoId, obraId: visita.obraId, realizada: false },
+                      { onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível desmarcar a visita.')) },
+                    );
                     return;
                   }
-                  setObservacaoRascunho(visita.visitaObservacao || '');
+                  setRascunho(respostasDaVisita(visita));
                   setEditandoId(visita.id);
                 }}
                 salvando={marcarRealizada.isPending}
@@ -453,8 +497,8 @@ function VisitaCard({
   visita,
   podeMarcar,
   editando,
-  observacaoRascunho,
-  onObservacaoChange,
+  rascunho,
+  onRascunhoChange,
   nomeCriador,
   onSelectObra,
   onIniciarEdicao,
@@ -467,8 +511,8 @@ function VisitaCard({
   visita: VisitaObraListagem;
   podeMarcar: boolean;
   editando: boolean;
-  observacaoRascunho: string;
-  onObservacaoChange: (v: string) => void;
+  rascunho: RespostasDaVisita;
+  onRascunhoChange: (v: RespostasDaVisita) => void;
   nomeCriador: string;
   onSelectObra: (obraId: string) => void;
   onIniciarEdicao: () => void;
@@ -550,19 +594,33 @@ function VisitaCard({
         )}
       </div>
 
-      {visita.visitaObservacao && !editando && (
-        <p className="mt-2 whitespace-pre-wrap rounded-md bg-muted/40 p-2 text-xs text-foreground">
-          {visita.visitaObservacao}
-        </p>
+      {/* 🔴 A ANÁLISE É DE QUEM VÊ O CARTÃO, não só de quem registrou a visita — achado na
+          revisão do Task 6a. Antes só a observação reaparecia fora do modo de edição; as
+          outras quatro respostas (fase, concorrente, com quem falou, próximo passo) ficavam
+          gravadas no banco mas eram invisíveis para todo mundo assim que o formulário
+          fechava. `ResumoDaVisita` já inclui a linha "Obs.: …", por isso a observação não
+          tem mais um parágrafo à parte aqui — apareceria duas vezes. */}
+      {!editando && (
+        <ResumoDaVisita
+          analise={{
+            fase: visita.visitaFase,
+            concorrentes: visita.visitaConcorrentes,
+            contatoNome: visita.contatoNome,
+            proximoPasso: visita.visitaProximoPasso,
+            proximoPassoEm: visita.visitaProximoPassoEm,
+            observacao: visita.visitaObservacao,
+          }}
+        />
       )}
 
       {podeMarcar && editando && (
-        <div className="mt-2 space-y-2">
-          <Textarea
-            value={observacaoRascunho}
-            onChange={(e) => onObservacaoChange(e.target.value)}
-            placeholder="O que você viu na obra?"
-            className="min-h-20 text-sm"
+        <div className="mt-2 space-y-3">
+          <PerguntasDaVisita
+            valor={rascunho}
+            onChange={onRascunhoChange}
+            clienteId={visita.clienteId}
+            clienteEmpresa={visita.clienteEmpresa}
+            disabled={salvando}
           />
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={onCancelarEdicao}>

@@ -41,6 +41,9 @@ import type { CnpjData } from '@/lib/cnpj';
 
 import { getNomeNegocioAutomatico } from '@/lib/nome-negocio';
 import { OrigemLeadSelect } from '@/components/shared/OrigemLeadSelect';
+import { filenameFromUrl } from '@/lib/download-file';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
+import type { CopiaDeNegocio } from '@/lib/copia-de-negocio';
 
 export interface NovoNegocioDialogProps {
   open: boolean;
@@ -51,11 +54,16 @@ export interface NovoNegocioDialogProps {
   status?: string;
   /** Funil de destino. Sem isso, cai no funil padrão da empresa. */
   funilId?: string;
+  /**
+   * Cópia de um negócio existente: a janela abre preenchida e NADA é gravado até a pessoa
+   * confirmar. A etapa e o funil vêm por `status` e `funilId`.
+   */
+  copiaDe?: CopiaDeNegocio;
   /** Chamado após criação bem-sucedida. */
   onCreated?: (pedidoId?: string) => void;
 }
 
-export function NovoNegocioDialog({ open, onOpenChange, clienteId, status, funilId, onCreated }: NovoNegocioDialogProps) {
+export function NovoNegocioDialog({ open, onOpenChange, clienteId, status, funilId, copiaDe, onCreated }: NovoNegocioDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {open && (
@@ -64,6 +72,7 @@ export function NovoNegocioDialog({ open, onOpenChange, clienteId, status, funil
           clienteId={clienteId}
           status={status}
           funilId={funilId}
+          copiaDe={copiaDe}
           onCreated={onCreated}
         />
       )}
@@ -76,6 +85,7 @@ function NovoNegocioFormContent({
   clienteId: clienteIdProp,
   status: statusProp,
   funilId: funilIdProp,
+  copiaDe,
   onCreated,
 }: Omit<NovoNegocioDialogProps, 'open'>) {
   const { data: clientes } = useClientes();
@@ -109,10 +119,12 @@ function NovoNegocioFormContent({
   const [step, setStep] = useState(1);
 
   // Step 1 fields
-  const [clienteId, setClienteId] = useState(clienteIdProp ?? '');
-  const [obraId, setObraId] = useState('');
-  const [fabricanteId, setFabricanteId] = useState('');
-  const [vendedorId, setVendedorId] = useState('');
+  // 🔴 O preenchimento da cópia é ESTADO INICIAL, lido uma vez. Quem chama precisa ter a cópia
+  // pronta antes de montar a janela — ver `NovoPedido.tsx`.
+  const [clienteId, setClienteId] = useState(copiaDe?.clienteId || clienteIdProp || '');
+  const [obraId, setObraId] = useState(copiaDe?.obraId ?? '');
+  const [fabricanteId, setFabricanteId] = useState(copiaDe?.fabricanteId ?? '');
+  const [vendedorId, setVendedorId] = useState(copiaDe?.vendedorId ?? '');
 
   /**
    * Os responsáveis ALÉM do principal.
@@ -121,7 +133,7 @@ function NovoNegocioFormContent({
    * validação de campo obrigatório exige e que vai em `usuario_id` na gravação — mantê-lo
    * intacto é o que deixou o resto deste formulário sem uma linha de mudança.
    */
-  const [participantes, setParticipantes] = useState<string[]>([]);
+  const [participantes, setParticipantes] = useState<string[]>(copiaDe?.participantes ?? []);
 
   const responsaveis = useMemo<ResponsavelSelecionado[]>(
     () => [
@@ -138,22 +150,25 @@ function NovoNegocioFormContent({
   };
   const [dataPedido, setDataPedido] = useState<Date>(new Date());
   const [prazoResposta, setPrazoResposta] = useState<Date | undefined>();
-  const [origemLead, setOrigemLead] = useState('');
-  const [enderecoEntrega, setEnderecoEntrega] = useState('');
+  const [origemLead, setOrigemLead] = useState(copiaDe?.origemLead ?? '');
+  const [enderecoEntrega, setEnderecoEntrega] = useState(copiaDe?.enderecoEntrega ?? '');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [status, setStatus] = useState(statusProp ?? 'novo_lead');
-  const [marcadorId, setMarcadorId] = useState('');
+  // O anexo do original, pelo LINK: a cópia aponta para o mesmo arquivo, sem duplicar nada no
+  // armazenamento. Tirar o anexo aqui mexe só nesta cópia — nenhum gesto de tela apaga arquivo.
+  const [pdfUrlHerdado, setPdfUrlHerdado] = useState<string | null>(copiaDe?.pdfUrl ?? null);
+  const [status, setStatus] = useState(statusProp ?? copiaDe?.status ?? 'novo_lead');
+  const [marcadorId, setMarcadorId] = useState(copiaDe?.marcadorId ?? '');
   const [isUploading, setIsUploading] = useState(false);
-  const [nome, setNome] = useState('');
-  const [nomeAutomatico, setNomeAutomatico] = useState(true);
+  const [nome, setNome] = useState(copiaDe?.nome ?? '');
+  const [nomeAutomatico, setNomeAutomatico] = useState(copiaDe ? copiaDe.nomeAutomatico : true);
 
   // Step 2 fields
   const [observacoes, setObservacoes] = useState('');
   const { profile } = useAuth();
   const { data: camposConfig } = useConfiguracoesCampos('pedidos', profile?.empresa_id);
   const { data: marcadores } = useMarcadores(profile?.empresa_id);
-  const [camposExtras, setCamposExtras] = useState<Record<string, string>>({});
-  const [valorManual, setValorManual] = useState<number | null>(null);
+  const [camposExtras, setCamposExtras] = useState<Record<string, string>>(copiaDe?.camposExtras ?? {});
+  const [valorManual, setValorManual] = useState<number | null>(copiaDe?.valor ?? null);
 
   // Derived
   const selectedCliente = useMemo(() => clientes?.find(c => c.id === clienteId), [clientes, clienteId]);
@@ -225,7 +240,9 @@ function NovoNegocioFormContent({
       fabricante_id: fabricanteId,
       vendedor_id: vendedorId,
       status: status,
-      anexo_pdf: pdfFile ? 'ok' : undefined,
+      // O anexo herdado da cópia vale como anexo para a exigência de campo obrigatório: ele já
+      // é um PDF de verdade, só que enviado antes.
+      anexo_pdf: pdfFile || pdfUrlHerdado ? 'ok' : undefined,
       data_pedido: dataPedido ? 'ok' : undefined,
       obra_id: obraId,
       origem_lead: origemLead,
@@ -302,7 +319,8 @@ function NovoNegocioFormContent({
     if (!resolvedFunilId) { toast.error('Não foi possível identificar o funil de destino. Tente novamente em instantes.'); return false; }
 
     setIsUploading(true);
-    let pdfUrl = '';
+    // Começa no anexo herdado da cópia; um arquivo novo, se houver, toma o lugar dele abaixo.
+    let pdfUrl = pdfUrlHerdado ?? '';
 
     try {
       if (pdfFile) {
@@ -365,8 +383,10 @@ function NovoNegocioFormContent({
       });
       toast.success('Negócio criado com sucesso!');
       onCreated?.(created?.id);
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err) {
+      // CLAUDE.md §4.6: erro do Supabase não é um `Error` — é `{ message, details, hint, code }`
+      // —, e `err.message` cru pulava a parte que o banco escreve em `details`/`hint`.
+      toast.error(mensagemDeErro(err, 'Não foi possível criar o negócio.'));
     } finally {
       setIsUploading(false);
     }
@@ -473,6 +493,14 @@ function NovoNegocioFormContent({
         />
 
         <CorpoDialogo className="mx-0 px-6 py-5">
+          {copiaDe && (
+            <div className="mb-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+              <p className="text-xs text-foreground">
+                Cópia de <span className="font-semibold">{copiaDe.rotuloDoOriginal}</span>. Nada é
+                gravado até você criar o negócio.
+              </p>
+            </div>
+          )}
         {step === 1 ? (
             <div className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -737,7 +765,7 @@ function NovoNegocioFormContent({
                 </Label>
                 <div className={cn(
                   "relative border-2 border-dashed rounded-lg p-4 transition-colors",
-                  pdfFile ? "border-primary/50 bg-primary/5" : "border-muted hover:border-primary/30"
+                  pdfFile || pdfUrlHerdado ? "border-primary/50 bg-primary/5" : "border-muted hover:border-primary/30"
                 )}>
                   <input
                     type="file"
@@ -758,6 +786,25 @@ function NovoNegocioFormContent({
                           size="icon"
                           className="h-8 w-8 text-destructive"
                           onClick={(e) => { e.stopPropagation(); setPdfFile(null); }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : pdfUrlHerdado ? (
+                      /* O anexo veio do negócio copiado: é o MESMO arquivo, e por isso não tem
+                         tamanho para mostrar (ele não passou por aqui). Tirar daqui não mexe no
+                         original — nenhum gesto de tela apaga arquivo do armazenamento. */
+                      <>
+                        <FileText className="h-6 w-6 text-primary" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{filenameFromUrl(pdfUrlHerdado, 'anexo.pdf')}</p>
+                          <p className="text-xs text-muted-foreground">Anexo do negócio copiado</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={(e) => { e.stopPropagation(); setPdfUrlHerdado(null); }}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

@@ -12,6 +12,7 @@ import {
   avisarMensagemNova,
   previaDaMensagem,
 } from '@/lib/aviso-de-mensagem-nova';
+import { camposDeMencaoParaGravar } from '@/lib/mencao';
 
 // WhatsApp/uazapi às vezes usa o JID de celulares BR sem o 9º dígito (número antigo).
 // Normaliza para o formato canônico, igual ao _shared/whatsapp.ts das edge functions
@@ -127,6 +128,11 @@ export interface WaMensagem {
   // Nota de sistema (ex: "Fulano assumiu esta conversa") — nunca enviada ao
   // WhatsApp, renderizada como chip central em vez de bolha de mensagem.
   is_nota_interna?: boolean;
+  // Quem foi mencionado nesta nota (id de usuário) e se marcou @todos. Só a janela
+  // "Adicionar nota" preenche isto de verdade — notas de sistema gravam com os
+  // padrões (`[]`/`false`) e nunca disparam menção.
+  mencionados?: string[];
+  menciona_todos?: boolean;
   // Notas fixadas aparecem numa faixa fixa no topo do chat, além da posição
   // cronológica normal — só tem efeito quando is_nota_interna também é true.
   fixada?: boolean;
@@ -1472,6 +1478,7 @@ export function useUnreadWaMessages() {
             // sempre. O som sai de lá dentro e cala sozinho quando a pessoa já
             // está com esta conversa aberta (ver definirConversaEmFoco).
             avisarMensagemNova({
+              origem: 'whatsapp',
               de: nomeConversa,
               previa: descricao,
               conversaId: row.id,
@@ -1718,9 +1725,26 @@ export function useWaAddNota() {
 
   return useMutation({
     mutationFn: async (
-      { conversaId, texto, fixada = false }: { conversaId: string; texto: string; fixada?: boolean },
+      {
+        conversaId,
+        texto,
+        fixada = false,
+        mencionados = [],
+        mencionaTodos = false,
+      }: {
+        conversaId: string;
+        texto: string;
+        fixada?: boolean;
+        mencionados?: string[];
+        mencionaTodos?: boolean;
+      },
     ) => {
       if (!profile?.empresa_id) throw new Error('Empresa não identificada');
+      // Sem @, o payload não cita `mencionados`/`menciona_todos` — inclusive a nota de
+      // sistema (ex.: "assumiu esta conversa"), que chama sem menção. Ver o comentário
+      // de `camposDeMencaoParaGravar` em src/lib/mencao.ts sobre por que isso importa
+      // enquanto a migration das menções não roda em produção.
+      const camposDeMencao = camposDeMencaoParaGravar({ ids: mencionados, todos: mencionaTodos });
       const { data, error } = await supabase
         .from('whatsapp_mensagens')
         .insert({
@@ -1734,6 +1758,7 @@ export function useWaAddNota() {
           lida: true,
           is_nota_interna: true,
           fixada,
+          ...camposDeMencao,
         })
         .select()
         .single();

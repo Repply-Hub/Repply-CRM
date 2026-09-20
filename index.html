@@ -38,15 +38,36 @@
     />
 
     <!-- Fonts: General Sans (display) + Satoshi (body) + JetBrains Mono (data) -->
+    <!-- 🔴 UMA FAMÍLIA POR FOLHA DO FONTSHARE. Até 14/09/2026 havia aqui uma folha só pedindo
+         General Sans e Satoshi juntas, e nesse dia a Satoshi não chegava: o texto de corpo do
+         sistema inteiro estava na fonte do aparelho. O servidor do Fontshare responde certo,
+         mas a rede de entrega dele guarda a resposta só pelo primeiro `f[]` e ignora os
+         seguintes, e vale a última resposta gravada. A folha combinada dividia a cópia guardada
+         com todo site que pede só General Sans — por isso o defeito aparece e some sem ninguém
+         mexer. Não junte as duas de volta: src/test/uma-familia-por-folha-do-fontshare.test.ts
+         falha.
+
+         A Satoshi vem na versão variável (`@1`: pesos 300 a 900 num arquivo só, 42 KB). Ela não
+         tem 600 fixo — pedir `satoshi@600` é ignorado em silêncio —, e sem ele cada
+         `font-semibold` do código (320 em 14/09/2026, inclusive o botão Entrar) virava negrito
+         700. As fixas 400/500/700 somavam 76 KB. -->
     <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
     <link
-      href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&f[]=satoshi@400,500,700&display=swap"
+      href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://api.fontshare.com/v2/css?f[]=satoshi@1&display=swap"
       rel="stylesheet"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- 600 e 700 porque o código usa `font-mono font-semibold` e `font-mono font-bold` em
+         números (18 lugares em 14/09/2026). O Google entrega o MESMO arquivo para todos os pesos
+         desta família: pedir mais peso não baixa nada a mais, só troca o negrito que o navegador
+         improvisa por cima do 500 pelo desenho de verdade. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <meta property="og:title" content="Repply - o CRM que fala a sua língua" />

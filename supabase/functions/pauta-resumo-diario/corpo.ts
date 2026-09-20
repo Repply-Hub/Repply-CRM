@@ -75,6 +75,10 @@ export interface NegocioDaEquipe {
   dias_parado: number | null;
   total_geral: number;
   valor_geral: number | null;
+  // As duas abaixo chegam desde a migration 20260914153000, mas o e-mail NÃO as usa — por isso
+  // opcionais: nada no e-mail pode passar a depender delas sem uma decisão.
+  responsavel_id?: string | null;
+  responsavel_avatar?: string | null;
 }
 
 /**

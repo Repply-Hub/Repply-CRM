@@ -8,12 +8,14 @@ import {
   avisarMensagemNova,
   previaDaMensagem,
 } from '@/lib/aviso-de-mensagem-nova';
+import { chaveDaMensagemDoChat } from '@/lib/alvo-do-chat';
 
 export interface Notificacao {
   id: string;
   usuario_id: string;
   pedido_id: string | null;
   cliente_id: string | null;
+  link?: string | null;
   tipo: string;
   titulo: string;
   mensagem: string | null;
@@ -151,6 +153,11 @@ export function useUnreadChatMessages() {
         qc.invalidateQueries({ queryKey: ['unread_chat_count'] });
 
         if (payload.eventType === 'INSERT' && meId && payload.new.usuario_id !== meId) {
+          // Menção a mim: quem avisa é useAvisoDeMencao ("te mencionou"). Avisar aqui também
+          // daria dois avisos pela mesma mensagem.
+          const mencionados: string[] = Array.isArray(payload.new.mencionados) ? payload.new.mencionados : [];
+          if (!payload.new.recipient_id && (mencionados.includes(meId) || payload.new.menciona_todos)) return;
+
           const members = qc.getQueryData<any[]>(['chat-members']) || [];
           let sender = members.find((m) => m.id === payload.new.usuario_id);
 
@@ -164,15 +171,24 @@ export function useUnreadChatMessages() {
           }
 
           const nomeConversa = sender?.nome || 'Alguém';
+          // A chave da conversa exata (Geral, o grupo ou a pessoa) a partir dos
+          // mesmos três campos que `useUnreadChatByTarget` já lê do payload —
+          // ver `chaveDaMensagemDoChat`. Antes disso o clique só levava para
+          // `/chat`, e a pessoa tinha de procurar a conversa (14/09/2026).
+          const chave = chaveDaMensagemDoChat({
+            grupo_id: payload.new.grupo_id,
+            recipient_id: payload.new.recipient_id,
+            usuario_id: payload.new.usuario_id,
+          });
           // O MESMO aviso do WhatsApp, pela mesma função — inclusive o botão
           // para abrir, que faltava aqui. Ver aviso-de-mensagem-nova.
           avisarMensagemNova({
+            origem: 'chat',
             de: nomeConversa,
             previa: previaDaMensagem(payload.new.conteudo, 'Enviou um arquivo'),
-            // O chat interno não tem rota por conversa: leva para a seção,
-            // que é onde a mensagem está. `navigate` e não `location.assign`
-            // para não recarregar o app inteiro.
-            aoAbrir: () => navigate('/chat'),
+            // `Chat.tsx` lê `?conversa=` e troca de alvo sozinho (`alvoInicialDaUrl`).
+            // `navigate` e não `location.assign` para não recarregar o app inteiro.
+            aoAbrir: () => navigate(`/chat?conversa=${chave}`),
           });
         }
       })

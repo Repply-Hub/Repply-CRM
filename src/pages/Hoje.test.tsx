@@ -118,12 +118,17 @@ afterEach(() => {
 
 describe('o topo da tela "Hoje"', () => {
   describe('🔴 fila vazia com trabalho na tabela do time — a fila é mais estreita que a tabela', () => {
-    it('continua dizendo "Sua fila está vazia", e aponta a tabela de baixo', () => {
+    it('continua dizendo "Sua fila está vazia", e aponta a tabela de baixo com um botão', () => {
       prepararTela({ pauta: [], tabelaDoTime: { total: 5 } });
       montarATela();
 
       expect(manchete()).toBe('Sua fila está vazia');
-      expect(screen.getByText(/O que pede atenção está na tabela logo abaixo — 5 negócios\./)).toBeInTheDocument();
+      // Este arquivo monta a tela SEM a chave `pauta_de_todos` (o esboço de
+      // `usePossoVerPautaDeTodos` devolve falso): o aviso fala dos negócios da própria pessoa.
+      expect(
+        screen.getByText('Quer adiantar? Seus 5 negócios que pedem atenção estão na tabela logo abaixo.'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Ver a tabela' })).toBeInTheDocument();
       expect(screen.queryByText(/Seu dia está seu/)).toBeNull();
     });
 
@@ -133,6 +138,8 @@ describe('o topo da tela "Hoje"', () => {
 
       expect(manchete()).toBe('Sua fila está vazia');
       expect(screen.queryByText(/Seu dia está seu/)).toBeNull();
+      // E não aponta para uma tabela que não respondeu.
+      expect(screen.queryByRole('button', { name: 'Ver a tabela' })).toBeNull();
     });
   });
 
@@ -165,6 +172,27 @@ describe('o topo da tela "Hoje"', () => {
 
     expect(manchete()).toBe('Um negócio está há 40 dias sem mexer.');
     expect(comoSeLe(apoio())).toBe('R$ 1.000 · Obra Esquecida');
+  });
+
+  describe('a etiqueta de negócio perseguido substitui o selo na fila (15/09/2026)', () => {
+    it('com retomada, mostra "Nª tentativa" no lugar do selo', () => {
+      const perseguido: ItemDaPauta = { ...negocio('Obra Exemplo', 180000, 9), tentativas: 1 };
+      prepararTela({ pauta: [perseguido] });
+      montarATela();
+
+      // 1 retomada + o envio = "2ª tentativa"
+      expect(screen.getByText('2ª tentativa')).toBeInTheDocument();
+      // o selo comum ("Parado", no esboço) não aparece para esse item
+      expect(screen.queryByText('Parado')).toBeNull();
+    });
+
+    it('sem retomada, continua o selo que o banco mandou', () => {
+      prepararTela({ pauta: [negocio('Obra Exemplo', 180000, 9)] });
+      montarATela();
+
+      expect(screen.getByText('Parado')).toBeInTheDocument();
+      expect(screen.queryByText(/ª tentativa/)).toBeNull();
+    });
   });
 
   describe('a régua de "parado" é a da empresa — a mesma com que o banco montou a fila', () => {

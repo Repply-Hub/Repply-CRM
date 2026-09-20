@@ -32,6 +32,13 @@
  * Campo que o diff não cita é campo que o UPDATE não escreve. Se um dia alguém acrescentar
  * esses dois campos aqui "só para completar o objeto", o UPDATE passa a sobrescrevê-los com o
  * que a tela tinha em memória — e o registro de campo vira nulo sem ninguém pedir.
+ *
+ * 🔴 A MESMA REGRA VALE PARA AS CINCO RESPOSTAS DA VISITA CONCLUÍDA (16/09/2026): fase da obra,
+ * concorrente visto, com quem falou, próximo passo e a data dele (`visitaFase`,
+ * `visitaConcorrentes`, `visitaContatoId`, `visitaProximoPasso`, `visitaProximoPassoEm`) —
+ * as mesmas cinco colunas que `src/lib/analise-da-visita.ts` descreve. Cada uma segue,
+ * campo por campo, o MESMO contrato de `visitaObservacao`: ausente é "não mexa", `null` é
+ * apagar de propósito, e só entra em `alterar` quando mudou de verdade.
  */
 
 /** Uma parada como ela está NO BANCO. */
@@ -41,6 +48,12 @@ export interface ParadaGravada {
   inicio: Date;
   visitaRealizada: boolean;
   visitaObservacao: string | null;
+  /** As cinco respostas da visita concluída, como estão gravadas — ver o cabeçalho do arquivo. */
+  visitaFase: string | null;
+  visitaConcorrentes: string | null;
+  visitaContatoId: string | null;
+  visitaProximoPasso: string | null;
+  visitaProximoPassoEm: string | null;
 }
 
 /** Uma parada como ela está NA TELA depois da edição. */
@@ -58,18 +71,27 @@ export interface ParadaEditada {
    * a proteção que o cabeçalho de `useEditarRotaDeVisita` descreve.
    *
    * `null` e `undefined` são coisas DIFERENTES aqui: `null` é apagar de propósito.
+   *
+   * As cinco respostas abaixo (`visitaFase` … `visitaProximoPassoEm`) seguem o MESMO contrato,
+   * campo por campo — cada uma pode estar ausente enquanto as outras estão presentes.
    */
   visitaRealizada?: boolean;
   visitaObservacao?: string | null;
+  visitaFase?: string | null;
+  visitaConcorrentes?: string | null;
+  visitaContatoId?: string | null;
+  visitaProximoPasso?: string | null;
+  visitaProximoPassoEm?: string | null;
 }
 
 export interface DiferencaDaRota {
   /**
    * Paradas que continuam, com o que mudou nelas.
    *
-   * 🔴 `visitaRealizada` e `visitaObservacao` só APARECEM quando mudaram. Quem grava precisa
-   * mandar ao banco exatamente as chaves presentes: escrever as ausentes como `false`/`null`
-   * apagaria a anotação de campo de paradas que ninguém tocou.
+   * 🔴 `visitaRealizada`, `visitaObservacao` e as cinco respostas da visita concluída só
+   * APARECEM quando mudaram. Quem grava precisa mandar ao banco exatamente as chaves
+   * presentes: escrever as ausentes como `false`/`null` apagaria a anotação ou a resposta de
+   * paradas que ninguém tocou.
    */
   alterar: Array<{
     grupoId: string;
@@ -77,6 +99,11 @@ export interface DiferencaDaRota {
     fim: Date;
     visitaRealizada?: boolean;
     visitaObservacao?: string | null;
+    visitaFase?: string | null;
+    visitaConcorrentes?: string | null;
+    visitaContatoId?: string | null;
+    visitaProximoPasso?: string | null;
+    visitaProximoPassoEm?: string | null;
   }>;
   /** Paradas que saíram da rota: apagar TODAS as cópias destes grupos. */
   remover: string[];
@@ -234,25 +261,66 @@ export function diferencaDaRota(
     // ela tira a parada e põe outra, que aí vira remover + inserir. O teste
     // "trocar a obra de uma parada gravada não vira alteração" fixa este comportamento para
     // que a decisão apareça quando alguém for mudá-la.
-    // O registro de campo (realizada / observação) só entra quando a pessoa MUDOU alguma coisa
-    // nele nesta edição. As chaves são acrescentadas uma a uma, e não com um objeto de valores
-    // `undefined`, porque quem grava monta o UPDATE a partir das chaves PRESENTES — um
-    // `visitaObservacao: undefined` viajando junto viraria "apague a observação".
-    const registro: { visitaRealizada?: boolean; visitaObservacao?: string | null } = {};
+    // O registro de campo (realizada / observação / as cinco respostas) só entra quando a
+    // pessoa MUDOU alguma coisa nele nesta edição. As chaves são acrescentadas uma a uma, e não
+    // com um objeto de valores `undefined`, porque quem grava monta o UPDATE a partir das
+    // chaves PRESENTES — um `visitaObservacao: undefined` viajando junto viraria "apague a
+    // observação".
+    const registro: {
+      visitaRealizada?: boolean;
+      visitaObservacao?: string | null;
+      visitaFase?: string | null;
+      visitaConcorrentes?: string | null;
+      visitaContatoId?: string | null;
+      visitaProximoPasso?: string | null;
+      visitaProximoPassoEm?: string | null;
+    } = {};
     if (
       parada.visitaRealizada !== undefined &&
       parada.visitaRealizada !== gravada.visitaRealizada
     ) {
       registro.visitaRealizada = parada.visitaRealizada;
     }
+    // `null` e `''` significam a mesma coisa no banco (a coluna guarda nulo), então comparar
+    // sem normalizar faria a tela mandar UPDATE toda vez que alguém abrisse e fechasse a edição
+    // de uma parada sem anotação. As cinco respostas da visita concluída (16/09/2026) seguem o
+    // MESMO bloco, campo por campo — é a extensão direta do mecanismo que protege
+    // `visitaObservacao` desde 31/08/2026.
     if (
       parada.visitaObservacao !== undefined &&
-      // `null` e `''` significam a mesma coisa no banco (a coluna guarda nulo), então
-      // comparar sem normalizar faria a tela mandar UPDATE toda vez que alguém abrisse e
-      // fechasse a edição de uma parada sem anotação.
       (parada.visitaObservacao || null) !== (gravada.visitaObservacao || null)
     ) {
       registro.visitaObservacao = parada.visitaObservacao;
+    }
+    if (
+      parada.visitaFase !== undefined &&
+      (parada.visitaFase || null) !== (gravada.visitaFase || null)
+    ) {
+      registro.visitaFase = parada.visitaFase;
+    }
+    if (
+      parada.visitaConcorrentes !== undefined &&
+      (parada.visitaConcorrentes || null) !== (gravada.visitaConcorrentes || null)
+    ) {
+      registro.visitaConcorrentes = parada.visitaConcorrentes;
+    }
+    if (
+      parada.visitaContatoId !== undefined &&
+      (parada.visitaContatoId || null) !== (gravada.visitaContatoId || null)
+    ) {
+      registro.visitaContatoId = parada.visitaContatoId;
+    }
+    if (
+      parada.visitaProximoPasso !== undefined &&
+      (parada.visitaProximoPasso || null) !== (gravada.visitaProximoPasso || null)
+    ) {
+      registro.visitaProximoPasso = parada.visitaProximoPasso;
+    }
+    if (
+      parada.visitaProximoPassoEm !== undefined &&
+      (parada.visitaProximoPassoEm || null) !== (gravada.visitaProximoPassoEm || null)
+    ) {
+      registro.visitaProximoPassoEm = parada.visitaProximoPassoEm;
     }
     const registroMudou = Object.keys(registro).length > 0;
 

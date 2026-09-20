@@ -10,9 +10,14 @@ import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import type { RotaDoDia } from '@/lib/rota-do-dia';
 import {
   ordenarPorHorario,
+  aplicarOrdemMantendoHorarios,
   moverParadaMantendoHorarios,
   ultimoHorarioUtilizavel,
 } from '@/lib/ordem-das-paradas';
+import { pontosDaRotaEmOrdem, avaliarOrdemDaRota, rotaAceitaSugestaoDeOrdem } from '@/lib/melhor-ordem-da-rota';
+import { duracaoLegivel } from '@/lib/osrm';
+import { useRotaOsrm } from '@/hooks/use-rota-osrm';
+import { useMelhorOrdem } from '@/hooks/use-melhor-ordem';
 import {
   Dialog, DialogTitle, DialogDescription,
   ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo,
@@ -25,7 +30,6 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -38,10 +42,15 @@ import { useAuth } from '@/hooks/use-auth';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useObras } from '@/hooks/use-obras';
 import { useCreateRotaVisita, useEditarRotaDeVisita, useEventoParticipantes, buscarConflitosDeVisita, type ConflitoVisita } from '@/hooks/use-eventos';
+import { RESPOSTAS_VAZIAS, respostasDaVisita, type RespostasDaVisita } from '@/lib/analise-da-visita';
+import { tarefasDaRotaConcluida } from '@/lib/rota-tarefas';
+import { PerguntasDaVisita } from './PerguntasDaVisita';
 
 interface ObraOpcao {
   id: string;
   nome_obra: string | null;
+  /** De quem `PerguntasDaVisita` busca os contatos em "Com quem você falou" (`useContatosDoCliente`). */
+  cliente_id: string;
   clientes: { empresa: string | null } | null;
 }
 
@@ -56,7 +65,13 @@ interface Parada {
   grupoId?: string | null;
   obraId: string;
   nomeObra: string;
-  observacao: string;
+  /**
+   * As cinco respostas da visita concluída (fase, concorrente, contato, próximo passo) MAIS o
+   * texto livre de hoje — `respostas.observacao` é a MESMA coisa que o antigo campo
+   * `observacao` desta interface, só que agora dentro do objeto que `PerguntasDaVisita`
+   * controla inteiro. Ver `src/lib/analise-da-visita.ts`.
+   */
+  respostas: RespostasDaVisita;
   /**
    * Se ESTA parada já foi visitada.
    *
@@ -224,11 +239,11 @@ export function NovaRotaVisitaDialog({
             grupoId: p.grupoId,
             obraId: p.obraId,
             nomeObra: p.obraNome || 'Obra sem nome',
-            // A anotação que já está no banco vem junto: se a pessoa ligar a chave, ela EDITA
-            // o que está escrito em vez de começar do zero e apagar sem perceber.
-            observacao: p.visitaObservacao ?? '',
+            // O que já está gravado vem junto: se a pessoa ligar a chave, ela EDITA as
+            // respostas existentes em vez de começar do zero e apagar sem perceber.
+            respostas: respostasDaVisita(p),
             // O estado real de CADA parada, como está no banco. É isto que faz a visita já
-            // realizada aparecer marcada, com o comentário, ao abrir a edição.
+            // realizada aparecer marcada, com as respostas, ao abrir a edição.
             realizada: !!p.visitaRealizada,
             horario: format(p.inicio, 'HH:mm'),
           })),
@@ -245,7 +260,7 @@ export function NovaRotaVisitaDialog({
       (obrasIniciais ?? []).map((o, idx) => ({
         obraId: o.id,
         nomeObra: o.nome_obra || 'Obra sem nome',
-        observacao: '',
+        respostas: RESPOSTAS_VAZIAS,
         realizada: false,
         horario: somarMinutos('09:00', idx * DURACAO_PADRAO_MINUTOS),
       })),
@@ -268,6 +283,17 @@ export function NovaRotaVisitaDialog({
     (o) => !paradas.some((p) => p.obraId === o.id),
   );
 
+  /**
+   * De qual CLIENTE é cada obra — é dali que `PerguntasDaVisita` busca os contatos oferecidos
+   * em "Com quem você falou" (`useContatosDoCliente`). `useObras()` já traz `cliente_id` (a
+   * coluna crua da obra) e `clientes.empresa` juntos, sem consulta extra.
+   */
+  const obraPorId = useMemo(() => {
+    const mapa = new Map<string, ObraOpcao>();
+    for (const o of (obras as ObraOpcao[]) ?? []) mapa.set(o.id, o);
+    return mapa;
+  }, [obras]);
+
   const adicionarParada = (obra: ObraOpcao) => {
     setParadas((prev) => {
       // A parada nova entra DEPOIS da mais tarde do dia — que é a última da lista ORDENADA, e
@@ -280,7 +306,13 @@ export function NovaRotaVisitaDialog({
       const horario = ultima ? somarMinutos(ultima, DURACAO_PADRAO_MINUTOS) : '09:00';
       return [
         ...prev,
-        { obraId: obra.id, nomeObra: obra.nome_obra || 'Obra sem nome', observacao: '', realizada: false, horario },
+        {
+          obraId: obra.id,
+          nomeObra: obra.nome_obra || 'Obra sem nome',
+          respostas: RESPOSTAS_VAZIAS,
+          realizada: false,
+          horario,
+        },
       ];
     });
     setBuscaOpen(false);
@@ -305,8 +337,8 @@ export function NovaRotaVisitaDialog({
     );
   };
 
-  const atualizarObservacao = (obraId: string, observacao: string) => {
-    setParadas((prev) => prev.map((p) => (p.obraId === obraId ? { ...p, observacao } : p)));
+  const atualizarRespostas = (obraId: string, respostas: RespostasDaVisita) => {
+    setParadas((prev) => prev.map((p) => (p.obraId === obraId ? { ...p, respostas } : p)));
   };
 
   const alternarRealizada = (obraId: string, realizada: boolean) => {
@@ -343,11 +375,67 @@ export function NovaRotaVisitaDialog({
    */
   const paradasEmOrdem = useMemo(() => ordenarPorHorario(paradas), [paradas]);
 
+  /**
+   * A localização de cada parada vem da OBRA (`obraId`), não da parada — `Parada` não guarda
+   * coordenada. `pontosDaRotaEmOrdem` devolve `null` (nenhuma sugestão) se QUALQUER obra da
+   * rota estiver sem localização, de propósito: ver o comentário dela em
+   * `melhor-ordem-da-rota.ts` sobre por que filtrar deslocaria os índices da sugestão.
+   *
+   * Os pontos vêm de `paradasEmOrdem` (a lista em ordem de horário), e não de `paradas` (a
+   * lista crua): é sobre essa mesma sequência que `useRotaOsrm` mede o tempo ATUAL e que
+   * `useMelhorOrdem` calcula a melhor ordem — comparando maçã com maçã, e com índices que
+   * `aplicarOrdemMantendoHorarios` sabe aplicar de volta.
+   *
+   * 🔴 Decisão do dono do produto — 16/09/2026: rota com visita já realizada não recebe
+   * sugestão de ordem. Nenhuma parada pode ter `realizada === true`.
+   */
+  const pontosDaRota = useMemo(
+    () => {
+      if (!rotaAceitaSugestaoDeOrdem(paradas)) return null;
+      return pontosDaRotaEmOrdem(
+        paradasEmOrdem,
+        obras as Array<{ id: string; latitude?: number | null; longitude?: number | null }>,
+      );
+    },
+    [paradasEmOrdem, obras, paradas],
+  );
+  const { data: trajetoAtual } = useRotaOsrm(pontosDaRota);
+  const { data: melhorOrdem } = useMelhorOrdem(pontosDaRota);
+  const avaliacaoDaOrdem = useMemo(
+    () => avaliarOrdemDaRota({ duracaoAtualS: trajetoAtual?.duracaoS, melhorOrdem }),
+    [trajetoAtual, melhorOrdem],
+  );
+
   const janelaDaParada = (parada: Parada) => {
     const inicio = new Date(`${format(data, 'yyyy-MM-dd')}T${parada.horario}:00`);
     const fim = new Date(inicio.getTime() + DURACAO_PADRAO_MINUTOS * 60 * 1000);
     return { inicio: inicio.toISOString(), fim: fim.toISOString() };
   };
+
+  /**
+   * As tarefas do próximo passo desta rota, decididas a partir do que está na tela e do que
+   * estava gravado (só as paradas que PASSAM a realizadas agora, com data e a caixinha marcada).
+   * A criação em si acontece DENTRO da mutação (`useCreateRotaVisita`/`useEditarRotaDeVisita`),
+   * para o botão Salvar ficar travado até o fim — ver o comentário lá.
+   */
+  const tarefasDaRota = (editandoAgora: boolean) =>
+    tarefasDaRotaConcluida({
+      editando: editandoAgora,
+      jaRealizada,
+      paradas: paradasEmOrdem.map((p) => ({
+        grupoId: p.grupoId,
+        nomeObra: p.nomeObra,
+        clienteId: obraPorId.get(p.obraId)?.cliente_id ?? null,
+        realizada: p.realizada,
+        respostas: p.respostas,
+      })),
+      paradasGravadas: editandoAgora
+        ? (rotaParaEditar?.paradas ?? []).map((p) => ({
+            grupoId: p.grupoId,
+            visitaRealizada: p.visitaRealizada,
+          }))
+        : undefined,
+    });
 
   const salvarEdicao = () => {
     if (!rotaParaEditar) return;
@@ -361,22 +449,39 @@ export function NovaRotaVisitaDialog({
           inicio: p.inicio,
           visitaRealizada: !!p.visitaRealizada,
           visitaObservacao: p.visitaObservacao ?? null,
+          // As cinco respostas gravadas — vindas de `VisitasObrasPainel.tsx`, que já as lê de
+          // `useTodasVisitasObras`. Sem elas aqui, `diferencaDaRota` compararia contra
+          // `undefined` e QUALQUER edição pareceria "a resposta virou vazia".
+          visitaFase: p.visitaFase ?? null,
+          visitaConcorrentes: p.visitaConcorrentes ?? null,
+          visitaContatoId: p.visitaContatoId ?? null,
+          visitaProximoPasso: p.visitaProximoPasso ?? null,
+          visitaProximoPassoEm: p.visitaProximoPassoEm ?? null,
         })),
       // O registro de campo vai POR PARADA, com o estado que está na tela de cada uma. Mandar
       // o valor que já está gravado é inofensivo: `diferencaDaRota` compara e não gera
       // alteração nenhuma quando nada mudou.
       //
-      // 🔴 DESMARCAR NÃO APAGA A ANOTAÇÃO. Quando a caixinha está desmarcada, `visitaObservacao`
-      // fica AUSENTE, e ausente significa "não mexa". A pessoa que desmarca está dizendo "esta
-      // visita não aconteceu", não "jogue fora o que eu escrevi" — e o texto volta a aparecer
-      // se ela marcar de novo. Apagar de propósito continua possível: é marcar, limpar o campo
-      // e salvar, aí sim vai `null`.
+      // 🔴 DESMARCAR NÃO APAGA A ANOTAÇÃO NEM AS RESPOSTAS. Quando a caixinha está desmarcada,
+      // `visitaObservacao` e as cinco respostas ficam AUSENTES, e ausente significa "não mexa".
+      // A pessoa que desmarca está dizendo "esta visita não aconteceu", não "jogue fora o que
+      // eu respondi" — e tudo volta a aparecer se ela marcar de novo. Apagar de propósito
+      // continua possível: é marcar, limpar o campo e salvar, aí sim vai `null`.
       paradasEmOrdem.map((p) => ({
         grupoId: p.grupoId,
         obraId: p.obraId,
         horario: p.horario,
         visitaRealizada: p.realizada,
-        ...(p.realizada ? { visitaObservacao: p.observacao || null } : {}),
+        ...(p.realizada
+          ? {
+              visitaObservacao: p.respostas.observacao || null,
+              visitaFase: p.respostas.fase || null,
+              visitaConcorrentes: p.respostas.concorrentes || null,
+              visitaContatoId: p.respostas.contatoId || null,
+              visitaProximoPasso: p.respostas.proximoPasso || null,
+              visitaProximoPassoEm: p.respostas.proximoPassoEm || null,
+            }
+          : {}),
       })),
       format(data, 'yyyy-MM-dd'),
       DURACAO_PADRAO_MINUTOS,
@@ -411,6 +516,9 @@ export function NovaRotaVisitaDialog({
         gruposDaRota: (rotaParaEditar?.paradas ?? [])
           .map((p) => p.grupoId)
           .filter((g): g is string => !!g),
+        // As tarefas do próximo passo das paradas que passaram a realizadas nesta edição. A
+        // criação acontece DENTRO da mutação, então o botão fica travado até o fim.
+        tarefasDoProximoPasso: tarefasDaRota(true),
       },
       {
         onSuccess: (r) => {
@@ -425,6 +533,7 @@ export function NovaRotaVisitaDialog({
                   .join(', ')}.`
               : 'Rota atualizada.',
           );
+          if (r.avisoDaTarefa) toast.warning(r.avisoDaTarefa);
           onOpenChange(false);
         },
         onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível salvar a rota.')),
@@ -449,16 +558,28 @@ export function NovaRotaVisitaDialog({
           obraId: p.obraId,
           nomeObra: p.nomeObra,
           horario: p.horario,
-          observacao: jaRealizada ? p.observacao : undefined,
+          // As cinco respostas seguem a MESMA regra da observação: só viajam quando a rota
+          // inteira nasce "já realizada". `useCreateRotaVisita` grava `undefined` como nulo.
+          observacao: jaRealizada ? p.respostas.observacao : undefined,
+          visitaFase: jaRealizada ? p.respostas.fase : undefined,
+          visitaConcorrentes: jaRealizada ? p.respostas.concorrentes : undefined,
+          visitaContatoId: jaRealizada ? p.respostas.contatoId : undefined,
+          visitaProximoPasso: jaRealizada ? p.respostas.proximoPasso : undefined,
+          visitaProximoPassoEm: jaRealizada ? p.respostas.proximoPassoEm : undefined,
         })),
+        // Só quando a rota nasce "essas visitas já aconteceram" (`jaRealizada`) haverá tarefas —
+        // `tarefasDaRota(false)` já devolve vazio quando a chave está desligada. Criadas dentro da
+        // mutação, com o botão travado até o fim.
+        tarefasDoProximoPasso: tarefasDaRota(false),
       },
       {
-        onSuccess: () => {
+        onSuccess: (r) => {
           toast.success(
             paradas.length === 1
               ? 'Visita registrada no calendário.'
               : `Rota criada com ${paradas.length} visitas no calendário.`,
           );
+          if (r.avisoDaTarefa) toast.warning(r.avisoDaTarefa);
           onOpenChange(false);
         },
         onError: () => toast.error('Não foi possível criar a rota de visita.'),
@@ -754,6 +875,41 @@ export function NovaRotaVisitaDialog({
               </PopoverContent>
             </Popover>
 
+            {/* O aviso da melhor ordem, logo acima da lista de paradas — decisão 3 do desenho:
+                aparece ao montar/editar a rota, onde dá para trocar antes de salvar e antes de
+                combinar horário com o cliente. Nada aparece em `sem_sugestao` (menos de 3
+                paradas com localização, obra sem localização, ou serviço fora/lento/carregando
+                — `avaliarOrdemDaRota` cai em `sem_sugestao` enquanto os dois números não
+                chegam, então o carregamento também fica em silêncio). */}
+            {avaliacaoDaOrdem.caso === 'ja_otima' && (
+              <p className="rounded-lg border border-green-500/40 bg-green-500/5 px-3 py-2 text-xs text-foreground">
+                Perfeito, nosso sistema de rotas aponta esse caminho como o mais produtivo.
+              </p>
+            )}
+            {avaliacaoDaOrdem.caso === 'ordem_melhor' && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2">
+                <p className="text-xs text-foreground">
+                  Há uma ordem mais rápida: economiza cerca de{' '}
+                  <span className="font-semibold">{duracaoLegivel(avaliacaoDaOrdem.ganhoS)}</span>. Os
+                  horários continuam os mesmos — muda só qual obra fica em cada um.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    // `avaliacaoDaOrdem.ordem` refere-se aos índices das paradas EM ORDEM DE
+                    // HORÁRIO (`paradasEmOrdem`), e `aplicarOrdemMantendoHorarios` já ordena de
+                    // novo por dentro antes de aplicar — mantendo a grade de horários, só troca
+                    // quem ocupa cada um.
+                    setParadas((prev) => aplicarOrdemMantendoHorarios(prev, avaliacaoDaOrdem.ordem!))
+                  }
+                >
+                  Usar esta ordem
+                </Button>
+              </div>
+            )}
+
             {paradas.length === 0 ? (
               <p className="pt-1 text-xs text-muted-foreground">Nenhuma obra adicionada ainda.</p>
             ) : (
@@ -765,7 +921,9 @@ export function NovaRotaVisitaDialog({
                       ref={provided.innerRef}
                       className="max-w-full space-y-2 overflow-x-hidden pt-1"
                     >
-                      {paradas.map((parada, index) => (
+                      {paradas.map((parada, index) => {
+                        const obraDaParada = obraPorId.get(parada.obraId);
+                        return (
                         <Draggable key={parada.obraId} draggableId={parada.obraId} index={index}>
                           {(provided, snapshot) => (
                             <div
@@ -809,8 +967,20 @@ export function NovaRotaVisitaDialog({
                                   existe uma visita pode ter acontecido e a seguinte não. Vem
                                   marcada e com o comentário quando já está assim no banco.
                                   CRIANDO: quem manda é a chave do topo — ali a rota inteira é
-                                  registrada de uma vez, que é o que aquela chave significa. */}
+                                  registrada de uma vez, que é o que aquela chave significa.
+
+                                  🔴 SÓ a parada que JÁ EXISTE no banco (tem `grupoId`) oferece
+                                  marcar como realizada aqui. Uma obra acrescentada AGORA, no meio
+                                  da edição, ainda não foi gravada: ela cai no caminho de INSERIR
+                                  (`diferencaDaRota` → `inserir`), que grava a parada nova SEMPRE
+                                  como não realizada e sem análise. Oferecer a caixa para ela era
+                                  prometer um registro que o salvamento descartava em silêncio — a
+                                  pessoa preenchia fase, concorrente e próximo passo, via "1
+                                  acrescentada" e nada ficava. O gesto certo é o mesmo que o resto
+                                  do código já segue: parada nova nasce não realizada; marcar como
+                                  feita é um passo separado, na ficha da obra. */}
                               {editando ? (
+                                parada.grupoId ? (
                                 <div className="mt-2 space-y-2">
                                   <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground">
                                     <Checkbox
@@ -820,30 +990,37 @@ export function NovaRotaVisitaDialog({
                                     Visita já realizada
                                   </label>
                                   {parada.realizada && (
-                                    <Textarea
-                                      className="text-sm"
-                                      rows={2}
-                                      placeholder="O que você viu nesta obra?"
-                                      value={parada.observacao}
-                                      onChange={(e) => atualizarObservacao(parada.obraId, e.target.value)}
+                                    <PerguntasDaVisita
+                                      valor={parada.respostas}
+                                      onChange={(r) => atualizarRespostas(parada.obraId, r)}
+                                      clienteId={obraDaParada?.cliente_id}
+                                      clienteEmpresa={obraDaParada?.clientes?.empresa}
                                     />
                                   )}
                                 </div>
+                                ) : (
+                                  <p className="mt-2 text-xs text-muted-foreground">
+                                    Salve a rota primeiro. Depois, marque esta visita como feita na
+                                    ficha da obra.
+                                  </p>
+                                )
                               ) : (
                                 jaRealizada && (
-                                  <Textarea
-                                    className="mt-2 text-sm"
-                                    rows={2}
-                                    placeholder="O que você viu nesta obra?"
-                                    value={parada.observacao}
-                                    onChange={(e) => atualizarObservacao(parada.obraId, e.target.value)}
-                                  />
+                                  <div className="mt-2">
+                                    <PerguntasDaVisita
+                                      valor={parada.respostas}
+                                      onChange={(r) => atualizarRespostas(parada.obraId, r)}
+                                      clienteId={obraDaParada?.cliente_id}
+                                      clienteEmpresa={obraDaParada?.clientes?.empresa}
+                                    />
+                                  </div>
                                 )
                               )}
                             </div>
                           )}
                         </Draggable>
-                      ))}
+                        );
+                      })}
                       {provided.placeholder}
                     </div>
                   )}

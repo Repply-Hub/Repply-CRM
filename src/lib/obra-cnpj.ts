@@ -1,4 +1,4 @@
-import { isValidCnpj } from '@/utils/cnpj';
+import { classificarDocumento, mensagemDoDocumento } from '@/lib/cnpj';
 
 /**
  * A regra do campo SPE/CNPJ da obra, num lugar só.
@@ -11,7 +11,19 @@ import { isValidCnpj } from '@/utils/cnpj';
  *
  * Uma função só, chamada pelos dois, é o que impede as cópias de divergirem de novo.
  *
- * @param valor       o que está no campo, COM máscara (é assim que a tela guarda)
+ * 🔴 Decisão do dono do produto, 12/09/2026: a FRASE de cada caso também passa a vir de um
+ * lugar só — `classificarDocumento` + `mensagemDoDocumento`, de `@/lib/cnpj`. Esta função tinha
+ * frase própria ("CNPJ incompleto", "CNPJ inválido"), diferente da que `CampoCnpj` já mostra
+ * embaixo do campo enquanto a pessoa digita — a mesma pessoa via um texto ao digitar e outro ao
+ * salvar, para o mesmo erro. Agora é uma frase só, em todo o sistema; mudar o texto muda nos
+ * dois lugares de uma vez.
+ *
+ * Efeito colateral bom: a validação antiga (acima) cobrava o valor COM máscara, 18 caracteres —
+ * era exatamente essa exigência que quebrava o formulário de editar. `classificarDocumento`
+ * conta DÍGITOS, não caracteres, então também aceita o valor CRU do banco (14 dígitos, sem
+ * máscara) sem precisar passar por `formatCnpj` antes de chegar aqui.
+ *
+ * @param valor       o que está no campo — com ou sem máscara, tanto faz
  * @param obrigatorio se a empresa marcou o campo como obrigatório em Configurações → Campos
  * @returns a mensagem de erro, ou `null` quando está tudo certo
  */
@@ -23,11 +35,9 @@ export function validarCnpjDaObra(valor: string, obrigatorio: boolean): string |
     return obrigatorio ? 'CNPJ obrigatório' : null;
   }
 
-  // 18 é o tamanho COM máscara: 00.000.000/0000-00. Quem carrega o valor cru do banco
-  // (14 dígitos) precisa passar por `formatCnpj` ANTES de chegar aqui.
-  if (preenchido.length < 18) {
-    return 'CNPJ incompleto';
-  }
+  const classe = classificarDocumento(preenchido);
+  if (classe === 'cnpj') return null;
 
-  return isValidCnpj(preenchido) ? null : 'CNPJ inválido';
+  // `seNaoExistir` não importa aqui: sem consulta à Receita, o resultado nunca é 'nao_existe'.
+  return mensagemDoDocumento(classe, { seNaoExistir: 'avisar' })?.texto ?? null;
 }

@@ -1152,7 +1152,12 @@ export default function Obras() {
 
                 <div className="border-t pt-6">
                   <h3 className="mb-3 text-sm font-semibold">Histórico de visitas</h3>
-                  <HistoricoVisitasObra obraId={selectedObra.id} />
+                  <HistoricoVisitasObra
+                    obraId={selectedObra.id}
+                    nomeObra={selectedObra.nome_obra}
+                    clienteId={selectedObra.cliente_id}
+                    clienteEmpresa={selectedObra.clientes?.empresa}
+                  />
                 </div>
 
                 <div className="border-t pt-6">
@@ -1179,9 +1184,9 @@ export default function Obras() {
                         // Vazio = sem marcador. O <SeletorMarcadorObra> traduz isso na tela
                         // para "Sem marcador", e vira `null` de volta na hora de salvar.
                         marcador_id: selectedObra.marcador_id || '',
-                        // Com máscara, e não cru. O banco guarda só os 14 dígitos, mas a
-                        // validação cobra os 18 caracteres do formato — sem `formatCnpj`
-                        // aqui, obra COM CNPJ salvo era reprovada por "CNPJ obrigatório".
+                        // Com máscara — não porque `validarCnpjDaObra` peça: ela conta DÍGITOS,
+                        // não caracteres (aceita até o valor cru do banco). O `formatCnpj` aqui
+                        // é só para MOSTRAR o campo já mascarado ao abrir o formulário de editar.
                         spe_cnpj: formatCnpj(selectedObra.spe_cnpj || ''),
                       });
                       // O endereço veio do banco, não de uma consulta: nada de aviso de sede.

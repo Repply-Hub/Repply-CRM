@@ -3,6 +3,11 @@
 Este arquivo orienta o Claude Code quando trabalha neste repositório.
 **Leitura obrigatória antes de escrever qualquer código.**
 
+As regras comuns a **qualquer IA** — skills e quando usá-las, publicação, e as armadilhas
+principais — vivem no `AGENTS.md`, carregado aqui:
+
+@AGENTS.md
+
 ---
 
 ## 1. O que é este projeto
@@ -72,13 +77,22 @@ conceito for estrutural. Nomeie arquivos e serviços, mas sempre dizendo para qu
 
 ### Skills conforme o pedido
 
+As skills estão versionadas no repositório (`.claude/skills/` e `.agents/skills/`), então
+qualquer IA que abra o projeto as encontra. A tabela completa de quando usar cada uma, mais a
+regra do `humanizer`, está no `AGENTS.md` §1 (carregado no topo). O essencial:
+
 | Ele pede… | Use |
 |---|---|
-| Pensar antes de fazer, discutir uma ideia | `superpowers:brainstorming` |
-| Construir algo novo com plano | `superpowers:writing-plans` → `executing-plans` |
-| "isso não funciona", bug, comportamento estranho | `superpowers:systematic-debugging` |
-| Revisar o que foi feito | `superpowers:requesting-code-review` |
-| Confirmar que está pronto | `superpowers:verification-before-completion` |
+| Pensar antes de fazer, discutir uma ideia, construir algo novo | `brainstorming`, depois `writing-plans` |
+| Executar um plano com tarefas independentes | `subagent-driven-development` (o que os planos daqui exigem) |
+| "isso não funciona", bug, comportamento estranho | `systematic-debugging` |
+| Escrever teste, começar conserto/funcionalidade | `test-driven-development` |
+| Revisar o que foi feito | `requesting-code-review` |
+| Confirmar que está pronto | `verification-before-completion` |
+| Suavizar texto que o **cliente** lê (não commit nem doc técnico) | `humanizer` |
+
+O nome pode aparecer com ou sem o prefixo `superpowers:`, conforme a IA e se a pessoa também
+tem o plugin instalado — as duas formas chamam a mesma skill.
 
 **Sempre responda em PT-BR**, independentemente do idioma da skill ou do código.
 
@@ -774,21 +788,23 @@ npx vitest run src/hooks/whatsapp-phone.test.ts
 
 ## 13. Git e GitHub — fluxo obrigatório
 
-O trabalho vai **direto no `main`**, como o time já faz. A barreira não é o Pull Request:
-é a **autorização do Lucas, pedida antes de cada commit.**
+O trabalho vai **direto no `main`**, como o time já faz. Não há Pull Request.
 
-> 🔴 **Nunca commite nem envie nada sem avisar e receber o "pode".**
-> A autorização é **por commit**. Ter recebido antes não vale para o próximo.
+> 🔴 **Regra de publicação: autonomia com cuidados** (desde 27/08/2026, vale para qualquer IA —
+> ver `AGENTS.md` §4). Pode commitar e publicar sozinho **o que você mesmo escreveu**, depois da
+> verificação do §9, sempre relatando o que subiu. **Pare e converse antes** quando o próximo
+> passo escreve/apaga **dado de produção**, **exclui** algo, muda o **banco**, é **decisão de
+> produto** (muda o que o cliente vê ou paga, §11) ou revela **risco de segurança** novo.
 >
-> Isso existe porque o `main` não tem proteção, a publicação em produção está a um comando
-> de distância (§16),
-> e a rede de proteção automática é fraca (10 arquivos de teste para 78 mil linhas, lint com
-> 498 problemas herdados, TypeScript frouxo). Sem etapa humana, o erro chega ao cliente
-> pagante em minutos.
+> Isso substitui a regra anterior ("pede o 'pode' a cada commit"), que segurava o trabalho de
+> rotina. O que se preserva é o controle sobre o que toca dado de cliente pagante — e os cuidados
+> de git abaixo, porque o `main` não tem proteção e `git push` publica em minutos (§16). Rode a
+> verificação do §9 **antes** de publicar, não depois: não há etapa seguinte onde o erro apareça.
 
-### Os quatro passos, nesta ordem
+### Os passos, nesta ordem
 
-**1. Avisar e esperar.** Diga o que vai subir e por quê. Espere a resposta.
+**1. Antes de código de rotina, siga.** Antes de tocar dado/exclusão/banco/decisão de produto,
+**avise e espere** o "pode" do Lucas.
 
 **2. Conferir se entrou commit de outra pessoa.** Outros colaboradores continuam subindo
 código no `main`. Antes de commitar:

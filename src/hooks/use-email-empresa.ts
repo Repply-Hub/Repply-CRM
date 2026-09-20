@@ -331,6 +331,8 @@ export function useEmailEmpresa() {
       body: string,
       respondendoA?: string | null,
       rascunhoId?: string | null,
+      cc?: string[],
+      bcc?: string[],
     ) =>
       enviarMutation.mutateAsync({
         to,
@@ -338,6 +340,8 @@ export function useEmailEmpresa() {
         body,
         ...(respondendoA ? { reply_to_message_id: respondendoA } : {}),
         ...(rascunhoId ? { rascunho_id: rascunhoId } : {}),
+        ...(cc?.length ? { cc } : {}),
+        ...(bcc?.length ? { bcc } : {}),
       }),
     enviar: enviarMutation.mutateAsync,
 

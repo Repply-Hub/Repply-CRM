@@ -1,5 +1,5 @@
-import DOMPurify from 'dompurify';
 import { supabase } from '@/integrations/supabase/client';
+import { sanitizarHtmlEmail } from './sanitizar-html-email';
 
 /**
  * 🔴 A LOGO DO E-MAIL DEIXOU DE TER ENDEREÇO PRÓPRIO, em 31/08/2026.
@@ -15,33 +15,20 @@ import { supabase } from '@/integrations/supabase/client';
  */
 
 /**
- * Assinatura pessoal roda como HTML digitado pelo próprio usuário (editor de
- * negrito/itálico/sublinhado/link em `AssinaturaEmailEditor`, ou o modo
- * "imagem" que grava um único `<img>`) e vai direto para um e-mail que sai da
- * caixa da EMPRESA — sem isto, colar algo que vire `<img onerror=...>` ou um
- * `javascript:` num link quebraria o e-mail ou rodaria no cliente de quem o
- * recebe.
+ * Assinatura pessoal roda como HTML montado no `EditorTextoRico` (o mesmo
+ * editor do corpo do e-mail, desde 18/09/2026 — sem mais abas Texto/Imagem)
+ * e vai direto para um e-mail que sai da caixa da EMPRESA — sem isto, colar
+ * algo que vire `<img onerror=...>` ou um `javascript:` num link quebraria o
+ * e-mail ou rodaria no cliente de quem o recebe.
  *
- * As duas allowlists abaixo são deliberadamente separadas, não uma união
- * "b/i/u/a/br/img": o modo imagem grava SÓ a tag `<img>` gerada por
- * `montarAssinaturaImagemHtml`, e o modo texto nunca deve deixar uma imagem
- * colada/injetada se infiltrar no meio do texto — cada uma sai exatamente
- * como o modo correspondente promete (só imagem, ou só texto + suas
- * estilizações), nunca uma mistura dos dois. `ehAssinaturaImagem` decide qual
- * ramo aplicar antes de qualquer sanitização.
+ * Delega para `sanitizarHtmlEmail` — a MESMA allowlist do conjunto Essencial
+ * usada no corpo (negrito/itálico/sublinhado/tachado/cor/fonte/tamanho,
+ * link, imagem, listas, alinhamento). Antes havia duas allowlists
+ * (texto/imagem) porque o editor antigo tinha dois modos exclusivos; o
+ * editor único não distingue mais os dois, então uma allowlist só basta.
  */
 export function sanitizarAssinaturaEmail(html: string | null | undefined): string {
-  const bruto = html ?? '';
-  if (ehAssinaturaImagem(bruto)) {
-    return DOMPurify.sanitize(bruto, {
-      ALLOWED_TAGS: ['img'],
-      ALLOWED_ATTR: ['src', 'alt', 'style'],
-    });
-  }
-  return DOMPurify.sanitize(bruto, {
-    ALLOWED_TAGS: ['b', 'strong', 'i', 'em', 'u', 'a', 'br'],
-    ALLOWED_ATTR: ['href'],
-  });
+  return sanitizarHtmlEmail(html ?? '');
 }
 
 /**

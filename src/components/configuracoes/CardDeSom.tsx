@@ -96,7 +96,6 @@ export function CardDeSom() {
         {trocando && (
           <div role="radiogroup" aria-label="Som das notificações" className="mt-2 space-y-0.5">
             {principais.map(linha)}
-            <p className="px-2 pt-2 text-[11px] text-muted-foreground">Criados pela Repply</p>
             {daRepply.map(linha)}
           </div>
         )}

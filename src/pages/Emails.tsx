@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import {
   Mail,
   MailOpen,
+  MailCheck,
   Send,
   Inbox,
   Search,
@@ -21,7 +22,6 @@ import {
   ChevronsRight,
   Tag,
   CornerUpLeft,
-  Move,
   GripVertical,
   X,
 } from "lucide-react";
@@ -32,8 +32,6 @@ import {
   keepPreviousData,
 } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/use-auth";
-import { marcaDaEmpresa } from "@/lib/marca-da-empresa";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -60,7 +58,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useEmailEmpresa } from "@/hooks/use-email-empresa";
 import { useEmailAnexos } from "@/hooks/use-email-anexos";
 import {
@@ -68,15 +66,18 @@ import {
   mensagemDeRejeicao,
 } from "@/lib/email-anexos";
 import { erroLegivelDaFunction } from "@/lib/erro-edge-function";
+import { parseEnderecos } from "@/lib/enderecos-email";
 import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
-import { LeitorEmail, type EmailAberto } from "@/components/email/LeitorEmail";
+import {
+  LeitorEmail,
+  type EmailAberto,
+  type EnderecoDoEmail,
+} from "@/components/email/LeitorEmail";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
 import { ConfirmarEnviarEmailDialog } from "@/components/email/ConfirmarEnviarEmailDialog";
-import {
-  ehAssinaturaImagem,
-  montarRodapeEmailHtml,
-  normalizarAssinaturaAntiga,
-} from "@/lib/assinatura-email";
+import { normalizarAssinaturaAntiga } from "@/lib/assinatura-email";
+import { sanitizarHtmlEmail } from "@/lib/sanitizar-html-email";
+import { enviarImagemEmail } from "@/lib/imagem-email";
 import { GerenciarCaixaDialog } from "@/components/email/GerenciarCaixaDialog";
 import { BarraPastas } from "@/components/email/BarraPastas";
 import {
@@ -93,10 +94,42 @@ import {
 } from "@/hooks/use-email-pastas";
 import { MoverParaMarcadorDialog } from "@/components/email/MoverParaMarcadorDialog";
 
+/**
+ * Normaliza a coluna `destinatarios`/`cc`/`bcc` de `email_mensagens` (jsonb,
+ * array do Nylas no formato `{name?, email}` — ver migration
+ * `20260804121322_email_nylas.sql` e `mensagemParaLinha` em
+ * `supabase/functions/_shared/nylas.ts`) para o tipo que `LeitorEmail` espera.
+ * A coluna chega tipada como `Json` (`types.ts` é gerado solto — CLAUDE.md §2),
+ * daí o cast explícito em vez de confiar na inferência.
+ */
+function normalizarEnderecos(valor: unknown): EnderecoDoEmail[] {
+  return Array.isArray(valor) ? (valor as EnderecoDoEmail[]) : [];
+}
+
+/** Escapa `&`, `<` e `>` — usado ao colocar texto solto (não HTML) dentro do corpo do editor. */
+function escaparHtml(t: string): string {
+  return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * Corpo inicial de uma composição: área de digitação em branco no topo, depois
+ * a assinatura, e por fim (em resposta/encaminhar) a citação do original.
+ */
+function montarCorpoInicial(assinaturaHtml: string, citacaoHtml = ""): string {
+  return `<p></p>${assinaturaHtml || ""}${citacaoHtml}`;
+}
+
 /** Uma linha da caixa de entrada, no formato que a listagem devolve. */
 interface MensagemRecebida {
   id: string;
   lido: boolean;
+  /**
+   * Regra fixa do sistema (gatilho no banco, ver migration
+   * `email_mensagens_prioritaria`): verdadeiro quando o remetente já é
+   * cliente/contato cadastrado na empresa OU o assunto traz uma palavra de
+   * urgência. Só destaca com um ponto laranja; não reordena a lista.
+   */
+  prioritaria: boolean;
   criado_em: string | null;
   data_recebimento: string | null;
   snippet: string;
@@ -106,7 +139,14 @@ interface MensagemRecebida {
   /** Id da conversa no provedor — liga esta mensagem às respostas enviadas na mesma conversa. */
   threadId: string | null;
   remetente: string;
-  destinatarios: string[];
+  /**
+   * Cru, no formato do Nylas (`{name?, email}[]`) — não mais reduzido a
+   * `string[]` de endereços: é o que permite `LeitorEmail` mostrar a lista
+   * INTEIRA de "Para" (não só o primeiro) ao abrir a mensagem.
+   */
+  destinatarios: EnderecoDoEmail[];
+  /** Mesmo formato, para "Cc" no leitor. Cco não é buscado aqui: nunca aparece em mensagem recebida (é oculta por natureza). */
+  cc: EnderecoDoEmail[];
   assunto: string | null;
   /** Ids de pasta/marcador do provedor — mistura pasta de sistema com marcador real. */
   pastas: string[];
@@ -225,6 +265,7 @@ const SeloMarcadores = ({
 };
 
 const Emails = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   // A busca só vira consulta depois que a digitação para. Enquanto o termo
@@ -253,8 +294,6 @@ const Emails = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   /** Ids das mensagens em processo de "mover para marcador" — vazio = fechado. */
   const [mensagensParaMover, setMensagensParaMover] = useState<string[]>([]);
-  /** Arrastar-e-soltar linha -> marcador. Desligado por padrão: clique comum não pode virar arrasto sem querer. */
-  const [modoArrastar, setModoArrastar] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("received");
   /** `nylas_message_id` da mensagem sendo respondida; nulo num e-mail novo. */
   const [respondendoA, setRespondendoA] = useState<string | null>(null);
@@ -362,18 +401,11 @@ const Emails = () => {
     destinatario: "",
     assunto: "",
     corpo: "",
+    cc: "",
+    cco: "",
   });
   /** Id do rascunho em `email_rascunhos` sendo editado; nulo enquanto o autosave ainda não gravou a primeira vez. */
   const [rascunhoId, setRascunhoId] = useState<string | null>(null);
-  /**
-   * Se a assinatura entra NESTE e-mail. Começa `true` em toda composição
-   * nova ou resposta; a pessoa pode remover e voltar atrás quantas vezes
-   * quiser antes de enviar. É por composição — não altera a assinatura
-   * salva em Configurações — e vale só enquanto o compositor está aberto:
-   * a escolha não é gravada no rascunho, então reabrir um rascunho salvo
-   * começa com a assinatura marcada de novo.
-   */
-  const [incluirAssinatura, setIncluirAssinatura] = useState(true);
 
   const { data: perfil } = useQuery({
     queryKey: ["meu_perfil"],
@@ -392,50 +424,13 @@ const Emails = () => {
   });
 
   /**
-   * A marca da empresa de quem envia — a MESMA que vai no topo dos PDFs.
-   *
-   * 🔴 Até 31/08/2026 o rodapé do e-mail escrevia "MD Representações" e apontava para uma logo
-   * de caminho único, igual para as dez empresas. Todo e-mail de todo cliente saía assinado
-   * com o nome de outra representação.
+   * Assinatura a semear no CORPO ao abrir uma composição (novo/responder) —
+   * a assinatura salva pela pessoa (`usuarios.assinatura_email`), crua, sem o
+   * rodapé de nome/logo/empresa que o envio montava antes (esse rodapé
+   * automático deixou de existir: a pessoa monta a assinatura inteira, se
+   * quiser, no editor de Configurações — ver Task 6). Vazia, nada é semeado.
    */
-  const { profile } = useAuth();
-  const marcaDaMinhaEmpresa = useMemo(() => marcaDaEmpresa(profile), [profile]);
-
-  /**
-   * Prévia da assinatura mostrada no compositor enquanto a pessoa escreve —
-   * MESMA regra do rodapé que `sendEmailMutation` monta no envio (nome/logo/
-   * imagem, com as preferências de mostrar-nome/mostrar-empresa), só que aqui
-   * não é gravado em lugar nenhum. `logoUrl` sem cache-bust por `Date.now()`
-   * (diferente do envio): ali o bust importa pra não mandar uma logo velha
-   * cacheada; aqui recalcular a cada re-render (a cada tecla digitada no
-   * corpo) recarregaria a imagem sem parar.
-   */
-  const assinaturaPreviewHtml = useMemo(() => {
-    const assinaturaNormalizada = normalizarAssinaturaAntiga(perfil?.assinatura_email);
-    return montarRodapeEmailHtml({
-      nome: perfil?.nome ?? "",
-      assinaturaHtml: assinaturaNormalizada,
-      logoUrl: marcaDaMinhaEmpresa.logoUrl,
-      nomeDaEmpresa: marcaDaMinhaEmpresa.nome,
-      mostrarLogo: !ehAssinaturaImagem(assinaturaNormalizada),
-      mostrarNome:
-        !ehAssinaturaImagem(assinaturaNormalizada) ||
-        (perfil?.assinatura_imagem_mostrar_nome ?? true),
-      mostrarNomeEmpresa:
-        !ehAssinaturaImagem(assinaturaNormalizada) ||
-        (perfil?.assinatura_imagem_mostrar_empresa ?? true),
-      isolado: true,
-    });
-  }, [
-    // A marca entra nas dependências: sem ela, trocar a logo da empresa não repintaria este
-    // preview até a página ser recarregada.
-    marcaDaMinhaEmpresa.logoUrl,
-    marcaDaMinhaEmpresa.nome,
-    perfil?.nome,
-    perfil?.assinatura_email,
-    perfil?.assinatura_imagem_mostrar_nome,
-    perfil?.assinatura_imagem_mostrar_empresa,
-  ]);
+  const assinaturaParaCorpo = normalizarAssinaturaAntiga(perfil?.assinatura_email) || "";
 
   /**
    * Rascunhos do usuário logado, mais recente primeiro. Alimenta a aba
@@ -458,14 +453,11 @@ const Emails = () => {
 
   useEffect(() => {
     const to = searchParams.get("to");
-    if (to) {
-      setFormData((prev) => ({ ...prev, destinatario: to }));
-      // Contexto novo (endereço veio de fora, não de um rascunho salvo): não
-      // continuar amarrado a um rascunho de uma composição anterior.
-      setRascunhoId(null);
-      setIncluirAssinatura(true);
-      setIsComposeOpen(true);
-    }
+    // Mesmo caminho de "escrever para": destinatário preenchido, corpo já
+    // com a assinatura semeada, sem amarrar a um rascunho de composição
+    // anterior — `enviarPara` já faz tudo isso (ver abaixo).
+    if (to) enviarPara(to);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const salvarRascunhoMutation = useMutation({
@@ -700,7 +692,7 @@ const Emails = () => {
       let query = supabase
         .from("email_mensagens")
         .select(
-          "id, assunto, snippet, destinatarios, remetente_email, envio_status, data_mensagem, caixa_origem, nylas_thread_id, nylas_message_id, pastas",
+          "id, assunto, snippet, destinatarios, cc, bcc, remetente_email, envio_status, data_mensagem, caixa_origem, nylas_thread_id, nylas_message_id, pastas",
           { count: "exact" },
         )
         .eq("direcao", "enviado")
@@ -720,13 +712,18 @@ const Emails = () => {
       // Remapeia para o formato que o JSX já consome, para a troca de origem
       // não obrigar a reescrever a renderização inteira.
       const emails = (data ?? []).map((m) => {
-        const dest = Array.isArray(m.destinatarios) ? m.destinatarios : [];
+        const dest = normalizarEnderecos(m.destinatarios);
         return {
           id: m.id,
           destinatario: dest
-            .map((d: { email?: string }) => d?.email)
+            .map((d) => d?.email)
             .filter(Boolean)
             .join(", "),
+          // Cru, para o leitor mostrar a lista inteira de Para/Cc/Cco em vez
+          // do `destinatario` singular acima (ver `EmailAberto` em LeitorEmail.tsx).
+          destinatarios: dest,
+          cc: normalizarEnderecos(m.cc),
+          bcc: normalizarEnderecos(m.bcc),
           remetente: m.remetente_email,
           assunto: m.assunto,
           corpo: m.snippet ?? "",
@@ -769,7 +766,7 @@ const Emails = () => {
       let consulta = supabase
         .from("email_mensagens")
         .select(
-          "id, lido, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, assunto, caixa_origem, pastas",
+          "id, lido, prioritaria, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, cc, assunto, caixa_origem, pastas",
           { count: "exact" },
         )
         .eq("direcao", "recebido")
@@ -825,6 +822,10 @@ const Emails = () => {
       const emails = (data ?? []).map((m) => ({
         id: m.id,
         lido: m.lido,
+        // Regra fixa do sistema (gatilho no banco). Ausente em linhas antigas,
+        // que nasceram antes da coluna — daí o `?? false`: e-mail sem a marca
+        // simplesmente não recebe o ponto laranja.
+        prioritaria: m.prioritaria ?? false,
         criado_em: m.data_mensagem,
         data_recebimento: m.data_mensagem,
         // A listagem do Nylas devolve snippet, não body — e é o snippet que a
@@ -839,11 +840,11 @@ const Emails = () => {
         remetente: m.remetente_nome
           ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
           : (m.remetente_email ?? ""),
-        destinatarios: Array.isArray(m.destinatarios)
-          ? m.destinatarios
-              .map((d: { email?: string }) => d?.email)
-              .filter(Boolean)
-          : [],
+        // Cru (Nylas), não mais reduzido a `string[]` — é o que deixa o leitor
+        // mostrar a lista INTEIRA de "Para" (ver `abrirRecebido`, mais abaixo,
+        // e `EmailAberto` em LeitorEmail.tsx).
+        destinatarios: normalizarEnderecos(m.destinatarios),
+        cc: normalizarEnderecos(m.cc),
         assunto: m.assunto,
         pastas: (m.pastas ?? []) as string[],
       }));
@@ -855,6 +856,17 @@ const Emails = () => {
 
   const receivedEmails = receivedData?.emails || [];
   const totalReceived = receivedData?.count || 0;
+
+  // Botão de leitura em massa (barra de seleção): se TODA a seleção já está
+  // lida, ele oferece "Marcar não lido"; senão, "Lido". Antes o botão era fixo
+  // em "Lido" e nunca virava o inverso ao selecionar um e-mail já lido. Padrão
+  // Gmail. Só faz sentido na aba Recebidos, a única com estado de leitura.
+  const selecaoTodaLida =
+    activeTab === "received" &&
+    selectedIds.length > 0 &&
+    selectedIds.every((id) =>
+      receivedEmails.some((e) => e.id === id && e.lido),
+    );
 
   /**
    * Ids de conversa (`nylas_thread_id`) que já têm alguma mensagem ENVIADA —
@@ -1018,6 +1030,8 @@ const Emails = () => {
       destinatario: string;
       assunto: string;
       corpo: string;
+      cc: string;
+      cco: string;
     }) => {
       if (!isConnected) {
         throw new Error(
@@ -1025,55 +1039,32 @@ const Emails = () => {
         );
       }
 
-      // `assinatura_email` já sanitizada em Configurações antes de ser salva —
-      // normaliza aqui é só pra converter formato ANTIGO (texto puro com
-      // `\n`, de antes do editor de formatação existir). `montarRodapeEmailHtml`
-      // sanitiza de novo por conta própria, então dado antigo/legado também
-      // não passa cru.
-      const assinaturaNormalizada = normalizarAssinaturaAntiga(perfil?.assinatura_email);
-
-      // Quem escreve pode ter removido a assinatura DESTE e-mail (botão
-      // "Remover" no compositor). Nesse caso o e-mail sai só com o corpo
-      // digitado — sem rodapé de nome/logo/assinatura.
-      const rodapeHtml = incluirAssinatura
-        ? montarRodapeEmailHtml({
-            nome: perfil?.nome ?? "",
-            assinaturaHtml: assinaturaNormalizada,
-            // A logo já vem com `?v=` do momento em que foi enviada — ver `CampoDeLogoDaEmpresa`.
-            logoUrl: marcaDaMinhaEmpresa.logoUrl,
-            nomeDaEmpresa: marcaDaMinhaEmpresa.nome,
-            // Assinatura em modo imagem já é autossuficiente — mostrar a logo
-            // da empresa em cima dela seria redundante/poluído.
-            mostrarLogo: !ehAssinaturaImagem(assinaturaNormalizada),
-            // Só vale no modo imagem — no modo texto o nome e a empresa sempre
-            // aparecem, como sempre apareceram.
-            mostrarNome:
-              !ehAssinaturaImagem(assinaturaNormalizada) ||
-              (perfil?.assinatura_imagem_mostrar_nome ?? true),
-            mostrarNomeEmpresa:
-              !ehAssinaturaImagem(assinaturaNormalizada) ||
-              (perfil?.assinatura_imagem_mostrar_empresa ?? true),
-          })
-        : "";
-
+      // O corpo agora é HTML pronto do editor (a assinatura, se a pessoa não
+      // apagou, já está dentro dele — ver `montarCorpoInicial`). O rodapé
+      // automático (nome+logo+empresa, colado aqui no envio) deixou de
+      // existir: `sanitizarHtmlEmail` é a única defesa nesta etapa, e é a
+      // MESMA função que já limpa o HTML a cada `onChange` do editor.
       const htmlBody = `
         <div style="font-family: sans-serif; font-size: 16px; color: #333; line-height: 1.5;">
-          ${data.corpo.replace(/\n/g, "<br>")}
+          ${sanitizarHtmlEmail(data.corpo)}
         </div>
-        ${rodapeHtml}
       `;
 
       // O registro em email_mensagens é feito pela Edge Function, que é quem
       // conhece o id devolvido pelo Nylas. Gravar também daqui criaria duas
       // linhas para o mesmo envio — e o cliente nem tem INSERT nessa tabela.
       return await sendEmail(
-        data.destinatario,
+        // "Para" agora aceita vários endereços — mesma regra de separador e
+        // duplicado do Cc/Cco (ver `enderecos-email.ts`).
+        parseEnderecos(data.destinatario),
         data.assunto,
         htmlBody,
         respondendoA,
         // A função de servidor puxa os anexos deste rascunho, monta o
         // multipart pro Nylas e depois apaga balde + linhas.
         rascunhoId,
+        parseEnderecos(data.cc),
+        parseEnderecos(data.cco),
       );
     },
     onSuccess: () => {
@@ -1085,8 +1076,9 @@ const Emails = () => {
         destinatario: "",
         assunto: "",
         corpo: "",
+        cc: "",
+        cco: "",
       });
-      setIncluirAssinatura(true);
       // Enviado com sucesso: o rascunho que o alimentava não serve mais.
       // Os anexos (balde + linhas) já foram apagados pela função de servidor
       // depois que o Nylas aceitou; aqui só cai a linha do rascunho.
@@ -1112,17 +1104,35 @@ const Emails = () => {
 
   const deleteEmailMutation = useMutation({
     mutationFn: async ({ id }: { id: string; type: "sent" | "received" }) => {
-      // Exclusão lógica nos dois casos. Apagar de verdade faria o webhook e o
-      // sync trazerem a mensagem de volta na próxima entrega — e o cliente nem
-      // tem DELETE em email_mensagens (só UPDATE de lido/favorito/excluido).
-      const { error } = await supabase
-        .from("email_mensagens")
-        .update({ excluido: true })
-        .eq("id", id);
-      if (error) throw error;
+      // Fala com o Gmail PRIMEIRO: só sai da Entrada aqui se o provedor
+      // confirmou a mudança para a lixeira (`email-excluir`). Decisão do dono
+      // do produto, 15/09/2026: se o provedor falhar, NÃO esconder e avisar —
+      // nunca fingir que excluiu.
+      const { data, error } = await supabase.functions.invoke("email-excluir", {
+        body: { mensagem_id: id },
+      });
+      if (error) {
+        throw await erroLegivelDaFunction(
+          error,
+          "Não foi possível excluir o e-mail.",
+        );
+      }
+      const resultado = data as {
+        excluidas: number;
+        falharam: number;
+        detalhe?: string;
+      };
+      // Um alvo só, e ele falhou: TRATAR COMO ERRO, para o e-mail continuar na
+      // lista e o aviso aparecer — é a decisão "não excluir e avisar" acima.
+      if (resultado.excluidas === 0) {
+        throw new Error(
+          resultado.detalhe ||
+            "O Gmail não confirmou a exclusão. Tente de novo.",
+        );
+      }
     },
     onSuccess: (_, variables) => {
-      toast.success("E-mail excluído com sucesso");
+      toast.success("E-mail movido para a lixeira");
       queryClient.invalidateQueries({
         queryKey: [variables.type === "sent" ? "emails" : "received_emails"],
       });
@@ -1131,6 +1141,10 @@ const Emails = () => {
       // Sem esta linha o número ao lado de "Todas" continuaria contando as
       // mensagens que acabaram de ser excluídas.
       queryClient.invalidateQueries({ queryKey: ["received_emails_total"] });
+      // A lixeira e a Caixa de entrada dependem da mesma coluna `pastas`, que
+      // a function acabou de reescrever — sem isto o selo da barra lateral
+      // ficaria contando a mensagem na pasta errada até um refresh manual.
+      queryClient.invalidateQueries({ queryKey: ["email_contagem_por_pasta"] });
       if (selectedEmail?.id === variables.id) {
         setSelectedEmail(null);
       }
@@ -1149,16 +1163,27 @@ const Emails = () => {
       ids: string[];
       type: "sent" | "received";
     }) => {
-      const { error } = await supabase
-        .from("email_mensagens")
-        .update({ excluido: true })
-        .in("id", ids);
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke("email-excluir", {
+        body: { mensagem_ids: ids },
+      });
+      if (error) {
+        throw await erroLegivelDaFunction(
+          error,
+          "Não foi possível excluir os e-mails.",
+        );
+      }
+      return data as { excluidas: number; falharam: number; detalhe?: string };
     },
-    onSuccess: (_, variables) => {
-      toast.success(
-        `${variables.ids.length} e-mail(s) excluído(s) com sucesso`,
-      );
+    onSuccess: (r, variables) => {
+      if (r.falharam === 0) {
+        toast.success(`${r.excluidas} e-mail(s) movido(s) para a lixeira`);
+      } else {
+        // Falha PARCIAL não é erro da mutação: quem deu certo já saiu da
+        // lista. Avisa quantos ficaram para trás em vez de fingir que foi tudo.
+        toast.warning(
+          `${r.falharam} não ${r.falharam === 1 ? "foi excluído" : "foram excluídos"}: o Gmail não confirmou. Tente de novo.`,
+        );
+      }
       queryClient.invalidateQueries({
         queryKey: [variables.type === "sent" ? "emails" : "received_emails"],
       });
@@ -1167,6 +1192,7 @@ const Emails = () => {
       // Sem esta linha o número ao lado de "Todas" continuaria contando as
       // mensagens que acabaram de ser excluídas.
       queryClient.invalidateQueries({ queryKey: ["received_emails_total"] });
+      queryClient.invalidateQueries({ queryKey: ["email_contagem_por_pasta"] });
       setSelectedIds([]);
       setIsBulkDeleting(false);
     },
@@ -1249,8 +1275,15 @@ const Emails = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.destinatario || !formData.assunto || !formData.corpo) {
+    if (!formData.assunto || !formData.corpo) {
       toast.error("Preencha todos os campos");
+      return;
+    }
+    // Cobre tanto o campo vazio quanto um texto que não sobra em endereço
+    // nenhum depois de separado (ex.: só vírgula) — nos dois casos não há
+    // para quem enviar.
+    if (parseEnderecos(formData.destinatario).length === 0) {
+      toast.error("Informe pelo menos um endereço em Para.");
       return;
     }
     sendEmailMutation.mutate(formData);
@@ -1304,6 +1337,13 @@ const Emails = () => {
       : `Re: ${assunto}`;
     const quando = selectedEmail.created_at || selectedEmail.criado_em;
     const citado = selectedEmail.snippet || selectedEmail.corpo || "";
+    const cabecalho = `Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${selectedEmail.remetente} escreveu:`;
+    // Citação em HTML (o corpo agora é HTML, não texto puro) — escapa o texto
+    // do e-mail original antes de colocar dentro da tag, senão `<`/`>`/`&` que
+    // vierem no assunto ou no trecho citado quebrariam a marcação do corpo.
+    const citacaoHtml =
+      `<br><blockquote style="margin:0;border-left:2px solid #ccc;padding-left:12px;color:#555">` +
+      `${escaparHtml(cabecalho)}<br>${escaparHtml(citado).replace(/\n/g, "<br>")}</blockquote>`;
 
     setFormData({
       ...formData,
@@ -1313,7 +1353,11 @@ const Emails = () => {
         selectedEmail.remetente || selectedEmail.destinatario,
       ),
       assunto: replySubject,
-      corpo: `\n\n--- Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${selectedEmail.remetente} escreveu:\n\n${citado}`,
+      corpo: montarCorpoInicial(assinaturaParaCorpo, citacaoHtml),
+      // Contexto novo: Cc/Cco de uma composição anterior não continuam numa
+      // resposta diferente.
+      cc: "",
+      cco: "",
     });
     // Guarda a QUAL mensagem se está respondendo, no id do provedor. É o que o
     // Nylas usa para montar In-Reply-To/References; sem isso a resposta sai
@@ -1324,8 +1368,6 @@ const Emails = () => {
     // Contexto novo: uma resposta não continua o rascunho de outra
     // composição — o autosave (abaixo) cria uma linha própria para ela.
     setRascunhoId(null);
-    // Resposta também nasce com a assinatura incluída — a pessoa remove se quiser.
-    setIncluirAssinatura(true);
     // O e-mail aberto CONTINUA aberto atrás do compositor. Fechá-lo aqui era o
     // que jogava a pessoa de volta para a caixa de entrada no meio da resposta.
     setRespondendo(true);
@@ -1340,11 +1382,16 @@ const Emails = () => {
    * mensagem nova para aquele endereço, não uma resposta.
    */
   const enviarPara = (endereco: string) => {
-    setFormData({ destinatario: endereco, assunto: "", corpo: "" });
+    setFormData({
+      destinatario: endereco,
+      assunto: "",
+      corpo: montarCorpoInicial(assinaturaParaCorpo),
+      cc: "",
+      cco: "",
+    });
     setRespondendoA(null);
     setRespondendo(false);
     setRascunhoId(null);
-    setIncluirAssinatura(true);
     setIsComposeOpen(true);
   };
 
@@ -1366,15 +1413,22 @@ const Emails = () => {
         destinatario: maisRecente.destinatario ?? "",
         assunto: maisRecente.assunto ?? "",
         corpo: maisRecente.corpo ?? "",
+        // Rascunho não guarda Cc/Cco (ver `RascunhoEmail`) — recuperar um
+        // antigo nunca traz cópia/cópia oculta de volta.
+        cc: "",
+        cco: "",
       });
       setRascunhoId(maisRecente.id);
-      // A escolha de assinatura não é gravada no rascunho — sempre começa incluída.
-      setIncluirAssinatura(true);
       toast.info("Rascunho recuperado.");
     } else {
-      setFormData({ destinatario: "", assunto: "", corpo: "" });
+      setFormData({
+        destinatario: "",
+        assunto: "",
+        corpo: montarCorpoInicial(assinaturaParaCorpo),
+        cc: "",
+        cco: "",
+      });
       setRascunhoId(null);
-      setIncluirAssinatura(true);
     }
     setRespondendoA(null);
     setRespondendo(false);
@@ -1392,9 +1446,10 @@ const Emails = () => {
       destinatario: r.destinatario ?? "",
       assunto: r.assunto ?? "",
       corpo: r.corpo ?? "",
+      cc: "",
+      cco: "",
     });
     setRascunhoId(r.id);
-    setIncluirAssinatura(true);
     setRespondendoA(null);
     setRespondendo(false);
     setIsComposeOpen(true);
@@ -1411,19 +1466,16 @@ const Emails = () => {
 
   /** Marca como lida sem segurar a abertura da mensagem. */
   const marcarLido = (id: string) => {
-    // Escreve direto na lista que já está na tela, em vez de invalidar a
+    // Escreve direto nas listas que já estão na tela, em vez de invalidar a
     // consulta: trocar um booleano não justifica refazer a busca inteira.
-    // A chave tem de ser a MESMA da consulta que alimenta a lista, item por
-    // item: `setQueryData` com uma chave a menos escreve num cache que ninguém
-    // lê, e o selo de não-lida ficava na tela até a próxima busca.
-    queryClient.setQueryData<PaginaRecebidos>(
-      [
-        "received_emails",
-        pageReceived,
-        pastaSelecionada,
-        buscaAplicada,
-        somenteNaoLidas,
-      ],
+    // Por PREFIXO (`setQueriesData` só com `["received_emails"]`), e NÃO por
+    // chave exata: a chave real da consulta tem mais campos (página, pasta,
+    // marcadores, busca, só-não-lidas) e um `setQueryData` com um campo a menos
+    // escrevia num cache que ninguém lê — a linha não virava lida ao abrir e
+    // voltar, nem ao clicar. O prefixo acerta todas as variações abertas e não
+    // volta a quebrar se a chave ganhar mais um campo amanhã.
+    queryClient.setQueriesData<PaginaRecebidos>(
+      { queryKey: ["received_emails"] },
       (antigo) =>
         antigo
           ? {
@@ -1458,16 +1510,10 @@ const Emails = () => {
       });
   };
 
-  /** Inverso de `marcarLido`: mesma escrita otimista, mesmo espelho no provedor. */
+  /** Inverso de `marcarLido`: mesma escrita otimista por prefixo, mesmo espelho no provedor. */
   const marcarNaoLido = (id: string) => {
-    queryClient.setQueryData<PaginaRecebidos>(
-      [
-        "received_emails",
-        pageReceived,
-        pastaSelecionada,
-        buscaAplicada,
-        somenteNaoLidas,
-      ],
+    queryClient.setQueriesData<PaginaRecebidos>(
+      { queryKey: ["received_emails"] },
       (antigo) =>
         antigo
           ? {
@@ -1521,8 +1567,11 @@ const Emails = () => {
   const abrirRecebido = (email: MensagemRecebida) => {
     if (!email.lido) marcarLido(email.id);
     void abrirComCorpo({
+      // `...email` já leva `destinatarios`/`cc` crus (Nylas) para o leitor
+      // mostrar a lista inteira — só o `destinatario` singular abaixo precisa
+      // de tradução, porque hoje é string e a lista é `{name?, email}[]`.
       ...email,
-      destinatario: email.destinatarios?.[0] || "",
+      destinatario: email.destinatarios?.[0]?.email || "",
       remetente: email.remetente,
       corpo: email.snippet ?? "",
       created_at: email.criado_em,
@@ -1558,7 +1607,7 @@ const Emails = () => {
       const { data, error } = await supabase
         .from("email_mensagens")
         .select(
-          "id, lido, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, assunto, caixa_origem",
+          "id, lido, data_mensagem, snippet, nylas_message_id, nylas_thread_id, remetente_nome, remetente_email, destinatarios, cc, bcc, assunto, caixa_origem",
         )
         .eq("id", alvo)
         .maybeSingle();
@@ -1568,9 +1617,7 @@ const Emails = () => {
         // Sem acesso à caixa a RLS não devolve linha — e aí não há o que abrir.
         toast.error("Não encontrei esta mensagem, ou você não tem acesso a ela.");
       } else {
-        const destinatarios = (data.destinatarios ?? []) as Array<{
-          email?: string;
-        }>;
+        const destinatarios = normalizarEnderecos(data.destinatarios);
         void abrirComCorpoRef.current({
           id: data.id,
           lido: data.lido,
@@ -1579,6 +1626,9 @@ const Emails = () => {
           corpo: data.snippet ?? "",
           remetente: data.remetente_nome || data.remetente_email || "",
           destinatario: destinatarios[0]?.email ?? "",
+          destinatarios,
+          cc: normalizarEnderecos(data.cc),
+          bcc: normalizarEnderecos(data.bcc),
           created_at: data.data_mensagem,
           criado_em: data.data_mensagem,
           threadId: data.nylas_thread_id ?? null,
@@ -1651,7 +1701,7 @@ const Emails = () => {
     const { data: m, error } = await supabase
       .from("email_mensagens")
       .select(
-        "id, direcao, data_mensagem, remetente_nome, remetente_email, destinatarios, assunto, snippet, lido, nylas_message_id, nylas_thread_id, caixa_origem",
+        "id, direcao, data_mensagem, remetente_nome, remetente_email, destinatarios, cc, bcc, assunto, snippet, lido, nylas_message_id, nylas_thread_id, caixa_origem",
       )
       .eq("id", id)
       .maybeSingle();
@@ -1661,11 +1711,8 @@ const Emails = () => {
     }
 
     const enviado = m.direcao === "enviado";
-    const destEmails = Array.isArray(m.destinatarios)
-      ? m.destinatarios
-          .map((d: { email?: string }) => d?.email)
-          .filter(Boolean)
-      : [];
+    const destinatarios = normalizarEnderecos(m.destinatarios);
+    const destEmails = destinatarios.map((d) => d?.email).filter(Boolean);
     if (!enviado && !m.lido) marcarLido(m.id);
 
     void abrirComCorpo({
@@ -1676,6 +1723,12 @@ const Emails = () => {
           ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
           : (m.remetente_email ?? ""),
       destinatario: enviado ? destEmails.join(", ") : (destEmails[0] ?? ""),
+      // Cru, para o leitor mostrar a lista inteira — igual aos outros
+      // caminhos que abrem uma mensagem (ver `abrirRecebido`/o efeito de
+      // `mensagemId`, acima).
+      destinatarios,
+      cc: normalizarEnderecos(m.cc),
+      bcc: normalizarEnderecos(m.bcc),
       assunto: m.assunto,
       corpo: m.snippet ?? "",
       created_at: m.data_mensagem,
@@ -1729,20 +1782,18 @@ const Emails = () => {
           descartarRascunhoMutation.mutate(rascunhoId);
         }
         setRascunhoId(null);
-        setFormData({ destinatario: "", assunto: "", corpo: "" });
-        setIncluirAssinatura(true);
+        setFormData({ destinatario: "", assunto: "", corpo: "", cc: "", cco: "" });
         fecharCompositor(false);
       }}
       isConnected={isConnected}
       isEnviando={sendEmailMutation.isPending}
       titulo={respondendo ? "Responder" : "Nova mensagem"}
-      assinaturaPreviewHtml={assinaturaPreviewHtml}
-      incluirAssinatura={incluirAssinatura}
-      onIncluirAssinaturaChange={setIncluirAssinatura}
       anexos={anexosCtrl.anexos}
       onAnexar={aoAnexar}
       onRemoverAnexo={aoRemoverAnexo}
       anexando={anexosCtrl.subindo}
+      onConfigurarAssinatura={() => navigate("/configuracoes?tab=perfil")}
+      onEnviarImagemCorpo={(file) => enviarImagemEmail(file, perfil?.empresa_id ?? "")}
     />
   );
 
@@ -1814,8 +1865,8 @@ const Emails = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>Excluir este e-mail?</AlertDialogTitle>
               <AlertDialogDescription>
-                Ele sai da sua caixa no CRM. A mensagem original continua na
-                conta de e-mail — nada é apagado no provedor.
+                O e-mail vai para a lixeira do Gmail e sai da sua caixa de
+                entrada. Dá para recuperar na lixeira por até 30 dias.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -1913,12 +1964,16 @@ const Emails = () => {
                     onClick={() =>
                       bulkUpdateReadStatusMutation.mutate({
                         ids: selectedIds,
-                        lido: true,
+                        lido: !selecaoTodaLida,
                       })
                     }
                   >
-                    <CheckSquare className="h-4 w-4" />
-                    Lido
+                    {selecaoTodaLida ? (
+                      <MailOpen className="h-4 w-4" />
+                    ) : (
+                      <CheckSquare className="h-4 w-4" />
+                    )}
+                    {selecaoTodaLida ? "Marcar não lido" : "Lido"}
                   </Button>
                 )}
                 {/* Mensagem enviada também guarda `pastas` (a Edge Function de
@@ -2050,31 +2105,6 @@ const Emails = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              {/* Arrastar-e-soltar: só nas caixas que representam mensagens
-                  reais no provedor (recebidos e enviados). Rascunho nunca
-                  chegou a existir no provedor, então não tem marcador para
-                  carregar. Desligado por padrão — ligado sempre, um clique
-                  comum na linha correria o risco de virar arrasto sem querer. */}
-              {isConnected && (activeTab === "received" || activeTab === "sent") && (
-                <Button
-                  variant={modoArrastar ? "default" : "ghost"}
-                  size="icon"
-                  className={cn(
-                    "rounded-full shrink-0",
-                    !modoArrastar && "hover:bg-muted",
-                  )}
-                  onClick={() => setModoArrastar((v) => !v)}
-                  aria-pressed={modoArrastar}
-                  title={
-                    modoArrastar
-                      ? "Desligar o modo de arrastar para marcador"
-                      : "Arrastar mensagens para um marcador"
-                  }
-                  aria-label="Arrastar mensagens para um marcador"
-                >
-                  <Move className="h-5 w-5" />
-                </Button>
-              )}
               {isConnected && (
                 <Button
                   variant="ghost"
@@ -2089,20 +2119,36 @@ const Emails = () => {
                   />
                 </Button>
               )}
-              {/* Único caminho para trocar de caixa. O card de conexão — que tem
-                  o botão de desconectar — só aparece quando NÃO há caixa
-                  conectada, então depois de conectar não sobrava saída.
-                  Escondido de quem não é dono nem gestor só para não oferecer
-                  uma ação que o servidor vai recusar; a barreira real está na
-                  Edge Function. */}
-              {isConnected && podeGerenciarCaixa && (
+              {/* Engrenagem para TODOS (decisão do Lucas, 16/09/2026 — tela mais
+                  limpa, sem botão novo). Quem gerencia a caixa (dono/gestor)
+                  clica e abre "Gerenciar caixa" — único caminho para trocar de
+                  caixa; o card de conexão, que tem o botão de desconectar, só
+                  aparece quando NÃO há caixa conectada, então depois de
+                  conectar não sobrava outra saída. Quem NÃO gerencia vai direto
+                  para a própria assinatura em Configurações: a ação de
+                  gerenciar continua escondida dela só para não oferecer o que o
+                  servidor recusaria (a barreira real está na Edge Function),
+                  não porque ela não tenha nada para fazer aqui. */}
+              {isConnected && (
                 <Button
                   variant="ghost"
                   size="icon"
                   className="rounded-full hover:bg-muted shrink-0"
-                  onClick={() => setGerenciarCaixaAberto(true)}
-                  title={`Gerenciar a caixa conectada (${connectedEmail ?? ""})`}
-                  aria-label="Gerenciar a caixa de e-mail da empresa"
+                  onClick={() =>
+                    podeGerenciarCaixa
+                      ? setGerenciarCaixaAberto(true)
+                      : navigate("/configuracoes?tab=perfil")
+                  }
+                  title={
+                    podeGerenciarCaixa
+                      ? `Gerenciar a caixa conectada (${connectedEmail ?? ""})`
+                      : "Configurar assinatura"
+                  }
+                  aria-label={
+                    podeGerenciarCaixa
+                      ? "Gerenciar a caixa de e-mail da empresa"
+                      : "Configurar assinatura"
+                  }
                 >
                   <Settings className="h-5 w-5 text-muted-foreground" />
                 </Button>
@@ -2145,11 +2191,12 @@ const Emails = () => {
               contagens={contagens}
               contaId={conta?.id}
               podeCriarMarcador={podeGerenciarCaixa}
-              onMoverParaMarcador={
-                modoArrastar
-                  ? (ids, pastaId) =>
-                      moverParaMarcadorMut.mutate({ mensagemIds: ids, pastaId })
-                  : undefined
+              // Arrastar é sempre ligado (alça própria na linha, item 2 do
+              // desenho) — só as linhas de Recebidos e Enviados têm
+              // `draggable`, então soltar aqui nunca dispara a partir de
+              // Rascunhos, mesmo com o handler sempre presente.
+              onMoverParaMarcador={(ids, pastaId) =>
+                moverParaMarcadorMut.mutate({ mensagemIds: ids, pastaId })
               }
             />
           )}
@@ -2173,7 +2220,7 @@ const Emails = () => {
                         rotuloPrincipal="Destinatário"
                         rotuloData="Enviado em"
                         rotuloAssunto="Assunto e prévia"
-                        mostrarEspacoAlca={modoArrastar}
+                        mostrarEspacoAlca
                         checkbox={{
                           checked:
                             emails.length > 0 &&
@@ -2192,12 +2239,14 @@ const Emails = () => {
                             onClick={() =>
                               void abrirComCorpo({ ...email, type: "sent" })
                             }
-                            draggable={modoArrastar}
+                            draggable
                             onDragStart={(e) => iniciarArrastoLinha(e, email.id)}
                           >
-                            {modoArrastar && (
-                              <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
-                            )}
+                            {/* Alça sempre presente, discreta — clique comum na
+                                linha não é arrasto (nativo não confunde os
+                                dois), então não há por que escondê-la atrás
+                                de um modo à parte. */}
+                            <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground opacity-60 group-hover:opacity-100" />
                             <Checkbox
                               className="shrink-0"
                               checked={selectedIds.includes(email.id)}
@@ -2241,6 +2290,11 @@ const Emails = () => {
                               className={cn(
                                 LARGURA_COL_ACOES,
                                 "flex items-center justify-end",
+                                // Some no hover/seleção só a partir de `sm:` —
+                                // no celular não há hover, então ali a ação
+                                // continua sempre visível (item 4 do desenho).
+                                "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
+                                selectedIds.includes(email.id) && "sm:opacity-100",
                               )}
                             >
                               <Button
@@ -2436,7 +2490,7 @@ const Emails = () => {
                         rotuloPrincipal="Remetente"
                         rotuloData="Recebido em"
                         rotuloAssunto="Assunto e prévia"
-                        mostrarEspacoAlca={modoArrastar}
+                        mostrarEspacoAlca
                         checkbox={{
                           checked:
                             receivedEmails.length > 0 &&
@@ -2453,12 +2507,10 @@ const Emails = () => {
                           )}
                           // Marca lido aqui E no provedor (ver `marcarLido`).
                           onClick={() => abrirRecebido(email)}
-                          draggable={modoArrastar}
+                          draggable
                           onDragStart={(e) => iniciarArrastoLinha(e, email.id)}
                         >
-                          {modoArrastar && (
-                            <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
-                          )}
+                          <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground opacity-60 group-hover:opacity-100" />
                           <Checkbox
                             className="shrink-0"
                             checked={selectedIds.includes(email.id)}
@@ -2483,8 +2535,16 @@ const Emails = () => {
                               quatro informações disputavam a mesma linha, todas em
                               text-sm — nada se destacava. */}
                             <div className="flex items-center gap-1.5">
-                              {!email.lido && (
-                                <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
+                              {/* Ponto laranja = PRIORIDADE (remetente já
+                                cadastrado ou assunto urgente), não "não lido".
+                                O não-lido é marcado pelo negrito abaixo e pelo
+                                avatar em tom laranja claro — padrão Gmail. */}
+                              {email.prioritaria && (
+                                <span
+                                  className="h-2 w-2 shrink-0 rounded-full bg-primary"
+                                  title="Prioritário: remetente conhecido ou assunto urgente"
+                                  aria-label="E-mail prioritário"
+                                />
                               )}
                               <span
                                 className={cn(
@@ -2563,9 +2623,15 @@ const Emails = () => {
                             className={cn(
                               LARGURA_COL_ACOES,
                               "flex items-center justify-end gap-1",
+                              "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
+                              selectedIds.includes(email.id) && "sm:opacity-100",
                             )}
                           >
-                            {email.lido && (
+                            {/* Alterna lido/não-lido no hover, à esquerda do
+                              excluir: e-mail lido ganha "marcar não lida", e o
+                              não-lido ganha o inverso, "marcar lida" (padrão
+                              Gmail — a ação oposta ao estado atual). */}
+                            {email.lido ? (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -2578,6 +2644,20 @@ const Emails = () => {
                                 aria-label="Marcar como não lida"
                               >
                                 <MailOpen className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  marcarLido(email.id);
+                                }}
+                                title="Marcar como lida"
+                                aria-label="Marcar como lida"
+                              >
+                                <MailCheck className="h-4 w-4" />
                               </Button>
                             )}
                             <Button
@@ -2726,6 +2806,9 @@ const Emails = () => {
                               className={cn(
                                 LARGURA_COL_ACOES,
                                 "flex items-center justify-end",
+                                // Rascunho não tem seleção em massa (sem checkbox
+                                // no cabeçalho), então só hover/foco decidem aqui.
+                                "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
                               )}
                             >
                               <Button
@@ -2775,10 +2858,10 @@ const Emails = () => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+            <AlertDialogTitle>Excluir este e-mail?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Isso excluirá permanentemente o
-              e-mail do nosso banco de dados.
+              O e-mail vai para a lixeira do Gmail e sai da sua caixa de
+              entrada. Dá para recuperar na lixeira por até 30 dias.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2802,8 +2885,9 @@ const Emails = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir e-mails em massa?</AlertDialogTitle>
             <AlertDialogDescription>
-              Você está prestes a excluir {selectedIds.length} e-mail(s). Esta
-              ação não pode ser desfeita.
+              {selectedIds.length} e-mail(s) vão para a lixeira do Gmail e
+              saem da sua caixa de entrada. Dá para recuperar na lixeira por
+              até 30 dias.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

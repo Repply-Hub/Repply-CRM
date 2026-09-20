@@ -264,6 +264,10 @@ import {
 import { downloadFile } from "@/lib/download-file";
 import { useArquivosPrivados } from "@/hooks/use-arquivo-privado";
 import { linkifyText } from "@/lib/linkify";
+import { useCampoComMencao } from "@/hooks/use-campo-com-mencao";
+import { ListaDeMencao } from "@/components/mencao/ListaDeMencao";
+import { TextoComMencoes } from "@/components/mencao/TextoComMencoes";
+import { useMencoesNaoLidas, useMarcarMencoesLidas } from "@/hooks/use-mencoes";
 import {
   CLASSE_BADGE_INSTANCIA_SEM_COR,
   CLASSES_BADGE_INSTANCIA,
@@ -668,6 +672,21 @@ function precisaAssumir(conv: WaConversa): boolean {
   return (conv.responsaveis ?? []).length === 0;
 }
 
+// O @ de "você foi mencionado numa nota desta conversa" — ao lado do número vermelho,
+// como no WhatsApp. Some quando a pessoa abre a conversa.
+function ArrobaDeMencao({ ativo }: { ativo: boolean }) {
+  if (!ativo) return null;
+  return (
+    <span
+      title="Você foi mencionado numa nota"
+      aria-label="Você foi mencionado numa nota"
+      className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground"
+    >
+      @
+    </span>
+  );
+}
+
 // Badge de não lidas. Quando a conversa está aberta (`ativa`) o contador não
 // zera mais sozinho — só some quando o usuário envia uma resposta — então aqui
 // trocamos o badge sólido por um contorno com ícone de olho, sinalizando que a
@@ -985,6 +1004,7 @@ function MeusChatsList({
   activeFiltrosCount,
   onLimparFiltros,
   currentUserId,
+  mencoesPorConversa,
 }: {
   conversas: WaConversa[];
   apelidoPorInstanciaId: Map<string, string>;
@@ -1002,6 +1022,8 @@ function MeusChatsList({
   hasFiltros: boolean;
   activeFiltrosCount: number;
   onLimparFiltros: () => void;
+  // O @ de menção não lida, por conversa — mesma fonte do badge da lista lateral.
+  mencoesPorConversa?: Record<string, number>;
 }) {
   // Mesmos filtros da visualização normal (Conversa/Período/Instância/
   // Responsável/status, vindos via props já aplicados em `conversas`) — só
@@ -1261,6 +1283,9 @@ function MeusChatsList({
                       </TableCell>
                       <TableCell className="px-4 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <ArrobaDeMencao
+                            ativo={(mencoesPorConversa?.[conv.id] ?? 0) > 0}
+                          />
                           <NaoLidasBadge
                             conv={conv}
                             ativa={false}
@@ -3062,7 +3087,14 @@ function LeadSheet({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs break-words text-foreground">
-              {linkifyText(n.conteudo)}
+              <TextoComMencoes
+                texto={n.conteudo}
+                nomes={(n.mencionados ?? []).map(
+                  (id) => vendedores.find((v) => v.id === id)?.nome ?? "",
+                ).filter(Boolean)}
+                todos={!!n.menciona_todos}
+                meuNome={profile?.nome}
+              />
             </p>
             <p className="text-[10px] text-amber-700/70 dark:text-amber-300/60">
               {format(new Date(n.created_at), "dd/MM/yyyy HH:mm", {
@@ -4447,6 +4479,34 @@ export default function WhatsAppInbox() {
   const [notaFixada, setNotaFixada] = useState(false);
   const setNotaFixadaMutation = useWaSetNotaFixada();
 
+  // Quem pode ser mencionado na nota: só quem atende o número E enxerga esta conversa.
+  // Quem decide é o banco (pessoas_mencionaveis_na_conversa), com a mesma regra da RLS.
+  const notaTextoRef = useRef<HTMLTextAreaElement>(null);
+  const {
+    data: mencionaveisDaNota = [],
+    isLoading: carregandoMencionaveisDaNota,
+    isError: erroAoCarregarMencionaveisDaNota,
+  } = useQuery({
+    queryKey: ["mencionaveis_da_conversa", conversaAtiva?.id],
+    enabled: novaNotaOpen && !!conversaAtiva?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("pessoas_mencionaveis_na_conversa", {
+        p_conversa_id: conversaAtiva!.id,
+      });
+      if (error) throw error;
+      return (data ?? []) as { id: string; nome: string; avatar_url: string | null }[];
+    },
+  });
+  const mencaoNota = useCampoComMencao({
+    texto: notaTexto,
+    setTexto: setNotaTexto,
+    pessoas: mencionaveisDaNota,
+    ativo: true,
+    totalDaConversa: mencionaveisDaNota.length,
+    ref: notaTextoRef,
+    conversaChave: conversaAtiva?.id ?? undefined,
+  });
+
   // --- Enviar contato (cartão vCard) ---
   const [enviarContatoOpen, setEnviarContatoOpen] = useState(false);
   // Aberto pelo botão "Salvar em Contatos" dentro de um cartão de contato recebido.
@@ -4460,16 +4520,20 @@ export default function WhatsAppInbox() {
       toast.error("Escreva o conteúdo da nota");
       return;
     }
+    const { ids, todos } = mencaoNota.paraEnviar(notaTexto.trim());
     try {
       await addNota.mutateAsync({
         conversaId: conversaAtiva.id,
         texto: notaTexto.trim(),
         fixada: notaFixada,
+        mencionados: ids,
+        mencionaTodos: todos,
       });
       toast.success("Nota adicionada");
       setNotaTexto("");
       setNotaFixada(false);
       setNovaNotaOpen(false);
+      mencaoNota.limpar();
     } catch (err: any) {
       toast.error(err?.message || "Erro ao adicionar nota");
     }
@@ -4719,6 +4783,15 @@ export default function WhatsAppInbox() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversaAtivaId, profile?.id]);
+  // O @ de "você foi mencionado numa nota desta conversa" — some assim que a pessoa
+  // abre a conversa que tinha o aviso.
+  const { data: mencoes } = useMencoesNaoLidas();
+  const marcarMencoesLidas = useMarcarMencoesLidas();
+  useEffect(() => {
+    if (!conversaAtivaId || !mencoes?.whatsapp[conversaAtivaId]) return;
+    marcarMencoesLidas.mutate({ origem: "whatsapp_nota", chave: conversaAtivaId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversaAtivaId, conversaAtivaId ? mencoes?.whatsapp[conversaAtivaId] : undefined]);
   const registrarVisualizacao = useWaRegistrarVisualizacao();
   // Conversa sem responsável: registra quem do time abriu, pra lista "Não
   // atribuídas" mostrar a pilha de quem já entrou e não assumiu (ver
@@ -6671,10 +6744,12 @@ export default function WhatsAppInbox() {
           {!modoSelecao &&
             (conv.ultima_mensagem_at ||
               conversaNaoLida(conv, profile?.id) ||
-              (conv.responsaveis ?? []).length > 0) && (
+              (conv.responsaveis ?? []).length > 0 ||
+              (mencoes?.whatsapp[conv.id] ?? 0) > 0) && (
               <div className="flex flex-col items-end gap-1 shrink-0">
                 <div className="flex items-center gap-1.5">
                   <ConversaParticipantesStack conv={conv} />
+                  <ArrobaDeMencao ativo={(mencoes?.whatsapp[conv.id] ?? 0) > 0} />
                   <NaoLidasBadge
                     conv={conv}
                     ativa={conversaAtiva?.id === conv.id}
@@ -6912,6 +6987,7 @@ export default function WhatsAppInbox() {
           conversas={conversasFiltradas}
           apelidoPorInstanciaId={apelidoPorInstanciaId}
           currentUserId={profile?.id}
+          mencoesPorConversa={mencoes?.whatsapp}
           onOpen={(id) => {
             setConversaAtivaId(id);
             setAbaInbox("conversas");
@@ -7019,6 +7095,15 @@ export default function WhatsAppInbox() {
                             : ""}
                         </span>
                       )}
+                      {!conversaNaoLida(conv, profile?.id) &&
+                        (mencoes?.whatsapp[conv.id] ?? 0) > 0 && (
+                          <span
+                            title="Você foi mencionado numa nota"
+                            className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-primary text-[7px] font-bold text-primary-foreground ring-1 ring-background"
+                          >
+                            @
+                          </span>
+                        )}
                     </div>
                   ))}
                 </div>
@@ -8601,7 +8686,16 @@ export default function WhatsAppInbox() {
                                                 : ""}
                                               :
                                             </span>{" "}
-                                            {linkifyText(msg.conteudo)}
+                                            <TextoComMencoes
+                                              texto={msg.conteudo}
+                                              nomes={(msg.mencionados ?? []).map(
+                                                (id) =>
+                                                  vendedores.find((v) => v.id === id)
+                                                    ?.nome ?? "",
+                                              ).filter(Boolean)}
+                                              todos={!!msg.menciona_todos}
+                                              meuNome={profile?.nome}
+                                            />
                                           </p>
                                         </div>
                                         <div className="flex items-center gap-1 mt-0.5 justify-center">
@@ -8830,7 +8924,14 @@ export default function WhatsAppInbox() {
                       <div key={n.id} className="flex items-start gap-2">
                         <StickyNote className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                         <p className="text-sm text-amber-900 dark:text-amber-200 flex-1 break-words">
-                          {linkifyText(n.conteudo)}
+                          <TextoComMencoes
+                            texto={n.conteudo}
+                            nomes={(n.mencionados ?? []).map(
+                              (id) => vendedores.find((v) => v.id === id)?.nome ?? "",
+                            ).filter(Boolean)}
+                            todos={!!n.menciona_todos}
+                            meuNome={profile?.nome}
+                          />
                           <span className="text-amber-700/70 dark:text-amber-300/60">
                             {" "}
                             ·{" "}
@@ -9679,11 +9780,35 @@ export default function WhatsAppInbox() {
             <Label htmlFor="nota-texto">Nota interna</Label>
             <Textarea
               id="nota-texto"
+              ref={notaTextoRef}
               rows={4}
               value={notaTexto}
-              onChange={(e) => setNotaTexto(e.target.value)}
-              placeholder="Visível só pra equipe — não é enviada ao contato"
+              onChange={mencaoNota.aoMudar}
+              onKeyDown={(e) => {
+                mencaoNota.aoTeclar(e);
+              }}
+              placeholder="Visível só pra equipe — não é enviada ao contato. Use @ para chamar alguém."
             />
+            {mencaoNota.aberta && (
+              <ListaDeMencao
+                consulta={mencaoNota.consulta}
+                sugestoes={mencaoNota.sugestoes}
+                ativa={mencaoNota.ativa}
+                onEscolher={mencaoNota.escolher}
+                mensagemVazia={
+                  // Enquanto carrega ou se falhar, a lista vazia NÃO significa "ninguém
+                  // atende este número" — só ainda não se sabe. A nota continua podendo
+                  // ser salva sem @ nos dois casos (decisão do dono do produto, 15/09/2026).
+                  carregandoMencionaveisDaNota
+                    ? "Carregando quem pode ser mencionado…"
+                    : erroAoCarregarMencionaveisDaNota
+                      ? "Não foi possível carregar a lista. Feche e abra a nota de novo."
+                      : conversaAtiva?.instancia_id
+                        ? "Ninguém com esse nome atende este número."
+                        : "Ninguém atende este número, então não há a quem mencionar."
+                }
+              />
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Checkbox

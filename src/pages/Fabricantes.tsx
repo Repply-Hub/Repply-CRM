@@ -29,7 +29,6 @@ import {
   useCriarContatosEmLote,
 } from "@/hooks/use-fabricante-contatos";
 import { rotuloDoCartao, type ContatoDaFabrica, type FuncaoDaFabrica } from "@/lib/contatos-da-fabrica";
-import { telefoneParaCadastro } from "@/lib/contato-da-conversa";
 import { useAuth } from "@/hooks/use-auth";
 // Criar, editar e excluir fabricante vêm todos do arquivo do domínio (CLAUDE.md §5.3).
 // `use-mutations.ts` teve um `useCreateFabricante` até 28/08/2026; ele foi removido de lá
@@ -47,16 +46,18 @@ import {
   fabricanteEstaAtivo,
 } from "@/lib/ordem-de-fabricantes";
 
-import { Plus, Loader2, CheckCircle2, Pencil, Trash2, Factory, Phone, User, ArrowLeft, Hash, X } from "lucide-react";
+import { Plus, Loader2, Pencil, Trash2, Factory, Phone, User, ArrowLeft, Hash, X } from "lucide-react";
 import { toast } from "sonner";
 
 import {
-  maskCnpj,
   unmaskCnpj,
-  isValidCnpjDigits,
-  fetchCnpjData,
   telefoneDaReceita,
+  formatarDocumento,
+  resultadoPermiteSalvar,
+  type CnpjData,
 } from "@/lib/cnpj";
+import { CampoCnpj, type CampoCnpjHandle } from "@/components/shared/CampoCnpj";
+import { CampoTelefones } from "@/components/shared/CampoTelefones";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -90,10 +91,16 @@ function FabricanteForm({
   const createFabricante = useCreateFabricante();
   const updateFabricante = useUpdateFabricante();
   const criarContatosEmLote = useCriarContatosEmLote();
-  const [cnpj, setCnpj] = useState(editData?.cnpj ?? "");
-  const [cnpjStatus, setCnpjStatus] = useState<
-    "idle" | "loading" | "valid" | "invalid"
-  >("idle");
+  const [cnpj, setCnpj] = useState(formatarDocumento(editData?.cnpj));
+  // Enquanto o Salvar espera a Receita (até 10 s), o botão fica travado: dois cliques criariam
+  // a fábrica duas vezes.
+  const [conferindo, setConferindo] = useState(false);
+  const campoCnpjRef = useRef<CampoCnpjHandle>(null);
+  // Sessão do modal: incrementa quando ele FECHA. Fechar (o "X") durante os até 10 s da
+  // conferência não desmonta este componente — o <Dialog> só esconde —, então sem isto o
+  // handleSubmit em andamento seguia até o fim mesmo com a pessoa já tendo desistido. Captura-se
+  // o número ANTES de esperar a Receita; se ele mudou depois, o modal fechou nesse meio-tempo.
+  const sessaoRef = useRef(0);
   const [nome, setNome] = useState(editData?.nome ?? "");
   const [telefone, setTelefone] = useState(editData?.telefone ?? "");
   // Fabricante novo nasce Ativa: quem cadastra uma marca é porque acabou de passar a
@@ -103,12 +110,9 @@ function FabricanteForm({
   // Contatos montados ANTES de a fábrica existir. Só usados no cadastro novo: na edição a
   // fábrica já tem identificador e cada gesto grava na hora.
   const [contatosPendentes, setContatosPendentes] = useState<ContatoEditavel[]>([]);
-  const sessionRef = useRef(0);
 
   const reset = () => {
-    sessionRef.current += 1;
     setCnpj("");
-    setCnpjStatus("idle");
     setNome("");
     setTelefone("");
     setAtivo(true);
@@ -117,9 +121,7 @@ function FabricanteForm({
 
   useEffect(() => {
     if (open) {
-      sessionRef.current += 1;
-      setCnpj(editData?.cnpj ?? "");
-      setCnpjStatus("idle");
+      setCnpj(formatarDocumento(editData?.cnpj));
       setNome(editData?.nome ?? "");
       setTelefone(editData?.telefone ?? "");
       setAtivo(fabricanteEstaAtivo(editData));
@@ -127,48 +129,50 @@ function FabricanteForm({
     }
   }, [open, editData]);
 
-  const handleCnpjBlur = async () => {
-    const digits = unmaskCnpj(cnpj);
-    if (digits.length !== 14) return;
-    if (!isValidCnpjDigits(digits)) {
-      setCnpjStatus("invalid");
-      toast.error("CNPJ inválido");
-      return;
-    }
-    const session = sessionRef.current;
-    setCnpjStatus("loading");
-    try {
-      const data = await fetchCnpjData(digits);
-      if (sessionRef.current !== session) return; // formulário foi fechado/reaberto enquanto a consulta rodava
-      setCnpjStatus("valid");
-      if (data.razao_social && !nome) setNome(data.razao_social);
-      // A Receita manda o telefone só em dígitos, com o DDD grudado ("2121660000"). Sem passar
-      // pelo formatador ele entrava cru no campo — ver `telefoneDaReceita` em src/lib/cnpj.ts.
-      const telefoneReceita = telefoneDaReceita(data);
-      if (telefoneReceita && !telefone) setTelefone(telefoneReceita);
-      toast.success("CNPJ validado!");
-    } catch {
-      if (sessionRef.current !== session) return;
-      setCnpjStatus("invalid");
-      toast.error("CNPJ não encontrado");
-    }
+  // A consulta à Receita mora no <CampoCnpj>, o único lugar do sistema que fala com ela
+  // (src/test/uma-consulta-de-cnpj-so.test.ts). Aqui fica só o que ESTA tela faz com os dados.
+  // Função de atualização, e não o valor da hora: a resposta chega até 10 s depois, e a pessoa
+  // pode ter digitado o nome nesse meio-tempo.
+  const preencherComDadosDaReceita = (data: CnpjData) => {
+    if (data.razao_social) setNome((atual) => atual || data.razao_social);
+    // A Receita manda o telefone só em dígitos, com o DDD grudado ("2121660000") — ver
+    // `telefoneDaReceita` em src/lib/cnpj.ts.
+    const telefoneReceita = telefoneDaReceita(data);
+    if (telefoneReceita) setTelefone((atual) => atual || telefoneReceita);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      unmaskCnpj(cnpj).length === 14 &&
-      !isValidCnpjDigits(unmaskCnpj(cnpj))
-    ) {
-      toast.error("CNPJ inválido");
-      return;
-    }
+    // 🔴 A regra da fábrica (decisão do dono do produto, 11/09/2026): CNPJ que a Receita CONFIRMA
+    // não existir não entra. Quem digita e clica em Salvar sem sair do campo não escapa — a
+    // consulta roda agora e o salvamento espera por ela. Serviço fora do ar não trava.
+    const sessaoDoEnvio = sessaoRef.current;
+    setConferindo(true);
+    const conferencia = await campoCnpjRef.current?.conferir();
+    // Só zera o cadeado desta MESMA sessão: se a pessoa fechou, reabriu e clicou em Salvar de
+    // novo, esta promessa velha (que só volta agora) não pode destravar a conferência NOVA que
+    // ainda está rodando — senão os dois cliques em Salvar criam a fábrica duas vezes. Fechar
+    // o modal já zera `conferindo` sozinho (no onOpenChange, ao lado do `sessaoRef.current += 1`).
+    if (sessaoDoEnvio === sessaoRef.current) setConferindo(false);
+    // A pessoa pode ter fechado o modal pelo "X" enquanto a Receita ainda respondia: sem esta
+    // guarda, o salvamento seguia sozinho e gravava a fábrica que ela desistiu de cadastrar.
+    if (sessaoDoEnvio !== sessaoRef.current) return;
+    if (conferencia && !resultadoPermiteSalvar(conferencia, "bloquear")) return;
+    const cnpjDigitos = unmaskCnpj(cnpj);
     try {
       if (editData) {
+        // Só grava o CNPJ quando a pessoa MEXEU nele — mesmo critério de `documentoMudou` em
+        // ClienteDetalhe.tsx (compara o texto mostrado, com máscara, não os dígitos). Sem isto,
+        // toda edição regravava `cnpjDigitos || null` mesmo sem tocar no campo, e as 11 fábricas
+        // com máscara perdiam a máscara só por trocar Ativa/Inativa.
+        const documentoMudou = cnpj !== formatarDocumento(editData.cnpj);
         await updateFabricante.mutateAsync({
           id: editData.id,
           nome,
-          cnpj: cnpj || undefined,
+          // `undefined` = ninguém mexeu, o banco fica como estava (inclusive o formato antigo).
+          // `null` = a pessoa apagou de propósito: `undefined` sumiria do pedido e o CNPJ antigo
+          // continuaria gravado.
+          cnpj: documentoMudou ? (cnpjDigitos || null) : undefined,
           // `nome_contato` NÃO vai mais: quem guarda pessoa agora é `fabricante_contatos`.
           // Não mandar preserva o que a coluna já tinha — apagá-la é o passo 2, em arquivo
           // próprio, depois deste site publicado.
@@ -185,7 +189,7 @@ function FabricanteForm({
       } else {
         const novoId = await createFabricante.mutateAsync({
           nome,
-          cnpj: cnpj || undefined,
+          cnpj: cnpjDigitos || undefined,
           telefone: telefone || undefined,
           ativo,
         });
@@ -241,7 +245,14 @@ function FabricanteForm({
       open={open}
       onOpenChange={(o) => {
         onOpenChange(o);
-        if (!o) reset();
+        if (!o) {
+          sessaoRef.current += 1;
+          // Sem isto o botão reabria preso em "Conferindo o CNPJ...": a promessa velha do
+          // handleSubmit só zera `conferindo` se a sessão ainda bater, e como acabamos de
+          // trocá-la, ela nunca mais vai bater. Reabrir precisa nascer destravado.
+          setConferindo(false);
+          reset();
+        }
       }}
     >
       <ConteudoDialogo className="sm:max-w-[425px]">
@@ -251,33 +262,14 @@ function FabricanteForm({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          <div>
-            <Label>CNPJ</Label>
-            <div className="relative">
-              <Input
-                value={cnpj}
-                onChange={(e) => {
-                  setCnpj(maskCnpj(e.target.value));
-                  setCnpjStatus("idle");
-                }}
-                onBlur={handleCnpjBlur}
-                placeholder="00.000.000/0000-00"
-                className={
-                  cnpjStatus === "invalid"
-                    ? "border-destructive"
-                    : cnpjStatus === "valid"
-                      ? "border-green-500"
-                      : ""
-                }
-              />
-              {cnpjStatus === "loading" && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-              )}
-              {cnpjStatus === "valid" && (
-                <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
-              )}
-            </div>
-          </div>
+          <CampoCnpj
+            ref={campoCnpjRef}
+            value={cnpj}
+            onChange={setCnpj}
+            onDadosEncontrados={preencherComDadosDaReceita}
+            seNaoExistir="bloquear"
+            valorJaGravado={editData?.cnpj}
+          />
           <div>
             <Label>Nome</Label>
             <Input
@@ -288,15 +280,9 @@ function FabricanteForm({
           </div>
           <div>
             <Label>Telefone</Label>
-            {/* Mesmo formatador dos contatos, ao SAIR do campo. Aqui o número é o da
-                FÁBRICA — a mesa da empresa, que a consulta de CNPJ preenche —, não a
-                linha de uma pessoa. */}
-            <Input
-              value={telefone}
-              onChange={(e) => setTelefone(e.target.value)}
-              onBlur={(e) => setTelefone(telefoneParaCadastro(e.target.value))}
-              placeholder="(00) 0000-0000"
-            />
+            {/* O número da FÁBRICA — a mesa da empresa, que a consulta de CNPJ preenche —, não a
+                linha de uma pessoa. Formata ao sair do campo, como todo telefone de cadastro. */}
+            <CampoTelefones value={telefone} onChange={setTelefone} placeholder="(00) 0000-0000" />
           </div>
           {/* Status Ativa/Inativa. É um interruptor e não uma lista de duas opções porque
               a pergunta é um fato do mundo — "eu represento esta marca?" —, tem resposta
@@ -338,8 +324,8 @@ function FabricanteForm({
             onPendentesChange={setContatosPendentes}
           />
 
-          <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? "Salvando..." : "Salvar"}
+          <Button type="submit" className="w-full" disabled={isPending || conferindo}>
+            {conferindo ? "Conferindo o CNPJ..." : isPending ? "Salvando..." : "Salvar"}
           </Button>
         </form>
       </ConteudoDialogo>
@@ -401,7 +387,7 @@ function FabricanteCard({
             {fab.cnpj && (
               <span className="text-xs text-muted-foreground flex items-center gap-1 truncate">
                 <Hash className="h-3 w-3 flex-shrink-0" />
-                {fab.cnpj}
+                {formatarDocumento(fab.cnpj)}
               </span>
             )}
           </div>
@@ -458,7 +444,7 @@ function FabricanteDetailHeader({
                 {fab.cnpj && (
                   <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
                     <Hash className="h-3.5 w-3.5" />
-                    {fab.cnpj}
+                    {formatarDocumento(fab.cnpj)}
                   </span>
                 )}
                 {rotuloDoCartao(contatos, funcoes) && (

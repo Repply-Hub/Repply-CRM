@@ -29,7 +29,7 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'calendario', path: '/calendario', label: 'Calendário', icon: 'CalendarDays', visible: true },
   { id: 'tarefas', path: '/tarefas', label: 'Tarefas', icon: 'ClipboardList', visible: true },
   { id: 'chat', path: '/chat', label: 'Chat', icon: 'MessageSquare', visible: true },
-  { id: 'whatsapp', path: '/whatsapp', label: 'WhatsApp', icon: 'MessageCircle', visible: true },
+  { id: 'whatsapp', path: '/whatsapp', label: 'WhatsApp', icon: 'WhatsApp', visible: true },
   { id: 'emails', path: '/emails', label: 'E-mails', icon: 'Mail', visible: true },
   { id: 'configuracoes', path: '/configuracoes', label: 'Configurações', icon: 'Settings', visible: true },
 
@@ -43,10 +43,16 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
 // de antes da remoção — filtrados ao carregar para que sumam do menu de todo mundo.
 const REMOVED_IDS = new Set(['pedidos', 'portal_consultas', 'importacoes_ignoradas', 'historico']);
 
-function fixChatWhatsappIcons(list: SidebarItem[]): SidebarItem[] {
+// Exportada para o teste de normalização (ver use-sidebar-preferences.test.ts):
+// quem já salvou a sidebar com o ícone antigo (`MessageCircle`, genérico)
+// precisa receber o símbolo novo do WhatsApp (`WhatsApp`, ver
+// `sidebar-icons.ts`) sem precisar salvar de novo — dono do produto,
+// 14/09/2026. Mesmo mecanismo de sempre: reescreve na LEITURA, então
+// alcança quem já tinha o item salvo de antes.
+export function fixChatWhatsappIcons(list: SidebarItem[]): SidebarItem[] {
   return list.map(i => {
     if (i.id === 'chat') return { ...i, icon: 'MessageSquare' };
-    if (i.id === 'whatsapp') return { ...i, icon: 'MessageCircle' };
+    if (i.id === 'whatsapp') return { ...i, icon: 'WhatsApp' };
     return i;
   });
 }

@@ -45,4 +45,11 @@ describe('montarSelectDeNegocios', () => {
     expect(so_cliente).toContain('fabricante:fabricantes(');
     expect(so_cliente).not.toContain('fabricante:fabricantes!inner(');
   });
+
+  // A cópia de um negócio (docs/superpowers/specs/2026-09-12-duplicar-negocio-design.md) leva a
+  // origem do lead. Era o único campo dela que este select não trazia — e a falta seria
+  // silenciosa: a cópia abriria com a origem em branco e ninguém saberia dizer por quê.
+  it('traz a origem do lead, que a cópia do negócio leva', () => {
+    expect(montarSelectDeNegocios()).toContain('origem_lead');
+  });
 });

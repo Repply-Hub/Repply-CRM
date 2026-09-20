@@ -3,10 +3,46 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { DiferencaDaRota } from '@/lib/rota-em-edicao';
 import type { PeriodoDoCalendario } from '@/lib/periodo-do-calendario';
+import { contatoApareceNoCalendario } from '@/lib/contato-no-calendario';
 import { useAuth } from './use-auth';
+import { useCreateTarefa } from './use-tarefas';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
+import type { EspecificacaoDeTarefa } from '@/lib/rota-tarefas';
 import type { CalendarEvent, CalendarType, EventoForm } from '@/components/calendar/types';
 import { CALENDAR_COLORS } from '@/components/calendar/types';
 import { normalizarLembretes } from '@/lib/lembretes-do-evento';
+
+/**
+ * Cria as tarefas do próximo passo de uma rota, DEPOIS de a rota já ter gravado, DENTRO da
+ * mutação — assim `isPending` cobre a criação inteira e o botão Salvar continua travado até o
+ * fim (sem a janela de duplo-clique que duplicaria a rota). A falha de uma tarefa NÃO derruba a
+ * rota já salva: conta as falhas e devolve uma frase com o motivo real (`mensagemDeErro`), ou
+ * `null` quando todas nasceram. Mesmo espírito da Tarefa 7a no painel da obra.
+ */
+async function criarTarefasDoProximoPasso(
+  criarTarefa: ReturnType<typeof useCreateTarefa>,
+  tarefas: EspecificacaoDeTarefa[],
+): Promise<string | null> {
+  let falhas = 0;
+  let primeiroMotivo = '';
+  for (const tarefa of tarefas) {
+    try {
+      await criarTarefa.mutateAsync(tarefa);
+    } catch (e) {
+      falhas += 1;
+      if (!primeiroMotivo) primeiroMotivo = mensagemDeErro(e, '');
+    }
+  }
+  if (falhas === 0) return null;
+  const oQue =
+    falhas === 1
+      ? 'a tarefa do próximo passo não foi criada'
+      : `${falhas} tarefas do próximo passo não foram criadas`;
+  const acao = falhas === 1 ? 'Crie-a pela tela de Tarefas.' : 'Crie-as pela tela de Tarefas.';
+  return primeiroMotivo
+    ? `A rota foi salva, mas ${oQue}: ${primeiroMotivo}. ${acao}`
+    : `A rota foi salva, mas ${oQue}. ${acao}`;
+}
 
 // Estrutura local para mapear a row do banco
 interface EventoRow {
@@ -202,6 +238,9 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>, periodo: 
       // Próximos contatos
       (contatos as unknown as ContatoCalendario[])?.forEach((c) => {
         if (!c.proximo_contato_em) return;
+        // O "Retomar depois" (tipo='retorno') não vira mais marcador no calendário — só
+        // sincroniza com Tarefas. A coluna segue gravada (é o que devolve o negócio à pauta).
+        if (!contatoApareceNoCalendario(c.tipo)) return;
         const start = new Date(c.proximo_contato_em);
         const end = new Date(start.getTime() + 30 * 60 * 1000);
         result.push({
@@ -301,6 +340,18 @@ export interface ParadaRotaVisita {
   obraId: string;
   nomeObra: string;
   observacao?: string;
+  /**
+   * As cinco respostas da visita concluída (fase, concorrente, contato, próximo passo e a data
+   * dele) — mesma regra da `observacao` acima: só chegam preenchidas quando a rota nasce
+   * `jaRealizada`. `NovaRotaVisitaDialog.tsx` já manda `undefined` para as duas quando a rota
+   * ainda não aconteceu, e é isso que faz uma parada nova gravar as cinco colunas como nulo,
+   * igual sempre foi.
+   */
+  visitaFase?: string | null;
+  visitaConcorrentes?: string | null;
+  visitaContatoId?: string | null;
+  visitaProximoPasso?: string | null;
+  visitaProximoPassoEm?: string | null;
   horario: string; // HH:mm — cada parada tem seu próprio horário, editado à mão
 }
 
@@ -397,6 +448,7 @@ export async function buscarConflitosDeVisita({
 export function useCreateRotaVisita() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const criarTarefa = useCreateTarefa();
 
   return useMutation({
     mutationFn: async ({
@@ -406,6 +458,7 @@ export function useCreateRotaVisita() {
       jaRealizada,
       participantes,
       titulo,
+      tarefasDoProximoPasso,
     }: {
       data: string; // yyyy-MM-dd
       duracaoMinutos?: number;
@@ -415,6 +468,13 @@ export function useCreateRotaVisita() {
       participantes?: string[];
       /** Título livre da rota. Vazio = a tela mostra só a data, como antes de 28/08/2026. */
       titulo?: string | null;
+      /**
+       * As tarefas do próximo passo a criar DEPOIS de gravar a rota — já decididas por
+       * `tarefasDaRotaConcluida` na tela (só as paradas que passam a realizadas, com data e a
+       * caixinha marcada). Criadas aqui dentro, e não no `onSuccess` da tela, para o botão Salvar
+       * ficar travado (`isPending`) até o fim — senão um duplo-clique duplicaria a rota.
+       */
+      tarefasDoProximoPasso?: EspecificacaoDeTarefa[];
     }) => {
       if (paradas.length === 0) {
         throw new Error('Selecione ao menos uma obra para a rota de visita.');
@@ -463,16 +523,30 @@ export function useCreateRotaVisita() {
           rota_titulo: rotaTitulo,
           visita_realizada: jaRealizada,
           visita_observacao: parada.observacao || null,
+          // Mesmo caminho de `visita_observacao`: `parada.visitaX` só vem preenchido quando a
+          // rota nasce `jaRealizada` (o diálogo manda `undefined` nas outras cinco quando não),
+          // então `|| null` grava nulo em qualquer rota que ainda não aconteceu — igual hoje.
+          visita_fase: parada.visitaFase || null,
+          visita_concorrentes: parada.visitaConcorrentes || null,
+          visita_contato_id: parada.visitaContatoId || null,
+          visita_proximo_passo: parada.visitaProximoPasso || null,
+          visita_proximo_passo_em: parada.visitaProximoPassoEm || null,
         }));
       });
 
       const { error } = await supabase.from('eventos').insert(rows);
       if (error) throw error;
+
+      // A rota já está gravada. As tarefas do próximo passo são consequência: a falha delas não
+      // derruba a rota. Ver `criarTarefasDoProximoPasso`.
+      const avisoDaTarefa = await criarTarefasDoProximoPasso(criarTarefa, tarefasDoProximoPasso ?? []);
+      return { avisoDaTarefa };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['eventos'] });
       qc.invalidateQueries({ queryKey: ['obra_visitas'] });
       qc.invalidateQueries({ queryKey: ['obra_visitas_todas'] });
+      qc.invalidateQueries({ queryKey: ['tarefas'] });
     },
   });
 }
@@ -501,6 +575,7 @@ export function useCreateRotaVisita() {
 export function useEditarRotaDeVisita() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const criarTarefa = useCreateTarefa();
 
   return useMutation({
     mutationFn: async ({
@@ -511,12 +586,19 @@ export function useEditarRotaDeVisita() {
       titulo,
       tituloOriginal,
       gruposDaRota,
+      tarefasDoProximoPasso,
     }: {
       diferenca: DiferencaDaRota;
       /** user_ids (auth) das paradas NOVAS. Vazio cai para o próprio criador. */
       participantes?: string[];
       /** Para montar o título das paradas novas ("Visita: <obra>"). */
       nomeDaObraPorId: (obraId: string) => string;
+      /**
+       * As tarefas do próximo passo a criar DEPOIS de gravar a edição — já decididas por
+       * `tarefasDaRotaConcluida` na tela (só as paradas que PASSAM a realizadas nesta edição).
+       * Criadas aqui dentro para o `isPending` cobrir tudo e o botão Salvar não reabrir no meio.
+       */
+      tarefasDoProximoPasso?: EspecificacaoDeTarefa[];
       /**
        * A identidade da rota que está sendo editada. Nula quando a rota é anterior a
        * 28/08/2026 — nesse caso uma identidade é criada agora e gravada em todas as paradas.
@@ -539,7 +621,10 @@ export function useEditarRotaDeVisita() {
       const rotaIdEfetivo = rotaId ?? crypto.randomUUID();
       const precisaCarimbar = !rotaId || tituloMudou;
 
-      if (diferenca.semMudanca && !tituloMudou) return { mudou: false as const };
+      // Nada mudou na rota: também não há transição para realizada, logo nenhuma tarefa. O
+      // `avisoDaTarefa: null` mantém a mesma forma de retorno dos dois caminhos.
+      if (diferenca.semMudanca && !tituloMudou)
+        return { mudou: false as const, avisoDaTarefa: null as string | null };
 
       const alvos = new Set<string>(
         participantes && participantes.length > 0 ? participantes : [user!.id],
@@ -597,6 +682,26 @@ export function useEditarRotaDeVisita() {
         if (parada.visitaObservacao !== undefined) {
           camposDaParada.visita_observacao = parada.visitaObservacao || null;
         }
+        // As cinco respostas da visita concluída (16/09/2026) seguem o MESMO mecanismo:
+        // `diferencaDaRota` só as põe em `parada` quando mudaram, e o `if` aqui só escreve a
+        // chave que veio. Engordar isto para um objeto que sempre carrega as cinco apagaria a
+        // resposta de toda parada que ninguém tocou nesta edição — o mesmo risco que
+        // `visitaObservacao` corre, um comentário acima.
+        if (parada.visitaFase !== undefined) {
+          camposDaParada.visita_fase = parada.visitaFase || null;
+        }
+        if (parada.visitaConcorrentes !== undefined) {
+          camposDaParada.visita_concorrentes = parada.visitaConcorrentes || null;
+        }
+        if (parada.visitaContatoId !== undefined) {
+          camposDaParada.visita_contato_id = parada.visitaContatoId || null;
+        }
+        if (parada.visitaProximoPasso !== undefined) {
+          camposDaParada.visita_proximo_passo = parada.visitaProximoPasso || null;
+        }
+        if (parada.visitaProximoPassoEm !== undefined) {
+          camposDaParada.visita_proximo_passo_em = parada.visitaProximoPassoEm || null;
+        }
 
         const { error } = await supabase
           .from('eventos')
@@ -634,17 +739,23 @@ export function useEditarRotaDeVisita() {
         if (error) throw error;
       }
 
+      // A rota já gravou. As tarefas do próximo passo (só das paradas que passaram a realizadas)
+      // nascem aqui dentro, e a falha delas não derruba a edição. Ver `criarTarefasDoProximoPasso`.
+      const avisoDaTarefa = await criarTarefasDoProximoPasso(criarTarefa, tarefasDoProximoPasso ?? []);
+
       return {
         mudou: true as const,
         inseridas: diferenca.inserir.length,
         alteradas: diferenca.alterar.length,
         removidas: diferenca.remover.length,
+        avisoDaTarefa,
       };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['eventos'] });
       qc.invalidateQueries({ queryKey: ['obra_visitas'] });
       qc.invalidateQueries({ queryKey: ['obra_visitas_todas'] });
+      qc.invalidateQueries({ queryKey: ['tarefas'] });
     },
   });
 }

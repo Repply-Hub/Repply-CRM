@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Check, Clock, Sun } from 'lucide-react';
+import { ArrowDown, Check, Clock, Sun } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,11 +10,14 @@ import { formatarMoedaBRL } from '@/lib/moeda';
 import { cn } from '@/lib/utils';
 import { vozDaPauta } from '@/lib/voz-da-pauta';
 import { separarAPauta } from '@/lib/pauta-do-dia';
+import { fraseDoAvisoDaTabela } from '@/lib/aviso-da-tabela';
+import { responsavelParaODialogo } from '@/lib/responsavel-para-o-dialogo';
 import { useAuth } from '@/hooks/use-auth';
 import { useConfiguracoesAutomacao, PADROES_DA_PAUTA } from '@/hooks/use-configuracoes-automacao';
 import { usePossoVerPautaDeTodos } from '@/hooks/use-minha-permissao';
 import { usePauta, type ItemDaPauta } from '@/hooks/use-pauta';
 import { DialogoRetorno } from '@/components/pauta/DialogoRetorno';
+import { EtiquetaDeTentativa } from '@/components/pauta/EtiquetaDeTentativa';
 import { RadarDeRisco } from '@/components/pauta/RadarDeRisco';
 import { PainelDoNegocio } from '@/components/pedidos/PainelDoNegocio';
 import { useNegocioNoEndereco } from '@/hooks/use-negocio-no-endereco';
@@ -41,6 +44,30 @@ import {
  * é a MESMA que alimenta o e-mail de resumo. Ver docs/operacao/plano-pauta-do-dia.md.
  */
 
+/**
+ * O AVISO DA PAUTA VAZIA — pedido de 14/09/2026: quando a pauta está vazia, apontar para a tabela
+ * logo abaixo, com um botão que desce até ela (a âncora `#tabela-do-time` é da `TabelaDoTime`).
+ * Sem negócio na tabela, não aparece nada.
+ */
+function AvisoDaTabela({ total, podeVerDeTodos }: { total: number; podeVerDeTodos: boolean }) {
+  const frase = fraseDoAvisoDaTabela(total, podeVerDeTodos);
+  if (!frase) return null;
+  return (
+    <div className="mt-2 flex max-w-xl flex-wrap items-center justify-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+      <ArrowDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <span className="text-sm text-card-foreground">{frase}</span>
+      <Button
+        size="sm"
+        onClick={() =>
+          document.getElementById('tabela-do-time')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      >
+        Ver a tabela
+      </Button>
+    </div>
+  );
+}
+
 function ItemPauta({
   item,
   larguraInteira,
@@ -65,16 +92,24 @@ function ItemPauta({
     >
       <div className="min-w-0 flex-1">
         <div className="mb-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <span
-            className={cn(
-              'rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
-              ehCompromisso
-                ? 'bg-muted text-muted-foreground'
-                : 'bg-destructive/10 text-destructive',
-            )}
-          >
-            {item.selo}
-          </span>
+          {/* 🔴 A ETIQUETA DE TENTATIVA SUBSTITUI O SELO "Orçamento parado" — pedido de
+              15/09/2026. Um negócio já cobrado várias vezes não está "parado", e é o que mais pede
+              atenção. Só para negócio (compromisso mantém o selo "Hoje"), e só a partir da 1ª
+              retomada; sem retomada, continua o selo que o banco mandou. */}
+          {!ehCompromisso && (item.tentativas ?? 0) > 0 ? (
+            <EtiquetaDeTentativa tentativas={item.tentativas as number} />
+          ) : (
+            <span
+              className={cn(
+                'rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
+                ehCompromisso
+                  ? 'bg-muted text-muted-foreground'
+                  : 'bg-destructive/10 text-destructive',
+              )}
+            >
+              {item.selo}
+            </span>
+          )}
           {item.valor !== null && (
             <span className="font-mono text-xs tabular-nums text-muted-foreground">
               {formatarMoedaBRL(item.valor)}
@@ -231,19 +266,18 @@ const Hoje = () => {
    * contra "o negócio volta para a sua pauta"). Repassar o nome cru faria o diálogo avisar a
    * pessoa sobre ela mesma toda vez que ela adiasse um negócio seu.
    *
-   * Por isso a comparação com o próprio nome. O que a tabela devolve é `usuarios.nome`, a MESMA
-   * coluna de onde sai `profile.nome` — não é um apelido nem um e-mail. Dois colegas homônimos na
-   * mesma empresa fariam esta linha errar para o lado brando (o diálogo trataria o negócio do
-   * colega como se fosse seu); é texto, não permissão — quem decide se o gesto pode acontecer é
-   * `registrar_retorno` no servidor, e o aviso ao dono sai de lá do mesmo jeito.
+   * Por isso a pergunta "é meu?", que desde 14/09/2026 compara o IDENTIFICADOR do dono com o de
+   * quem está logado — `responsavelParaODialogo` (`src/lib/responsavel-para-o-dialogo.ts`).
+   * Comparando nomes, dois homônimos faziam o diálogo prometer "volta para a sua pauta" sobre o
+   * negócio do colega (item 69 da dívida técnica). Sem identificador, cai no nome, como antes.
+   * Mas isto é só o TEXTO do diálogo — não é a permissão. Quem decide se o gesto pode mesmo
+   * acontecer, e quem de fato recebe a tarefa e o aviso, é `registrar_retorno` no servidor.
    */
   function aoRetomarDaTabela(linha: NegocioEmRisco) {
-    const dono = (linha.responsavel ?? '').trim();
-    const euMesmo = dono.toLowerCase() === (profile?.nome ?? '').trim().toLowerCase();
     setAlvo({
       pedidoId: linha.id,
       titulo: linha.nome,
-      responsavel: !dono || euMesmo ? null : dono,
+      responsavel: responsavelParaODialogo(linha, profile),
     });
   }
 
@@ -340,6 +374,9 @@ const Hoje = () => {
                 ? 'O negócio do dia recebeu retorno. A pauta de amanhã nasce de manhã.'
                 : `Os ${negociosDoDia} negócios do dia receberam retorno. A pauta de amanhã nasce de manhã.`}
             </p>
+            {/* Só com a tabela de baixo RESPONDIDA: apontar para uma tabela que ainda carrega, ou que
+                deu erro, seria prometer uma lista que a pessoa não vai encontrar. */}
+            {timeRespondeu && <AvisoDaTabela total={totalDoTime} podeVerDeTodos={podeVerDeTodos} />}
           </div>
         ) : filaVaziaEComemora ? (
           // O vazio COMEMORA. É o dia em que a pessoa terminou — e é exatamente o momento
@@ -363,11 +400,12 @@ const Hoje = () => {
           <div className="flex flex-col items-center gap-2 py-14 text-center">
             <h2 className="text-xl font-semibold text-card-foreground">Sua fila está vazia</h2>
             <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-              Nada seu passou do prazo e não há compromisso na agenda de hoje.{' '}
-              {totalDoTime > 0
-                ? `O que pede atenção está na tabela logo abaixo — ${totalDoTime} ${totalDoTime === 1 ? 'negócio' : 'negócios'}.`
-                : 'O que pede atenção está na tabela logo abaixo.'}
+              Nada seu passou do prazo e não há compromisso na agenda de hoje.
             </p>
+            {/* O aviso com botão substitui a frase corrida que dizia a mesma coisa e passava batida
+                (pedido de 14/09/2026). Sem resposta da tabela, não há aviso — pelo mesmo motivo do
+                estado de cima. */}
+            {timeRespondeu && <AvisoDaTabela total={totalDoTime} podeVerDeTodos={podeVerDeTodos} />}
           </div>
         ) : (
           <>

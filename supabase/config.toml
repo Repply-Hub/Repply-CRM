@@ -46,10 +46,12 @@ verify_jwt = false
 verify_jwt = false
 
 # Atende dois chamadores com credenciais diferentes: o pg_cron com service_role
-# e o navegador com JWT de usuário. A distinção é feita dentro da função, que
-# recusa quem não apresentar nenhuma das duas.
+# e o navegador com JWT de usuário. `verify_jwt = true` deixa o GATEWAY conferir
+# a assinatura dos dois; a função só decide qual dos dois é (papelDoToken), sem
+# comparar o texto da chave — comparação por igualdade quebrou em produção
+# quando a chave do cofre deixou de ser idêntica à variável de ambiente.
 [functions.email-sync]
-verify_jwt = false
+verify_jwt = true
 
 # email-conectar, email-enviar, email-desconectar, email-mensagem e
 # email-marcar-lido NÃO entram aqui — exigem sessão do usuário.

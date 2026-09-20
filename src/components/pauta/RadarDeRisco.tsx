@@ -9,6 +9,7 @@ import { formatarMoedaBRL } from '@/lib/moeda';
 import { useDashboardNegociosRisco, type NegocioEmRisco } from '@/hooks/use-dashboard';
 import { BarraDeFiltros } from '@/components/pauta/BarraDeFiltros';
 import { TabelaDoTime } from '@/components/pauta/TabelaDoTime';
+import { AgendadosParaRetornar } from '@/components/pauta/AgendadosParaRetornar';
 import { MOLDURA_DA_PAUTA } from '@/components/pauta/moldura-da-pauta';
 import { recorteParaOServidor, type FiltrosDoPainel } from '@/lib/filtros-do-painel';
 
@@ -23,18 +24,21 @@ import { recorteParaOServidor, type FiltrosDoPainel } from '@/lib/filtros-do-pai
  * foi textual de propósito. A definição de cada condição vive na função de banco
  * `dashboard_negocios_risco` (migration 20260824220000).
  *
- * SEM FILTRO DE PERÍODO, e isso é deliberado: um negócio aberto criado há meses continua
- * sendo risco hoje. Filtrar por data de criação ou de fechamento esconderia justamente os
- * mais antigos parados, que são os que mais importa achar. Ver o comentário de
- * `useDashboardNegociosRisco`.
+ * SEM FILTRO DE PERÍODO POR PADRÃO, e isso é deliberado: um negócio aberto criado há meses
+ * continua sendo risco hoje, e recortar por data esconderia justamente os mais antigos parados,
+ * que são os que mais importa achar. Desde 15/09/2026 há um filtro de período OPCIONAL, que nasce
+ * desligado (`PeriodoDoPainel`): só quando a pessoa escolhe um período o bloco recorta, por data de
+ * CRIAÇÃO (`data_pedido`) — nunca de fechamento, que para negócio aberto é um chute (§4.4). Ver o
+ * comentário de `useDashboardNegociosRisco`.
  */
 
 // Recharts quebra o texto do tick em várias linhas quando ele não cabe na largura reservada
 // pro eixo — tick em SVG puro (sem a prop `width`, que é o que dispara o word-wrap) e a
 // largura do eixo calculada a partir do nome mais longo.
 // Os nomes na cor do texto principal, e não no cinza secundário: são o que se lê primeiro no
-// gráfico. A grade e o eixo de valores continuam em `commonAxisProps`/`commonGridProps`, que são
-// compartilhados com o Dashboard — mexer lá mudaria aquela tela também.
+// gráfico. Desde 14/09/2026 a grade e os valores do eixo também ganham a força do tema — trocados
+// só no gráfico daqui, porque `commonAxisProps`/`commonGridProps` são compartilhados com o
+// Dashboard e mexer lá mudaria aquela tela também.
 const renderVendedorTick = ({ x, y, payload }: { x: number; y: number; payload: { value: string } }) => (
   <text x={x} y={y} dy={4} textAnchor="end" fontSize={11} fill="hsl(var(--card-foreground))">
     {payload?.value ?? ''}
@@ -134,7 +138,10 @@ export function RadarDeRisco({
             "Resumo por fabricante" abaixo já mostram só os negócios da pessoa — manter "empresa
             inteira" aqui em cima seria anunciar um número que os cartões não mostram mais. */}
         <p className="text-sm text-muted-foreground">
-          {podeFiltrarPorResponsavel ? 'A carteira da empresa inteira.' : 'A sua carteira.'} É a foto de agora — não depende de período.
+          {podeFiltrarPorResponsavel ? 'A carteira da empresa inteira.' : 'A sua carteira.'}{' '}
+          {filtros.dataDe && filtros.dataAte
+            ? 'No período escolhido, por data de criação.'
+            : 'É a foto de agora — não depende de período.'}
         </p>
       </header>
 
@@ -148,15 +155,15 @@ export function RadarDeRisco({
     {/* Radar de Risco — negócios ABERTOS (nem ganhos nem perdidos) parados ou sem
         próxima ação agendada. Ver useDashboardNegociosRisco e a migration
         20260824220000_dashboard_negocios_risco.sql para a definição exata de cada
-        condição. Sem filtro de Período de propósito: um negócio antigo parado
-        continua sendo risco hoje mesmo fora da janela de data escolhida no topo. */}
+        condição. Sem período escolhido na barra, mostra tudo — inclusive os parados antigos;
+        com um período, recorta por data de criação (`data_pedido`). */}
     <div className="mt-5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
         <Card className={MOLDURA_DA_PAUTA}>
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1.5">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Negócios Parados</p>
+                <p className="text-xs font-semibold text-card-foreground">Negócios Parados</p>
                 <p className="text-2xl font-extrabold text-card-foreground tracking-tight">{risco.qtdParados}</p>
                 <span className="text-xs font-semibold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.1)]">
                   {formatCurrency(risco.valorParados)}
@@ -172,7 +179,7 @@ export function RadarDeRisco({
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1.5">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Sem Próxima Ação</p>
+                <p className="text-xs font-semibold text-card-foreground">Sem Próxima Ação</p>
                 <p className="text-2xl font-extrabold text-card-foreground tracking-tight">{risco.qtdSemProximaAcao}</p>
                 <span className="text-xs font-semibold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[hsl(var(--warning))] bg-[hsl(var(--warning)/0.1)]">
                   {formatCurrency(risco.valorSemProximaAcao)}
@@ -192,7 +199,7 @@ export function RadarDeRisco({
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1.5">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Valor em Risco</p>
+                <p className="text-xs font-semibold text-card-foreground">Valor em Risco</p>
                 <p className="text-2xl font-extrabold text-card-foreground tracking-tight">{formatCurrency(risco.valorRiscoTotal)}</p>
                 {/* Valor ÚNICO — negócio que é parado E sem próxima ação entra uma vez só.
                     Sem contagem aqui de propósito: qtdParados + qtdSemProximaAcao contaria
@@ -248,8 +255,13 @@ export function RadarDeRisco({
                       <stop offset="100%" stopColor={chartColors.warning} stopOpacity={1} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid {...commonGridProps} vertical horizontal={false} />
-                  <XAxis type="number" {...commonAxisProps} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                  <CartesianGrid {...commonGridProps} stroke="hsl(var(--border))" vertical horizontal={false} />
+                  <XAxis
+                    type="number"
+                    {...commonAxisProps}
+                    tick={{ ...commonAxisProps.tick, fill: 'hsl(var(--card-foreground))' }}
+                    tickFormatter={v => `${(v / 1000).toFixed(0)}k`}
+                  />
                   <YAxis dataKey="vendedor" type="category" {...commonAxisProps} width={riscoVendedorAxisWidth} tick={renderVendedorTick} interval={0} />
                   <Tooltip content={<ChartTooltip formatValue={formatCurrency} />} />
                   <Bar
@@ -283,7 +295,8 @@ export function RadarDeRisco({
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-muted text-[11px] uppercase tracking-wider text-muted-foreground">
+                    {/* A mesma faixa da tabela do time: contraste do dashboard de referência. */}
+                    <tr className="bg-foreground/[0.06] text-xs text-card-foreground">
                       <th className="px-3 py-2 text-left font-semibold">Fabricante</th>
                       <th className="px-3 py-2 text-right font-semibold">Negócios</th>
                       <th className="px-3 py-2 text-right font-semibold">Valor</th>
@@ -304,6 +317,16 @@ export function RadarDeRisco({
           </CardContent>
         </Card>
       </div>
+
+      {/* A faixa "Agendados para retornar", no FIM do Radar (pedido do dono do produto, 17/09):
+          os negócios adiados por "Retomar depois", recolhidos numa sanfona. É o outro lado da
+          moeda de "pedem atenção". Mesmo recorte e mesmo `onAbrir` da tabela do time. */}
+      <AgendadosParaRetornar
+        empresaId={empresaId}
+        filtros={recorte}
+        podeVerDeTodos={podeFiltrarPorResponsavel}
+        onAbrir={onAbrirNegocio}
+      />
     </div>
     </section>
   );

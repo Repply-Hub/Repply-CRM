@@ -15,6 +15,7 @@ import { SECOES } from '@/lib/secoes';
 import { SidebarAddItemDialog } from '@/components/layout/SidebarAddItemDialog';
 import { SidebarFavicon } from '@/components/layout/SidebarFavicon';
 import { useUnreadEmails, useUnreadChatMessages, useUnreadWaMessages } from '@/hooks/use-notificacoes';
+import { useAvisoDeMencao, useMencoesNaoLidas } from '@/hooks/use-mencoes';
 import logoSidebar from '@/assets/logo-sidebar.svg';
 import { toast } from 'sonner';
 import {
@@ -101,6 +102,10 @@ export function AppSidebar() {
   const { data: unreadEmails = 0 } = useUnreadEmails();
   const { data: unreadChat = 0 } = useUnreadChatMessages();
   const { data: unreadWa = 0 } = useUnreadWaMessages();
+  const { data: mencoes } = useMencoesNaoLidas();
+  // Montado aqui porque o menu está em toda tela: é o que garante o aviso de menção
+  // mesmo com o chat e o WhatsApp fechados. UMA vez só.
+  useAvisoDeMencao();
 
   const { items, save, isSaving } = useSidebarPreferences();
   const { profile } = useAuth();
@@ -418,6 +423,9 @@ export function AppSidebar() {
                     const Icon = getIconComponent(item.icon);
                     const showBadge = (item.id === 'emails' && unreadEmails > 0) || (item.id === 'chat' && unreadChat > 0) || (item.id === 'whatsapp' && unreadWa > 0);
                     const badgeCount = item.id === 'emails' ? unreadEmails : item.id === 'whatsapp' ? unreadWa : unreadChat;
+                    const temArroba =
+                      (item.id === 'chat' && (mencoes?.totalChat ?? 0) > 0) ||
+                      (item.id === 'whatsapp' && (mencoes?.totalWhatsapp ?? 0) > 0);
 
                     const iconEl = (
                       <div className="relative">
@@ -426,7 +434,7 @@ export function AppSidebar() {
                         ) : (
                           Icon && <Icon className="h-4 w-4 shrink-0" />
                         )}
-                        {showBadge && collapsed && (
+                        {(showBadge || temArroba) && collapsed && (
                           <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive animate-pulse border-2 border-sidebar shadow-sm" />
                         )}
                       </div>
@@ -434,8 +442,17 @@ export function AppSidebar() {
                     const labelEl = !collapsed && (
                       <div className="flex items-center justify-between flex-1 min-w-0">
                         <span className="text-[13px] truncate">{item.label}</span>
+                        {temArroba && (
+                          <span
+                            title="Você foi mencionado"
+                            aria-label="Você foi mencionado"
+                            className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground"
+                          >
+                            @
+                          </span>
+                        )}
                         {showBadge && (
-                          <span className="ml-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
+                          <span className="ml-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground animate-in zoom-in-50 duration-300">
                             {badgeCount > 99 ? '99+' : badgeCount}
                           </span>
                         )}

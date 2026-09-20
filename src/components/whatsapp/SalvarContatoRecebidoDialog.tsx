@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, UserPlus } from "lucide-react";
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
+import { CampoTelefones } from "@/components/shared/CampoTelefones";
 import { useClientes } from "@/hooks/use-clientes";
 import { useCreateContato } from "@/hooks/use-mutations";
 import { mensagemDeErro } from "@/lib/mensagem-de-erro";
@@ -87,7 +88,7 @@ export function SalvarContatoRecebidoDialog({
           </div>
           <div className="space-y-1.5">
             <Label>Telefone</Label>
-            <Input value={telefone} onChange={(e) => setTelefone(e.target.value)} />
+            <CampoTelefones value={telefone} onChange={setTelefone} />
           </div>
           <div className="space-y-1.5">
             <Label>Cliente (opcional)</Label>

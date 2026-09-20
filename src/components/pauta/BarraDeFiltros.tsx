@@ -7,6 +7,7 @@ import { useKanbanColunasEmpresa } from '@/hooks/use-kanban-colunas';
 // Negócios os importa (`Negocios.tsx:33`) — usar outro caminho criaria uma segunda lista.
 import { useVendedores, useFabricantes } from '@/hooks/use-clientes';
 import type { FiltrosDoPainel } from '@/lib/filtros-do-painel';
+import { PeriodoDoPainel } from '@/components/pauta/PeriodoDoPainel';
 
 /**
  * A barra de filtros do painel "No geral".
@@ -16,9 +17,10 @@ import type { FiltrosDoPainel } from '@/lib/filtros-do-painel';
  * devolve a lista nominal só para quem tem a chave `pauta_de_todos` (ou, sem a chave gravada,
  * para quem é gestor/admin/empresa). Aqui é só para não oferecer o que vai voltar vazio.
  *
- * Nenhum filtro de PERÍODO, e isso é deliberado: um negócio aberto criado há meses continua
- * sendo risco hoje. Recortar por data esconderia justamente os mais antigos parados, que são os
- * que mais importa achar — na MD os abertos mais antigos são de 2022.
+ * O filtro de PERÍODO nasce DESLIGADO (`PeriodoDoPainel`): sem ele, o bloco mostra tudo, inclusive
+ * os parados mais antigos, que são os que mais importa achar (os abertos mais antigos são de anos
+ * atrás). Ao contrário do responsável, o período vale para TODOS — não depende da chave. Quando
+ * ligado, recorta por data de CRIAÇÃO. Ver a decisão em `RadarDeRisco.tsx`.
  *
  * 🔴 As opções de ETAPA vêm de `useKanbanColunasEmpresa`, não de `useKanbanColunas`.
  * `useKanbanColunas(empresaId, funilId)` só busca quando recebe um `funilId`
@@ -52,10 +54,12 @@ export function BarraDeFiltros({ empresaId, filtros, onChange, podeFiltrarPorRes
   // `?responsaveis=` que tenha sobrado no endereço não é mandado para o servidor
   // (`RadarDeRisco.tsx`), então contá-lo aqui deixaria um crachá "1 filtro" e um botão "Limpar"
   // apontando para um recorte que não está mais acontecendo — e sem dizer qual filtro é.
+  const temPeriodo = !!(filtros.dataDe && filtros.dataAte);
   const quantos =
     filtros.etapas.length +
     filtros.fabricantes.length +
-    (podeFiltrarPorResponsavel ? filtros.responsaveis.length : 0);
+    (podeFiltrarPorResponsavel ? filtros.responsaveis.length : 0) +
+    (temPeriodo ? 1 : 0);
 
   return (
     <div className="mt-5 flex flex-wrap items-center gap-2">
@@ -82,6 +86,13 @@ export function BarraDeFiltros({ empresaId, filtros, onChange, podeFiltrarPorRes
           className="w-[190px]"
         />
       )}
+      {/* O período vem para TODOS — não é gated pela chave, ao contrário do responsável acima. É
+          opcional e nasce desligado; ver `PeriodoDoPainel` e o comentário de "sem período" abaixo. */}
+      <PeriodoDoPainel
+        dataDe={filtros.dataDe}
+        dataAte={filtros.dataAte}
+        onChange={(periodo) => onChange({ ...filtros, ...periodo })}
+      />
       {quantos > 0 && (
         <>
           <Badge variant="secondary" className="font-mono tabular-nums">

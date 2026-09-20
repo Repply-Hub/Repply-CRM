@@ -11,6 +11,7 @@ import {
   mensagemParaLinha,
   type MensagemNylas,
 } from "../_shared/nylas.ts";
+import { papelDoToken } from "../_shared/papel-do-token.ts";
 
 /**
  * Traz mensagens do Nylas para o CRM.
@@ -22,8 +23,20 @@ import {
  *     15 min vira `failing` no Nylas e, em 72h, `failed` — que NÃO reativa
  *     sozinho. Sem esta função, essa janela vira perda silenciosa de e-mail.
  *
- * `verify_jwt = false` no config, porque atende dois chamadores com credenciais
- * diferentes; a distinção é feita aqui dentro.
+ * `verify_jwt = true` no config: o gateway do Supabase confere a ASSINATURA do
+ * token antes de qualquer requisição chegar aqui. Esta função atende dois
+ * chamadores com credenciais diferentes (o cron e a pessoa logada), e só decide
+ * QUEM está chamando — nunca SE o token é legítimo, isso já foi conferido antes.
+ *
+ * Até 15/09/2026 a distinção era por IGUALDADE de texto contra a variável de
+ * ambiente `SUPABASE_SERVICE_ROLE_KEY`. Quebrou em produção — medido em 15/09:
+ * 95 respostas 401 em 24h, e provavelmente desde 25/08, quando a chave foi
+ * gravada no cofre (`vault`). Essa chave é um JWT `service_role` válido,
+ * mas seu texto não é byte-a-byte igual ao da variável de ambiente desta
+ * função — e a comparação falhava mesmo com credencial correta, empurrando o
+ * cron para o fluxo de usuário, que `getUser()` recusava com 401. Por isso a
+ * checagem agora lê o `role` de dentro do token (`papelDoToken`) em vez de
+ * comparar o texto inteiro.
  */
 
 const LIMITE_PADRAO = 50;
@@ -63,7 +76,11 @@ serve(async (req) => {
     // Dois chamadores, duas credenciais. Diferente de gmail-sync-inbox, que com
     // verify_jwt=false e sem checagem nenhuma é acionável por qualquer um na
     // internet e itera TODOS os usuários.
-    const ehCron = token === (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? " ");
+    //
+    // A checagem lê o PAPEL de dentro do token, não compara texto: o gateway
+    // (verify_jwt = true, acima) já garantiu que a assinatura é válida antes
+    // desta linha rodar, então basta perguntar quem o token diz que é.
+    const ehCron = papelDoToken(token) === "service_role";
 
     let empresaId: string | null = null;
     if (!ehCron) {

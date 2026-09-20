@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CargoSelect } from '@/components/shared/CargoSelect';
+import { CampoTelefones } from '@/components/shared/CampoTelefones';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useCreateContato } from '@/hooks/use-mutations';
@@ -201,9 +202,9 @@ export function SeletorContatosObra({
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Telefone</Label>
-              <Input
+              <CampoTelefones
                 value={novo.telefone}
-                onChange={(e) => setNovo((n) => ({ ...n, telefone: e.target.value }))}
+                onChange={(v) => setNovo((n) => ({ ...n, telefone: v }))}
                 className="h-8 text-sm"
               />
             </div>

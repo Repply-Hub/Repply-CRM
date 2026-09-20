@@ -1,9 +1,17 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
 import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, useDeleteChatMessage, useAddChatGrupoMembros, ChatGrupo, ChatMessage, QuotedMessage, useMarkChatAsRead, useMarkGroupMessagesRead, useMessageReadReceipts, useChatGeralConfig, useUpdateChatGeralConfig, useChatLastActivity, ChatLastActivity } from '@/hooks/use-chat';
 import { useOnlineUsers } from '@/hooks/use-presence';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
+import { alvoInicialDaUrl, chaveDoAlvo } from '@/lib/alvo-do-chat';
+import { useVendedores } from '@/hooks/use-clientes';
+import { useCampoComMencao } from '@/hooks/use-campo-com-mencao';
+import { ListaDeMencao } from '@/components/mencao/ListaDeMencao';
+import { TextoComMencoes } from '@/components/mencao/TextoComMencoes';
+import { useMencoesNaoLidas, useMarcarMencoesLidas } from '@/hooks/use-mencoes';
+import { deveMarcarMencaoComoVista } from '@/lib/marcar-mencao-como-vista';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
@@ -25,7 +33,6 @@ import { cn, autoResizeTextarea } from '@/lib/utils';
 import { painelVisivelNoCelular, equipeRecolhidaEfetiva } from '@/lib/painel-do-chat-no-celular';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { downloadFile } from '@/lib/download-file';
-import { linkifyText } from '@/lib/linkify';
 import { CreateGroupDialog } from '@/components/chat/CreateGroupDialog';
 import { validateFile } from '@/lib/file-validation';
 import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
@@ -101,6 +108,7 @@ function MembersList({
   onToggle,
   grupos,
   unreadCounts,
+  mencoesPorChave,
   geralNome,
   geralFotoUrl,
   onlineIds,
@@ -115,6 +123,8 @@ function MembersList({
   onToggle: () => void;
   grupos: ChatGrupo[];
   unreadCounts: Record<string, number>;
+  /** Não lidas por conversa (Geral/grupo) — chave `mencoesPorChave` do @, ver `useMencoesNaoLidas`. */
+  mencoesPorChave: Record<string, number>;
   geralNome: string;
   geralFotoUrl?: string | null;
   onlineIds: Set<string>;
@@ -156,6 +166,9 @@ function MembersList({
               {unreadCounts['geral']}
             </span>
           )}
+          {(mencoesPorChave['geral'] ?? 0) > 0 && !(unreadCounts['geral'] > 0) && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-primary text-[7px] font-bold text-primary-foreground ring-1 ring-background">@</span>
+          )}
         </div>
         {grupos.map(g => {
           const count = unreadCounts[`grupo_${g.id}`];
@@ -179,6 +192,9 @@ function MembersList({
                 <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground ring-1 ring-background">
                   {count}
                 </span>
+              )}
+              {(mencoesPorChave[`grupo_${g.id}`] ?? 0) > 0 && !(count > 0) && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-primary text-[7px] font-bold text-primary-foreground ring-1 ring-background">@</span>
               )}
             </div>
           );
@@ -269,11 +285,16 @@ function MembersList({
                   <p className="text-xs font-medium text-foreground truncate">{geralNome}</p>
                   <p className="text-[10px] text-muted-foreground">Toda a equipe</p>
                 </div>
-                {unreadCounts['geral'] > 0 && (
-                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
-                    {unreadCounts['geral']}
-                  </span>
-                )}
+                <div className="flex items-center gap-1">
+                  {(mencoesPorChave['geral'] ?? 0) > 0 && (
+                    <span aria-label="Você foi mencionado" className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">@</span>
+                  )}
+                  {unreadCounts['geral'] > 0 && (
+                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                      {unreadCounts['geral']}
+                    </span>
+                  )}
+                </div>
               </button>
 
             </>
@@ -306,11 +327,16 @@ function MembersList({
                 <p className="text-xs font-medium text-foreground truncate">{g.nome}</p>
                 <p className="text-[10px] text-muted-foreground">Grupo</p>
               </div>
-              {unreadCounts[`grupo_${g.id}`] > 0 && (
-                <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
-                  {unreadCounts[`grupo_${g.id}`]}
-                </span>
-              )}
+              <div className="flex items-center gap-1">
+                {(mencoesPorChave[`grupo_${g.id}`] ?? 0) > 0 && (
+                  <span aria-label="Você foi mencionado" className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">@</span>
+                )}
+                {unreadCounts[`grupo_${g.id}`] > 0 && (
+                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                    {unreadCounts[`grupo_${g.id}`]}
+                  </span>
+                )}
+              </div>
             </button>
           ))}
 
@@ -633,7 +659,31 @@ const Chat = () => {
   const isAdminEmpresa = profile?.role === 'empresa' || profile?.role === 'admin';
   const canManageGrupos = isAdminEmpresa || profile?.role === 'gestor';
   const onlineIds = useOnlineUsers();
-  const [target, setTarget] = useState<ChatTarget>({ type: 'geral' });
+  // `?conversa=<chave>` chega do aviso de mensagem nova (ver `alvo-do-chat.ts` e
+  // `use-notificacoes.ts`). Precisa vir antes do `useState` do alvo logo abaixo,
+  // que já lê o parâmetro para nascer na conversa certa.
+  const [searchParams, setSearchParams] = useSearchParams();
+  // O alvo nasce direto da URL quando ela já pede uma conversa válida — nunca
+  // passa por `{ type: 'geral' }` no caminho. Antes o `useState` sempre
+  // começava no Geral e só trocava depois, no efeito abaixo de
+  // `handleSelectTarget`; no intervalo entre montar e esse efeito rodar, o
+  // Geral chegava a contar como alvo selecionado e sua menção não lida era
+  // marcada como vista mesmo quando a pessoa tinha clicado no aviso de OUTRA
+  // conversa (achado I-2 da revisão final do Bloco 4). O efeito continua
+  // existindo — ele cuida do painel do celular e de limpar o parâmetro da
+  // URL, e roda também quando o parâmetro chega com o chat já montado
+  // (segundo aviso clicado sem sair de `/chat`).
+  const [target, setTarget] = useState<ChatTarget>(
+    () => alvoInicialDaUrl(searchParams.get('conversa')) ?? { type: 'geral' },
+  );
+
+  // Chave da conversa atual ('geral' | `grupo_<id>` | `dm_<id>`) — usada tanto para saber
+  // se há menção não lida nesta conversa quanto para o campo com @ saber quando trocou de
+  // conversa (`useCampoComMencao`, opção `conversaChave`).
+  const chaveAtual = chaveDoAlvo(target);
+  const { data: mencoes } = useMencoesNaoLidas();
+  const marcarMencoesLidas = useMarcarMencoesLidas();
+
   // Abaixo de `md`: false = mostra a lista, true = mostra a conversa (uma coisa
   // por vez — decisão do dono do produto em 11/09/2026). Começa em `false` mesmo
   // o alvo padrão sendo o Geral (regra 1 do brief b1-chat-celular). De `md` para
@@ -647,6 +697,26 @@ const Chat = () => {
   // `teamCollapsed` continua intacto: ao alargar de volta, o recolhimento
   // manual reaparece do jeito que a pessoa deixou.
   const isMobile = useIsMobile();
+
+  // Estar com a conversa aberta é ter visto a menção — inclusive a que chega
+  // enquanto a pessoa está lá. Abaixo de `md` isso só é verdade quando o
+  // celular mostra a CONVERSA, não a lista: o alvo pode já estar selecionado
+  // por baixo dos panos (é o que o `useState` acima faz a partir da URL) sem
+  // que a pessoa tenha de fato aberto aquela tela. No desktop o painel da
+  // conversa está sempre visível, então basta o alvo estar selecionado — ver
+  // `deveMarcarMencaoComoVista` em `src/lib/marcar-mencao-como-vista.ts`.
+  useEffect(() => {
+    const deve = deveMarcarMencaoComoVista({
+      tipoDoAlvo: target.type,
+      temMencaoNaoLida: !!mencoes?.chat[chaveAtual],
+      isMobile,
+      painelCelular,
+    });
+    if (!deve) return;
+    marcarMencoesLidas.mutate({ origem: 'chat', chave: chaveAtual });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveAtual, mencoes?.chat[chaveAtual], isMobile, painelCelular]);
+
   const [text, setText] = useState('');
   const [previewFile, setPreviewFile] = useState<FilePreviewTarget | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<{ file: File; previewUrl: string | null }[]>([]);
@@ -898,6 +968,37 @@ const Chat = () => {
     },
   });
 
+  // Quem pode ser mencionado: no Geral, a empresa toda; no grupo, os membros. Sempre sem
+  // a própria pessoa e sem excluído (`useVendedores` já vem sem excluído).
+  const { data: ativos = [] } = useVendedores();
+  const pessoasMencionaveis = useMemo(() => {
+    // Enquanto `get_my_vendedor_id` (myVendedor) ainda não respondeu, ele é `undefined` —
+    // e `u.id !== myVendedor` nunca é falso, porque nenhum id real é igual a `undefined`.
+    // Sem este corte, a própria pessoa aparecia na lista de @ até a consulta voltar.
+    if (!myVendedor) return [];
+    const vivos = (ativos as { id: string; nome: string | null; avatar_url?: string | null; user_id: string | null }[])
+      .filter((u) => u.user_id && u.id !== myVendedor);
+    const base = target.type === 'grupo'
+      ? vivos.filter((u) => grupoMembros.some((m) => m.id === u.id))
+      : vivos;
+    return base.map((u) => ({ id: u.id, nome: u.nome ?? 'Sem nome', avatar_url: u.avatar_url }));
+  }, [ativos, grupoMembros, myVendedor, target.type]);
+  const nomePorId = useMemo(
+    () => new Map((ativos as { id: string; nome: string | null }[]).map((u) => [u.id, u.nome ?? ''])),
+    [ativos],
+  );
+  const meuNome = nomePorId.get(myVendedor ?? '') ?? null;
+
+  const mencao = useCampoComMencao({
+    texto: text,
+    setTexto: setText,
+    pessoas: pessoasMencionaveis,
+    ativo: target.type !== 'dm',
+    totalDaConversa: pessoasMencionaveis.length,
+    ref: inputRef,
+    conversaChave: chaveAtual,
+  });
+
   const markGroupRead = useMarkGroupMessagesRead();
 
   // Confirmação de leitura por todos: só se aplica a grupo/geral, onde chat_mensagens.lida
@@ -971,6 +1072,9 @@ const Chat = () => {
 
   useEffect(() => {
     const handleKeyDownGlobal = (e: KeyboardEvent) => {
+      // Esc que a lista de @ já tratou (fechou a lista) não deve também voltar para o
+      // Geral — o hook do campo com menção chama `preventDefault()` nesse caso.
+      if (e.defaultPrevented) return;
       if (e.key === 'Escape') {
         if (target.type !== 'geral') {
           setTarget({ type: 'geral' });
@@ -991,9 +1095,41 @@ const Chat = () => {
     setMostrarConversaNoCelular(true);
   };
 
+  // Abre a conversa exata que o aviso de mensagem nova mandou pelo parâmetro
+  // `?conversa=` — antes disso o clique só levava para `/chat` genérico, e a
+  // pessoa tinha de procurar a conversa (dono do produto, 14/09/2026). Reage
+  // à mudança do parâmetro mesmo com a tela já montada: clicar num segundo
+  // aviso enquanto já se está em `/chat` troca de novo, pelo mesmo caminho de
+  // quem clica na lista (`handleSelectTarget`, que no celular também troca
+  // para a visão de conversa). Chave inválida ou ausente: não faz nada, fica
+  // no Geral. Roda também na primeira montagem, mesmo com o alvo já tendo
+  // nascido nessa mesma conversa (pelo `useState` lá em cima): é o que liga
+  // `mostrarConversaNoCelular` no celular, e como o alvo já está correto,
+  // `handleSelectTarget` só repete o mesmo valor — sem piscar outra conversa
+  // na tela nem criar laço (o parâmetro sai da URL logo depois).
+  useEffect(() => {
+    const conversa = searchParams.get('conversa');
+    if (!conversa) return;
+    const alvo = alvoInicialDaUrl(conversa);
+    if (alvo) handleSelectTarget(alvo);
+    // Tira o parâmetro da URL para não forçar o mesmo alvo de novo num clique
+    // manual na lista ou num back/forward do navegador.
+    setSearchParams(
+      (prev) => {
+        prev.delete('conversa');
+        return prev;
+      },
+      { replace: true },
+    );
+    // `handleSelectTarget` é recriada a cada render e entrar aqui reabriria o
+    // efeito sem parar — só o parâmetro importa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const handleSend = async () => {
     const trimmed = text.trim();
     if (!trimmed && selectedFiles.length === 0) return;
+    const mencoesParaEnviar = mencao.paraEnviar(trimmed);
     setText('');
     const files = selectedFiles.map(f => f.file);
     selectedFiles.forEach(f => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl); });
@@ -1001,8 +1137,9 @@ const Chat = () => {
     const quoted = buildQuotedParams(respondendoA);
     setRespondendoA(null);
     try {
-      await send(trimmed, files, activeGrupoId, activeRecipientId, quoted);
+      await send(trimmed, files, activeGrupoId, activeRecipientId, quoted, mencoesParaEnviar);
     } finally {
+      mencao.limpar();
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
@@ -1326,6 +1463,7 @@ const Chat = () => {
           onToggle={() => setTeamCollapsed(prev => !prev)}
           grupos={sortedGrupos}
           unreadCounts={unreadCounts}
+          mencoesPorChave={mencoes?.chat ?? {}}
           geralNome={geralNome}
           geralFotoUrl={geralConfig?.foto_url}
           onlineIds={onlineIds}
@@ -2008,7 +2146,14 @@ const Chat = () => {
                                     )}
                                   </div>
                                 )}
-                                {msg.conteudo && !(msg.arquivo_url && msg.conteudo === msg.arquivo_nome) && linkifyText(msg.conteudo)}
+                                {msg.conteudo && !(msg.arquivo_url && msg.conteudo === msg.arquivo_nome) && (
+                                  <TextoComMencoes
+                                    texto={msg.conteudo}
+                                    nomes={(msg.mencionados ?? []).map((id) => nomePorId.get(id) ?? '').filter(Boolean)}
+                                    todos={!!msg.menciona_todos}
+                                    meuNome={meuNome}
+                                  />
+                                )}
                               </div>
                               <p className={`flex items-center gap-0.5 text-[9px] text-muted-foreground mt-0.5 ${isMe ? 'justify-end mr-1' : 'ml-1'}`}>
                                 {format(new Date(msg.created_at), 'HH:mm', { locale: ptBR })}
@@ -2246,7 +2391,17 @@ const Chat = () => {
             </DialogContent>
           </Dialog>
 
-          <div className="border-t border-border px-4 py-3">
+          <div className="relative border-t border-border px-4 py-3">
+            {mencao.aberta && (
+              <ListaDeMencao
+                className="absolute bottom-full left-4 z-20 mb-1"
+                consulta={mencao.consulta}
+                sugestoes={mencao.sugestoes}
+                ativa={mencao.ativa}
+                onEscolher={mencao.escolher}
+                mensagemVazia="Ninguém com esse nome nesta conversa."
+              />
+            )}
             {respondendoA && (
               <div className="mb-2">
                 <QuotedPreview
@@ -2337,8 +2492,8 @@ const Chat = () => {
                 <Textarea
                   ref={inputRef}
                   value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  onKeyDown={handleKeyDown}
+                  onChange={mencao.aoMudar}
+                  onKeyDown={(e) => { if (mencao.aoTeclar(e)) return; handleKeyDown(e); }}
                   onPaste={handlePasteImage}
                   placeholder="Digite sua mensagem..."
                   className="flex-1 min-h-9 resize-none py-2 overflow-hidden"
