@@ -28,6 +28,7 @@ const Dashboard = lazyComRetry(() => import("./pages/Dashboard"));
 const Hoje = lazyComRetry(() => import("./pages/Hoje"));
 const AdminDashboard = lazyComRetry(() => import("./pages/AdminDashboard"));
 const Configuracoes = lazyComRetry(() => import("./pages/Configuracoes"));
+const Ajuda = lazyComRetry(() => import("./pages/Ajuda"));
 const Obras = lazyComRetry(() => import("./pages/Obras"));
 const Fabricantes = lazyComRetry(() => import("./pages/Fabricantes"));
 const Portal = lazyComRetry(() => import("./pages/Portal"));
@@ -255,7 +256,12 @@ function ProtectedRoute({
   //
   // Isto é navegação, não segurança: quem impede a leitura de conteúdo são as
   // policies (migration 20260804195019).
-  const ROTAS_DO_ADMIN_GERAL = ["/admin", "/configuracoes"];
+  //
+  // /ajuda entrou em 15/09/2026 pelo mesmo motivo de /configuracoes: também não tem
+  // conteúdo de cliente (é documentação do produto, igual para toda empresa), e é onde o
+  // admin sobe as imagens da Ajuda (ImagemDaAjuda.tsx, RLS por is_admin()). Sem esta linha
+  // o admin nem chega a ver a tela: cai direto neste `if` e volta para /admin/empresas.
+  const ROTAS_DO_ADMIN_GERAL = ["/admin", "/configuracoes", "/ajuda"];
   if (
     profileAttempted &&
     profile?.role === "admin" &&
@@ -626,6 +632,14 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <Configuracoes />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/ajuda"
+      element={
+        <ProtectedRoute>
+          <Ajuda />
         </ProtectedRoute>
       }
     />

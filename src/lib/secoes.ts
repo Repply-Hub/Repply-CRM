@@ -38,7 +38,8 @@ export type SecaoId =
   | 'chat'
   | 'whatsapp'
   | 'emails'
-  | 'configuracoes';
+  | 'configuracoes'
+  | 'ajuda';
 
 export interface Secao {
   id: SecaoId;
@@ -75,6 +76,9 @@ export const SECOES: Secao[] = [
   { id: 'whatsapp',      label: 'WhatsApp',      rota: '/whatsapp',      desligavel: true,  modulosPermissao: ['whatsapp'] },
   { id: 'emails',        label: 'E-mail',        rota: '/emails',        desligavel: true,  modulosPermissao: ['emails'] },
   { id: 'configuracoes', label: 'Configurações', rota: '/configuracoes', desligavel: false, modulosPermissao: ['configuracoes'] },
+  // Conteúdo de referência, sem risco — nasce ligada para todos os presets (diferente de
+  // "hoje", que nasceu desligada por cautela). Decisão de produto de 14/09/2026.
+  { id: 'ajuda',          label: 'Ajuda',          rota: '/ajuda',          desligavel: true,  modulosPermissao: ['ajuda'] },
 ];
 
 export const SECOES_DESLIGAVEIS = SECOES.filter((s) => s.desligavel);

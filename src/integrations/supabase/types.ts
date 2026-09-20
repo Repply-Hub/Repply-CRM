@@ -39,6 +39,35 @@ export type Database = {
   }
   public: {
     Tables: {
+      ajuda_imagens: {
+        Row: {
+          atualizado_em: string
+          atualizado_por: string | null
+          chave: string
+          path: string
+        }
+        Insert: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          chave: string
+          path: string
+        }
+        Update: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          chave?: string
+          path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ajuda_imagens_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_erros: {
         Row: {
           component_stack: string | null

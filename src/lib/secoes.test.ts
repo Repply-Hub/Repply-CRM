@@ -15,11 +15,12 @@ describe('SECOES', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('tem exatamente 9 seções desligáveis', () => {
-    // 'hoje' (a pauta do dia) entrou em 24/08/2026. Este teste é o que obriga quem
-    // acrescenta seção a passar por aqui — foi ele que pegou a adição.
+  it('tem exatamente 10 seções desligáveis', () => {
+    // 'hoje' (a pauta do dia) entrou em 24/08/2026, 'ajuda' entrou em 14/09/2026. Este
+    // teste é o que obriga quem acrescenta seção a passar por aqui — foi ele que pegou
+    // as duas adições.
     expect(SECOES_DESLIGAVEIS.map((s) => s.id).sort()).toEqual(
-      ['calendario', 'chat', 'dashboard', 'emails', 'hoje', 'obras', 'portal', 'tarefas', 'whatsapp'],
+      ['ajuda', 'calendario', 'chat', 'dashboard', 'emails', 'hoje', 'obras', 'portal', 'tarefas', 'whatsapp'],
     );
   });
 

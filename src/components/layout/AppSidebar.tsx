@@ -60,8 +60,12 @@ const ADMIN_ONLY_IDS = new Set(['admin_wa_instancias', 'usuarios_admin', 'admin_
  * Isto é conveniência de navegação, não segurança: a barreira real são as
  * policies de RLS, que desde a migration 20260804195019 não deixam mais o admin
  * ler conteúdo de empresa nenhuma.
+ *
+ * `ajuda` entrou em 15/09/2026: é onde o admin sobe as imagens da página de Ajuda
+ * (ImagemDaAjuda.tsx), e diferente de `configuracoes` não tem um link alternativo (o avatar
+ * do cabeçalho) — sem entrar aqui, a única forma de chegar lá seria digitar a URL de cabeça.
  */
-const ITENS_DO_ADMIN_GERAL = ['admin_empresas', 'admin_secoes', 'admin_wa_instancias'];
+const ITENS_DO_ADMIN_GERAL = ['admin_empresas', 'admin_secoes', 'admin_wa_instancias', 'ajuda'];
 
 export function AppSidebar() {
   const { state, setOpen, isMobile } = useSidebar();

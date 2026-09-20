@@ -35,6 +35,17 @@ export interface ModuloDescricao {
 
 const MODULOS: ModuloDescricao[] = [
   {
+    key: 'ajuda',
+    label: 'Ajuda',
+    descricoes: {
+      ver: 'Visualizar o passo a passo das funcionalidades do sistema',
+      criar: 'Não aplicável à Ajuda',
+      editar: 'Não aplicável à Ajuda',
+      excluir: 'Não aplicável à Ajuda',
+    },
+    funcionalidades: [],
+  },
+  {
     key: 'dashboard',
     label: 'Dashboard',
     descricoes: {

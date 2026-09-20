@@ -32,6 +32,9 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'whatsapp', path: '/whatsapp', label: 'WhatsApp', icon: 'WhatsApp', visible: true },
   { id: 'emails', path: '/emails', label: 'E-mails', icon: 'Mail', visible: true },
   { id: 'configuracoes', path: '/configuracoes', label: 'Configurações', icon: 'Settings', visible: true },
+  // Última seção "normal" do menu, depois de Configurações — passo a passo das
+  // funcionalidades, não compete por destaque com o que a pessoa usa no dia a dia.
+  { id: 'ajuda', path: '/ajuda', label: 'Ajuda', icon: 'HelpCircle', visible: true },
 
   { id: 'admin_empresas', path: '/admin/empresas', label: 'Empresas', icon: 'Building2', visible: true },
   { id: 'usuarios_admin', path: '/configuracoes?tab=usuarios', label: 'Usuários', icon: 'Users', visible: true },

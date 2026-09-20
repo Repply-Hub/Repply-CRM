@@ -73,10 +73,18 @@ export function useSecoesDaEmpresa() {
  * funciona sem ela, então não há resposta possível além de sim.
  */
 export function useSecaoLigada(id: SecaoId) {
+  const { profile, profileLoaded } = useAuth();
   const { mapa, carregando, erro } = useSecoesDaEmpresa();
 
   const desligavel = SECOES.find((s) => s.id === id)?.desligavel ?? true;
   if (!desligavel) return { ligada: true, carregando: false };
+
+  // Admin global não tem empresa (`empresa_id` nulo), então `secoes_da_empresa` nunca busca
+  // (veja o `enabled` acima) e `mapa` fica `undefined` para sempre. "A empresa contratou
+  // esta seção?" não é uma pergunta que se aplica a ele. Sem este corte, toda seção
+  // desligável que o admin alcançar (como /ajuda, desde 15/09/2026) ficaria girando em
+  // "Carregando..." pra sempre em SecaoRoute — não é erro de rede, é pergunta sem resposta.
+  if (profileLoaded && profile?.role === 'admin') return { ligada: true, carregando: false };
 
   // Erro de rede não pode trancar quem paga. A barreira real dos dados é a RLS — este
   // hook é conveniência de navegação. É o mesmo argumento que o gate de plano usa em
