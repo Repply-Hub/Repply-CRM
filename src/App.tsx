@@ -13,6 +13,7 @@ import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { secaoDaRota } from "@/lib/secoes";
 import { useSecaoLigada } from "@/hooks/use-secoes";
+import { PAYWALL_ATIVO, deveAssinarPrimeiro } from "@/lib/plano-gate";
 // Todas as páginas entram por aqui, e não pelo `lazy` do React: o wrapper
 // traduz "o arquivo desta página sumiu do servidor depois de um deploy" num
 // erro reconhecível, em vez de deixar virar o "Algo deu errado" genérico.
@@ -313,6 +314,19 @@ function ProtectedRoute({
   // 🔴 E o bloqueio de verdade nunca dependeu deste `if`: ele é a RLS do Postgres, que
   // desde 29/08/2026 cobre 45 tabelas e recusa criar, editar e apagar. Este trecho sempre
   // foi conveniência de navegação — está escrito no comentário logo acima.
+
+  // Desvio de ONBOARDING: empresa que NUNCA assinou (nasce `inactive`) vai para /assinar antes de
+  // entrar. É o pedido do Lucas de 21/09/2026, refazendo em parte a decisão de 30/08 acima — mas
+  // cirúrgico: `deveAssinarPrimeiro` pega SÓ `nunca_ativou`. Cliente que pagava e o pagamento
+  // falhou (`pagamento_parou`) NÃO cai aqui — continua na régua de cobrança (faixa dia-15 em
+  // só-leitura, suspensão dia-30), que é exatamente o que a decisão de 30/08 protege.
+  //
+  // `requerPlano` mantém a própria /assinar de fora (ela usa requerPlano={false}), então não há
+  // laço. Preso a `PAYWALL_ATIVO`: com o interruptor desligado o desvio fica inerte, igual ao
+  // guard da /assinar (Assinar.tsx) — ligar o paywall é o que o ativa.
+  if (requerPlano && PAYWALL_ATIVO && deveAssinarPrimeiro(profile)) {
+    return <Navigate to="/assinar" replace />;
+  }
 
   // A `key` inclui a ROTA, e essa é a correção mais importante deste arquivo.
   //

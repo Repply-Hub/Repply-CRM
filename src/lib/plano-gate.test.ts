@@ -4,6 +4,7 @@ import {
   extrairEmpresa,
   acessoSuspenso,
   degrauDaRegua,
+  deveAssinarPrimeiro,
   diasDeInadimplencia,
   meuDegrauNaRegua,
   motivoDoBloqueio,
@@ -432,6 +433,71 @@ describe('motivoDoBloqueio — por que está bloqueado, não só se está', () =
   it('perfil sem assinatura não inventa motivo', () => {
     expect(motivoDoBloqueio(null)).toBeNull();
     expect(motivoDoBloqueio({ role: 'gestor', empresas: null })).toBeNull();
+  });
+});
+
+describe('deveAssinarPrimeiro — o paywall de onboarding, só para quem nunca assinou', () => {
+  /** Mesmo perfil direto do bloco acima, para poder pôr `stripe_subscription_id`. */
+  function comAssinatura(campos: Record<string, unknown>) {
+    return {
+      role: 'gestor',
+      empresas: {
+        id: 'empresa-1',
+        nome: 'Construtora Meridiano',
+        empresa_assinaturas: campos,
+      },
+    };
+  }
+
+  const ONTEM = new Date(Date.now() - 86_400_000).toISOString();
+  const AMANHA = new Date(Date.now() + 86_400_000).toISOString();
+
+  it('🔴 empresa nova (inactive, sem assinatura no Stripe) precisa assinar primeiro', () => {
+    // É como toda empresa nasce, pelo gatilho `criar_assinatura_inicial_empresa`.
+    expect(deveAssinarPrimeiro(comAssinatura({ plan_status: 'inactive' }))).toBe(true);
+  });
+
+  it('abriu o checkout e desistiu (tem customer, não tem assinatura) ainda precisa assinar', () => {
+    expect(
+      deveAssinarPrimeiro(comAssinatura({ plan_status: 'inactive', stripe_customer_id: 'cus_123' })),
+    ).toBe(true);
+  });
+
+  it('🔴 cliente que pagava e o pagamento falhou NÃO é mandado para o paywall (é o que 30/08 protege)', () => {
+    // Esse caso é da régua de cobrança (faixa dia-15 em só-leitura, suspensão dia-30), não do
+    // desvio de onboarding. Mandá-lo para /assinar reabriria o bug que a decisão de 30/08 fechou.
+    expect(
+      deveAssinarPrimeiro(
+        comAssinatura({
+          plan_status: 'canceled',
+          stripe_customer_id: 'cus_123',
+          stripe_subscription_id: 'sub_123',
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('teste vencido não vai para o paywall de onboarding', () => {
+    expect(
+      deveAssinarPrimeiro(comAssinatura({ plan_status: 'trialing', current_period_end: ONTEM })),
+    ).toBe(false);
+  });
+
+  it('empresa ativa, em teste no prazo, legacy/cortesia e admin não precisam assinar', () => {
+    expect(deveAssinarPrimeiro(comAssinatura({ plan_status: 'active' }))).toBe(false);
+    expect(
+      deveAssinarPrimeiro(comAssinatura({ plan_status: 'trialing', current_period_end: AMANHA })),
+    ).toBe(false);
+    expect(deveAssinarPrimeiro(profileFake({ planStatus: 'active' }))).toBe(false);
+    expect(
+      deveAssinarPrimeiro(profileFake({ role: 'admin', planStatus: 'inactive' })),
+    ).toBe(false);
+  });
+
+  it('sem perfil ou sem empresa não manda ninguém para o paywall', () => {
+    expect(deveAssinarPrimeiro(null)).toBe(false);
+    expect(deveAssinarPrimeiro(undefined)).toBe(false);
+    expect(deveAssinarPrimeiro({ role: 'gestor', empresas: null })).toBe(false);
   });
 });
 

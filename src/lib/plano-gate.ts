@@ -243,6 +243,24 @@ export function motivoDoBloqueio(
 }
 
 /**
+ * A empresa precisa ASSINAR ANTES de usar o app? É o predicado do desvio de onboarding do
+ * `ProtectedRoute` (App.tsx): quando verdadeiro, a pessoa vai para `/assinar` em vez de entrar.
+ *
+ * Verdadeiro só para quem NUNCA assinou — o motivo `nunca_ativou`. Toda empresa nasce assim
+ * (`plan_status = 'inactive'`, sem assinatura no Stripe, pelo gatilho
+ * `criar_assinatura_inicial_empresa`), então é exatamente a empresa recém-criada.
+ *
+ * 🔴 NÃO pega quem já foi cliente pagante e o pagamento falhou (`pagamento_parou`). Esse caso é
+ * da RÉGUA de cobrança — faixa dia-15 em só-leitura, suspensão dia-30 —, e foi justamente o que o
+ * desvio automático de 30/08/2026 desligou para não expulsar cliente pagante para o paywall sem
+ * caminho de volta (ver App.tsx). Também não pega teste vencido, admin, nem empresa
+ * legacy/cortesia/ativa: `motivoDoBloqueio` já devolve o motivo certo (ou null) para cada um.
+ */
+export function deveAssinarPrimeiro(profile: ProfileComPlano | null | undefined): boolean {
+  return motivoDoBloqueio(profile)?.motivo === 'nunca_ativou';
+}
+
+/**
  * A situação comercial da MINHA empresa, no mesmo vocabulário do painel de admin.
  *
  * 🔴 REAPROVEITA `situacaoDaEmpresa`, E ISSO É O PONTO. Ela já traduz status técnico em
