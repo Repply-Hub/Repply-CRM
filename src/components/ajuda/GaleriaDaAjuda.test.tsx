@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react';
 import { GaleriaDaAjuda } from './GaleriaDaAjuda';
 
 // jsdom não implementa IntersectionObserver, e o embla-carousel (por trás do <Carousel> do
@@ -243,5 +243,83 @@ describe('GaleriaDaAjuda — remover uma foto', () => {
       { chave: 'hoje-pauta-passo-1-1', path: 'hoje-pauta-passo-1-1.png' },
       expect.anything(),
     );
+  });
+});
+
+describe('GaleriaDaAjuda — na página, com mais de uma foto', () => {
+  it('mostra a descrição de como navegar e deixa as setas do carrossel na cor primária (laranja)', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([
+      ['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')],
+      ['hoje-pauta-passo-1-2', foto('hoje-pauta-passo-1-2')],
+    ]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    expect(screen.getByText(/2 fotos nesta sequência/)).toBeInTheDocument();
+    const anterior = screen.getByRole('button', { name: /previous slide/i });
+    const proxima = screen.getByRole('button', { name: /next slide/i });
+    // Variante "default" do Button é a que pinta de laranja (bg-primary, token da marca).
+    expect(anterior.className).toContain('bg-primary');
+    expect(proxima.className).toContain('bg-primary');
+  });
+
+  it('com uma foto só, não mostra a descrição de navegação nem setas', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')]]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    expect(screen.queryByText(/fotos nesta sequência/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /previous slide/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('GaleriaDaAjuda — navegar dentro do diálogo de ampliar', () => {
+  it('abre a foto clicada e, com mais de uma, mostra o contador e deixa ir para a próxima', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([
+      ['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')],
+      ['hoje-pauta-passo-1-2', foto('hoje-pauta-passo-1-2')],
+    ]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    const [primeiroBotaoAmpliar] = screen.getAllByTitle('Ampliar imagem');
+    fireEvent.click(primeiroBotaoAmpliar);
+
+    const dialogo = screen.getByRole('dialog');
+    // O carrossel da página não desmonta com o diálogo aberto — Radix só sobrepõe. Por
+    // isso o "1/2" do contador é procurado DENTRO do diálogo, não em `screen` inteiro
+    // (que ainda tem o "1/2" do carrossel por trás).
+    expect(within(dialogo).getByText('1/2')).toBeInTheDocument();
+    expect(dialogo.querySelector('img')).toHaveAttribute('src', 'https://exemplo.test/hoje-pauta-passo-1-1.png');
+
+    fireEvent.click(screen.getByTitle('Próxima foto'));
+
+    expect(within(dialogo).getByText('2/2')).toBeInTheDocument();
+    expect(dialogo.querySelector('img')).toHaveAttribute('src', 'https://exemplo.test/hoje-pauta-passo-1-2.png');
+    // Chegou na última: não dá a volta para a primeira.
+    expect(screen.getByTitle('Próxima foto')).toBeDisabled();
+  });
+
+  it('clicar na PRÓPRIA imagem (não só no ícone de lupa) também abre o diálogo ampliado', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')]]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByAltText(/Tela do passo 1/));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('com uma foto só, o diálogo abre sem contador nem setas de navegação', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')]]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    fireEvent.click(screen.getByTitle('Ampliar imagem'));
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.queryByTitle('Próxima foto')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Foto anterior')).not.toBeInTheDocument();
   });
 });
