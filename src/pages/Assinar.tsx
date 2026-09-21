@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { TelaBloqueio } from "@/components/shared/TelaBloqueio";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/layout/Logo";
-import { formatarPrecoBRL, rotuloIntervalo } from "@/lib/planos";
+import { PrecoLancamento } from "@/components/shared/PrecoLancamento";
 import { usePlanos } from "@/hooks/use-planos";
 import {
   PAYWALL_ATIVO,
@@ -260,12 +260,9 @@ export default function Assinar() {
             {plano.nome}
           </h1>
 
-          <p className="mt-4 flex items-baseline justify-center gap-1.5">
-            <span className="font-display text-5xl font-bold tabular-nums text-card-foreground">
-              {formatarPrecoBRL(plano.preco)}
-            </span>
-            <span className="text-sm text-muted-foreground">{rotuloIntervalo(plano.intervalo)}</span>
-          </p>
+          <div className="mt-5">
+            <PrecoLancamento tamanho="medio" />
+          </div>
 
           <ul className="mt-7 space-y-3 text-left">
             {plano.beneficios.map((b) => (
@@ -286,7 +283,7 @@ export default function Assinar() {
             {processando !== "checkout" && <ArrowRight />}
           </Button>
           <p className="mt-3 text-xs text-muted-foreground">
-            Pagamento no cartão, processado pelo Stripe. Cancele quando quiser.
+            Pagamento processado pelo Stripe. Cancele quando quiser.
           </p>
         </div>
 

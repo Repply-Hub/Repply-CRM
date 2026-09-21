@@ -74,3 +74,20 @@ export function formatarPrecoBRL(valor: number): string {
     maximumFractionDigits: 0,
   });
 }
+
+/**
+ * A condição de lançamento como a VITRINE mostra — landing e /assinar (componente
+ * `PrecoLancamento`). Decisão do Lucas (21/09/2026): por ora são só valores de EXIBIÇÃO; a
+ * cobrança de verdade (Stripe/banco) é acertada depois e pode não bater com isto no meio-tempo.
+ *
+ * São textos fixos de propósito (não passam por `formatarPrecoBRL`): o parcelado tem duas casas
+ * e o à vista não, e o cliente escolheu os números exatos. `12 × 333,33` chega a R$ 4.000; o à
+ * vista/pix sai por R$ 3.497.
+ */
+export const VITRINE_LANCAMENTO = {
+  parcelas: 12,
+  parcelaMensal: 'R$ 333,33',
+  aVista: 'R$ 3.497',
+  /** Quanto o à vista economiza contra o parcelado (R$ 4.000 − R$ 3.497). É o gatilho do card em destaque. */
+  economia: 'R$ 503',
+} as const;
