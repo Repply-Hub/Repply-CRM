@@ -273,6 +273,99 @@ describe('GaleriaDaAjuda — na página, com mais de uma foto', () => {
   });
 });
 
+describe('GaleriaDaAjuda — tira de miniaturas na página', () => {
+  it('com mais de uma foto, mostra uma miniatura por foto, na ordem da sequência', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([
+      ['hoje-pauta-passo-1-2', foto('hoje-pauta-passo-1-2')],
+      ['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')],
+      ['hoje-pauta-passo-1-3', foto('hoje-pauta-passo-1-3')],
+    ]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    const miniaturas = screen.getAllByAltText(/Tela do passo 1 — miniatura/);
+    expect(miniaturas).toHaveLength(3);
+    expect(miniaturas[0]).toHaveAttribute('src', 'https://exemplo.test/hoje-pauta-passo-1-1.png');
+    expect(miniaturas[1]).toHaveAttribute('src', 'https://exemplo.test/hoje-pauta-passo-1-2.png');
+    expect(miniaturas[2]).toHaveAttribute('src', 'https://exemplo.test/hoje-pauta-passo-1-3.png');
+  });
+
+  it('com uma foto só, não mostra tira de miniatura nenhuma', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')]]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    expect(screen.queryByAltText(/miniatura/)).not.toBeInTheDocument();
+  });
+
+  it('clicar numa miniatura não quebra a tela (chama a navegação do carrossel)', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([
+      ['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')],
+      ['hoje-pauta-passo-1-2', foto('hoje-pauta-passo-1-2')],
+    ]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    const [, segundaMiniatura] = screen.getAllByAltText(/Tela do passo 1 — miniatura/);
+    expect(() => fireEvent.click(segundaMiniatura)).not.toThrow();
+  });
+});
+
+describe('GaleriaDaAjuda — tira de miniaturas dentro do diálogo de ampliar', () => {
+  it('abre junto com o diálogo, no rodapé, e destaca a foto que está ampliada', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([
+      ['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')],
+      ['hoje-pauta-passo-1-2', foto('hoje-pauta-passo-1-2')],
+    ]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    // Ainda fechado: só a tira da página, nenhuma dentro de diálogo (não existe diálogo).
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    const [primeiroBotaoAmpliar] = screen.getAllByTitle('Ampliar imagem');
+    fireEvent.click(primeiroBotaoAmpliar);
+
+    const dialogo = screen.getByRole('dialog');
+    const miniaturasDoDialogo = within(dialogo).getAllByAltText(/Tela do passo 1 — miniatura/);
+    expect(miniaturasDoDialogo).toHaveLength(2);
+    // A primeira (índice 0, a que abriu) vem destacada.
+    expect(miniaturasDoDialogo[0].closest('button')?.className).toContain('border-primary');
+    expect(miniaturasDoDialogo[1].closest('button')?.className).not.toContain('border-primary');
+  });
+
+  it('clicar numa miniatura do diálogo troca a foto ampliada, sem fechar o diálogo', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([
+      ['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')],
+      ['hoje-pauta-passo-1-2', foto('hoje-pauta-passo-1-2')],
+    ]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    fireEvent.click(screen.getAllByTitle('Ampliar imagem')[0]);
+    const dialogo = screen.getByRole('dialog');
+
+    const [, segundaMiniaturaDoDialogo] = within(dialogo).getAllByAltText(/Tela do passo 1 — miniatura/);
+    fireEvent.click(segundaMiniaturaDoDialogo);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(dialogo.querySelector('img[alt="Tela do passo 1"]')).toHaveAttribute(
+      'src',
+      'https://exemplo.test/hoje-pauta-passo-1-2.png',
+    );
+  });
+
+  it('com uma foto só, o diálogo não mostra tira de miniatura nenhuma', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')]]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    fireEvent.click(screen.getByTitle('Ampliar imagem'));
+
+    expect(within(screen.getByRole('dialog')).queryByAltText(/miniatura/)).not.toBeInTheDocument();
+  });
+});
+
 describe('GaleriaDaAjuda — navegar dentro do diálogo de ampliar', () => {
   it('abre a foto clicada e, com mais de uma, mostra o contador e deixa ir para a próxima', () => {
     tela.profile = { role: 'vendedor' };

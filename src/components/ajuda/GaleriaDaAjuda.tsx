@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, ImageIcon, ImagePlus, Loader2, Maximize2, RotateCcw, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel';
+import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext, type CarouselApi } from '@/components/ui/carousel';
 import {
   Dialog,
   DialogTitle,
@@ -77,6 +77,22 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
   const [ampliadaIndice, setAmpliadaIndice] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const ampliada = ampliadaIndice !== null ? fotos[ampliadaIndice] : undefined;
+
+  // A tira de miniaturas (abaixo da descrição, só com mais de uma foto) precisa saber qual
+  // slide o carrossel principal está mostrando, para destacar a miniatura certa — e precisa
+  // da API do embla para PULAR direto para um slide ao clicar numa miniatura (`scrollTo`),
+  // não só avançar uma de cada vez como as setas fazem.
+  const [carrosselApi, setCarrosselApi] = useState<CarouselApi>();
+  const [slideAtivo, setSlideAtivo] = useState(0);
+  useEffect(() => {
+    if (!carrosselApi) return;
+    setSlideAtivo(carrosselApi.selectedScrollSnap());
+    const aoSelecionar = () => setSlideAtivo(carrosselApi.selectedScrollSnap());
+    carrosselApi.on('select', aoSelecionar);
+    return () => {
+      carrosselApi.off('select', aoSelecionar);
+    };
+  }, [carrosselApi]);
 
   const abrirAmpliada = (indice: number) => {
     setZoom(1);
@@ -172,7 +188,11 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
         // dentro por esse respiro, e `left-0`/`right-0` das setas — que medem a partir da
         // borda do Carousel, não do conteúdo — caem exatamente nesse respiro, do lado de
         // fora da imagem.
-        <Carousel className={fotos.length > 1 ? 'w-full px-7' : 'w-full'} opts={{ align: 'start' }}>
+        <Carousel
+          setApi={setCarrosselApi}
+          className={fotos.length > 1 ? 'w-full px-7' : 'w-full'}
+          opts={{ align: 'start' }}
+        >
           <CarouselContent className="ml-0">
             {fotos.map((foto, i) => (
               <CarouselItem key={foto.chave} className="basis-full pl-0">
@@ -226,6 +246,35 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
         <p className="text-[11px] text-muted-foreground/70">
           {fotos.length} fotos nesta sequência — arraste ou use as setas para ver as outras.
         </p>
+      )}
+
+      {/* Tira de miniaturas: um jeito de PULAR direto para uma foto qualquer, sem clicar
+          "próxima" várias vezes. A borda colorida marca qual é a que o carrossel principal
+          está mostrando agora — atualiza sozinha ao arrastar ou usar as setas, não só ao
+          clicar numa miniatura. */}
+      {fotos.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+          {fotos.map((foto, i) => (
+            <button
+              key={foto.chave}
+              type="button"
+              onClick={() => carrosselApi?.scrollTo(i)}
+              title={`Ir para a foto ${i + 1}`}
+              className={cn(
+                'h-12 w-16 shrink-0 overflow-hidden rounded-md border-2 transition-colors',
+                slideAtivo === i
+                  ? 'border-primary'
+                  : 'border-transparent opacity-60 hover:opacity-100',
+              )}
+            >
+              <img
+                src={foto.url}
+                alt={`${legenda} — miniatura ${i + 1} de ${fotos.length}`}
+                className="h-full w-full object-cover"
+              />
+            </button>
+          ))}
+        </div>
       )}
 
       <Dialog open={!!ampliada} onOpenChange={(aberto) => !aberto && fecharAmpliada()}>
@@ -284,7 +333,36 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
               </>
             )}
           </CorpoDialogo>
-          <RodapeDialogo className="justify-center px-4 py-3 sm:justify-center">
+          {/* `flex-col`/`sm:flex-col` cancelam o padrão de `RodapeDialogo` (linha no desktop,
+              pensado para par de botão Cancelar/Salvar) — aqui os dois blocos empilham em
+              QUALQUER largura: miniaturas em cima, controle de zoom embaixo. `sm:space-x-0`
+              cancela o respaçamento horizontal que o padrão também aplicaria entre os dois
+              blocos empilhados. */}
+          <RodapeDialogo className="flex-col sm:flex-col items-center justify-center gap-3 px-4 py-3 sm:space-x-0">
+            {fotos.length > 1 && ampliadaIndice !== null && (
+              <div className="flex w-full justify-center gap-1.5 overflow-x-auto">
+                {fotos.map((foto, i) => (
+                  <button
+                    key={foto.chave}
+                    type="button"
+                    onClick={() => abrirAmpliada(i)}
+                    title={`Ir para a foto ${i + 1}`}
+                    className={cn(
+                      'h-12 w-16 shrink-0 overflow-hidden rounded-md border-2 transition-colors',
+                      ampliadaIndice === i
+                        ? 'border-primary'
+                        : 'border-transparent opacity-60 hover:opacity-100',
+                    )}
+                  >
+                    <img
+                      src={foto.url}
+                      alt={`${legenda} — miniatura ${i + 1} de ${fotos.length}`}
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex items-center gap-0.5 rounded-full border bg-background px-1 py-1">
               <Button
                 type="button"
