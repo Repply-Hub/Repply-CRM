@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks, CreditCard } from 'lucide-react';
 import { CardDeSom } from '@/components/configuracoes/CardDeSom';
+import { CardDoBotaoDeAjuda } from '@/components/configuracoes/CardDoBotaoDeAjuda';
 import { PagamentosTab } from '@/components/configuracoes/PagamentosTab';
 import { podeGerenciarAssinatura } from '@/lib/plano-gate';
 import { SidebarHistoricoDialog } from '@/components/configuracoes/SidebarHistoricoDialog';
@@ -513,6 +514,8 @@ function ProfileTab() {
         </Card>
 
         <CardDeSom />
+
+        <CardDoBotaoDeAjuda />
 
         {!carregandoSecoes && !personalizarNaDireita && <CustomizeTab />}
         {/* GmailSettings sai daqui: a conexão de e-mail passou a ser da EMPRESA,

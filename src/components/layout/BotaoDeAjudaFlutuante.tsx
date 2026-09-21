@@ -1,6 +1,7 @@
 import { HelpCircle } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useSecaoLigada } from '@/hooks/use-secoes';
+import { useBotaoAjudaVisivel } from '@/hooks/use-botao-ajuda-visivel';
 
 /**
  * Botão de Ajuda, flutuante no canto inferior direito de toda tela logada — pedido do Lucas
@@ -10,11 +11,16 @@ import { useSecaoLigada } from '@/hooks/use-secoes';
  * `/ajuda` não é condicionada por permissão de usuário (ver o comentário em Ajuda.tsx) — só
  * pelo PLANO da empresa, e é exatamente isso que `useSecaoLigada('ajuda')` responde. Some
  * enquanto a resposta não chega (ligada === undefined) em vez de piscar e desaparecer.
+ *
+ * `useBotaoAjudaVisivel` é a preferência pessoal (Configurações › CardDoBotaoDeAjuda) para
+ * quem quer esconder o botão neste computador — sem apagar acesso a `/ajuda`, só ao atalho.
  */
 export function BotaoDeAjudaFlutuante() {
   const location = useLocation();
   const { ligada } = useSecaoLigada('ajuda');
+  const { visivel } = useBotaoAjudaVisivel();
 
+  if (!visivel) return null;
   if (ligada !== true) return null;
   if (location.pathname === '/ajuda') return null;
 
