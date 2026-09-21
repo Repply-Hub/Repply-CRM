@@ -77,6 +77,7 @@ import { CompositorEmail } from "@/components/email/CompositorEmail";
 import { ConfirmarEnviarEmailDialog } from "@/components/email/ConfirmarEnviarEmailDialog";
 import { normalizarAssinaturaAntiga } from "@/lib/assinatura-email";
 import { sanitizarHtmlEmail } from "@/lib/sanitizar-html-email";
+import { prepararHtmlParaEmail } from "@/lib/html-para-email";
 import { enviarImagemEmail } from "@/lib/imagem-email";
 import { GerenciarCaixaDialog } from "@/components/email/GerenciarCaixaDialog";
 import { BarraPastas } from "@/components/email/BarraPastas";
@@ -1040,13 +1041,14 @@ const Emails = () => {
       }
 
       // O corpo agora é HTML pronto do editor (a assinatura, se a pessoa não
-      // apagou, já está dentro dele — ver `montarCorpoInicial`). O rodapé
-      // automático (nome+logo+empresa, colado aqui no envio) deixou de
-      // existir: `sanitizarHtmlEmail` é a única defesa nesta etapa, e é a
-      // MESMA função que já limpa o HTML a cada `onChange` do editor.
+      // apagou, já está dentro dele — ver `montarCorpoInicial`). Dois passos:
+      // `sanitizarHtmlEmail` (segurança) e `prepararHtmlParaEmail` (fidelidade —
+      // dá espaçamento inline aos parágrafos e preserva as linhas em branco, que
+      // a caixa de quem recebe descartaria, ver 21/09).
+      const corpoParaEnvio = prepararHtmlParaEmail(sanitizarHtmlEmail(data.corpo));
       const htmlBody = `
         <div style="font-family: sans-serif; font-size: 16px; color: #333; line-height: 1.5;">
-          ${sanitizarHtmlEmail(data.corpo)}
+          ${corpoParaEnvio}
         </div>
       `;
 
