@@ -13,7 +13,6 @@ import { AJUDA_CONTEUDO, textoDoPasso, galeriaDoPasso, type TopicoAjuda } from '
 import { secaoPorId, type SecaoId } from '@/lib/secoes';
 import { useSecoesDaEmpresa } from '@/hooks/use-secoes';
 import { useAuth } from '@/hooks/use-auth';
-import { ImagemDaAjuda } from '@/components/ajuda/ImagemDaAjuda';
 import { GaleriaDaAjuda } from '@/components/ajuda/GaleriaDaAjuda';
 import { DocumentacaoApi } from '@/components/ajuda/DocumentacaoApi';
 
@@ -254,9 +253,15 @@ export default function Ajuda() {
                             )}
                           </div>
                           {/* Sempre presente, mesmo vazio: é o que mantém a coluna da imagem
-                              alinhada em todas as linhas, tópico tendo imagem ou não. */}
+                              alinhada em todas as linhas, tópico tendo imagem ou não.
+                              GaleriaDaAjuda (não mais ImagemDaAjuda, desde 21/09/2026): a
+                              coluna do tópico virou galeria como a dos passos — o admin
+                              decide na hora se sobe uma foto só ou várias, sem precisar de
+                              código novo por tópico. A chave antiga (sem sufixo numérico)
+                              continua valendo como a primeira foto, ver o comentário em
+                              GaleriaDaAjuda.tsx. */}
                           <div className="lg:col-start-2">
-                            <ImagemDaAjuda imagem={topico.imagem} />
+                            <GaleriaDaAjuda prefixo={topico.imagem.chave} legenda={topico.imagem.legenda} />
                           </div>
                         </Fragment>
                       ))}

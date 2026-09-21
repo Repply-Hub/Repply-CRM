@@ -4,12 +4,14 @@ import type { SecaoId } from '@/lib/secoes';
  * Conteúdo da página de Ajuda (`src/pages/Ajuda.tsx`), separado da apresentação para poder
  * ser editado sem tocar em JSX.
  *
- * `imagem.chave` é o identificador estável do espaço de print, usado como chave primária em
- * `ajuda_imagens` (banco) e como nome de arquivo no balde `ajuda-imagens` (ver a migration
- * `20260915090000_ajuda_imagens.sql`). O admin da plataforma envia a imagem pela própria
- * página de Ajuda (`src/hooks/use-ajuda-imagens.ts`) — não há mais upload manual de asset
- * pelo código. `imagem.legenda` é o que aparece para o admin enquanto a imagem daquela
- * chave ainda não foi enviada, dizendo exatamente qual tela fotografar.
+ * `imagem.chave` é o identificador estável do espaço de print — desde 21/09/2026, a BASE do
+ * nome de uma galeria (`GaleriaDaAjuda.tsx`), não mais uma chave de imagem única: o admin
+ * decide na própria tela se sobe uma foto só ou várias, sem precisar de código novo por
+ * tópico. Fica gravado em `ajuda_imagens` (banco) e como nome de arquivo no balde
+ * `ajuda-imagens` (ver a migration `20260915090000_ajuda_imagens.sql`). O admin da plataforma
+ * envia a imagem pela própria página de Ajuda (`src/hooks/use-ajuda-imagens.ts`) — não há
+ * upload manual de asset pelo código. `imagem.legenda` é o que aparece para o admin enquanto
+ * a sequência daquele tópico ainda está vazia, dizendo exatamente qual tela fotografar.
  *
  * 🔴 NÃO troque uma `chave` já publicada sem apagar a linha antiga em `ajuda_imagens`: a
  * imagem enviada para a chave antiga fica órfã, sem nenhum tópico apontando para ela.
@@ -32,14 +34,16 @@ export interface ImagemDoTopico {
  * quando UM passo sozinho precisa de mais de uma tela para se explicar. As fotos entram
  * penduradas abaixo DAQUELE número na lista, num carrossel, não na coluna do tópico inteiro.
  *
- * Continua opcional por passo: a maioria dos tópicos tem poucos passos e uma imagem só do
- * tópico já basta, então um `PassoAjuda` comum (`string`) não ganha galeria nenhuma.
+ * Continua opcional por passo: a maioria dos tópicos tem poucos passos e a galeria do
+ * `ImagemDoTopico` já basta, então um `PassoAjuda` comum (`string`) não ganha galeria
+ * própria — só a do tópico.
  *
- * Diferente de `ImagemDoTopico` (uma `chave` fixa, uma imagem), aqui `prefixo` é a BASE do
- * nome — o admin sobe quantas fotos quiser pela própria tela, sem precisar de código novo a
- * cada uma: a 1ª foto enviada vira `<prefixo>-1`, a 2ª `<prefixo>-2`, e assim por diante
- * (`GaleriaDaAjuda.tsx` calcula o próximo número sozinho). Continua sendo a mesma tabela
- * `ajuda_imagens` — só muda que várias linhas compartilham o mesmo prefixo de chave.
+ * Mesmo mecanismo de `ImagemDoTopico.chave` (`prefixo` é a BASE do nome): o admin sobe
+ * quantas fotos quiser pela própria tela, sem precisar de código novo a cada uma — a 1ª foto
+ * enviada vira `<prefixo>-1`, a 2ª `<prefixo>-2`, e assim por diante (`GaleriaDaAjuda.tsx`
+ * calcula o próximo número sozinho). Existe como tipo à parte porque um passo de dentro do
+ * tópico precisa da própria legenda/prefixo, diferente da galeria do tópico inteiro — mas as
+ * duas usam o mesmo componente e a mesma tabela `ajuda_imagens`.
  */
 export interface PassoComGaleria {
   texto: string;

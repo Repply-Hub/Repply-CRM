@@ -113,6 +113,69 @@ describe('GaleriaDaAjuda — só uma foto não precisa de contador nem de setas'
   });
 });
 
+describe('GaleriaDaAjuda — chave sem sufixo (a de ImagemDaAjuda, antes de 21/09/2026)', () => {
+  it('uma chave IGUAL ao prefixo, sem número, aparece como a primeira foto da galeria', () => {
+    tela.profile = { role: 'vendedor' };
+    // "dashboard-grafico" é exatamente o prefixo, sem "-1" — o formato que a imagem única de
+    // um tópico gravava antes da coluna do tópico virar galeria.
+    tela.imagens = new Map([['dashboard-grafico', foto('dashboard-grafico')]]);
+    render(<GaleriaDaAjuda prefixo="dashboard-grafico" legenda="Gráfico do Dashboard" />);
+
+    expect(screen.getByAltText(/Gráfico do Dashboard/)).toHaveAttribute(
+      'src',
+      'https://exemplo.test/dashboard-grafico.png',
+    );
+  });
+
+  it('a chave sem sufixo entra ANTES das numeradas na ordem do carrossel', () => {
+    tela.profile = { role: 'admin' };
+    tela.imagens = new Map([
+      ['dashboard-grafico-2', foto('dashboard-grafico-2')],
+      ['dashboard-grafico', foto('dashboard-grafico')],
+    ]);
+    render(<GaleriaDaAjuda prefixo="dashboard-grafico" legenda="Gráfico do Dashboard" />);
+
+    expect(screen.getByText('1/2')).toBeInTheDocument();
+    expect(screen.getByAltText(/foto 1 de 2/)).toHaveAttribute('src', 'https://exemplo.test/dashboard-grafico.png');
+  });
+
+  it('quando só existe a chave sem sufixo (índice 0), a próxima foto enviada vira "-1" — não repete o índice 0', async () => {
+    tela.profile = { role: 'admin' };
+    tela.imagens = new Map([['dashboard-grafico', foto('dashboard-grafico')]]);
+    render(<GaleriaDaAjuda prefixo="dashboard-grafico" legenda="Gráfico do Dashboard" />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [arquivoDeImagem('nova.png')] } });
+
+    await waitFor(() => expect(enviarMutateAsync).toHaveBeenCalledTimes(1));
+    expect(enviarMutateAsync.mock.calls[0][0]).toMatchObject({ chave: 'dashboard-grafico-1' });
+  });
+
+  it('com a chave sem sufixo E uma numerada já presentes, a próxima foto continua depois do maior número', async () => {
+    tela.profile = { role: 'admin' };
+    tela.imagens = new Map([
+      ['dashboard-grafico-2', foto('dashboard-grafico-2')],
+      ['dashboard-grafico', foto('dashboard-grafico')],
+    ]);
+    render(<GaleriaDaAjuda prefixo="dashboard-grafico" legenda="Gráfico do Dashboard" />);
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [arquivoDeImagem('nova.png')] } });
+
+    await waitFor(() => expect(enviarMutateAsync).toHaveBeenCalledTimes(1));
+    expect(enviarMutateAsync.mock.calls[0][0]).toMatchObject({ chave: 'dashboard-grafico-3' });
+  });
+
+  it('uma chave de OUTRO tópico que só compartilha o começo do nome não entra na galeria', () => {
+    tela.profile = { role: 'vendedor' };
+    // "dashboard-grafico-pizza" não é nem "dashboard-grafico" nem "dashboard-grafico-<número>".
+    tela.imagens = new Map([['dashboard-grafico-pizza', foto('dashboard-grafico-pizza')]]);
+    const { container } = render(<GaleriaDaAjuda prefixo="dashboard-grafico" legenda="Gráfico do Dashboard" />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
 describe('GaleriaDaAjuda — numeração da sequência ao enviar', () => {
   it('a primeira foto de uma sequência vazia vira "<prefixo>-1"', async () => {
     tela.profile = { role: 'admin' };

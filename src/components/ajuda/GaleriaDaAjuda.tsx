@@ -1,11 +1,23 @@
 import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { ImageIcon, ImagePlus, Loader2, Trash2 } from 'lucide-react';
+import { ImageIcon, ImagePlus, Loader2, Maximize2, RotateCcw, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel';
+import {
+  Dialog,
+  DialogTitle,
+  ConteudoDialogo,
+  CabecalhoDialogo,
+  CorpoDialogo,
+  RodapeDialogo,
+} from '@/components/shared/DialogoResponsivo';
 import { useAuth } from '@/hooks/use-auth';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { useAjudaImagens, useEnviarImagemDaAjuda, useRemoverImagemDaAjuda, type ImagemDaAjuda } from '@/hooks/use-ajuda-imagens';
+
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3;
+const ZOOM_PASSO = 0.25;
 
 /** Escapa caracteres especiais de regex — `prefixo` vem do código, mas mais vale prevenir. */
 function escaparRegex(texto: string): string {
@@ -13,13 +25,19 @@ function escaparRegex(texto: string): string {
 }
 
 /**
- * A sequência de fotos de um passo numerado (`PassoComGaleria`, `ajuda-conteudo.ts`).
+ * A sequência de fotos de um tópico ou de um passo numerado (`PassoComGaleria`,
+ * `ajuda-conteudo.ts`) — qualquer `chave`/`prefixo` do conteúdo pode virar galeria, sem
+ * precisar decidir isso de antemão no código: `prefixo` é a BASE do nome de um grupo, cada
+ * foto enviada pela tela vira `<prefixo>-1`, `<prefixo>-2`, e assim por diante, calculado
+ * sozinho a partir do maior número já usado. O admin master monta a sequência direto na
+ * tela, sem precisar de código novo a cada foto — só a legenda inicial (o que fotografar)
+ * vem do código.
  *
- * Diferente de `ImagemDaAjuda` (uma `chave` fixa = uma imagem), aqui `prefixo` é a BASE do
- * nome de um grupo: cada foto enviada pela tela vira `<prefixo>-1`, `<prefixo>-2`, e assim por
- * diante, calculado sozinho a partir do maior número já usado. O admin master monta a
- * sequência direto na tela, sem precisar de código novo a cada foto — só a legenda inicial (o
- * que fotografar) vem do código, como em `ImagemDaAjuda`.
+ * A chave SEM sufixo (`<prefixo>`, exatamente) também casa, como foto de índice 0 — é o
+ * formato que `ImagemDaAjuda` (uma chave fixa = uma imagem, usado até 21/09/2026) gravava
+ * para a imagem única de um tópico. Sem este caso, toda imagem de tópico já enviada antes
+ * da galeria virar padrão ficaria órfã: existe na tabela e no balde, mas nenhuma tela
+ * mostraria mais. Não precisa migração de dado nenhuma — só ler os dois formatos.
  *
  * Mesma regra de visibilidade: quem não administra a plataforma só vê a galeria quando ela já
  * tem pelo menos uma foto.
@@ -32,10 +50,15 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
 
   const fotos = useMemo(() => {
     if (!imagens) return [];
-    const padrao = new RegExp(`^${escaparRegex(prefixo)}-(\\d+)$`);
+    const prefixoEscapado = escaparRegex(prefixo);
+    const padraoNumerado = new RegExp(`^${prefixoEscapado}-(\\d+)$`);
     const comIndice: Array<ImagemDaAjuda & { indice: number }> = [];
     for (const img of imagens.values()) {
-      const m = padrao.exec(img.chave);
+      if (img.chave === prefixo) {
+        comIndice.push({ ...img, indice: 0 });
+        continue;
+      }
+      const m = padraoNumerado.exec(img.chave);
       if (m) comIndice.push({ ...img, indice: Number(m[1]) });
     }
     return comIndice.sort((a, b) => a.indice - b.indice);
@@ -46,6 +69,10 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
   const [enviandoLote, setEnviandoLote] = useState(false);
   const [arrastando, setArrastando] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // A foto ampliada no momento (ou null, diálogo fechado) — independe de qual slide o
+  // carrossel está mostrando, porque o clique em "ampliar" já diz exatamente qual foto.
+  const [ampliada, setAmpliada] = useState<ImagemDaAjuda | null>(null);
+  const [zoom, setZoom] = useState(1);
 
   if (!ehAdmin && fotos.length === 0) return null;
 
@@ -118,17 +145,30 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
                       {i + 1}/{fotos.length}
                     </span>
                   )}
-                  {ehAdmin && (
+                  <div className="absolute right-1.5 top-1.5 flex gap-1">
                     <button
                       type="button"
-                      onClick={() => apagarFoto(foto)}
-                      disabled={ocupado}
-                      title="Remover esta foto"
-                      className="absolute right-1.5 top-1.5 rounded-md bg-background/80 p-1.5 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
+                      onClick={() => {
+                        setZoom(1);
+                        setAmpliada(foto);
+                      }}
+                      title="Ampliar imagem"
+                      className="rounded-md bg-background/80 p-1.5 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Maximize2 className="h-3.5 w-3.5" />
                     </button>
-                  )}
+                    {ehAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => apagarFoto(foto)}
+                        disabled={ocupado}
+                        title="Remover esta foto"
+                        className="rounded-md bg-background/80 p-1.5 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </CarouselItem>
             ))}
@@ -141,6 +181,65 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
           )}
         </Carousel>
       )}
+
+      <Dialog open={!!ampliada} onOpenChange={(aberto) => !aberto && setAmpliada(null)}>
+        <ConteudoDialogo className="sm:max-w-4xl p-0">
+          <CabecalhoDialogo className="px-4 pt-4">
+            <DialogTitle className="text-sm font-normal text-muted-foreground">{legenda}</DialogTitle>
+          </CabecalhoDialogo>
+          <CorpoDialogo className="mx-0 flex items-center justify-center px-4 pb-2">
+            {ampliada && (
+              <img
+                src={ampliada.url}
+                alt={legenda}
+                style={{ transform: `scale(${zoom})` }}
+                className="max-h-[70dvh] w-auto max-w-full rounded-md object-contain transition-transform"
+              />
+            )}
+          </CorpoDialogo>
+          <RodapeDialogo className="justify-center px-4 py-3 sm:justify-center">
+            <div className="flex items-center gap-0.5 rounded-full border bg-background px-1 py-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                disabled={zoom <= ZOOM_MIN}
+                onClick={() => setZoom((z) => Math.max(ZOOM_MIN, Number((z - ZOOM_PASSO).toFixed(2))))}
+                title="Diminuir zoom"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <span className="w-12 text-center text-xs tabular-nums text-muted-foreground">
+                {Math.round(zoom * 100)}%
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                disabled={zoom >= ZOOM_MAX}
+                onClick={() => setZoom((z) => Math.min(ZOOM_MAX, Number((z + ZOOM_PASSO).toFixed(2))))}
+                title="Aumentar zoom"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              {zoom !== 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full"
+                  onClick={() => setZoom(1)}
+                  title="Restaurar zoom"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </RodapeDialogo>
+        </ConteudoDialogo>
+      </Dialog>
 
       {ehAdmin && (
         <div

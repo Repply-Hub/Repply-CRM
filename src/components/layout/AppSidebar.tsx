@@ -62,7 +62,7 @@ const ADMIN_ONLY_IDS = new Set(['admin_wa_instancias', 'usuarios_admin', 'admin_
  * ler conteúdo de empresa nenhuma.
  *
  * `ajuda` esteve aqui entre 15/09/2026 e 21/09/2026 — era onde o admin subia as imagens da
- * página de Ajuda (ImagemDaAjuda.tsx), e diferente de `configuracoes` não tinha link
+ * página de Ajuda (GaleriaDaAjuda.tsx), e diferente de `configuracoes` não tinha link
  * alternativo. Saiu quando o botão de Ajuda virou flutuante (BotaoDeAjudaFlutuante.tsx,
  * em AppLayout): ele aparece em toda tela para qualquer perfil, inclusive o admin, e passou
  * a ser esse link alternativo — sem precisar de espaço no menu fechado dele.

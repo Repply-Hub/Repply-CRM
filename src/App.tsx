@@ -259,7 +259,7 @@ function ProtectedRoute({
   //
   // /ajuda entrou em 15/09/2026 pelo mesmo motivo de /configuracoes: também não tem
   // conteúdo de cliente (é documentação do produto, igual para toda empresa), e é onde o
-  // admin sobe as imagens da Ajuda (ImagemDaAjuda.tsx, RLS por is_admin()). Sem esta linha
+  // admin sobe as imagens da Ajuda (GaleriaDaAjuda.tsx, RLS por is_admin()). Sem esta linha
   // o admin nem chega a ver a tela: cai direto neste `if` e volta para /admin/empresas.
   const ROTAS_DO_ADMIN_GERAL = ["/admin", "/configuracoes", "/ajuda"];
   if (

@@ -22,9 +22,6 @@ const tela = vi.hoisted(() => ({
 vi.mock('@/components/layout/AppLayout', () => ({
   AppLayout: ({ children }: { children: ReactNode }) => children,
 }));
-vi.mock('@/components/ajuda/ImagemDaAjuda', () => ({
-  ImagemDaAjuda: ({ imagem }: { imagem: { chave: string } }) => <div data-testid={`imagem-${imagem.chave}`} />,
-}));
 vi.mock('@/components/ajuda/GaleriaDaAjuda', () => ({
   GaleriaDaAjuda: ({ prefixo }: { prefixo: string }) => <div data-testid={`galeria-${prefixo}`} />,
 }));
@@ -97,24 +94,24 @@ describe('Ajuda — aba de API exclusiva do admin master', () => {
 });
 
 describe('Ajuda — galeria de fotos por passo numérico', () => {
-  it('cada um dos 5 passos de "Como a pauta é montada" tem a própria galeria, além da imagem do tópico', () => {
+  it('cada um dos 5 passos de "Como a pauta é montada" tem a própria galeria, além da galeria do tópico', () => {
     renderAjuda();
 
     // A seção "Hoje" é a primeira e abre por padrão (sem `?secao=` na URL).
     for (let n = 1; n <= 5; n++) {
       expect(screen.getByTestId(`galeria-hoje-pauta-passo-${n}`)).toBeInTheDocument();
     }
-    // A imagem do tópico inteiro (coluna da direita) continua existindo — uma coisa não
+    // A galeria do tópico inteiro (coluna da direita) continua existindo — uma coisa não
     // substitui a outra.
-    expect(screen.getByTestId('imagem-hoje-pauta')).toBeInTheDocument();
+    expect(screen.getByTestId('galeria-hoje-pauta')).toBeInTheDocument();
   });
 
-  it('um tópico sem galeria por passo não ganha galeria nenhuma além da imagem do tópico', () => {
+  it('um tópico sem galeria por passo não ganha galeria por passo nenhuma além da do tópico', () => {
     renderAjuda();
 
     // "Abrir um item e decidir o que fazer" tem 3 passos, nenhum com galeria própria — só a
-    // imagem do tópico (hoje-retomar-depois) deve existir, nenhuma "hoje-retomar-depois-passo-N".
-    expect(screen.getByTestId('imagem-hoje-retomar-depois')).toBeInTheDocument();
+    // galeria do tópico (hoje-retomar-depois) deve existir, nenhuma "hoje-retomar-depois-passo-N".
+    expect(screen.getByTestId('galeria-hoje-retomar-depois')).toBeInTheDocument();
     expect(screen.queryByTestId(/galeria-hoje-retomar-depois-passo/)).not.toBeInTheDocument();
   });
 });
