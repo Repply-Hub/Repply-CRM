@@ -1670,7 +1670,9 @@ const Emails = () => {
         )
         .eq("nylas_thread_id", selectedEmail!.threadId as string)
         .eq("excluido", false)
-        .order("data_mensagem", { ascending: true });
+        // Mais recente primeiro (pedido da MD, 21/09): a resposta nova aparece
+        // logo abaixo do e-mail aberto, sem precisar rolar até o fim da conversa.
+        .order("data_mensagem", { ascending: false });
       if (error) throw error;
 
       const outras = (data ?? []).filter((m) => m.id !== selectedEmail!.id);
