@@ -61,11 +61,13 @@ const ADMIN_ONLY_IDS = new Set(['admin_wa_instancias', 'usuarios_admin', 'admin_
  * policies de RLS, que desde a migration 20260804195019 não deixam mais o admin
  * ler conteúdo de empresa nenhuma.
  *
- * `ajuda` entrou em 15/09/2026: é onde o admin sobe as imagens da página de Ajuda
- * (ImagemDaAjuda.tsx), e diferente de `configuracoes` não tem um link alternativo (o avatar
- * do cabeçalho) — sem entrar aqui, a única forma de chegar lá seria digitar a URL de cabeça.
+ * `ajuda` esteve aqui entre 15/09/2026 e 21/09/2026 — era onde o admin subia as imagens da
+ * página de Ajuda (ImagemDaAjuda.tsx), e diferente de `configuracoes` não tinha link
+ * alternativo. Saiu quando o botão de Ajuda virou flutuante (BotaoDeAjudaFlutuante.tsx,
+ * em AppLayout): ele aparece em toda tela para qualquer perfil, inclusive o admin, e passou
+ * a ser esse link alternativo — sem precisar de espaço no menu fechado dele.
  */
-const ITENS_DO_ADMIN_GERAL = ['admin_empresas', 'admin_secoes', 'admin_wa_instancias', 'ajuda'];
+const ITENS_DO_ADMIN_GERAL = ['admin_empresas', 'admin_secoes', 'admin_wa_instancias'];
 
 export function AppSidebar() {
   const { state, setOpen, isMobile } = useSidebar();

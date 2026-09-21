@@ -32,9 +32,6 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'whatsapp', path: '/whatsapp', label: 'WhatsApp', icon: 'WhatsApp', visible: true },
   { id: 'emails', path: '/emails', label: 'E-mails', icon: 'Mail', visible: true },
   { id: 'configuracoes', path: '/configuracoes', label: 'Configurações', icon: 'Settings', visible: true },
-  // Última seção "normal" do menu, depois de Configurações — passo a passo das
-  // funcionalidades, não compete por destaque com o que a pessoa usa no dia a dia.
-  { id: 'ajuda', path: '/ajuda', label: 'Ajuda', icon: 'HelpCircle', visible: true },
 
   { id: 'admin_empresas', path: '/admin/empresas', label: 'Empresas', icon: 'Building2', visible: true },
   { id: 'usuarios_admin', path: '/configuracoes?tab=usuarios', label: 'Usuários', icon: 'Users', visible: true },
@@ -44,7 +41,11 @@ export const DEFAULT_SIDEBAR_ITEMS: SidebarItem[] = [
 
 // Itens descontinuados que ainda podem existir em preferências salvas (usuário ou empresa)
 // de antes da remoção — filtrados ao carregar para que sumam do menu de todo mundo.
-const REMOVED_IDS = new Set(['pedidos', 'portal_consultas', 'importacoes_ignoradas', 'historico']);
+//
+// `ajuda` saiu do menu em 21/09/2026: virou botão flutuante (BotaoDeAjudaFlutuante.tsx),
+// visível em toda tela, em vez de item de sidebar — não some da preferência de quem já
+// tinha arrastado, ocultado ou reordenado o item, então precisa ser filtrado aqui.
+const REMOVED_IDS = new Set(['pedidos', 'portal_consultas', 'importacoes_ignoradas', 'historico', 'ajuda']);
 
 // Exportada para o teste de normalização (ver use-sidebar-preferences.test.ts):
 // quem já salvou a sidebar com o ícone antigo (`MessageCircle`, genérico)

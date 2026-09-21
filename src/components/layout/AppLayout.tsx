@@ -1,4 +1,5 @@
 import { AppSidebar } from './AppSidebar';
+import { BotaoDeAjudaFlutuante } from './BotaoDeAjudaFlutuante';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { NotificationCenter } from '@/components/layout/NotificationCenter';
@@ -96,6 +97,7 @@ export function AppLayout({ children, title, subtitle, headerContent, mainClassN
           </main>
         </div>
       </div>
+      <BotaoDeAjudaFlutuante />
       </TooltipProvider>
     </SidebarProvider>
   );
