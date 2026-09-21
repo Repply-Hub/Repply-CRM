@@ -4,7 +4,26 @@ import { Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TextStyle from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
+import Image from "@tiptap/extension-image";
 import { EditorTextoRico } from "./EditorTextoRico";
+
+// Reproduz a extensão de imagem com largura de EditorTextoRico.tsx.
+const ImagemComTamanho = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (el: HTMLElement) => {
+          const n = parseInt(String(el.getAttribute("width") ?? ""), 10);
+          return Number.isFinite(n) && n > 0 ? n : null;
+        },
+        renderHTML: (attrs: { width?: number | null }) =>
+          attrs.width ? { width: attrs.width } : {},
+      },
+    };
+  },
+});
 
 // Reproduz a extensão de tamanho do componente para provar que ela RENDERIZA o
 // font-size (o defeito relatado era da barra perder a seleção, não da extensão).
@@ -82,5 +101,25 @@ describe("extensão de tamanho de fonte", () => {
     const html = editor.getHTML();
     editor.destroy();
     expect(html).toContain("font-size: 24px");
+  });
+});
+
+describe("extensão de tamanho de imagem", () => {
+  it("renderiza o atributo width no <img>", () => {
+    const editor = new Editor({ extensions: [StarterKit, ImagemComTamanho] });
+    editor.chain().setImage({ src: "https://x/i.png", width: 300 } as { src: string; width: number }).run();
+    const html = editor.getHTML();
+    editor.destroy();
+    expect(html).toContain('width="300"');
+  });
+
+  it("updateAttributes troca a largura", () => {
+    const editor = new Editor({ extensions: [StarterKit, ImagemComTamanho] });
+    editor.chain().setImage({ src: "https://x/i.png", width: 500 } as { src: string; width: number }).run();
+    editor.commands.selectAll();
+    editor.chain().updateAttributes("image", { width: 150 }).run();
+    const html = editor.getHTML();
+    editor.destroy();
+    expect(html).toContain('width="150"');
   });
 });

@@ -63,6 +63,41 @@ const TamanhoDaFonte = TextStyle.extend({
   },
 });
 
+/**
+ * Estende a extensão `Image` para carregar uma LARGURA em px. A `Image` de
+ * fábrica só tem `src/alt/title`; sem largura, a imagem chega no tamanho
+ * NATURAL na caixa de quem recebe (a assinatura da MD chegava gigante). O
+ * `width` vira o atributo HTML `width` + `style` inline (o max-width protege no
+ * celular). "Original" = sem `width`, volta ao natural (escolha deliberada).
+ */
+const ImagemComTamanho = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (element: HTMLElement) => {
+          const bruto = element.getAttribute("width") || element.style.width;
+          const n = parseInt(String(bruto ?? ""), 10);
+          return Number.isFinite(n) && n > 0 ? n : null;
+        },
+        // Só o atributo HTML `width` (em px) — é o que a caixa de quem recebe
+        // respeita. O `max-width:100%` (segurança no celular) vai no
+        // `HTMLAttributes` estático do `.configure`, não aqui.
+        renderHTML: (attributes: { width?: number | null }) =>
+          attributes.width ? { width: attributes.width } : {},
+      },
+    };
+  },
+});
+
+const TAMANHOS_IMAGEM: { rotulo: string; valor: number | null }[] = [
+  { rotulo: "Pequena", valor: 150 },
+  { rotulo: "Média", valor: 300 },
+  { rotulo: "Grande", valor: 500 },
+  { rotulo: "Original", valor: null },
+];
+
 const FONTES: { rotulo: string; valor: string | null }[] = [
   { rotulo: "Padrão", valor: null },
   { rotulo: "Arial", valor: "Arial, Helvetica, sans-serif" },
@@ -248,7 +283,11 @@ export function EditorTextoRico({
       StarterKit,
       Underline,
       Link.configure({ openOnClick: false, autolink: true }),
-      Image.configure({ inline: false, allowBase64: false }),
+      ImagemComTamanho.configure({
+        inline: false,
+        allowBase64: false,
+        HTMLAttributes: { style: "max-width:100%;height:auto" },
+      }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       TamanhoDaFonte,
       Color,
@@ -311,7 +350,15 @@ export function EditorTextoRico({
     if (!file || !onEnviarImagem) return;
     try {
       const url = await onEnviarImagem(file);
-      editor.chain().focus().setImage({ src: url }).run();
+      // Teto ao inserir: mede o tamanho natural e limita a 500px, para a imagem
+      // nunca chegar gigante na caixa de quem recebe. `window.Image` é o do
+      // navegador (não confundir com a extensão `Image` do TipTap).
+      const medir = new window.Image();
+      const inserir = (largura: number) =>
+        editor.chain().focus().setImage({ src: url, width: largura } as { src: string; width: number }).run();
+      medir.onload = () => inserir(Math.min(medir.naturalWidth || 500, 500));
+      medir.onerror = () => inserir(500);
+      medir.src = url;
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Não foi possível enviar a imagem.");
     }
@@ -363,6 +410,29 @@ export function EditorTextoRico({
       <RemoveFormatting className="h-4 w-4" />
     </BotaoBarra>
   );
+  // Só aparece quando uma imagem está selecionada. Fica INLINE (não dentro do
+  // ⋯) para não aninhar popover em popover.
+  const menuTamanhoImagem = editor.isActive("image") ? (
+    <MenuBarra
+      titulo="Tamanho da imagem"
+      largura="w-40"
+      gatilho={<><ImageIcon className="h-4 w-4" /><ChevronDown className="h-3 w-3" /></>}
+    >
+      {(fechar) =>
+        TAMANHOS_IMAGEM.map((t) => (
+          <ItemMenu
+            key={t.rotulo}
+            onClick={() => {
+              editor.chain().focus().updateAttributes("image", { width: t.valor }).run();
+              fechar();
+            }}
+          >
+            {t.rotulo}
+          </ItemMenu>
+        ))
+      }
+    </MenuBarra>
+  ) : null;
 
   const Sep = () => <div className="mx-0.5 h-5 w-px shrink-0 bg-border" />;
 
@@ -464,6 +534,9 @@ export function EditorTextoRico({
         </BotaoBarra>
 
         <Sep />
+
+        {/* Tamanho da imagem: inline e só quando há imagem selecionada. */}
+        {menuTamanhoImagem}
 
         {/* Alinhamento + imagem + limpar: inline quando cabe, no ⋯ quando estreito. */}
         {!compacto ? (
