@@ -4867,6 +4867,14 @@ export type Database = {
       delete_current_user: { Args: never; Returns: undefined }
       delete_obras_bulk: { Args: { obra_ids: string[] }; Returns: undefined }
       empresa_plano_ativo: { Args: never; Returns: boolean }
+      excluir_etapa_do_funil: {
+        Args: {
+          p_coluna_id: string
+          p_destino: string
+        }
+        /** Quantos negócios foram remanejados para a etapa de destino. */
+        Returns: number
+      }
       email_do_negocio: {
         Args: {
           p_cliente_id: string

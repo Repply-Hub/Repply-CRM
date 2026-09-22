@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { invalidarPaineisDeNegocios } from './use-pedidos';
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 
 export interface KanbanColuna {
   id: string;
@@ -144,34 +145,42 @@ export function useDeleteKanbanColuna() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { id: string; slug: string; targetSlug: string; funilId: string }) => {
-      // Move pedidos da coluna excluída para a coluna alvo — escopado ao mesmo funil,
-      // já que dois funis diferentes podem ter colunas com o mesmo slug.
+      // UMA operação, no banco: `excluir_etapa_do_funil` apaga a coluna e remaneja os negócios
+      // na mesma transação (migration 20260922150000). Até 22/09/2026 eram duas gravações daqui,
+      // nesta ordem: mover os negócios e depois apagar a coluna. Só a segunda é protegida
+      // (`kanban_colunas_delete` exige gestor) e apagar zero linhas não devolve erro, então um
+      // vendedor comum movia os próprios negócios, a coluna ficava de pé e a tela dizia que
+      // tinha dado certo (item 39 da dívida). Inverter a ordem aqui não resolveria: entre as
+      // duas gravações sempre haveria uma janela — apagar a coluna e falhar ao mover deixaria
+      // os negócios numa etapa que não existe mais.
       //
-      // DATA DE FECHAMENTO: se a etapa de destino escolhida for Fechamento ou Perdido, este
-      // UPDATE marca dezenas ou centenas de negócios como fechados de uma vez. É o caminho
-      // de que ninguém lembra quando pensa em "fechar um negócio" — e por isso a regra da
-      // data não mora aqui: o gatilho `fn_set_pedido_fechado_em`
-      // (supabase/migrations/20260821120100_data_fechamento_em_todos_os_caminhos.sql) roda
-      // linha a linha também neste UPDATE em massa e carimba a data em cada um deles. Não
-      // acrescente carimbo de data aqui: duas donas para a mesma regra foi exatamente como
-      // o problema começou.
-      const { error: pErr } = await supabase
-        .from('pedidos')
-        .update({ status: input.targetSlug })
-        .eq('status', input.slug)
-        .eq('funil_id', input.funilId);
-      if (pErr) throw pErr;
-      const { error } = await supabase.from('kanban_colunas').delete().eq('id', input.id);
-      if (error) throw error;
+      // DATA DE FECHAMENTO: quando o destino é Fechamento ou Perdido, o gatilho
+      // `fn_set_pedido_fechado_em` (migration 20260821120100) carimba a data em cada negócio
+      // movido, dentro da mesma transação. A regra da data continua morando só lá — duas donas
+      // para a mesma regra foi exatamente como o problema começou.
+      const { data, error } = await supabase.rpc('excluir_etapa_do_funil', {
+        p_coluna_id: input.id,
+        p_destino: input.targetSlug,
+      });
+      if (error) throw new Error(mensagemDeErro(error, 'Não foi possível excluir a etapa.'));
+      return (data ?? 0) as number;
     },
-    onSuccess: () => {
+    onSuccess: (movidos: number) => {
       qc.invalidateQueries({ queryKey: ['kanban_colunas'] });
       // Remanejar negócios em massa pode passar dezenas deles para Fechamento ou Perdido —
       // ou tirá-los de lá —, então mexe no faturamento e nas metas, não só no quadro.
       invalidarPaineisDeNegocios(qc);
-      toast.success('Coluna excluída e negócios remanejados');
+      toast.success(
+        movidos > 0
+          ? `Etapa excluída e ${movidos.toLocaleString('pt-BR')} negócio(s) remanejado(s)`
+          : 'Etapa excluída',
+      );
     },
-    onError: (err: any) => toast.error(err?.message || 'Erro ao excluir coluna'),
+    // A tranquilidade que faltava, e que vale para QUALQUER falha agora que tudo é uma
+    // transação só: se a etapa não saiu, nenhum negócio mudou de lugar. Era exatamente o que a
+    // pessoa não sabia quando a tela anunciava sucesso sobre uma exclusão que não aconteceu.
+    onError: (err: unknown) =>
+      toast.error(`${mensagemDeErro(err, 'Não foi possível excluir a etapa.')} Nenhum negócio foi movido.`),
   });
 }
 

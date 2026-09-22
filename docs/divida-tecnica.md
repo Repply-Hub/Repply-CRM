@@ -55,8 +55,8 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 36 | [As 8 visões `v_md_*` entregam a carteira de clientes sem login](#36-as-8-visões-v_md_-entregam-a-carteira-de-clientes-sem-login) | **Crítica** | Sim — 1.305 clientes legíveis sem login |
 | 37 | [A pré-visualização de anexo executa o HTML do arquivo](#37-a-pré-visualização-de-anexo-executa-o-html-do-arquivo-recebido) | **Crítica** | Sim — arquivo de estranho roda na sessão de quem abre |
 | 38 | [Excluir usuário não tira o acesso](#38-excluir-usuário-não-tira-o-acesso) | **Crítica** | Latente — 0 excluídos hoje, mas não há como revogar |
-| 39 | [Excluir etapa do Kanban move negócios mesmo quando o banco recusa](#39-excluir-etapa-do-kanban-move-os-negócios-mesmo-quando-o-banco-recusa) | **Crítica** | Sim — pode carimbar centenas como fechados hoje |
-| 40 | [O conserto de datas não alcança a tela de Negócios](#40--o-conserto-de-datas-da-importação-não-alcança-a-tela-de-negócios) | **Crítica** | **Sim — reabre a prioridade zero** |
+| 39 | [Excluir etapa do Kanban move negócios mesmo quando o banco recusa](#39-excluir-etapa-do-kanban-move-os-negócios-mesmo-quando-o-banco-recusa) | ✅ Resolvida | 22/09/2026 — as duas gravações viraram uma operação só no banco |
+| 40 | [O conserto de datas não alcança a tela de Negócios](#40--o-conserto-de-datas-da-importação-não-alcançava-a-tela-de-negócios) | ✅ Código resolvido | 01/09/2026 · ⚠️ o dado já gravado continua errado — ver item 3 |
 | 41 | [Duas funções do banco atravessam a fronteira entre empresas](#41-duas-funções-do-banco-atravessam-a-fronteira-entre-empresas) | ✅ Resolvido | Corrigido na migration `20260829120000` — a tela só acompanhou em 31/08 |
 | 42 | [Funções de servidor abertas sem motivo, e duas sem conferir quem chamou](#42-seis-funções-de-servidor-abertas-sem-motivo-escrito-e-duas-sem-conferir-quem-chamou) | Alta | Não |
 | 43 | [Os 22.276 arquivos do Storage podem ser LISTADOS sem login](#43-os-22276-arquivos-do-storage-podem-ser-listados-sem-login) | Alta | Complementa o plano dos baldes |
@@ -1566,6 +1566,23 @@ A revogação do login é passo à parte, e não tem tela: hoje só pelo painel 
 ---
 
 ## 39. Excluir etapa do Kanban move os negócios mesmo quando o banco recusa
+
+> ✅ **Resolvido em 22/09/2026.** As duas gravações viraram UMA operação no banco,
+> `excluir_etapa_do_funil` (migration `20260922150000`): a exclusão vem primeiro e é ela que
+> decide — quem a regra de acesso recusa não move negócio nenhum —, e o remanejamento corre na
+> mesma transação. Inverter a ordem no navegador não bastaria: entre duas gravações separadas
+> sempre haveria uma janela, e apagar a coluna e falhar ao mover deixaria os negócios numa etapa
+> que não existe mais. O aviso de erro passou a dizer também que **nenhum negócio foi movido**.
+> Guarda estrutural: `src/hooks/excluir-etapa-nao-move-sozinha.test.tsx` falha se a tela voltar a
+> ter um caminho próprio para mover negócio ao excluir etapa.
+>
+> Ensaiado em produção em transação desfeita, numa etapa com 48 negócios: vendedor comum recusado
+> com os 48 intactos; gestor moveu os 48 e a etapa saiu.
+>
+> **Fica de fora, de propósito:** esconder a opção de quem não é gestor. Hoje ela aparece, a
+> pessoa tenta e recebe a recusa com a frase que diz o que fazer — honesto e sem risco. Esconder
+> é conforto de tela, não proteção (`CLAUDE.md` §6.1), e entra quando a matriz de permissões da
+> tela for revista (itens 36 e 44).
 
 **Gravidade: crítica.**
 
