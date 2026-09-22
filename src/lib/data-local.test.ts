@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { hojeLocal, formatarDataBR } from './data-local';
+import { format } from 'date-fns';
+import { hojeLocal, formatarDataBR, ancoraDoDia } from './data-local';
 
 /**
  * POR QUE ESTE ARQUIVO EXISTE
@@ -67,5 +68,34 @@ describe('formatarDataBR', () => {
   it('vazio vira vazio', () => {
     expect(formatarDataBR(null)).toBe('');
     expect(formatarDataBR('')).toBe('');
+  });
+});
+
+/**
+ * A âncora de meio-dia: ler do banco uma data que a pessoa escolheu sem escolher hora.
+ *
+ * `new Date('2026-09-01')` é meia-noite em UTC, que no Brasil é 21h de 31/08 — a data cai no dia
+ * anterior, e no dia 1º cai no MÊS anterior. Era o que fazia o Calendário desenhar o prazo de um
+ * negócio na véspera e o próximo contato às 21h do dia errado (CLAUDE.md §7.12).
+ */
+describe('ancoraDoDia', () => {
+  it('lê uma data seca no dia que está escrito, não na véspera', () => {
+    expect(format(ancoraDoDia('2026-09-01'), 'yyyy-MM-dd')).toBe('2026-09-01');
+  });
+
+  it('o idioma antigo, sem a âncora, caía mesmo no dia anterior — é o defeito que isto corrige', () => {
+    expect(format(new Date('2026-09-01'), 'yyyy-MM-dd')).toBe('2026-08-31');
+  });
+
+  it('lê um carimbo gravado à meia-noite em UTC no dia que a pessoa escolheu', () => {
+    expect(format(ancoraDoDia('2026-09-10T00:00:00+00:00'), 'yyyy-MM-dd')).toBe('2026-09-10');
+  });
+
+  it('fica no meio do dia, longe das duas bordas de fuso', () => {
+    expect(ancoraDoDia('2026-09-01').getHours()).toBe(12);
+  });
+
+  it('atravessa a virada do ano sem escorregar', () => {
+    expect(format(ancoraDoDia('2027-01-01'), 'yyyy-MM-dd')).toBe('2027-01-01');
   });
 });

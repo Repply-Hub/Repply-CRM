@@ -10,6 +10,7 @@ import {
   eventsForDay,
   timedEvents,
   allDayEvents,
+  recorteNoDia,
   yPxToDate,
 } from './calendarUtils';
 import type { CalendarEvent } from './types';
@@ -335,7 +336,18 @@ export function TimeGridView({ days, events, onClickSlot, onCreateRange, onClick
                   />
                 ))}
                 {/* Eventos do dia */}
-                {distribuirEmColunas(timedEvents(eventsForDay(events, day))).map(({ evento: ev, coluna, colunas }) => (
+                {/* O compromisso que atravessa dias é desenhado pelo PEDAÇO que cabe neste dia:
+                    a grade posiciona pela hora de início e estica pela duração, então sem o
+                    recorte um compromisso de ontem apareceria hoje no horário de ontem e com a
+                    altura dos dois dias. Quem cabe no dia passa intacto (mesmo objeto). */}
+                {distribuirEmColunas(
+                  timedEvents(eventsForDay(events, day)).map((ev) => {
+                    const pedaco = recorteNoDia(ev, day);
+                    return pedaco.inicio === ev.inicio && pedaco.fim === ev.fim
+                      ? ev
+                      : { ...ev, inicio: pedaco.inicio, fim: pedaco.fim };
+                  }),
+                ).map(({ evento: ev, coluna, colunas }) => (
                   <EventBlock key={ev.id} event={ev} onClick={onClickEvent} coluna={coluna} colunas={colunas} />
                 ))}
                 {/* Preview do drag-to-create */}

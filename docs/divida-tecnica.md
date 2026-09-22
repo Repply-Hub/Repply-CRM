@@ -67,7 +67,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 48 | [O Radar de Risco conta edição de campo como movimento](#48-o-radar-de-risco-conta-edição-de-campo-como-movimento) | Alta | Não — R$ 5,0 mi no lugar de R$ 14,4 mi |
 | 49 | [O filtro "Etapa" não filtra, em dois lugares](#49-o-filtro-etapa-não-filtra-em-dois-lugares) | Alta | Não — mas a Ação em massa não tem desfazer |
 | 50 | [A soma em reais do Kanban usa só os cartões carregados](#50-a-soma-em-reais-do-kanban-usa-só-os-cartões-carregados) | ✅ Resolvida | Corrigido em 22/09/2026 — a coluna pede o total da etapa ao banco |
-| 51 | [O Calendário mostra menos de 10% dos prazos, e um dia antes](#51-o-calendário-mostra-menos-de-10-dos-prazos-e-desenha-um-dia-antes) | Alta | Não |
+| 51 | [O Calendário mostra menos de 10% dos prazos, e um dia antes](#51-o-calendário-mostra-menos-de-10-dos-prazos-e-desenha-um-dia-antes) | ✅ Resolvida | Recorte de período em 27/08 e âncora de meio-dia em 22/09/2026 |
 | 52 | [Importar contatos cria construtoras duplicadas](#52-importar-contatos-cria-construtoras-duplicadas) | Alta | Suja a base a cada importação |
 | 53 | [Ler clientes é ~130× mais caro por linha que ler negócios](#53-ler-a-lista-de-clientes-é-130-mais-caro-por-linha-do-que-ler-negócios) | Média | Não hoje — piora sozinho |
 | 54 | [`app_erros` mistura desenvolvimento e produção](#54-app_erros-mistura-desenvolvimento-e-produção-e-ninguém-olha) | Média | Não |
@@ -1959,6 +1959,14 @@ devolve — a assinatura já aceita `stages` e a `queryKey` já ignora paginaç�
 
 ## 51. O Calendário mostra menos de 10% dos prazos, e desenha um dia antes
 
+> ✅ **Resolvido.** A parte 1 (teto de 1.000) saiu em 27/08/2026 com o recorte de período
+> (`src/lib/periodo-do-calendario.ts`, com teste). A parte 2 (um dia antes) saiu em 22/09/2026:
+> prazo e próximo contato passaram a ser lidos com `ancoraDoDia` (`src/lib/data-local.ts`), a
+> âncora de meio-dia do `CLAUDE.md` §7.12. Na mesma leva, o próximo contato deixou de virar um
+> bloco às 21h da véspera e entrou como compromisso de dia inteiro, e o compromisso de vários
+> dias passou a aparecer em todos os dias (`eventsForDay` e `recorteNoDia`, com teste em
+> `src/components/calendar/calendarUtils.test.ts`).
+
 **Gravidade: alta.**
 
 Dois defeitos somados, no mesmo arquivo:
@@ -2762,7 +2770,7 @@ demais datas do sistema são carimbo com fuso, e para elas `new Date(...)` está
 | onde | o que acontece | conserto |
 |---|---|---|
 | Clientes e contatos **já cadastrados** depois das 21h, antes do conserto de 11/09 | A "Data de Criação" continua gravada com o dia seguinte — o código novo só vale para cadastro novo | Dá para achar comparando `data_criacao` com `created_at` no horário de Brasília. Corrigir é mudança em dado de produção e pede conversa antes (`CLAUDE.md` §11) |
-| Calendário, `use-eventos.ts:184` | Desenha o fechamento um dia antes | Já é o [item 51](#51-o-calendário-mostra-menos-de-10-dos-prazos-e-desenha-um-dia-antes), que cita a linha de antes (164) |
+| Calendário, `use-eventos.ts` | Desenhava o fechamento um dia antes | ✅ Resolvido em 22/09/2026 com `ancoraDoDia` — ver [item 51](#51-o-calendário-mostra-menos-de-10-dos-prazos-e-desenha-um-dia-antes) |
 
 ✅ **Consertado em 11/09/2026**, com `src/lib/data-local.ts` (`hojeLocal` e `formatarDataBR`, com
 teste) e um guarda estrutural, `src/test/hoje-no-fuso-local.test.ts`, que falha se o idioma voltar:

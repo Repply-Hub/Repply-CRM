@@ -4,8 +4,8 @@ import { format } from 'date-fns';
  * Datas no fuso de quem usa o sistema.
  *
  * O JavaScript converte para UTC sem avisar, e o Brasil está três horas atrás: das 21h à
- * meia-noite, "hoje" em UTC já é amanhã (CLAUDE.md §7.12). As duas funções daqui existem porque
- * os dois idiomas mais digitados do projeto caíam nessa conta — ver `data-local.test.ts`.
+ * meia-noite, "hoje" em UTC já é amanhã (CLAUDE.md §7.12). As funções daqui existem porque os
+ * idiomas mais digitados do projeto caíam nessa conta — ver `data-local.test.ts`.
  */
 
 /**
@@ -40,4 +40,24 @@ export function formatarDataBR(valor: string | null | undefined): string {
   if (valor.length === 10) return recorte;
   const instante = new Date(valor);
   return Number.isNaN(instante.getTime()) ? recorte : format(instante, 'dd/MM/yyyy');
+}
+
+/**
+ * A data que a pessoa escolheu, como `Date` posicionado NO DIA CERTO — a "âncora de meio-dia"
+ * do CLAUDE.md §7.12.
+ *
+ * `new Date('2026-09-01')` é meia-noite em UTC, que no Brasil é 21h de 31/08: a data cai na
+ * véspera, e no dia 1º cai no mês anterior. Ancorar ao MEIO do dia deixa a data longe das duas
+ * bordas de fuso, então ela não escorrega para nenhum lado.
+ *
+ * Serve para os dois jeitos de guardar uma data sem hora que existem no banco:
+ *   · coluna `date` (`prazo_resposta`): chega como `AAAA-MM-DD`;
+ *   · carimbo gravado à meia-noite em UTC (`historico_contatos.proximo_contato_em`): chega como
+ *     `AAAA-MM-DDT00:00:00+00:00`, e o dia que vale é o da parte da data.
+ *
+ * NÃO use em carimbo com hora de verdade (`created_at`): ali a hora é informação, e jogá-la para
+ * meio-dia apagaria o dado. Para mostrar esses, é `formatarDataBR`.
+ */
+export function ancoraDoDia(valor: string): Date {
+  return new Date(`${valor.slice(0, 10)}T12:00:00`);
 }

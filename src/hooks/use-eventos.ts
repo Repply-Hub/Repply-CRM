@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { DiferencaDaRota } from '@/lib/rota-em-edicao';
 import type { PeriodoDoCalendario } from '@/lib/periodo-do-calendario';
 import { contatoApareceNoCalendario } from '@/lib/contato-no-calendario';
+import { ancoraDoDia } from '@/lib/data-local';
 import { useAuth } from './use-auth';
 import { useCreateTarefa } from './use-tarefas';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
@@ -221,7 +222,10 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>, periodo: 
     if (visibleCalendars.has('pessoal')) {
       (pedidos as unknown as PedidoCalendario[])?.forEach((p) => {
         if (!p.prazo_resposta) return;
-        const date = new Date(p.prazo_resposta);
+        // `prazo_resposta` é coluna `date`: chega como `AAAA-MM-DD`. Sem a âncora de meio-dia,
+        // `new Date` lê meia-noite em UTC e o prazo de 01/09 era desenhado em 31/08 — no mês
+        // anterior, e some da visão Dia (CLAUDE.md §7.12).
+        const date = ancoraDoDia(p.prazo_resposta);
         result.push({
           id: `prazo-${p.id}`,
           titulo: `Prazo: ${p.clientes?.empresa || 'Cliente'}`,
@@ -241,15 +245,18 @@ export function useCalendarEvents(visibleCalendars: Set<CalendarType>, periodo: 
         // O "Retomar depois" (tipo='retorno') não vira mais marcador no calendário — só
         // sincroniza com Tarefas. A coluna segue gravada (é o que devolve o negócio à pauta).
         if (!contatoApareceNoCalendario(c.tipo)) return;
-        const start = new Date(c.proximo_contato_em);
-        const end = new Date(start.getTime() + 30 * 60 * 1000);
+        // O próximo contato é uma DATA que a pessoa escolheu, sem hora: os 60 registros da base
+        // estão todos exatamente à meia-noite em UTC. Lido sem a âncora, virava um bloco de 30
+        // minutos às 21h da VÉSPERA, que sumia da visão Dia. Por isso ele entra como compromisso
+        // de dia inteiro, na faixa do topo, junto dos prazos — e não numa hora que ninguém marcou.
+        const start = ancoraDoDia(c.proximo_contato_em);
         result.push({
           id: `contato-${c.id}`,
           titulo: `Contato: ${c.pedidos?.clientes?.empresa || 'Cliente'}`,
           descricao: c.descricao || c.tipo,
           inicio: start,
-          fim: end,
-          diaInteiro: false,
+          fim: start,
+          diaInteiro: true,
           tipoCalendario: 'pessoal',
           cor: '#6b7280',
           editavel: false,

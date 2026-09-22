@@ -5,6 +5,8 @@ import {
   endOfMonth,
   addDays,
   isSameDay,
+  startOfDay,
+  endOfDay,
 } from 'date-fns';
 import type { CalendarEvent } from './types';
 
@@ -48,8 +50,46 @@ export function getCurrentTimePx(): number {
   return getEventTopPx(now);
 }
 
+/**
+ * Os compromissos que CRUZAM este dia — não só os que começam nele.
+ *
+ * Até 22/09/2026 era `isSameDay(e.inicio, day)`, e uma feira de três dias ou uma viagem de
+ * representação de 10 a 12 aparecia só no dia 10: os dias 11 e 12 pareciam livres e alguém
+ * marcava visita em cima. O dado sempre esteve certo (o dia inteiro é gravado até 23:59:59 do
+ * último dia); errado estava o desenho.
+ *
+ * Quem termina EXATAMENTE à meia-noite não invade o dia seguinte — senão toda reunião que vira
+ * o dia apareceria numa madrugada em que ninguém tem nada marcado. E um marco instantâneo
+ * (início igual ao fim, como a meia-noite de um lembrete) continua aparecendo no dia dele.
+ */
 export function eventsForDay(events: CalendarEvent[], day: Date): CalendarEvent[] {
-  return events.filter((e) => isSameDay(e.inicio, day));
+  const inicioDoDia = startOfDay(day).getTime();
+  const fimDoDia = endOfDay(day).getTime();
+  return events.filter((e) => {
+    const inicio = e.inicio.getTime();
+    // Fim antes do início existe na base; tratar como instantâneo em vez de sumir com a linha.
+    const fim = Math.max(e.fim?.getTime() ?? inicio, inicio);
+    const comecaAntesDeAcabarODia = inicio <= fimDoDia;
+    const aindaEstaAcontecendo = fim > inicioDoDia;
+    const comecaNesteDia = inicio >= inicioDoDia;
+    return comecaAntesDeAcabarODia && (aindaEstaAcontecendo || comecaNesteDia);
+  });
+}
+
+/**
+ * O pedaço do compromisso que cabe DENTRO deste dia.
+ *
+ * A grade de horas posiciona o bloco pela hora de início e o estica pela duração. Sem recortar,
+ * um compromisso que começou ontem às 8h seria desenhado hoje às 8h e com a altura dos dois dias
+ * — apareceria no dia certo, na hora errada. No dia do meio o pedaço ocupa o dia inteiro.
+ */
+export function recorteNoDia(evento: CalendarEvent, day: Date): { inicio: Date; fim: Date } {
+  const inicioDoDia = startOfDay(day);
+  const fimDoDia = endOfDay(day);
+  return {
+    inicio: evento.inicio < inicioDoDia ? inicioDoDia : evento.inicio,
+    fim: evento.fim > fimDoDia ? fimDoDia : evento.fim,
+  };
 }
 
 export function timedEvents(events: CalendarEvent[]): CalendarEvent[] {
