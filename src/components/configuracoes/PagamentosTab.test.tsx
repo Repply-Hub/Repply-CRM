@@ -163,12 +163,13 @@ describe('PagamentosTab', () => {
     expect(screen.getByRole('button', { name: /^assinar$/i })).toBeTruthy();
   });
 
-  it('o preço aparece formatado em real, com o ciclo', () => {
+  it('o preço mostra a condição de lançamento (à vista e parcelado)', () => {
     comAssinatura({ plan_status: 'inactive', origem: 'stripe' });
     render(<PagamentosTab />);
 
-    expect(screen.getByText(/2\.997,00/)).toBeTruthy();
-    expect(screen.getByText(/\/ ano/)).toBeTruthy();
+    // Mesmos números da vitrine (VITRINE_LANCAMENTO), não mais o valor antigo da tabela `planos`.
+    expect(screen.getByText(/R\$ 3\.497/)).toBeTruthy();
+    expect(screen.getByText(/R\$ 333,33/)).toBeTruthy();
   });
 
   it('perfil sem assinatura avisa, em vez de inventar um estado', () => {

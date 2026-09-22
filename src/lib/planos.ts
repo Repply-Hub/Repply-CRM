@@ -90,4 +90,10 @@ export const VITRINE_LANCAMENTO = {
   aVista: 'R$ 3.497',
   /** Quanto o à vista economiza contra o parcelado (R$ 4.000 − R$ 3.497). É o gatilho do card em destaque. */
   economia: 'R$ 503',
+  /**
+   * Resumo em uma linha, para onde o preço aparece em texto corrido (CTA da landing, cadastro,
+   * aba de Assinatura) em vez do bloco de dois cards. Mesmos números da vitrine — é o que evita a
+   * divergência que existia quando esses pontos liam `plano.preco` (o valor antigo, R$ 2.997/ano).
+   */
+  resumo: '12x de R$ 333,33 ou R$ 3.497 à vista',
 } as const;

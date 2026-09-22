@@ -9,7 +9,7 @@ import { usePlanos } from '@/hooks/use-planos';
 import { extrairAssinatura, extrairEmpresa, situacaoDoMeuPlano } from '@/lib/plano-gate';
 import { inicioDaAssinatura } from '@/lib/inicio-da-assinatura';
 import { ROTULO_SITUACAO, diasDeTrial, type SituacaoCS } from '@/lib/situacao-empresa';
-import { formatarMoedaBRL } from '@/lib/moeda';
+import { VITRINE_LANCAMENTO } from '@/lib/planos';
 import { CancelarAssinaturaDialog } from './CancelarAssinaturaDialog';
 
 /**
@@ -215,11 +215,12 @@ export function PagamentosTab() {
                   </div>
                   <p className="pt-1">
                     <span className="font-mono text-xl font-bold tabular-nums">
-                      {formatarMoedaBRL(plano.preco)}
+                      {VITRINE_LANCAMENTO.aVista}
                     </span>
-                    <span className="text-sm text-muted-foreground">
-                      {plano.intervalo === 'month' ? ' / mês' : ' / ano'}
-                    </span>
+                    <span className="text-sm text-muted-foreground"> à vista</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    ou {VITRINE_LANCAMENTO.parcelas}x de {VITRINE_LANCAMENTO.parcelaMensal}
                   </p>
                 </CardHeader>
 

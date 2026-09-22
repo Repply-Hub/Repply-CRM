@@ -1,13 +1,9 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { formatarPrecoBRL, rotuloIntervalo } from '@/lib/planos';
-import { usePlanos } from '@/hooks/use-planos';
+import { VITRINE_LANCAMENTO } from '@/lib/planos';
 
 export function CtaFinalSection() {
-  const { planos } = usePlanos();
-  const plano = planos[0];
-
   return (
     <section className="relative overflow-hidden bg-primary">
       {/* Malha decorativa, com máscara radial para sumir nas bordas. */}
@@ -35,8 +31,7 @@ export function CtaFinalSection() {
           </h2>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-lp-ink/80">
             Crie a conta da empresa e chame seu time pelo código.{' '}
-            {formatarPrecoBRL(plano.preco)}
-            {rotuloIntervalo(plano.intervalo)}, usuários ilimitados, cancele quando quiser.
+            {VITRINE_LANCAMENTO.resumo}, usuários ilimitados, cancele quando quiser.
           </p>
         </div>
 

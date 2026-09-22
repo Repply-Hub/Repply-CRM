@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { traduzirErroAuth } from "@/lib/erros-auth";
-import { formatarPrecoBRL, rotuloIntervalo } from "@/lib/planos";
-import { usePlanos } from "@/hooks/use-planos";
+import { VITRINE_LANCAMENTO } from "@/lib/planos";
 import { toast } from "sonner";
 
 type Caminho = "empresa" | "funcionario" | null;
@@ -54,9 +53,6 @@ export default function Cadastro() {
  * precisa ficar claro antes do clique, não depois do formulário preenchido.
  */
 function EscolhaCaminho({ onEscolher }: { onEscolher: (c: Caminho) => void }) {
-  const { planos } = usePlanos();
-  const plano = planos[0];
-
   return (
     <div className="space-y-3">
       <button
@@ -76,9 +72,7 @@ function EscolhaCaminho({ onEscolher }: { onEscolher: (c: Caminho) => void }) {
               </span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Você vira o gestor, convida o time e assina o plano de{" "}
-              {formatarPrecoBRL(plano.preco)}
-              {rotuloIntervalo(plano.intervalo)}.
+              Você vira o gestor, convida o time e assina o plano — {VITRINE_LANCAMENTO.resumo}.
             </p>
           </div>
         </div>
@@ -209,8 +203,6 @@ function CampoSenha({ mostrar, onAlternar }: { mostrar: boolean; onAlternar: () 
 
 function FormEmpresa({ onVoltar }: { onVoltar: () => void }) {
   const { signUpEmpresa } = useAuth();
-  const { planos } = usePlanos();
-  const plano = planos[0];
   const [loading, setLoading] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [emailEnviado, setEmailEnviado] = useState<string | null>(null);
@@ -288,8 +280,7 @@ function FormEmpresa({ onVoltar }: { onVoltar: () => void }) {
       </Button>
 
       <p className="text-center text-xs text-muted-foreground">
-        Plano de {formatarPrecoBRL(plano.preco)}
-        {rotuloIntervalo(plano.intervalo)} com usuários ilimitados. Cancele quando quiser.
+        {VITRINE_LANCAMENTO.resumo}, usuários ilimitados. Cancele quando quiser.
       </p>
     </form>
   );
