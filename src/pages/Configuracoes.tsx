@@ -28,6 +28,7 @@ import { useSecaoLigada } from '@/hooks/use-secoes';
 import { UsuariosTab } from '@/components/configuracoes/UsuariosTab';
 import { DominioTab } from '@/components/configuracoes/DominioTab';
 import { WhatsAppInstanciasTab } from '@/components/configuracoes/WhatsAppInstanciasTab';
+import { ModoDeVisualizacaoWhatsappCard } from '@/components/configuracoes/ModoDeVisualizacaoWhatsappCard';
 import { EmpresasTab } from '@/components/configuracoes/EmpresasTab';
 import { AutomacaoTab } from '@/components/configuracoes/AutomacaoTab';
 import { AssinaturaEmailEditor } from '@/components/configuracoes/AssinaturaEmailEditor';
@@ -787,6 +788,9 @@ const Configuracoes = () => {
                 empresa não contratou. */}
             {isGestor && temWhatsapp === true && (
               <TabsContent value="whatsapp" className="mt-0">
+                <div className="mb-4">
+                  <ModoDeVisualizacaoWhatsappCard />
+                </div>
                 <WhatsAppInstanciasTab />
               </TabsContent>
             )}
