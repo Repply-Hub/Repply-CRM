@@ -68,7 +68,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 49 | [O filtro "Etapa" não filtra, em dois lugares](#49-o-filtro-etapa-não-filtra-em-dois-lugares) | Alta | Não — mas a Ação em massa não tem desfazer |
 | 50 | [A soma em reais do Kanban usa só os cartões carregados](#50-a-soma-em-reais-do-kanban-usa-só-os-cartões-carregados) | ✅ Resolvida | Corrigido em 22/09/2026 — a coluna pede o total da etapa ao banco |
 | 51 | [O Calendário mostra menos de 10% dos prazos, e um dia antes](#51-o-calendário-mostra-menos-de-10-dos-prazos-e-desenha-um-dia-antes) | ✅ Resolvida | Recorte de período em 27/08 e âncora de meio-dia em 22/09/2026 |
-| 52 | [Importar contatos cria construtoras duplicadas](#52-importar-contatos-cria-construtoras-duplicadas) | Alta | Suja a base a cada importação |
+| 52 | [Importar contatos cria construtoras duplicadas](#52-importar-contatos-cria-construtoras-duplicadas) | ✅ Resolvida | Corrigido em 22/09/2026 — a busca pergunta só pelos nomes que a planilha cita |
 | 53 | [Ler clientes é ~130× mais caro por linha que ler negócios](#53-ler-a-lista-de-clientes-é-130-mais-caro-por-linha-do-que-ler-negócios) | Média | Não hoje — piora sozinho |
 | 54 | [`app_erros` mistura desenvolvimento e produção](#54-app_erros-mistura-desenvolvimento-e-produção-e-ninguém-olha) | Média | Não |
 | 55 | [Coisas que deveriam ser por empresa e são globais](#55-coisas-que-deveriam-ser-por-empresa-e-são-compartilhadas-por-todas) | Média | Não |
@@ -2019,6 +2019,20 @@ uma vez.
 ---
 
 ## 52. Importar contatos cria construtoras duplicadas
+
+> ✅ **Resolvido em 22/09/2026.** A busca deixou de pedir a lista inteira: agora pergunta só
+> pelos nomes que a planilha cita, em blocos de 50 (`src/lib/import/clientes-por-nome.ts`), e o
+> teto de 1.000 sai da jogada — o que limita passa a ser o bloco, não o tamanho da base.
+>
+> **Detalhe fácil de perder ao mexer:** a função devolve DUAS coisas. `porNome` só traz nome com
+> uma ficha (nome com duas fichas não vira vínculo adivinhado, que é como a tela já se comportava);
+> `jaCadastrados` traz todos os que existem, **inclusive os ambíguos** — sem ele a importação
+> criaria a terceira cópia da mesma construtora. Preso por 8 testes em
+> `src/lib/import/clientes-por-nome.test.ts`.
+>
+> **O que isto NÃO desfaz:** as fichas que as importações passadas já duplicaram continuam lá.
+> Medido em 22/09/2026: 35 nomes repetidos na MD (70 fichas) e 13 na JHS (30 fichas). Juntá-las é
+> mexer em dado de produção e espera decisão do Lucas.
 
 **Gravidade: alta.**
 

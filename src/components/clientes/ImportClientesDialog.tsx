@@ -16,6 +16,7 @@ import { ImportInstructionsStep } from '@/components/import/ImportInstructionsSt
 import { stringToEndereco, fetchCepData, maskCep, unmaskCep } from '@/lib/cep';
 import { matchUsuarioByNome, type UsuarioLite } from '@/lib/import/match-usuario';
 import { normalizeKey, buildOrFilter } from '@/lib/import/resolve-entities';
+import { clientesPorNomeCitado, type ClienteCitado } from '@/lib/import/clientes-por-nome';
 
 const IMPORT_ALLOWED_EXT = ['.xlsx', '.xls', '.csv'];
 
@@ -635,22 +636,29 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
       // empresa na hora (mesmo comportamento do import de Negócios via resolveClienteId),
       // para que os dois fluxos fiquem sincronizados.
       let clienteIdPorNomeEmpresa: Map<string, string> | null = null;
+      let empresasJaCadastradas = new Set<string>();
       if (target === 'contatos') {
-        const { data: clientesExistentes, error: clientesError } = await supabase
-          .from('clientes')
-          .select('id, empresa');
-        if (clientesError) throw clientesError;
-        const contagemPorNome = new Map<string, number>();
-        const idPorNome = new Map<string, string>();
-        (clientesExistentes ?? []).forEach(c => {
-          if (!c.empresa) return;
-          const chave = c.empresa.trim().toLowerCase();
-          contagemPorNome.set(chave, (contagemPorNome.get(chave) ?? 0) + 1);
-          idPorNome.set(chave, c.id);
+        // 🔴 Pergunta só pelos nomes que a PLANILHA cita, em blocos. Até 22/09/2026 isto pedia a
+        // lista inteira de clientes (`select('id, empresa')` sem filtro), e o servidor corta em
+        // 1.000 linhas sem avisar e sem ordenação: com a base da MD passando de 2.100, a
+        // construtora que ficasse de fora era lida como "não existe" e ganhava ficha nova — a
+        // cada importação, com histórico, negócios e contatos divididos entre as cópias
+        // (item 52 da dívida). "Sem empresa" é o texto do contato que não trouxe empresa
+        // (ver getMappedRowsBase) e nunca deve virar cliente.
+        const nomesCitados = allRows
+          .map(r => r.empresa?.trim())
+          .filter((n): n is string => !!n && normalizeKey(n) !== 'sem empresa');
+
+        const achados = await clientesPorNomeCitado(nomesCitados, async (bloco) => {
+          const { data, error } = await supabase
+            .from('clientes')
+            .select('id, empresa')
+            .or(buildOrFilter('empresa', bloco));
+          if (error) throw error;
+          return (data ?? []) as ClienteCitado[];
         });
-        clienteIdPorNomeEmpresa = new Map(
-          Array.from(idPorNome.entries()).filter(([chave]) => contagemPorNome.get(chave) === 1)
-        );
+        clienteIdPorNomeEmpresa = achados.porNome;
+        empresasJaCadastradas = achados.jaCadastrados;
 
         // Nomes de empresa citados nos contatos que não bateram com nenhum cliente
         // existente (chave ambígua não entra aqui) — precisam ser criados antes do
@@ -663,7 +671,7 @@ export function ImportClientesDialog({ open: controlledOpen, onOpenChange: contr
           if (!nome) return;
           const chave = nome.toLowerCase();
           if (chave === 'sem empresa') return;
-          if (contagemPorNome.has(chave)) return; // já existe (única ou ambígua)
+          if (empresasJaCadastradas.has(chave)) return; // já existe (única ou ambígua)
           if (!nomesParaCriar.has(chave)) nomesParaCriar.set(chave, nome);
         });
 
