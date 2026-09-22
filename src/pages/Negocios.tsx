@@ -42,7 +42,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import type { PedidoRow } from '@/lib/generate-pdf';
+import { PDF_NEGOCIOS_TETO, pdfCabeNoTeto, tituloDoPdfDeNegocios, linhasDoPdfDeNegocios } from '@/lib/pdf-de-negocios';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ColumnSettings, type ColumnDefinition, ColumnSettingsItem, ColumnSettingsHeader, ColumnSettingsPopover } from '@/components/shared/ColumnSettings';
 import { useTableSettings } from '@/hooks/use-table-settings';
@@ -1679,68 +1679,70 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
     }
   };
 
-  // O campo `obra` continua sendo preenchido aqui de propósito, mesmo com a seção desligada:
-  // quem decide se a COLUNA "Obra" entra no arquivo é o gerador do PDF, avisado por
-  // `comObra` em handleExportPdf. Esvaziar o valor aqui só trocaria a coluna cheia de nomes
-  // por uma coluna cheia de traços — que é justamente o que a cascata quer evitar.
-  const buildExportRows = (specificPedidoId?: string): { rows: PedidoRow[]; titulo: string } => {
-    if (specificPedidoId) {
-      const p = (showKanban ? kanbanPedidosFlat : pedidos).find(p => p.id === specificPedidoId);
-      if (!p) return { rows: [], titulo: '' };
-      return {
-        rows: [{
-          cliente: p.cliente?.empresa ?? '-',
-          obra: p.obra?.nome_obra ?? '-',
-          fabricante: p.fabricante?.nome ?? '-',
-          vendedor: p.vendedor?.nome ?? '-',
-          participantes: (participantesPorNegocio?.get(p.id) ?? []).map(r => r.nome).join(', '),
-          valor: p.valor_total ?? 0,
-          etapa: stageLabel(p.status),
-          data: p.data_pedido,
-        }],
-        titulo: `Negócio - ${getNomeNegocio(p)}`,
-      };
-    }
-
-    if (showKanban) {
-      return {
-        rows: pipelineOrders.map(o => ({
-          cliente: o.clientName,
-          obra: o.obra,
-          fabricante: o.fabricante,
-          vendedor: o.vendedor,
-          participantes: o.nomesDosParticipantes ?? '',
-          valor: o.valor,
-          etapa: stageLabel(o.stage),
-          data: o.createdAt,
-        })),
-        titulo: hasPipelineFilters ? 'Orçamentos (Filtrado)' : 'Orçamentos - Pipeline Completo',
-      };
-    }
-
-    return {
-      rows: filtered.map(p => ({
-        cliente: p.cliente?.empresa ?? '-',
-        obra: p.obra?.nome_obra ?? '-',
-        fabricante: p.fabricante?.nome ?? '-',
-        vendedor: p.vendedor?.nome ?? '-',
-        participantes: (participantesPorNegocio?.get(p.id) ?? []).map(r => r.nome).join(', '),
-        valor: p.valor_total ?? 0,
-        etapa: stageLabel(p.status),
-        data: p.data_pedido,
-      })),
-      titulo: selectedStages.length > 0 ? `Orçamentos - Filtrado` : 'Orçamentos - Todos',
-    };
-  };
-
+  // PDF: o FILTRO INTEIRO, buscado no servidor pelo mesmo caminho do Excel
+  // (obterNegociosParaExportar), até PDF_NEGOCIOS_TETO. Até 22/09/2026 saía só com o que estava
+  // carregado na tela, mas com o título "Pipeline Completo" e o total somado só sobre essas
+  // linhas — o documento que vai para fora mostrava uma fração do funil. Regras e porquê em
+  // src/lib/pdf-de-negocios.ts. A coluna "Obra" sai do arquivo inteira quando a empresa não tem
+  // a seção: o gerador é função pura e recebe a resposta por `comObra`.
   const handleExportPdf = async (specificPedidoId?: string) => {
-    const { rows, titulo } = buildExportRows(specificPedidoId);
-    if (rows.length === 0) return;
-    const { generatePedidosPdf } = await import('@/lib/generate-pdf');
-    // A coluna "Obra" do relatório sai do arquivo inteira quando a empresa não tem a seção.
-    // O gerador é função pura (roda fora do React), então não tem como perguntar sozinho —
-    // recebe a resposta por parâmetro de quem chama.
-    await generatePedidosPdf(rows, marcaDaEmpresa(profile), titulo, { comObra: temObras === true });
+    // Dois cliques seguidos disparariam duas varreduras do filtro ao mesmo tempo.
+    if (exportando) return;
+
+    const exportandoTudo = !specificPedidoId;
+    if (exportandoTudo && !pdfCabeNoTeto(totalCount)) {
+      toast.error(
+        `O PDF sai com até ${PDF_NEGOCIOS_TETO.toLocaleString('pt-BR')} negócios, e este filtro tem ${totalCount.toLocaleString('pt-BR')}. Filtre por etapa, vendedor ou fábrica, ou use o Excel, que leva todos.`,
+      );
+      return;
+    }
+
+    const avisoId = exportandoTudo
+      ? toast.loading(`Buscando os ${totalCount.toLocaleString('pt-BR')} negócios do filtro...`)
+      : undefined;
+
+    setExportando(true);
+    try {
+      const { negocios, titulo: tituloDoNegocio } = await obterNegociosParaExportar(specificPedidoId, carregados => {
+        if (avisoId !== undefined) {
+          toast.loading(
+            `Buscando negócios... ${carregados.toLocaleString('pt-BR')} de ${totalCount.toLocaleString('pt-BR')}`,
+            { id: avisoId },
+          );
+        }
+      });
+
+      if (negocios.length === 0) {
+        toast.error('Nenhum negócio para exportar.', { id: avisoId });
+        return;
+      }
+
+      // Mesmo cuidado do Excel: o arquivo tem de bater com o número que a tela promete.
+      if (exportandoTudo && negocios.length < totalCount) {
+        toast.warning(
+          `O PDF saiu com ${negocios.length.toLocaleString('pt-BR')} dos ${totalCount.toLocaleString('pt-BR')} negócios do filtro. Vale conferir e exportar de novo.`,
+        );
+      }
+
+      const filtrado = hasPipelineFilters || deferredSearch.trim() !== '';
+      const titulo = exportandoTudo ? tituloDoPdfDeNegocios(filtrado) : tituloDoNegocio;
+      const rows = linhasDoPdfDeNegocios(negocios, participantesPorNegocio, stageLabel);
+
+      if (avisoId !== undefined) {
+        toast.loading(`Montando o PDF com ${negocios.length.toLocaleString('pt-BR')} negócios...`, { id: avisoId });
+      }
+      const { generatePedidosPdf } = await import('@/lib/generate-pdf');
+      await generatePedidosPdf(rows, marcaDaEmpresa(profile), titulo, { comObra: temObras === true });
+
+      if (avisoId !== undefined) {
+        toast.success(`${negocios.length.toLocaleString('pt-BR')} negócios no PDF.`, { id: avisoId });
+      }
+    } catch (err) {
+      console.error('[export pdf negocios]', err);
+      toast.error((err as Error)?.message || 'Não foi possível gerar o PDF.', { id: avisoId });
+    } finally {
+      setExportando(false);
+    }
   };
 
   // Negócios cobertos pela exportação em Excel.
@@ -3275,23 +3277,25 @@ const Negocios = ({ defaultView = 'pipeline' }: NegociosProps) => {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Exportar negócios</DialogTitle>
-            {/* Diz QUANTOS negócios vão sair no arquivo, e o número é diferente por formato —
-                por isso os dois aparecem. O Excel passou a cobrir o recorte filtrado inteiro
-                (busca no servidor, ver handleExportExcel). O PDF continua com o que está na
-                tela de propósito: um PDF do funil da MD teria mais de 250 páginas e o navegador
-                monta esse arquivo inteiro na memória. Prometer "11.906" nos dois e entregar a
-                página num deles seria a mesma armadilha de antes, só que ao contrário. */}
+            {/* Diz QUANTOS negócios vão sair no arquivo. Os dois formatos cobrem o filtro inteiro
+                (busca no servidor, ver handleExportExcel e handleExportPdf), mas o PDF tem teto
+                (PDF_NEGOCIOS_TETO, decisão de 22/09/2026 — o funil inteiro da MD passaria de 250
+                páginas): acima dele o botão fica desligado e a frase diz o que fazer, em vez de
+                prometer um arquivo que não vai sair. */}
             <DialogDescription>
               {exportTargetId
                 ? 'Escolha o formato do arquivo a ser gerado.'
-                : `Excel: os ${totalCount.toLocaleString('pt-BR')} negócios do filtro atual. PDF: os ${(showKanban ? kanbanPedidosFlat.length : pedidos.length).toLocaleString('pt-BR')} que estão carregados na tela agora.`}
+                : pdfCabeNoTeto(totalCount)
+                  ? `Excel e PDF: os ${totalCount.toLocaleString('pt-BR')} negócios do filtro atual.`
+                  : `Excel: os ${totalCount.toLocaleString('pt-BR')} negócios do filtro atual. PDF: até ${PDF_NEGOCIOS_TETO.toLocaleString('pt-BR')} negócios — filtre por etapa, vendedor ou fábrica para gerar.`}
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 pt-2">
             <button
               type="button"
               onClick={() => handleExportFormatChoice('pdf')}
-              className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-sm font-medium hover:bg-muted/80 hover:border-primary/50 transition-all"
+              disabled={!exportTargetId && !pdfCabeNoTeto(totalCount)}
+              className="flex flex-col items-center gap-2 rounded-lg border border-border p-4 text-sm font-medium hover:bg-muted/80 hover:border-primary/50 transition-all disabled:opacity-50 disabled:pointer-events-none"
             >
               <FileDown className="h-6 w-6 text-muted-foreground" />
               PDF
