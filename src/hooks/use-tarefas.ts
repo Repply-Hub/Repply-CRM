@@ -148,8 +148,9 @@ export function useCreateTarefa() {
         usuario_id: usuarioRow.id,
         criado_por: tarefa.criado_por ?? usuarioRow.nome ?? null,
       };
-      const { error } = await supabase.from('tarefas' as any).insert(payload as any);
+      const { data, error } = await supabase.from('tarefas' as any).insert(payload as any).select('id').single();
       if (error) throw error;
+      return data as unknown as { id: string };
     },
     onSuccess: (_data, tarefa) => {
       qc.invalidateQueries({ queryKey: ['tarefas'] });

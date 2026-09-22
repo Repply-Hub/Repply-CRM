@@ -46,7 +46,11 @@ vi.mock('@/integrations/supabase/client', () => ({
           maybeSingle: async () => ({ data: { id: 'u1', nome: 'Fulano' }, error: null }),
         }),
       }),
-      insert: async () => ({ error: null }),
+      insert: () => ({
+        select: () => ({
+          single: async () => ({ data: { id: 'tarefa-1' }, error: null }),
+        }),
+      }),
       update: () => ({ eq: async () => ({ error: null }) }),
       delete: () => ({ eq: async () => ({ error: null }) }),
     }),
