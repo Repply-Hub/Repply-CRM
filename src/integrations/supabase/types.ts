@@ -1807,6 +1807,7 @@ export type Database = {
           secao_preset_id: string | null
           subtitulo_header: string | null
           whatsapp_assinar_remetente: boolean
+          whatsapp_lista_unica: boolean
         }
         Insert: {
           banner_url?: string | null
@@ -1822,6 +1823,7 @@ export type Database = {
           secao_preset_id?: string | null
           subtitulo_header?: string | null
           whatsapp_assinar_remetente?: boolean
+          whatsapp_lista_unica?: boolean
         }
         Update: {
           banner_url?: string | null
@@ -1837,6 +1839,7 @@ export type Database = {
           secao_preset_id?: string | null
           subtitulo_header?: string | null
           whatsapp_assinar_remetente?: boolean
+          whatsapp_lista_unica?: boolean
         }
         Relationships: []
       }
