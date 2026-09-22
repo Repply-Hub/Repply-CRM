@@ -66,7 +66,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 47 | ["Salvo" quando o banco recusou — o mesmo defeito em 4 telas](#47-salvo-quando-o-banco-recusou--o-mesmo-defeito-em-quatro-telas) | Alta | Não |
 | 48 | [O Radar de Risco conta edição de campo como movimento](#48-o-radar-de-risco-conta-edição-de-campo-como-movimento) | Alta | Não — R$ 5,0 mi no lugar de R$ 14,4 mi |
 | 49 | [O filtro "Etapa" não filtra, em dois lugares](#49-o-filtro-etapa-não-filtra-em-dois-lugares) | Alta | Não — mas a Ação em massa não tem desfazer |
-| 50 | [A soma em reais do Kanban usa só os cartões carregados](#50-a-soma-em-reais-do-kanban-usa-só-os-cartões-carregados) | Alta | Não |
+| 50 | [A soma em reais do Kanban usa só os cartões carregados](#50-a-soma-em-reais-do-kanban-usa-só-os-cartões-carregados) | ✅ Resolvida | Corrigido em 22/09/2026 — a coluna pede o total da etapa ao banco |
 | 51 | [O Calendário mostra menos de 10% dos prazos, e um dia antes](#51-o-calendário-mostra-menos-de-10-dos-prazos-e-desenha-um-dia-antes) | Alta | Não |
 | 52 | [Importar contatos cria construtoras duplicadas](#52-importar-contatos-cria-construtoras-duplicadas) | Alta | Suja a base a cada importação |
 | 53 | [Ler clientes é ~130× mais caro por linha que ler negócios](#53-ler-a-lista-de-clientes-é-130-mais-caro-por-linha-do-que-ler-negócios) | Média | Não hoje — piora sozinho |
@@ -1933,6 +1933,13 @@ em `use-pedidos.ts:57` e **não é lido por ninguém** — nem `montarQueryDeNeg
 ---
 
 ## 50. A soma em reais do Kanban usa só os cartões carregados
+
+> ✅ **Resolvido em 22/09/2026** — `KanbanColumn.tsx` passou a chamar `usePedidosStats` com a
+> etapa da coluna e os filtros do quadro, exatamente o conserto abaixo. Enquanto o total não
+> chega, a coluna mostra "—" em vez da soma parcial. Teste:
+> `src/components/pedidos/kanban/KanbanColumn.total.test.tsx`. Medido em produção antes do
+> conserto, numa coluna Fechamento de milhares de negócios: a tela mostrava 0,16% do valor. O
+> total por coluna custa 12 a 17 ms no banco.
 
 **Gravidade: alta.**
 

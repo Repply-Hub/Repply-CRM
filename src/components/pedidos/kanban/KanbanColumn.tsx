@@ -6,8 +6,9 @@ import { KanbanCard } from './KanbanCard';
 import { KanbanStage } from '@/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { usePedidos, type PedidosFilters, type PedidoWithRelations, type SearchMatches } from '@/hooks/use-pedidos';
+import { usePedidos, usePedidosStats, type PedidosFilters, type PedidoWithRelations, type SearchMatches } from '@/hooks/use-pedidos';
 import { mapPedidoToOrder } from '@/lib/pedido-to-order';
+import { formatarMoedaBRL } from '@/lib/moeda';
 
 // Referência estável (não uma array literal nova a cada render) — evita recomputar
 // useMemo/useEffect à toa quando a coluna está sem dados (desabilitada ou ainda carregando).
@@ -80,7 +81,20 @@ export const KanbanColumn = memo(function KanbanColumn({
   }, [rawRows, q]);
 
   const orders = useMemo(() => filteredRows.map(mapPedidoToOrder), [filteredRows]);
-  const total = orders.reduce((acc, o) => acc + o.valor, 0);
+
+  // O valor em reais é o total da ETAPA INTEIRA, somado no banco (`pedidos_stats`, a mesma conta
+  // do rodapé da visão Lista) com os mesmos filtros do quadro. Até 22/09/2026 era a soma só dos
+  // cartões carregados — os primeiros N e o que o "Ver mais" trouxesse —, enquanto o selo ao lado
+  // já mostrava a contagem exata: numa coluna Fechamento de milhares de negócios a tela exibia
+  // 0,16% do valor, sem nada indicar que era parcial (CLAUDE.md §6.4: some no banco).
+  const { data: statsDaEtapa } = usePedidosStats(empresaId, stageFilter, filters, stageEnabled);
+  const excluidaPeloFiltroDeEtapa = !!etapaFilter && !etapaFilter.includes(stageKey);
+  // Enquanto o total não chega, "—": mostrar a soma parcial no lugar seria repetir o defeito.
+  const totalDaEtapa = excluidaPeloFiltroDeEtapa
+    ? formatarMoedaBRL(0)
+    : statsDaEtapa
+      ? formatarMoedaBRL(statsDaEtapa.valor)
+      : '—';
 
   // Reporta ao pai os pedidos crus desta coluna (agregados por outras funções do board).
   const onOrdersChangeRef = useRef(onOrdersChange);
@@ -108,7 +122,7 @@ export const KanbanColumn = memo(function KanbanColumn({
         </span>
       </div>
       <div className="text-[11px] text-muted-foreground mb-2 px-1 tabular-nums shrink-0">
-        {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        {totalDaEtapa}
       </div>
       <Droppable droppableId={stageKey}>
         {(provided, snapshot) => (
