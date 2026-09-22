@@ -96,6 +96,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useModoCaixaWhatsapp } from "@/hooks/use-modo-caixa-whatsapp";
+import { elementosDaCaixa, ultimoResponsavel } from "@/lib/modo-caixa-whatsapp";
+import { iniciais } from "@/lib/iniciais";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -4203,6 +4206,8 @@ function LeadSheet({
 export default function WhatsAppInbox() {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const { modo, listaUnica } = useModoCaixaWhatsapp();
+  const modoCaixa = elementosDaCaixa(modo);
   const { data: conversas = [], isLoading: loadingConversas } =
     useWaConversas();
   const { data: config } = useWaConfig();
@@ -4547,9 +4552,11 @@ export default function WhatsAppInbox() {
       setAtribuicaoModalOpen(false);
       return;
     }
-    const semResponsavel = (conversaAtiva.responsaveis?.length ?? 0) === 0;
+    // No modo lista única não há atribuição, então nunca abre o aviso.
+    const semResponsavel =
+      (conversaAtiva.responsaveis?.length ?? 0) === 0 && !listaUnica;
     setAtribuicaoModalOpen(semResponsavel);
-  }, [conversaAtiva]);
+  }, [conversaAtiva, listaUnica]);
   const {
     data: mensagens = [],
     isLoading: loadingMensagens,
@@ -5240,8 +5247,9 @@ export default function WhatsAppInbox() {
     <div className="flex flex-col gap-0.5 w-60">
       {/* Conversas fechadas não têm responsável/atribuição, então "Conversa"
           (Todos/Não atribuído/Meus/Outros atendentes) não se aplica — só o
-          filtro de Instância faz sentido. */}
-      {filtroStatus !== "fechado" && (
+          filtro de Instância faz sentido. No modo lista única as abas de grupo
+          somem de vez (mostrarAbasDeGrupo). */}
+      {filtroStatus !== "fechado" && modoCaixa.mostrarAbasDeGrupo && (
         <>
           <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
             Conversa
@@ -5893,12 +5901,15 @@ export default function WhatsAppInbox() {
     setConfirmDeletarMassa(false);
   }
 
+  // No modo lista única não há abas de grupo, então o corte por responsável
+  // não se aplica: força "todos" para que a lista mostre tudo.
+  const filtroConversaEfetivo = listaUnica ? "todos" : filtroConversa;
   const conversasPorTipoEBusca = conversas.filter((c) => {
-    if (filtroConversa === "geral" && !precisaAssumir(c)) return false;
+    if (filtroConversaEfetivo === "geral" && !precisaAssumir(c)) return false;
     // "Meus chats" tem o mesmo significado pra vendedor e admin/gestor:
     // só o que está atribuído ao usuário logado.
     if (
-      filtroConversa === "meu" &&
+      filtroConversaEfetivo === "meu" &&
       (!profile?.id || !c.responsaveis?.some((r) => r.id === profile.id))
     )
       return false;
@@ -5906,7 +5917,7 @@ export default function WhatsAppInbox() {
     // causa da RLS, nunca enxerga conversa atribuída a outra pessoa) — mostra
     // o que está atribuído a alguém que não é o usuário logado.
     if (
-      filtroConversa === "outros" &&
+      filtroConversaEfetivo === "outros" &&
       !(
         (c.responsaveis?.length ?? 0) > 0 &&
         !c.responsaveis?.some((r) => r.id === profile?.id)
@@ -6003,6 +6014,7 @@ export default function WhatsAppInbox() {
   // instancia_id conhecida (dados de antes do backfill, ou instância já
   // removida) só entram soltas no fim, sem cabeçalho, pra não sumir.
   const conversasAgrupadasPorInstancia = useMemo(() => {
+    if (listaUnica) return null;
     if (!temMultiplasInstancias) return null;
 
     if (filtroInstancia !== "todos") {
@@ -6046,7 +6058,13 @@ export default function WhatsAppInbox() {
       }
     }
     return { grupos, avulsas };
-  }, [conversasFiltradas, temMultiplasInstancias, filtroInstancia, instancias]);
+  }, [
+    conversasFiltradas,
+    temMultiplasInstancias,
+    filtroInstancia,
+    instancias,
+    listaUnica,
+  ]);
 
   // Divide a sidebar em "Meus chats" / "Não atribuídos" / "Outros atendentes"
   // quando o filtro "Conversa" está em "Todos" — mesmo padrão visual usado para
@@ -6055,6 +6073,7 @@ export default function WhatsAppInbox() {
   // chats") para manter a mesma UI em qualquer perfil, não só quem vê tudo
   // (admin/empresa).
   const conversasAgrupadasPorResponsavel = useMemo(() => {
+    if (listaUnica) return null;
     if (!profile?.id) return null;
 
     const grupos: {
@@ -6137,7 +6156,7 @@ export default function WhatsAppInbox() {
 
     if (grupos.length === 0) return null;
     return grupos;
-  }, [conversasFiltradas, filtroConversa, profile?.id]);
+  }, [conversasFiltradas, filtroConversa, profile?.id, listaUnica]);
 
   // Mapa id → apelido da instância, para exibir o badge na linha da conversa
   // independente do agrupamento ativo (por responsável ou por instância).
@@ -6768,7 +6787,14 @@ export default function WhatsAppInbox() {
             direita (`ml-auto` no segundo em vez de `justify-between` no
             container — assim cada badge continua na ponta certa mesmo
             quando só um dos dois existe). */}
-        {!modoSelecao && (naoAtribuida || apelidoInstancia) && (
+        {!modoSelecao &&
+          (naoAtribuida ||
+            apelidoInstancia ||
+            // No modo lista única o rodapé precisa aparecer também quando a
+            // conversa TEM responsável (o oposto de `naoAtribuida`), para
+            // caber o traço de quem vem atendendo.
+            (modoCaixa.mostrarTracoResponsavel &&
+              ultimoResponsavel(conv.responsaveis))) && (
           // 50px = avatar de 40px (`ConversaAvatar` tamanho "sm") + 10px do
           // `gap-2.5` ao lado dele — alinha com o nome/prévia da conversa em
           // vez de começar embaixo do avatar.
@@ -6781,6 +6807,23 @@ export default function WhatsAppInbox() {
                 <span className="truncate">Não atribuído</span>
               </Badge>
             )}
+            {modoCaixa.mostrarTracoResponsavel &&
+              (() => {
+                const resp = ultimoResponsavel(conv.responsaveis);
+                return resp ? (
+                  <span
+                    title={`Atendendo: ${resp.nome ?? "sem nome"}`}
+                    className="ml-1 inline-flex items-center gap-1 text-[10px] text-muted-foreground"
+                  >
+                    <Avatar className="h-4 w-4">
+                      <AvatarImage src={resp.avatar_url ?? undefined} />
+                      <AvatarFallback className="text-[8px]">
+                        {iniciais(resp.nome ?? "")}
+                      </AvatarFallback>
+                    </Avatar>
+                  </span>
+                ) : null;
+              })()}
             {apelidoInstancia && infoCorInstanciaAtual.tipo === "hex" ? (
               // Hex livre não tem par claro/escuro calculado (ver
               // wa-instancia-cores.ts), então em vez de colorir borda/texto
@@ -7574,7 +7617,8 @@ export default function WhatsAppInbox() {
                               )}
                             </button>
                             <div className="mx-3 my-1 border-t border-border/50" />
-                            {filtroStatus !== "fechado" && (
+                            {filtroStatus !== "fechado" &&
+                              modoCaixa.mostrarAbasDeGrupo && (
                               <>
                                 <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
                                   Conversa
@@ -7982,7 +8026,7 @@ export default function WhatsAppInbox() {
                 {/* Modal de atribuição: cobre só o painel da conversa (não a página
                   inteira), ancorado acima do campo de digitação e centralizado
                   horizontalmente. Aparece ao abrir uma conversa sem responsável. */}
-                {atribuicaoModalOpen && (
+                {atribuicaoModalOpen && modoCaixa.mostrarAvisoSemResponsavel && (
                   <div className="pointer-events-none absolute inset-0 z-20 flex items-end justify-center p-4 pb-24">
                     <div className="pointer-events-auto flex w-fit max-w-[92vw] items-center gap-4 rounded-lg border bg-background p-4 shadow-lg">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/40">
@@ -8128,6 +8172,18 @@ export default function WhatsAppInbox() {
                             ? formatPhone(conversaAtiva.telefone)
                             : "WhatsApp"}
                       </p>
+                      {modoCaixa.mostrarTracoResponsavel &&
+                        conversaAtiva &&
+                        (() => {
+                          const resp = ultimoResponsavel(
+                            conversaAtiva.responsaveis,
+                          );
+                          return resp ? (
+                            <span className="block truncate text-xs text-muted-foreground">
+                              Atendendo: {resp.nome ?? "sem nome"}
+                            </span>
+                          ) : null;
+                        })()}
                     </div>
                   </button>
                   {conversaNaoLida(conversaAtiva, profile?.id) && (
