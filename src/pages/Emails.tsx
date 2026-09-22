@@ -914,7 +914,10 @@ const Emails = () => {
         .eq("excluido", false)
         .or(
           `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%,` +
-            `remetente_nome.ilike.%${buscaAplicada}%,remetente_email.ilike.%${buscaAplicada}%`,
+            `remetente_nome.ilike.%${buscaAplicada}%,remetente_email.ilike.%${buscaAplicada}%,` +
+            // Destinatários (coluna gerada `busca_destinatarios`, migration
+            // 20260922160000): faz o e-mail ENVIADO ser achado por quem recebeu.
+            `busca_destinatarios.ilike.%${buscaAplicada}%`,
         )
         .order("data_mensagem", { ascending: false })
         .range(pageBusca * PAGE_SIZE, (pageBusca + 1) * PAGE_SIZE - 1);

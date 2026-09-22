@@ -1458,6 +1458,8 @@ export type Database = {
           anexos: Json
           assunto: string | null
           bcc: Json
+          /** Coluna GERADA (migration 20260922160000): texto dos destinatários para a busca global. Só leitura. */
+          busca_destinatarios: string | null
           cc: Json
           /**
            * NULO quando a caixa de origem foi desconectada preservando o
