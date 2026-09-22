@@ -6767,7 +6767,7 @@ export default function WhatsAppInbox() {
               (mencoes?.whatsapp[conv.id] ?? 0) > 0) && (
               <div className="flex flex-col items-end gap-1 shrink-0">
                 <div className="flex items-center gap-1.5">
-                  <ConversaParticipantesStack conv={conv} />
+                  {!listaUnica && <ConversaParticipantesStack conv={conv} />}
                   <ArrobaDeMencao ativo={(mencoes?.whatsapp[conv.id] ?? 0) > 0} />
                   <NaoLidasBadge
                     conv={conv}
@@ -6799,7 +6799,7 @@ export default function WhatsAppInbox() {
           // `gap-2.5` ao lado dele — alinha com o nome/prévia da conversa em
           // vez de começar embaixo do avatar.
           <div className="flex items-center gap-2 pl-[50px]">
-            {naoAtribuida && (
+            {!listaUnica && naoAtribuida && (
               <Badge
                 variant="outline"
                 className="h-4 max-w-[88px] truncate border-dashed border-orange-400 px-1.5 py-0 text-[9px] font-medium leading-none text-orange-600 dark:border-orange-500/60 dark:text-orange-400"
@@ -8195,6 +8195,7 @@ export default function WhatsAppInbox() {
                       Não lida
                     </span>
                   )}
+                  {!listaUnica && (
                   <Popover
                     open={editarResponsavelOpen}
                     onOpenChange={(v) => {
@@ -8292,6 +8293,7 @@ export default function WhatsAppInbox() {
                       </Command>
                     </PopoverContent>
                   </Popover>
+                  )}
                   <div className="ml-auto flex shrink-0 items-center gap-1">
                     <Popover
                       open={buscaMensagensOpen}
