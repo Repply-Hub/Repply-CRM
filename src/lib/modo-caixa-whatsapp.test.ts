@@ -46,7 +46,11 @@ describe('ultimoResponsavel', () => {
     expect(ultimoResponsavel([bruno, ana])).toBe(bruno);
   });
   it('sem data não quebra (mantém um estável)', () => {
-    const semData = { id: 'c', nome: 'Carla', avatar_url: null };
-    expect(ultimoResponsavel([semData as any])).toBe(semData);
+    // Tipado com o campo opcional para o objeto ter propriedade em comum com a
+    // restrição `{ atribuido_em?: string }` — senão o TS acusa TS2559 (nenhuma
+    // propriedade em comum). Sem valor de data: é o caso "sem atribuido_em".
+    const semData: { id: string; nome: string; avatar_url: string | null; atribuido_em?: string } =
+      { id: 'c', nome: 'Carla', avatar_url: null };
+    expect(ultimoResponsavel([semData])).toBe(semData);
   });
 });
