@@ -3871,6 +3871,54 @@ export type Database = {
         }
         Relationships: []
       }
+      tarefa_anexos: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          id: string
+          nome: string
+          tamanho_bytes: number | null
+          tarefa_id: string
+          tipo: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          nome: string
+          tamanho_bytes?: number | null
+          tarefa_id: string
+          tipo?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          nome?: string
+          tamanho_bytes?: number | null
+          tarefa_id?: string
+          tipo?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tarefa_anexos_tarefa_id_fkey"
+            columns: ["tarefa_id"]
+            isOneToOne: false
+            referencedRelation: "tarefas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefa_anexos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tarefas: {
         Row: {
           campos_extras: Json
