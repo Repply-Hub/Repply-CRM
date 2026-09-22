@@ -1,20 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { Loader2, Mail, Paperclip, Send, Settings, Trash2, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { ChevronUp, Loader2, Mail, Minus, Paperclip, Send, Settings, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EditorTextoRico } from '@/components/shared/EditorTextoRico';
 import { tamanhoLegivel } from '@/lib/fabricante-arquivos';
-import { Dialog, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-// 🔴 CLAUDE.md §7.11: `<DialogContent>` cru não tem teto de altura nem
-// rolagem própria — em janela baixa o botão Enviar sai da tela. `ConteudoDialogo`
-// substitui o `<DialogContent>`; `CabecalhoDialogo` é o mesmo `DialogHeader` com
-// `shrink-0`; `CorpoDialogo` é o único pedaço que rola (ver o comentário grande
-// no formulário, mais abaixo).
-import {
-  ConteudoDialogo,
-  CabecalhoDialogo,
-  CorpoDialogo,
-} from '@/components/shared/DialogoResponsivo';
+import { cn } from '@/lib/utils';
 
 export interface RascunhoEmail {
   destinatario: string;
@@ -27,8 +17,17 @@ export interface RascunhoEmail {
 }
 
 interface Props {
-  open: boolean;
-  onOpenChange: (aberto: boolean) => void;
+  /**
+   * "encaixado" = cartão flutuante no canto inferior (e-mail novo), não-modal:
+   * o fundo continua rolável. "inline" = bloco em fluxo (resposta no topo da
+   * conversa). Default "encaixado".
+   */
+  variante?: 'encaixado' | 'inline';
+  /** Só no "encaixado": recolhido para a barrinha do cabeçalho. */
+  minimizado?: boolean;
+  onMinimizarChange?: (v: boolean) => void;
+  /** Fecha o compositor SEM apagar — o rascunho fica salvo (autosave). Diferente de `onDescartar` (lixo). */
+  onFechar: () => void;
   valores: RascunhoEmail;
   onChange: (valores: RascunhoEmail) => void;
   onEnviar: (e: React.FormEvent) => void;
@@ -63,28 +62,22 @@ interface Props {
 }
 
 /**
- * Compositor de e-mail.
- *
- * Vive num componente próprio porque é montado em DOIS lugares: na listagem
- * (botão "Escrever") e dentro do leitor de uma mensagem (botão "Responder").
- * Enquanto ele existia solto no JSX da listagem, responder obrigava a fechar o
- * e-mail aberto para o diálogo ter onde aparecer — a pessoa clicava em
- * "Responder" e era jogada de volta para a caixa de entrada.
- *
- * SOBRE AS CORES: este diálogo já imitou o cromo do Gmail com hex fixos
- * (faixa #404040 no cabeçalho, botão #0b57d0). Eram as duas únicas superfícies
- * de diálogo pintadas à mão no app inteiro, e viviam quebrando contraste porque
- * cor chumbada não sabe em que tema está. Pior: o DialogOverlay é `bg-black/80`,
- * então o pop-up é visto sobre a página ESCURECIDA (no tema claro o fundo atrás
- * dele compõe para ~#333). Uma faixa #404040 contra esse #333 dá 1,22:1 — o topo
- * do diálogo simplesmente não existia, e o título parecia flutuar no escurecimento
- * da página. Agora tudo aqui sai dos tokens de tema (--muted, --border,
- * --foreground, --primary), que já são redefinidos em .dark: o diálogo fica certo
- * nos dois temas por construção, não por mais um ajuste pontual de contraste.
+ * Compositor de e-mail — NÃO é mais modal (desde 21/09/2026, reforma "estilo
+ * Gmail"). Duas molduras conforme `variante`:
+ *  - "encaixado": cartão de posição fixa no canto inferior, que não trava o
+ *    fundo (dá pra rolar a lista/o e-mail atrás), com minimizar + fechar; no
+ *    celular vira tela cheia. É o e-mail NOVO.
+ *  - "inline": bloco em fluxo, montado no topo da conversa aberta (o leitor). É
+ *    a RESPOSTA.
+ * O formulário (Para/Cc/Cco, assunto, editor, anexos, Enviar) é o mesmo nas
+ * duas; só a moldura muda. Quem controla abrir/fechar/minimizar é a página
+ * (`Emails.tsx`), que monta um compositor de cada vez.
  */
 export function CompositorEmail({
-  open,
-  onOpenChange,
+  variante = 'encaixado',
+  minimizado = false,
+  onMinimizarChange,
+  onFechar,
   valores,
   onChange,
   onEnviar,
@@ -100,349 +93,308 @@ export function CompositorEmail({
   onEnviarImagemCorpo,
 }: Props) {
   const inputArquivoRef = useRef<HTMLInputElement>(null);
-  // Começa aberto quando já chega preenchido (reabrir um rascunho com Cc/Cco
-  // digitados nesta mesma sessão de composição não pode escondê-los de volta
-  // atrás do link). O link "Cc"/"Cco" some assim que a linha já está aberta —
-  // não faz sentido oferecer de novo o que já está na tela.
+  // Cc/Cco começam abertos só se já vierem preenchidos. Como a página monta um
+  // compositor NOVO a cada composição (não reusa a instância como o modal antigo
+  // fazia), o valor inicial no mount já resolve — sem o useEffect de antes.
   const [mostrarCc, setMostrarCc] = useState(!!valores.cc);
   const [mostrarCco, setMostrarCco] = useState(!!valores.cco);
-  // O compositor não desmonta entre "Escrever" e "Responder" (é a mesma
-  // instância, só o `open` alterna), então sem isto o Cc/Cco aberto numa
-  // composição continuaria aberto e vazio na seguinte. Ao (re)abrir, volta
-  // ao padrão: fechado, a menos que já chegue preenchido. Depende só de
-  // `open` de propósito — reagir a `valores.cc` esconderia o campo enquanto
-  // a pessoa apaga o que digitou.
-  useEffect(() => {
-    if (open) {
-      setMostrarCc(!!valores.cc);
-      setMostrarCco(!!valores.cco);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* `gap-0`: o DialogContent é um grid com `gap-4`. Com `p-0`, essa calha de
-          1rem aparecia como uma tira de bg-background entre o cabeçalho e o
-          formulário — mais uma costura visível no topo do pop-up.
 
-          Sem `border-none`: a borda padrão (--border) é justamente o que separa o
-          diálogo do overlay escurecido (8,7:1 no tema claro). Removê-la deixava a
-          separação por conta da cor de cada superfície, o que funcionava no corpo
-          branco e falhava na faixa escura. A sombra não substitui a borda: como é
-          deslocada 25px para baixo, o alfa efetivo na aresta SUPERIOR é ~0,017.
+  const corpoForm = (
+    <form onSubmit={onEnviar} className="flex min-h-0 flex-1 flex-col">
+      {/* Só o miolo rola; cabeçalho (da moldura) e este rodapé de ações ficam
+          fixos — o mesmo teto-de-altura/rolagem que o `ConteudoDialogo` dava,
+          agora à mão (CLAUDE.md §7.11), porque o cartão não é Dialog. */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {/* Campos sem moldura (silhueta de compositor), mas COM anel de foco.
+            Rótulos <label htmlFor> para clique/leitor de tela chegarem ao input
+            mesmo sem borda visível. */}
+        <div className="border-b px-6">
+          <div className="flex items-center gap-2 py-2">
+            <label htmlFor="to" className="min-w-[60px] text-sm text-muted-foreground">
+              Para
+            </label>
+            <Input
+              id="to"
+              placeholder="email@exemplo.com"
+              className="h-8 border-none bg-transparent px-0 shadow-none"
+              value={valores.destinatario}
+              onChange={(e) => onChange({ ...valores, destinatario: e.target.value })}
+            />
+            {/* Estilo Gmail: o link some depois de clicado. */}
+            <div className="flex shrink-0 items-center gap-2">
+              {!mostrarCc && (
+                <button
+                  type="button"
+                  className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+                  onClick={() => setMostrarCc(true)}
+                >
+                  Cc
+                </button>
+              )}
+              {!mostrarCco && (
+                <button
+                  type="button"
+                  className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+                  onClick={() => setMostrarCco(true)}
+                >
+                  Cco
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
 
-          O "X" é o do próprio DialogContent (o Radix desenha um em todo diálogo;
-          já houve um segundo botão desenhado à mão aqui e os dois se empilhavam no
-          mesmo canto). Ele não é mais recolorido: como o cabeçalho passou a ser
-          uma superfície CLARA no tema claro e escura no escuro, a cor herdada do
-          content já resolve os dois casos — `text-white` fixo era o que o apagava. */}
-      {/* 820px em vez de 600: responder num quadrado de 600 obrigava a quebrar
-          linha cedo demais, e o trecho citado do e-mail original (que já vem com
-          as quebras do remetente) ficava picotado. É a largura de leitura de um
-          e-mail, não a de um formulário. */}
-      <ConteudoDialogo className="sm:max-w-[820px] gap-0 overflow-hidden p-0 shadow-2xl">
-        {/* Cabeçalho no padrão das telas de importação do app: token com faixa
-            (`bg-muted`) + `border-b`, título herdando --foreground. O
-            CabecalhoDialogo por baixo é o DialogHeader de verdade (só com
-            `shrink-0` a mais), então preserva a estrutura que o Radix associa
-            ao aria-labelledby/aria-describedby — e agora também FICA FIXO no
-            topo, porque só o miolo (`CorpoDialogo`, abaixo) rola. O `pr-12`
-            reserva a coluna do botão de fechar para o título não passar por
-            baixo dele. */}
-        <CabecalhoDialogo className="space-y-0 border-b bg-muted px-6 py-4 pr-12">
-          <DialogTitle>{titulo}</DialogTitle>
-          <DialogDescription className="sr-only">
-            Preencha destinatário, assunto e mensagem para enviar pela caixa da empresa.
-          </DialogDescription>
-        </CabecalhoDialogo>
-
-        {/* CLAUDE.md §7.11: o `<form>` estica para ocupar o espaço entre o
-            cabeçalho e o rodapé (os dois `shrink-0`, fixos) — `flex-1 min-h-0`
-            é o que deixa o `CorpoDialogo` de dentro (também `flex-1 min-h-0`,
-            com rolagem própria) encolher de verdade em vez de estourar a
-            janela. Sem o `min-h-0` aqui, um item de flex se recusa a ficar
-            menor que o próprio conteúdo e a rolagem do `CorpoDialogo` nunca
-            aparece — a mesma armadilha que o comentário dele já explica. */}
-        <form onSubmit={onEnviar} className="flex min-h-0 flex-1 flex-col">
-          {/* `mx-0 px-0`: cancela o `-mx-6 px-6` padrão do CorpoDialogo, que
-              pressupõe um pai com `p-6` — este `ConteudoDialogo` é `p-0` (cada
-              linha abaixo já tem o próprio `px-6`, ver comentário de "Campos
-              sem moldura" a seguir). Sem isto o miolo ficaria 48px mais largo
-              que o modal de cada lado (medido em `DialogoResponsivo.tsx`). */}
-          <CorpoDialogo className="mx-0 px-0">
-          {/* Campos sem moldura (silhueta de compositor), mas COM anel de foco: a
-              className não pode voltar a trazer `focus-visible:ring-0`. O cn() usa
-              tailwind-merge, então aquele ring-0 apagava o `ring-2 ring-ring` do
-              primitivo e o campo focado ficava idêntico ao não-focado — falha de
-              WCAG 2.4.7, sem nenhum feedback ao navegar por Tab. Os rótulos são
-              <label htmlFor> para o clique/leitor de tela chegarem ao input mesmo
-              sem borda visível. */}
+        {mostrarCc && (
           <div className="border-b px-6">
             <div className="flex items-center gap-2 py-2">
-              <label htmlFor="to" className="min-w-[60px] text-sm text-muted-foreground">
-                Para
+              <label htmlFor="cc" className="min-w-[60px] text-sm text-muted-foreground">
+                Cc
               </label>
               <Input
-                id="to"
+                id="cc"
                 placeholder="email@exemplo.com"
                 className="h-8 border-none bg-transparent px-0 shadow-none"
-                value={valores.destinatario}
-                onChange={(e) => onChange({ ...valores, destinatario: e.target.value })}
+                value={valores.cc}
+                onChange={(e) => onChange({ ...valores, cc: e.target.value })}
               />
-              {/* Estilo Gmail: o link some depois de clicado — a linha revelada já
-                  é o próprio campo aberto, oferecer o link de novo seria redundante. */}
-              <div className="flex shrink-0 items-center gap-2">
-                {!mostrarCc && (
-                  <button
-                    type="button"
-                    className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-                    onClick={() => setMostrarCc(true)}
-                  >
-                    Cc
-                  </button>
-                )}
-                {!mostrarCco && (
-                  <button
-                    type="button"
-                    className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-                    onClick={() => setMostrarCco(true)}
-                  >
-                    Cco
-                  </button>
-                )}
-              </div>
             </div>
           </div>
+        )}
 
-          {mostrarCc && (
-            <div className="border-b px-6">
-              <div className="flex items-center gap-2 py-2">
-                <label htmlFor="cc" className="min-w-[60px] text-sm text-muted-foreground">
-                  Cc
-                </label>
-                <Input
-                  id="cc"
-                  placeholder="email@exemplo.com"
-                  className="h-8 border-none bg-transparent px-0 shadow-none"
-                  value={valores.cc}
-                  onChange={(e) => onChange({ ...valores, cc: e.target.value })}
-                />
-              </div>
-            </div>
-          )}
-
-          {mostrarCco && (
-            <div className="border-b px-6">
-              <div className="flex items-center gap-2 py-2">
-                <label htmlFor="cco" className="min-w-[60px] text-sm text-muted-foreground">
-                  Cco
-                </label>
-                <Input
-                  id="cco"
-                  placeholder="email@exemplo.com"
-                  className="h-8 border-none bg-transparent px-0 shadow-none"
-                  value={valores.cco}
-                  onChange={(e) => onChange({ ...valores, cco: e.target.value })}
-                />
-              </div>
-            </div>
-          )}
-
+        {mostrarCco && (
           <div className="border-b px-6">
-            <div className="flex items-center gap-2 py-3">
-              <label htmlFor="subject" className="min-w-[60px] text-sm text-muted-foreground">
-                Assunto
+            <div className="flex items-center gap-2 py-2">
+              <label htmlFor="cco" className="min-w-[60px] text-sm text-muted-foreground">
+                Cco
               </label>
               <Input
-                id="subject"
-                placeholder="Assunto"
-                className="h-8 border-none bg-transparent px-0 font-medium shadow-none"
-                value={valores.assunto}
-                onChange={(e) => onChange({ ...valores, assunto: e.target.value })}
+                id="cco"
+                placeholder="email@exemplo.com"
+                className="h-8 border-none bg-transparent px-0 shadow-none"
+                value={valores.cco}
+                onChange={(e) => onChange({ ...valores, cco: e.target.value })}
               />
             </div>
           </div>
+        )}
 
-          <div className="px-6 py-4">
-            <EditorTextoRico
-              value={valores.corpo}
-              onChange={(html) => onChange({ ...valores, corpo: html })}
-              onEnviarImagem={onEnviarImagemCorpo}
-              placeholder="Escreva sua mensagem aqui..."
-              minHeight={360}
-              aria-label="Corpo do e-mail"
+        <div className="border-b px-6">
+          <div className="flex items-center gap-2 py-3">
+            <label htmlFor="subject" className="min-w-[60px] text-sm text-muted-foreground">
+              Assunto
+            </label>
+            <Input
+              id="subject"
+              placeholder="Assunto"
+              className="h-8 border-none bg-transparent px-0 font-medium shadow-none"
+              value={valores.assunto}
+              onChange={(e) => onChange({ ...valores, assunto: e.target.value })}
             />
           </div>
+        </div>
 
-          {/* Anexos. O seletor de arquivo é escondido e disparado pelo botão —
-              `<input type="file">` cru não aceita estilo e some no meio de um
-              formulário sem moldura. `multiple`: dá pra escolher vários de uma
-              vez. Depois de escolher, `value = ''` para o mesmo arquivo poder
-              ser re-selecionado se a pessoa remover e mudar de ideia. */}
-          <div className="border-t px-6 py-3">
-            <input
-              ref={inputArquivoRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                const lista = Array.from(e.target.files ?? []);
-                if (lista.length) onAnexar(lista);
-                e.target.value = '';
-              }}
-            />
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1">
+        <div className="px-6 py-4">
+          <EditorTextoRico
+            value={valores.corpo}
+            onChange={(html) => onChange({ ...valores, corpo: html })}
+            onEnviarImagem={onEnviarImagemCorpo}
+            placeholder="Escreva sua mensagem aqui..."
+            minHeight={variante === 'inline' ? 220 : 320}
+            aria-label="Corpo do e-mail"
+          />
+        </div>
+
+        {/* Anexos. O seletor de arquivo é escondido e disparado pelo botão. */}
+        <div className="border-t px-6 py-3">
+          <input
+            ref={inputArquivoRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              const lista = Array.from(e.target.files ?? []);
+              if (lista.length) onAnexar(lista);
+              e.target.value = '';
+            }}
+          />
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                onClick={() => inputArquivoRef.current?.click()}
+                disabled={anexando}
+                title="Anexar arquivos a este e-mail"
+              >
+                {anexando ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Paperclip className="h-3.5 w-3.5" />
+                )}
+                {anexando ? 'Enviando arquivo…' : 'Anexar'}
+              </Button>
+              {/* A assinatura vive dentro do corpo (editor acima); este botão só
+                  leva para ajustar o texto salvo em Configurações. */}
+              {onConfigurarAssinatura && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
-                  onClick={() => inputArquivoRef.current?.click()}
-                  disabled={anexando}
-                  title="Anexar arquivos a este e-mail"
+                  onClick={onConfigurarAssinatura}
+                  title="Editar a assinatura salva em Configurações"
                 >
-                  {anexando ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Paperclip className="h-3.5 w-3.5" />
-                  )}
-                  {anexando ? 'Enviando arquivo…' : 'Anexar'}
+                  <Settings className="h-3.5 w-3.5" />
+                  Configurar assinatura
                 </Button>
-                {/* Discreto e sem guarda de papel: qualquer pessoa que escreve
-                    e-mail chega direto na própria assinatura, sem depender de
-                    quem gerencia a caixa da empresa abrir "Gerenciar caixa".
-                    A assinatura agora vive dentro do corpo (editor acima) —
-                    este botão só leva para ajustar o texto salvo. */}
-                {onConfigurarAssinatura && (
+              )}
+            </div>
+            {anexos.length > 0 && (
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {anexos.length} {anexos.length === 1 ? 'anexo' : 'anexos'}
+              </span>
+            )}
+          </div>
+
+          {anexos.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {anexos.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex items-center gap-2 rounded-md border bg-muted/40 px-2 py-1.5 text-sm"
+                >
+                  <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">{a.nome_arquivo}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {tamanhoLegivel(a.tamanho)}
+                  </span>
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
-                    className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
-                    onClick={onConfigurarAssinatura}
-                    title="Editar a assinatura salva em Configurações"
+                    size="icon"
+                    className="h-6 w-6 shrink-0 text-muted-foreground"
+                    onClick={() => onRemoverAnexo(a.id)}
+                    title={`Remover ${a.nome_arquivo}`}
+                    aria-label={`Remover ${a.nome_arquivo}`}
                   >
-                    <Settings className="h-3.5 w-3.5" />
-                    Configurar assinatura
+                    <X className="h-3.5 w-3.5" />
                   </Button>
-                )}
-              </div>
-              {anexos.length > 0 && (
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {anexos.length} {anexos.length === 1 ? 'anexo' : 'anexos'}
-                </span>
-              )}
-            </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
 
-            {anexos.length > 0 && (
-              <ul className="mt-2 space-y-1">
-                {anexos.map((a) => (
-                  <li
-                    key={a.id}
-                    className="flex items-center gap-2 rounded-md border bg-muted/40 px-2 py-1.5 text-sm"
-                  >
-                    <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate">{a.nome_arquivo}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {tamanhoLegivel(a.tamanho)}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 shrink-0 text-muted-foreground"
-                      onClick={() => onRemoverAnexo(a.id)}
-                      title={`Remover ${a.nome_arquivo}`}
-                      aria-label={`Remover ${a.nome_arquivo}`}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+      {/* Rodapé de ações fixo: Descartar (lixo, à esquerda) e Enviar/Conectar
+          (à direita). `justify-between` de propósito. `shrink-0` para não ceder
+          espaço ao miolo. */}
+      <div className="flex shrink-0 flex-row items-center justify-between gap-2 border-t px-6 py-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onDescartar}
+          title="Descartar rascunho"
+          aria-label="Descartar rascunho"
+        >
+          <Trash2 className="h-5 w-5" />
+        </Button>
 
-          </CorpoDialogo>
-
-          {/* Rodapé no padrão do app (NovoNegocioDialog/EventDialog): `border-t` e
-              nada de fundo. O `bg-muted/10` de antes era 10% de um token que no
-              tema claro já é 96% — compunha para #FEFEFE sobre branco (1,01:1),
-              uma barra de ações que não existia na tela. Quem separa a região é a
-              linha, não uma faixa diluída.
-
-              <div> em vez de DialogFooter: o primitivo nasce `flex-col-reverse
-              sm:flex-row sm:justify-end`, que empurraria os DOIS botões pro
-              canto direito juntos. Aqui é `justify-between` de propósito —
-              Descartar fica ancorado à esquerda e Enviar/Conectar à direita,
-              não colados um no outro. DialogFooter não carrega semântica de
-              acessibilidade — é só um div com classes.
-
-              `shrink-0` (novo, §7.11): sem ele este rodapé é só mais um item do
-              `<form>` flex-col e cederia espaço para o miolo crescer — exatamente
-              o "some por baixo" que o `CorpoDialogo` existe para evitar. Fixo
-              aqui, junto com o cabeçalho, é o que garante o Enviar visível em
-              janela baixa (1366x600), com só o meio (`CorpoDialogo`) rolando. */}
-          <div className="flex shrink-0 flex-row items-center justify-between gap-2 border-t px-6 py-4">
-            {/* Ghost puro: sem `hover:text-destructive`. O tailwind-merge derrubava
-                só a cor do texto da variante e mantinha o `hover:bg-accent`, então
-                no tema escuro o hover pintava vermelho-escuro (--destructive 40%)
-                sobre marrom-escuro (--accent 18%) = 1,93:1 — o ícone sumia no exato
-                instante anterior ao clique numa ação destrutiva. O par accent/
-                accent-foreground do hover padrão dá 4,65:1 no claro e 10,5:1 no
-                escuro; o caráter destrutivo fica no ícone, no title e no aria-label. */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={onDescartar}
-              title="Descartar rascunho"
-              aria-label="Descartar rascunho"
-            >
-              <Trash2 className="h-5 w-5" />
-            </Button>
-
-            {!isConnected ? (
-              // Sem caixa conectada não há de onde enviar. O caminho para
-              // conectar fica na própria aba de e-mails, atrás deste diálogo —
-              // daí fechar em vez de navegar para fora.
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                className="flex items-center gap-2"
-              >
-                <Mail className="h-4 w-4" />
-                Conectar uma caixa para enviar
-              </Button>
+        {!isConnected ? (
+          // Sem caixa conectada não há de onde enviar. Fechar (o rascunho fica
+          // salvo) em vez de navegar para fora.
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onFechar}
+            className="flex items-center gap-2"
+          >
+            <Mail className="h-4 w-4" />
+            Conectar uma caixa para enviar
+          </Button>
+        ) : (
+          <Button
+            type="submit"
+            disabled={isEnviando || anexando}
+            title={anexando ? 'Aguarde o anexo terminar de subir' : undefined}
+            className="gap-2"
+          >
+            {isEnviando ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              /* Voltou a ser `bg-primary` (o laranja da marca, variante padrão
-                 do Button) a pedido — antes era um azul (#0b57d0) hex fixo,
-                 justamente para fugir do laranja: rótulo branco sobre
-                 #FF5A1F mede 3,12:1, abaixo dos 4,5:1 que a WCAG 1.4.3 exige
-                 de texto (o azul dava 6,39:1). Essa é a MESMA combinação já
-                 usada em botão "default" no app inteiro — inclusive o
-                 "Escrever" que abre este compositor —, então este botão só
-                 volta a carregar o mesmo débito de contraste que o resto do
-                 app já carrega, não um novo. */
-              <Button
-                type="submit"
-                disabled={isEnviando || anexando}
-                title={anexando ? 'Aguarde o anexo terminar de subir' : undefined}
-                className="gap-2"
-              >
-                {isEnviando ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-                Enviar
-              </Button>
+              <Send className="h-4 w-4" />
             )}
-          </div>
-        </form>
-      </ConteudoDialogo>
-    </Dialog>
+            Enviar
+          </Button>
+        )}
+      </div>
+    </form>
+  );
+
+  if (variante === 'inline') {
+    return (
+      <div className="flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm">
+        <div className="flex shrink-0 items-center justify-between border-b bg-muted px-4 py-2">
+          <span className="truncate text-sm font-medium">{titulo}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={onFechar}
+            title="Fechar"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        {corpoForm}
+      </div>
+    );
+  }
+
+  // encaixado: cartão fixo no canto inferior direito (não-modal); celular = tela cheia.
+  return (
+    <div
+      className={cn(
+        'fixed z-50 flex flex-col border bg-card shadow-2xl',
+        'bottom-0 right-4 w-[540px] max-w-[calc(100vw-2rem)] max-h-[85dvh] rounded-t-lg',
+        'max-sm:inset-0 max-sm:right-0 max-sm:w-full max-sm:max-h-none max-sm:rounded-none',
+      )}
+      role="region"
+      aria-label={titulo}
+    >
+      <div className="flex shrink-0 items-center justify-between border-b bg-muted px-4 py-2">
+        <span className="truncate text-sm font-medium">{titulo}</span>
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => onMinimizarChange?.(!minimizado)}
+            title={minimizado ? 'Expandir' : 'Minimizar'}
+            aria-label={minimizado ? 'Expandir' : 'Minimizar'}
+          >
+            {minimizado ? <ChevronUp className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={onFechar}
+            title="Fechar"
+            aria-label="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      {!minimizado && corpoForm}
+    </div>
   );
 }
