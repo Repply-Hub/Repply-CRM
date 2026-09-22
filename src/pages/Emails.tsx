@@ -76,6 +76,10 @@ import {
   type EnderecoDoEmail,
 } from "@/components/email/LeitorEmail";
 import { type MensagemDaConversa } from "@/components/email/MensagemConversa";
+import {
+  ResultadosBusca,
+  type ResultadoBusca,
+} from "@/components/email/ResultadosBusca";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
 import { ConfirmarEnviarEmailDialog } from "@/components/email/ConfirmarEnviarEmailDialog";
 import { normalizarAssinaturaAntiga } from "@/lib/assinatura-email";
@@ -334,6 +338,8 @@ const Emails = () => {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [pageSent, setPageSent] = useState(0);
   const [pageReceived, setPageReceived] = useState(0);
+  /** Página da BUSCA GLOBAL (lista unificada de resultados). */
+  const [pageBusca, setPageBusca] = useState(0);
   const PAGE_SIZE = 50;
   // Nylas no lugar do Gmail direto: o contrato do hook é o mesmo
   // (isConnected/connectedEmail/sendEmail), então a troca é de import. A
@@ -647,16 +653,15 @@ const Emails = () => {
 
   useEffect(() => {
     const t = setTimeout(() => {
-      setBuscaAplicada(searchTerm.trim());
+      const termo = searchTerm.trim();
+      setBuscaAplicada(termo);
       // Voltar à primeira página: um termo novo tem outra contagem de
       // resultados, e continuar na página 3 mostraria uma lista vazia.
-      //
-      // AS DUAS abas. Antes só `pageSent` era zerada, o que não incomodava
-      // porque a busca nem chegava a Recebidos; agora que chega, estando na
-      // página 3 e digitando um termo com 5 resultados a lista vem vazia — e o
-      // paginador some junto, então não sobra nem o botão de voltar.
       setPageSent(0);
       setPageReceived(0);
+      setPageBusca(0);
+      // Entrando em busca (resultados sem seleção em massa), zera a seleção.
+      if (termo) setSelectedIds([]);
     }, 350);
     return () => clearTimeout(t);
   }, [searchTerm]);
@@ -890,6 +895,81 @@ const Emails = () => {
 
   const receivedEmails = receivedData?.emails || [];
   const totalReceived = receivedData?.count || 0;
+
+  /**
+   * BUSCA GLOBAL (estilo Gmail): com um termo digitado, varre TODOS os e-mails
+   * — recebidos e enviados, de qualquer marcador — em vez de ficar preso à
+   * aba/marcador. Consulta à parte das listas por aba; só roda quando há termo.
+   * `.or(ilike)` nos mesmos campos de Recebidos (assunto/prévia/remetente).
+   */
+  const { data: buscaData, isFetching: buscaCarregando } = useQuery({
+    queryKey: ["busca_global", buscaAplicada, pageBusca],
+    queryFn: async (): Promise<{ resultados: ResultadoBusca[]; count: number }> => {
+      const { data, error, count } = await supabase
+        .from("email_mensagens")
+        .select(
+          "id, direcao, data_mensagem, snippet, assunto, remetente_nome, remetente_email, destinatarios, cc, bcc, nylas_message_id, nylas_thread_id, caixa_origem, lido",
+          { count: "exact" },
+        )
+        .eq("excluido", false)
+        .or(
+          `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%,` +
+            `remetente_nome.ilike.%${buscaAplicada}%,remetente_email.ilike.%${buscaAplicada}%`,
+        )
+        .order("data_mensagem", { ascending: false })
+        .range(pageBusca * PAGE_SIZE, (pageBusca + 1) * PAGE_SIZE - 1);
+      if (error) throw error;
+
+      const resultados: ResultadoBusca[] = (data ?? []).map((m) => ({
+        id: m.id,
+        tipo: (m.direcao === "enviado" ? "sent" : "received") as "sent" | "received",
+        remetente: m.remetente_nome
+          ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
+          : (m.remetente_email ?? ""),
+        destinatarios: normalizarEnderecos(m.destinatarios),
+        cc: normalizarEnderecos(m.cc),
+        bcc: normalizarEnderecos(m.bcc),
+        assunto: m.assunto,
+        snippet: m.snippet ?? "",
+        data: m.data_mensagem,
+        lido: m.lido,
+        gmail_message_id: m.nylas_message_id,
+        threadId: m.nylas_thread_id ?? null,
+        caixaOrigem: m.caixa_origem ?? null,
+      }));
+      return { resultados, count: count || 0 };
+    },
+    enabled: isConnected && !!buscaAplicada,
+    placeholderData: keepPreviousData,
+  });
+  const resultadosBusca = buscaData?.resultados ?? [];
+  const totalBusca = buscaData?.count ?? 0;
+
+  /** Abre um resultado da busca no leitor por conversa (recebido ou enviado). */
+  const abrirResultado = (r: ResultadoBusca) => {
+    const enviado = r.tipo === "sent";
+    if (!enviado && r.lido === false) marcarLido(r.id);
+    const destEmails = r.destinatarios.map((d) => d?.email).filter(Boolean);
+    void abrirComCorpo({
+      id: r.id,
+      remetente: enviado ? (connectedEmail ?? "") : r.remetente,
+      destinatario: enviado ? destEmails.join(", ") : (destEmails[0] ?? ""),
+      destinatarios: r.destinatarios,
+      cc: r.cc,
+      bcc: r.bcc,
+      assunto: r.assunto,
+      corpo: r.snippet ?? "",
+      created_at: r.data,
+      criado_em: r.data,
+      type: enviado ? "sent" : "received",
+      threadId: r.threadId,
+      gmail_message_id: r.gmail_message_id,
+      lido: r.lido,
+      caixaOrigem: r.caixaOrigem,
+      respondida:
+        !enviado && !!(r.threadId && threadsRespondidos?.has(r.threadId)),
+    });
+  };
 
   // Botão de leitura em massa (barra de seleção): se TODA a seleção já está
   // lida, ele oferece "Marcar não lido"; senão, "Lido". Antes o botão era fixo
@@ -2000,6 +2080,10 @@ const Emails = () => {
 
 
   const escolherPasta = (p: PastaSelecionada) => {
+    // Clicar num marcador sai da busca global: os resultados varrem tudo, e
+    // escolher um marcador é justamente pedir para ver aquele recorte.
+    setSearchTerm("");
+    setBuscaAplicada("");
     // Outro marcador = outra contagem; ficar na pagina 3 mostraria vazio.
     setPastaSelecionada(p);
     setPageReceived(0);
@@ -2268,6 +2352,15 @@ const Emails = () => {
                       Cancelar
                     </Button>
                   </div>
+                ) : buscaAplicada ? (
+                  // Durante a busca as abas não valem (os resultados varrem
+                  // tudo): no lugar delas, um rótulo. Limpar a busca traz as
+                  // abas de volta.
+                  <div className="flex shrink-0 items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <Search className="h-4 w-4" />
+                    <span className="hidden sm:inline">Resultados em todos os e-mails</span>
+                    <span className="sm:hidden">Resultados</span>
+                  </div>
                 ) : (
                   <TabsList className={cn(TOGGLE_LIST_CLASS, "shrink-0")}>
                     <TabsTrigger value="received" className={TOGGLE_TRIGGER_CLASS}>
@@ -2470,6 +2563,19 @@ const Emails = () => {
               )}
 
               <div className="relative min-w-0 flex-1 overflow-hidden">
+                {buscaAplicada ? (
+                  <ResultadosBusca
+                    resultados={resultadosBusca}
+                    total={totalBusca}
+                    carregando={buscaCarregando}
+                    termo={buscaAplicada}
+                    pagina={pageBusca}
+                    tamanhoPagina={PAGE_SIZE}
+                    onPagina={setPageBusca}
+                    onAbrir={abrirResultado}
+                  />
+                ) : (
+                  <>
                 <TabsContent value="sent" className="m-0 h-full overflow-hidden">
                   <div className="h-full overflow-hidden flex flex-col bg-background">
                     <div className="flex-1 overflow-y-auto">
@@ -3101,6 +3207,8 @@ const Emails = () => {
                     </div>
                   </div>
                 </TabsContent>
+                  </>
+                )}
               </div>
             </div>
           </Tabs>

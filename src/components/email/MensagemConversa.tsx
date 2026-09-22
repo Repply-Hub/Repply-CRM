@@ -23,16 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { CorpoEmail } from './CorpoEmail';
-import { type EnderecoDoEmail } from './email-enderecos';
-
-/** Separa "Fulano <fulano@x.com>" em nome e endereço. */
-function separarRemetente(valor?: string | null): { nome: string; endereco: string } {
-  const bruto = (valor ?? '').trim();
-  if (!bruto) return { nome: 'Desconhecido', endereco: '' };
-  const m = bruto.match(/^(.*?)\s*<([^>]+)>$/);
-  if (m) return { nome: m[1].trim() || m[2], endereco: m[2] };
-  return { nome: bruto, endereco: bruto.includes('@') ? bruto : '' };
-}
+import { type EnderecoDoEmail, separarRemetente } from './email-enderecos';
 
 /**
  * Converte a lista do Nylas (`{name?, email}`) para `{nome, endereco}` — mesmo

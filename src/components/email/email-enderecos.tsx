@@ -14,3 +14,30 @@ export interface EnderecoDoEmail {
   name?: string | null;
   email?: string | null;
 }
+
+/** Separa "Fulano <fulano@x.com>" em nome e endereço. */
+export function separarRemetente(valor?: string | null): { nome: string; endereco: string } {
+  const bruto = (valor ?? '').trim();
+  if (!bruto) return { nome: 'Desconhecido', endereco: '' };
+  const m = bruto.match(/^(.*?)\s*<([^>]+)>$/);
+  if (m) return { nome: m[1].trim() || m[2], endereco: m[2] };
+  return { nome: bruto, endereco: bruto.includes('@') ? bruto : '' };
+}
+
+/**
+ * Quem mostrar numa linha da BUSCA GLOBAL: o remetente (recebido) ou
+ * "Para: destinatários" (enviado, onde o remetente é a própria caixa).
+ */
+export function quemDoResultado(r: {
+  tipo: 'sent' | 'received';
+  remetente: string;
+  destinatarios: EnderecoDoEmail[];
+}): string {
+  if (r.tipo === 'sent') {
+    const nomes = (r.destinatarios ?? [])
+      .map((d) => (d?.name?.trim() || d?.email?.trim() || '').trim())
+      .filter(Boolean);
+    return nomes.length ? `Para: ${nomes.join(', ')}` : 'Para: (sem destinatário)';
+  }
+  return separarRemetente(r.remetente).nome;
+}
