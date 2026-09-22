@@ -18,7 +18,7 @@ import { linkSuporteWhatsApp } from "@/lib/suporte";
 // Todas as páginas entram por aqui, e não pelo `lazy` do React: o wrapper
 // traduz "o arquivo desta página sumiu do servidor depois de um deploy" num
 // erro reconhecível, em vez de deixar virar o "Algo deu errado" genérico.
-import { lazyComRetry, ErroDeVersao } from "@/lib/lazy-com-retry";
+import { lazyComRetry, ErroDeVersao, ErroDeDownload } from "@/lib/lazy-com-retry";
 import { destravarSom } from "@/lib/som";
 
 const Negocios = lazyComRetry(() => import("./pages/Negocios"));
@@ -96,6 +96,11 @@ async function sairEVoltarParaRaiz() {
  */
 function TelaDeErro({ error, codigo }: { error: Error | null; codigo: string | null }) {
   const ehVersao = error instanceof ErroDeVersao || error?.name === "ErroDeVersao";
+  // Não conseguimos nem falar com o servidor. Recarregar não resolve isto, e mandar a pessoa
+  // apertar o mesmo botão para sempre foi o que prendeu uma vendedora da MD por 27 minutos em
+  // 22/09/2026 — a tela dizia "saiu uma versão nova" para uma falha de download.
+  const ehDownload = error instanceof ErroDeDownload || error?.name === "ErroDeDownload";
+  const ehFalhaConhecida = ehVersao || ehDownload;
 
   const recarregar = () => {
     // Navegação completa com cache-buster: só isso recria os módulos que o
@@ -110,22 +115,28 @@ function TelaDeErro({ error, codigo }: { error: Error | null; codigo: string | n
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center p-8">
       <p className="text-lg font-semibold text-foreground">
-        {ehVersao ? "Saiu uma versão nova do sistema" : "Algo deu errado"}
+        {ehDownload
+          ? "Não conseguimos baixar esta página"
+          : ehVersao
+            ? "Saiu uma versão nova do sistema"
+            : "Algo deu errado"}
       </p>
 
       <p className="max-w-md text-sm text-muted-foreground">
-        {ehVersao
-          ? "Esta aba está aberta desde antes da última atualização. Recarregue para continuar — nada do seu trabalho foi perdido."
-          : "A tela não conseguiu carregar. Recarregar costuma resolver."}
+        {ehDownload
+          ? "O sistema não chegou ao servidor para buscar esta parte. Confira a sua conexão e tente de novo. Se continuar, teste numa janela anônima: se lá funcionar, é uma extensão ou o antivírus do navegador bloqueando."
+          : ehVersao
+            ? "Esta aba está aberta desde antes da última atualização. Recarregue para continuar — nada do seu trabalho foi perdido."
+            : "A tela não conseguiu carregar. Recarregar costuma resolver."}
       </p>
 
-      {!ehVersao && error?.message && (
+      {!ehFalhaConhecida && error?.message && (
         <p className="max-w-lg rounded bg-muted/30 px-3 py-2 font-mono text-xs text-muted-foreground">
           {error.message}
         </p>
       )}
 
-      {!ehVersao && codigo && (
+      {!ehFalhaConhecida && codigo && (
         <p className="text-xs text-muted-foreground">
           Código do erro:{" "}
           <span className="font-mono font-semibold text-foreground">{codigo}</span>
@@ -137,7 +148,7 @@ function TelaDeErro({ error, codigo }: { error: Error | null; codigo: string | n
           onClick={recarregar}
           className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
         >
-          {ehVersao ? "Recarregar" : "Recarregar (forçado)"}
+          {ehFalhaConhecida ? "Recarregar" : "Recarregar (forçado)"}
         </button>
         <button
           onClick={sairEVoltarParaRaiz}

@@ -1,4 +1,11 @@
-import { ehFalhaDeModulo, ErroDeVersao } from './lazy-com-retry';
+import {
+  ehFalhaDeModulo,
+  ErroDeVersao,
+  ErroDeDownload,
+  enderecoDoModulo,
+  curarCacheDoModulo,
+  carregarComCura,
+} from './lazy-com-retry';
 
 /**
  * O que está sob teste é a decisão "isto é versão velha, ou é bug de verdade?".
@@ -58,5 +65,115 @@ describe('ErroDeVersao', () => {
     expect(erro).toBeInstanceOf(ErroDeVersao);
     expect(erro.name).toBe('ErroDeVersao');
     expect(erro).toBeInstanceOf(Error);
+  });
+});
+
+/**
+ * A CURA DO CACHE ENVENENADO — o caso medido em 22/09/2026.
+ *
+ * Uma vendedora da MD ficou 27 minutos presa na tela de "saiu uma versão nova", em laço:
+ * recarregar não resolvia, sair não resolvia, reiniciar o computador não resolvia, e a janela
+ * anônima funcionava. O motivo apareceu na aba Network do navegador dela: o arquivo
+ * `input-1TXyZfTh.js` respondia 404 vindo do **cache do disco**, enquanto no servidor ele
+ * estava lá, íntegro.
+ *
+ * A causa é nossa: a regra de cache do `vercel.json` vale para o caminho `/assets/`, e vale
+ * TAMBÉM para as respostas de erro. Um 404 momentâneo — durante uma publicação, ou uma falha
+ * de rede de um segundo — chega ao navegador com `Cache-Control: public, max-age=604800` e
+ * fica guardado por SETE DIAS. A partir daí o navegador nem pergunta ao servidor, e nenhuma
+ * quantidade de recarregar resolve.
+ *
+ * A cura: antes de tentar de novo, buscar o arquivo com `cache: 'reload'`, que obriga o
+ * navegador a ir à rede e substitui a entrada envenenada. Isso também separa três casos que
+ * hoje caem todos em "saiu uma versão nova": o arquivo voltou, o arquivo sumiu de verdade, e
+ * o servidor não respondeu.
+ */
+describe('enderecoDoModulo', () => {
+  it('acha o endereço do arquivo na mensagem do Chrome', () => {
+    const erro = new Error('Failed to fetch dynamically imported module: https://crm.exemplo.com.br/assets/input-1TXyZfTh.js');
+    expect(enderecoDoModulo(erro)).toBe('https://crm.exemplo.com.br/assets/input-1TXyZfTh.js');
+  });
+
+  it('devolve nulo quando o navegador não diz qual arquivo falhou', () => {
+    expect(enderecoDoModulo(new Error('error loading dynamically imported module'))).toBeNull();
+    expect(enderecoDoModulo(null)).toBeNull();
+  });
+});
+
+describe('curarCacheDoModulo', () => {
+  it('busca o arquivo ignorando o cache do navegador', async () => {
+    const chamadas: Array<[string, RequestInit | undefined]> = [];
+    const buscar = (async (url: string, opcoes: RequestInit) => {
+      chamadas.push([url, opcoes]);
+      return { ok: true, status: 200 } as Response;
+    }) as unknown as typeof fetch;
+
+    await curarCacheDoModulo('https://x/assets/input-1.js', buscar);
+
+    expect(chamadas[0][0]).toBe('https://x/assets/input-1.js');
+    expect(chamadas[0][1]?.cache).toBe('reload');
+  });
+
+  it('o arquivo estava lá: é cache envenenado, e agora foi substituído', async () => {
+    const buscar = (async () => ({ ok: true, status: 200 })) as unknown as typeof fetch;
+    expect(await curarCacheDoModulo('https://x/a.js', buscar)).toBe('arquivo-voltou');
+  });
+
+  it('o arquivo sumiu mesmo: é versão velha', async () => {
+    const buscar = (async () => ({ ok: false, status: 404 })) as unknown as typeof fetch;
+    expect(await curarCacheDoModulo('https://x/a.js', buscar)).toBe('arquivo-sumiu');
+  });
+
+  it('o servidor não respondeu: é a conexão, não a versão', async () => {
+    const buscar = (async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch;
+    expect(await curarCacheDoModulo('https://x/a.js', buscar)).toBe('sem-resposta');
+  });
+
+  it('sem endereço não há o que curar, e não gasta uma ida à rede', async () => {
+    let foi = false;
+    const buscar = (async () => { foi = true; return { ok: true, status: 200 }; }) as unknown as typeof fetch;
+    expect(await curarCacheDoModulo(null, buscar)).toBe('nao-sei');
+    expect(foi).toBe(false);
+  });
+});
+
+describe('carregarComCura', () => {
+  const modulo = { default: () => null };
+  const falhaDoChrome = () =>
+    new Error('Failed to fetch dynamically imported module: https://x/assets/input-1.js');
+
+  it('🔴 o caso da vendedora: o arquivo está no servidor, a cura limpa o cache e a página carrega', async () => {
+    let tentativas = 0;
+    const importar = async () => {
+      tentativas++;
+      if (tentativas === 1) throw falhaDoChrome();
+      return modulo;
+    };
+    const buscar = (async () => ({ ok: true, status: 200 })) as unknown as typeof fetch;
+
+    expect(await carregarComCura(importar, buscar)).toBe(modulo);
+    expect(tentativas).toBe(2);
+  });
+
+  it('não mexe em erro que não é de carregamento: bug de verdade sobe como veio', async () => {
+    const bug = new TypeError('x is not a function');
+    const importar = async () => { throw bug; };
+    const buscar = (async () => ({ ok: true, status: 200 })) as unknown as typeof fetch;
+
+    await expect(carregarComCura(importar, buscar)).rejects.toBe(bug);
+  });
+
+  it('arquivo realmente fora do ar vira "saiu uma versão nova"', async () => {
+    const importar = async () => { throw falhaDoChrome(); };
+    const buscar = (async () => ({ ok: false, status: 404 })) as unknown as typeof fetch;
+
+    await expect(carregarComCura(importar, buscar)).rejects.toBeInstanceOf(ErroDeVersao);
+  });
+
+  it('servidor sem resposta vira erro de download, não de versão', async () => {
+    const importar = async () => { throw falhaDoChrome(); };
+    const buscar = (async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch;
+
+    await expect(carregarComCura(importar, buscar)).rejects.toBeInstanceOf(ErroDeDownload);
   });
 });

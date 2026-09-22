@@ -373,6 +373,32 @@ recarregar resolve.
 Por isso existe `lazyComRetry`, que traduz isso na tela de "saiu versão nova". **Use
 `lazyComRetry` em vez de `React.lazy` direto.**
 
+🔴 **E existe um caso pior, medido em 22/09/2026: o cache envenenado.** A regra de cache do
+`vercel.json` casa pelo CAMINHO (`/assets/`), e o cabeçalho que ela manda vale também para as
+respostas de **erro**. Conferido em produção:
+
+```
+GET /assets/qualquer-coisa-que-nao-existe.js
+HTTP/1.1 404 Not Found
+Cache-Control: public, max-age=604800      ← o navegador guarda o "não existe" por 7 dias
+```
+
+Um 404 momentâneo — a janela de troca de uma publicação, ou uma falha de rede de um segundo —
+fica gravado no disco do navegador por uma semana. Dali em diante ele **não pergunta mais nada
+ao servidor**: serve o "não existe" guardado. Uma vendedora da MD ficou 27 minutos presa assim,
+e nada do caminho óbvio resolve — recarregar, sair, fechar a aba e até reiniciar o computador
+falham; janela anônima funciona (cache próprio); e "limpar cache" só resolve marcando
+**"Imagens e arquivos armazenados em cache"** E reiniciando o navegador.
+
+Por isso `carregarComCura` (mesmo arquivo) busca o arquivo com `cache: "reload"` antes de
+desistir: essa busca **substitui** a entrada envenenada. O resultado ainda separa três casos que
+antes eram um só — arquivo voltou (era cache), arquivo sumiu (é versão velha) e servidor sem
+resposta (é conexão, e aí a tela para de mandar recarregar). **Não remova essa ida à rede
+achando que é tentativa duplicada**: é ela que desenvenena.
+
+O risco de fundo continua no `vercel.json` — não há como dizer ali "não guarde as respostas de
+erro", e a regra de `/assets/` é a mesma para 200 e para 404.
+
 ### 7.6 `vercel.json` não aceita comentário
 
 JSON não tem comentário e a Vercel **recusa** propriedade desconhecida dentro das regras —
