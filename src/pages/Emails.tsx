@@ -275,7 +275,15 @@ const Emails = () => {
   // chegar fora de ordem.
   const [buscaAplicada, setBuscaAplicada] = useState("");
   const [selectedEmail, setSelectedEmail] = useState<EmailAberto | null>(null);
-  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  // "fechado" = nenhum compositor na tela; "encaixado" = e-mail novo (cartão
+  // no canto, nível da página); "inline" = resposta (bloco no topo da
+  // conversa, montado dentro do LeitorEmail). Um de cada vez — ver
+  // `abrirCompositorProtegido`, abaixo.
+  const [modoCompositor, setModoCompositor] = useState<
+    "fechado" | "encaixado" | "inline"
+  >("fechado");
+  const [minimizado, setMinimizado] = useState(false);
+  const compositorAberto = modoCompositor !== "fechado";
   const [respondendo, setRespondendo] = useState(false);
   const [emailParaConfirmar, setEmailParaConfirmar] = useState<string | null>(
     null,
@@ -595,7 +603,7 @@ const Emails = () => {
    * `rascunhoId` atual do escopo, então não fica desatualizado.
    */
   useEffect(() => {
-    if (!isComposeOpen) return;
+    if (!compositorAberto) return;
     if (!perfil?.id || !perfil?.empresa_id) return;
     const { destinatario, assunto, corpo } = formData;
     if (!destinatario && !assunto && !corpo) return;
@@ -610,7 +618,7 @@ const Emails = () => {
     }, 2000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, isComposeOpen, perfil?.id, perfil?.empresa_id]);
+  }, [formData, compositorAberto, perfil?.id, perfil?.empresa_id]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -1071,7 +1079,8 @@ const Emails = () => {
     },
     onSuccess: () => {
       toast.success("E-mail enviado.");
-      setIsComposeOpen(false);
+      setModoCompositor("fechado");
+      setMinimizado(false);
       setRespondendo(false);
       setRespondendoA(null);
       setFormData({
@@ -1330,50 +1339,81 @@ const Emails = () => {
   const LIMITE_ASSUNTO = 40;
   const LIMITE_PREVIA = 130;
 
+  /** Há algo digitado no rascunho atual que se perderia num "descartar" mudo? */
+  const rascunhoSujo = () =>
+    !!(
+      formData.destinatario ||
+      formData.assunto ||
+      formData.cc ||
+      formData.cco ||
+      (formData.corpo && formData.corpo.replace(/<[^>]*>/g, "").trim() !== "")
+    );
+
+  /**
+   * Um compositor de cada vez. Guarda a abertura pendente (a função que
+   * de fato troca o conteúdo e abre) enquanto pergunta o que fazer com o
+   * rascunho atual — ver o `<AlertDialog open={!!trocaPendente}>` no render.
+   */
+  const [trocaPendente, setTrocaPendente] = useState<null | (() => void)>(
+    null,
+  );
+
+  /** Embrulha toda abertura de compositor (novo/resposta/rascunho salvo). */
+  const abrirCompositorProtegido = (abrir: () => void) => {
+    if (compositorAberto && rascunhoSujo()) {
+      setTrocaPendente(() => abrir);
+    } else {
+      abrir();
+    }
+  };
+
   /** Monta a resposta a partir da mensagem aberta e abre o compositor. */
   const responderMensagem = () => {
     if (!selectedEmail) return;
-    const assunto = selectedEmail.assunto ?? "";
-    const replySubject = assunto.toLowerCase().startsWith("re:")
-      ? assunto
-      : `Re: ${assunto}`;
-    const quando = selectedEmail.created_at || selectedEmail.criado_em;
-    const citado = selectedEmail.snippet || selectedEmail.corpo || "";
-    const cabecalho = `Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${selectedEmail.remetente} escreveu:`;
-    // Citação em HTML (o corpo agora é HTML, não texto puro) — escapa o texto
-    // do e-mail original antes de colocar dentro da tag, senão `<`/`>`/`&` que
-    // vierem no assunto ou no trecho citado quebrariam a marcação do corpo.
-    const citacaoHtml =
-      `<br><blockquote style="margin:0;border-left:2px solid #ccc;padding-left:12px;color:#555">` +
-      `${escaparHtml(cabecalho)}<br>${escaparHtml(citado).replace(/\n/g, "<br>")}</blockquote>`;
+    abrirCompositorProtegido(() => {
+      const assunto = selectedEmail.assunto ?? "";
+      const replySubject = assunto.toLowerCase().startsWith("re:")
+        ? assunto
+        : `Re: ${assunto}`;
+      const quando = selectedEmail.created_at || selectedEmail.criado_em;
+      const citado = selectedEmail.snippet || selectedEmail.corpo || "";
+      const cabecalho = `Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${selectedEmail.remetente} escreveu:`;
+      // Citação em HTML (o corpo agora é HTML, não texto puro) — escapa o texto
+      // do e-mail original antes de colocar dentro da tag, senão `<`/`>`/`&` que
+      // vierem no assunto ou no trecho citado quebrariam a marcação do corpo.
+      const citacaoHtml =
+        `<br><blockquote style="margin:0;border-left:2px solid #ccc;padding-left:12px;color:#555">` +
+        `${escaparHtml(cabecalho)}<br>${escaparHtml(citado).replace(/\n/g, "<br>")}</blockquote>`;
 
-    setFormData({
-      ...formData,
-      // Só o endereço: o campo trazia "Nome <e-mail>" inteiro, que é o que o
-      // leitor exibe, não o que o provedor aceita como destinatário.
-      destinatario: soEndereco(
-        selectedEmail.remetente || selectedEmail.destinatario,
-      ),
-      assunto: replySubject,
-      corpo: montarCorpoInicial(assinaturaParaCorpo, citacaoHtml),
-      // Contexto novo: Cc/Cco de uma composição anterior não continuam numa
-      // resposta diferente.
-      cc: "",
-      cco: "",
+      setFormData({
+        ...formData,
+        // Só o endereço: o campo trazia "Nome <e-mail>" inteiro, que é o que o
+        // leitor exibe, não o que o provedor aceita como destinatário.
+        destinatario: soEndereco(
+          selectedEmail.remetente || selectedEmail.destinatario,
+        ),
+        assunto: replySubject,
+        corpo: montarCorpoInicial(assinaturaParaCorpo, citacaoHtml),
+        // Contexto novo: Cc/Cco de uma composição anterior não continuam numa
+        // resposta diferente.
+        cc: "",
+        cco: "",
+      });
+      // Guarda a QUAL mensagem se está respondendo, no id do provedor. É o que o
+      // Nylas usa para montar In-Reply-To/References; sem isso a resposta sai
+      // solta, o destinatário a recebe fora da conversa e — aqui dentro — quem
+      // tem acesso por marcador não enxerga a própria resposta, porque a regra a
+      // reconhece justamente por pertencer à conversa de origem.
+      setRespondendoA(selectedEmail.gmail_message_id ?? null);
+      // Contexto novo: uma resposta não continua o rascunho de outra
+      // composição — o autosave (abaixo) cria uma linha própria para ela.
+      setRascunhoId(null);
+      // O e-mail aberto CONTINUA aberto atrás do compositor. Fechá-lo aqui era o
+      // que jogava a pessoa de volta para a caixa de entrada no meio da resposta.
+      setRespondendo(true);
+      // Resposta é sempre INLINE — o cartão encaixado é só para e-mail novo.
+      setModoCompositor("inline");
     });
-    // Guarda a QUAL mensagem se está respondendo, no id do provedor. É o que o
-    // Nylas usa para montar In-Reply-To/References; sem isso a resposta sai
-    // solta, o destinatário a recebe fora da conversa e — aqui dentro — quem
-    // tem acesso por marcador não enxerga a própria resposta, porque a regra a
-    // reconhece justamente por pertencer à conversa de origem.
-    setRespondendoA(selectedEmail.gmail_message_id ?? null);
-    // Contexto novo: uma resposta não continua o rascunho de outra
-    // composição — o autosave (abaixo) cria uma linha própria para ela.
-    setRascunhoId(null);
-    // O e-mail aberto CONTINUA aberto atrás do compositor. Fechá-lo aqui era o
-    // que jogava a pessoa de volta para a caixa de entrada no meio da resposta.
-    setRespondendo(true);
-    setIsComposeOpen(true);
   };
 
   /**
@@ -1384,17 +1424,20 @@ const Emails = () => {
    * mensagem nova para aquele endereço, não uma resposta.
    */
   const enviarPara = (endereco: string) => {
-    setFormData({
-      destinatario: endereco,
-      assunto: "",
-      corpo: montarCorpoInicial(assinaturaParaCorpo),
-      cc: "",
-      cco: "",
+    abrirCompositorProtegido(() => {
+      setFormData({
+        destinatario: endereco,
+        assunto: "",
+        corpo: montarCorpoInicial(assinaturaParaCorpo),
+        cc: "",
+        cco: "",
+      });
+      setRespondendoA(null);
+      setRespondendo(false);
+      setRascunhoId(null);
+      setModoCompositor("encaixado");
+      setMinimizado(false);
     });
-    setRespondendoA(null);
-    setRespondendo(false);
-    setRascunhoId(null);
-    setIsComposeOpen(true);
   };
 
   /**
@@ -1405,36 +1448,39 @@ const Emails = () => {
    * da pessoa, e sobrepor com um rascunho antigo apagaria isso sem aviso.
    */
   const escreverNovo = () => {
-    const maisRecente = rascunhos?.[0];
-    const temConteudo =
-      maisRecente &&
-      (maisRecente.destinatario || maisRecente.assunto || maisRecente.corpo);
+    abrirCompositorProtegido(() => {
+      const maisRecente = rascunhos?.[0];
+      const temConteudo =
+        maisRecente &&
+        (maisRecente.destinatario || maisRecente.assunto || maisRecente.corpo);
 
-    if (temConteudo) {
-      setFormData({
-        destinatario: maisRecente.destinatario ?? "",
-        assunto: maisRecente.assunto ?? "",
-        corpo: maisRecente.corpo ?? "",
-        // Rascunho não guarda Cc/Cco (ver `RascunhoEmail`) — recuperar um
-        // antigo nunca traz cópia/cópia oculta de volta.
-        cc: "",
-        cco: "",
-      });
-      setRascunhoId(maisRecente.id);
-      toast.info("Rascunho recuperado.");
-    } else {
-      setFormData({
-        destinatario: "",
-        assunto: "",
-        corpo: montarCorpoInicial(assinaturaParaCorpo),
-        cc: "",
-        cco: "",
-      });
-      setRascunhoId(null);
-    }
-    setRespondendoA(null);
-    setRespondendo(false);
-    setIsComposeOpen(true);
+      if (temConteudo) {
+        setFormData({
+          destinatario: maisRecente.destinatario ?? "",
+          assunto: maisRecente.assunto ?? "",
+          corpo: maisRecente.corpo ?? "",
+          // Rascunho não guarda Cc/Cco (ver `RascunhoEmail`) — recuperar um
+          // antigo nunca traz cópia/cópia oculta de volta.
+          cc: "",
+          cco: "",
+        });
+        setRascunhoId(maisRecente.id);
+        toast.info("Rascunho recuperado.");
+      } else {
+        setFormData({
+          destinatario: "",
+          assunto: "",
+          corpo: montarCorpoInicial(assinaturaParaCorpo),
+          cc: "",
+          cco: "",
+        });
+        setRascunhoId(null);
+      }
+      setRespondendoA(null);
+      setRespondendo(false);
+      setModoCompositor("encaixado");
+      setMinimizado(false);
+    });
   };
 
   /** Abre um rascunho específico da aba "Rascunhos" para continuar editando. */
@@ -1444,17 +1490,22 @@ const Emails = () => {
     assunto: string | null;
     corpo: string | null;
   }) => {
-    setFormData({
-      destinatario: r.destinatario ?? "",
-      assunto: r.assunto ?? "",
-      corpo: r.corpo ?? "",
-      cc: "",
-      cco: "",
+    // Mesma trava de "um de cada vez": abrir este rascunho por cima de um
+    // compositor já aberto e sujo também precisa perguntar salvar/descartar.
+    abrirCompositorProtegido(() => {
+      setFormData({
+        destinatario: r.destinatario ?? "",
+        assunto: r.assunto ?? "",
+        corpo: r.corpo ?? "",
+        cc: "",
+        cco: "",
+      });
+      setRascunhoId(r.id);
+      setRespondendoA(null);
+      setRespondendo(false);
+      setModoCompositor("encaixado");
+      setMinimizado(false);
     });
-    setRascunhoId(r.id);
-    setRespondendoA(null);
-    setRespondendo(false);
-    setIsComposeOpen(true);
   };
 
   /** Descarta um rascunho a partir da lista, sem precisar abrir o compositor. */
@@ -1758,1161 +1809,1235 @@ const Emails = () => {
     if (p) setActiveTab("received");
   };
 
-  const fecharCompositor = (aberto: boolean) => {
-    setIsComposeOpen(aberto);
-    if (!aberto) {
-      setRespondendo(false);
-      // Sem isto, escrever um e-mail NOVO logo depois de fechar uma resposta
-      // sairia amarrado à conversa antiga.
-      setRespondendoA(null);
-    }
+  /**
+   * Fecha SEM apagar — o rascunho fica salvo (autosave). Diferente de
+   * `onDescartar` (o lixo, abaixo), que apaga de vez.
+   */
+  const fecharCompositor = () => {
+    setModoCompositor("fechado");
+    setMinimizado(false);
+    setRespondendo(false);
+    // Sem isto, escrever um e-mail NOVO logo depois de fechar uma resposta
+    // sairia amarrado à conversa antiga.
+    setRespondendoA(null);
   };
 
-  // Um único compositor, montado nas duas telas — a listagem e o leitor. É o
-  // que permite responder sem sair do e-mail aberto.
-  const compositor = (
-    <CompositorEmail
-      open={isComposeOpen}
-      onOpenChange={fecharCompositor}
-      valores={formData}
-      onChange={setFormData}
-      onEnviar={handleSubmit}
-      onDescartar={async () => {
-        // Diferente de fechar o compositor (que preserva o rascunho para
-        // retomar depois), este botão é a exclusão explícita — some da aba
-        // Rascunhos também, e leva os anexos do balde junto.
-        if (rascunhoId) {
-          await anexosCtrl.limparBaldeDoRascunho(rascunhoId).catch(() => {});
-          descartarRascunhoMutation.mutate(rascunhoId);
-        }
-        setRascunhoId(null);
-        setFormData({ destinatario: "", assunto: "", corpo: "", cc: "", cco: "" });
-        fecharCompositor(false);
-      }}
-      isConnected={isConnected}
-      isEnviando={sendEmailMutation.isPending}
-      titulo={respondendo ? "Responder" : "Nova mensagem"}
-      anexos={anexosCtrl.anexos}
-      onAnexar={aoAnexar}
-      onRemoverAnexo={aoRemoverAnexo}
-      anexando={anexosCtrl.subindo}
-      onConfigurarAssinatura={() => navigate("/configuracoes?tab=perfil")}
-      onEnviarImagemCorpo={(file) => enviarImagemEmail(file, perfil?.empresa_id ?? "")}
-    />
-  );
+  // Props comuns aos dois compositores (encaixado e inline) — só a moldura
+  // muda entre eles (variante/título/minimizar), o formulário é o mesmo.
+  const propsCompositor = {
+    valores: formData,
+    onChange: setFormData,
+    onEnviar: handleSubmit,
+    onDescartar: async () => {
+      // Diferente de fechar o compositor (que preserva o rascunho para
+      // retomar depois), este botão é a exclusão explícita — some da aba
+      // Rascunhos também, e leva os anexos do balde junto.
+      if (rascunhoId) {
+        await anexosCtrl.limparBaldeDoRascunho(rascunhoId).catch(() => {});
+        descartarRascunhoMutation.mutate(rascunhoId);
+      }
+      setRascunhoId(null);
+      setFormData({ destinatario: "", assunto: "", corpo: "", cc: "", cco: "" });
+      fecharCompositor();
+    },
+    isConnected,
+    isEnviando: sendEmailMutation.isPending,
+    anexos: anexosCtrl.anexos,
+    onAnexar: aoAnexar,
+    onRemoverAnexo: aoRemoverAnexo,
+    anexando: anexosCtrl.subindo,
+    onConfigurarAssinatura: () => navigate("/configuracoes?tab=perfil"),
+    onEnviarImagemCorpo: (file: File) =>
+      enviarImagemEmail(file, perfil?.empresa_id ?? ""),
+    onFechar: fecharCompositor,
+  };
+
+  // Encaixado: e-mail NOVO. Montado UMA vez no nível da página, fora da troca
+  // lista↔leitor logo abaixo, para não perder o rascunho (nem remontar o
+  // cartão) ao navegar entre as duas telas.
+  const compositorEncaixado =
+    modoCompositor === "encaixado" ? (
+      <CompositorEmail
+        variante="encaixado"
+        titulo="Nova mensagem"
+        minimizado={minimizado}
+        onMinimizarChange={setMinimizado}
+        {...propsCompositor}
+      />
+    ) : null;
+
+  // Inline: RESPOSTA. Só existe enquanto o leitor de um e-mail está na tela —
+  // é passado para dentro do `LeitorEmail`, que decide onde montá-lo (topo da
+  // conversa).
+  const compositorInline =
+    modoCompositor === "inline" ? (
+      <CompositorEmail variante="inline" titulo="Responder" {...propsCompositor} />
+    ) : null;
 
   // Leitura ocupa a tela inteira, como no Gmail. Antes era um modal, mas e-mail
   // é conteúdo para ler, não confirmação de ação: o modal empilhava um contexto
   // sobre o outro, prendia a rolagem e obrigava a fechar para voltar à lista.
-  if (selectedEmail) {
-    return (
-      <AppLayout
-        title="E-mail"
-        subtitle={connectedEmail ?? "Caixa da empresa"}
-        mainClassName="flex-1 overflow-hidden p-0"
-      >
-        <LeitorEmail
-          email={selectedEmail}
-          emailDaConta={connectedEmail}
-          onVoltar={() => setSelectedEmail(null)}
-          onExcluir={() =>
-            setEmailToDelete({
-              id: selectedEmail.id,
-              type:
-                selectedEmail.type ||
-                (selectedEmail.criado_em ? "received" : "sent"),
-            })
-          }
-          onResponder={responderMensagem}
-          onClicarEndereco={setEmailParaConfirmar}
-          onMarcarNaoLido={
-            selectedEmail.type === "received"
-              ? () => {
-                  marcarNaoLido(selectedEmail.id);
-                  setSelectedEmail(null);
-                }
-              : undefined
-          }
-          onMover={
-            selectedEmail.type === "received" || selectedEmail.type === "sent"
-              ? () => setMensagensParaMover([selectedEmail.id])
-              : undefined
-          }
-          mensagensDaConversa={mensagensDaConversa}
-          carregandoConversa={carregandoConversa}
-          onAbrirMensagemDaConversa={abrirMensagemDaConversa}
-        />
-
-        <MoverParaMarcadorDialog
-          open={mensagensParaMover.length > 0}
-          onOpenChange={(o) => !o && setMensagensParaMover([])}
-          contaId={conta?.id}
-          mensagemIds={mensagensParaMover}
-        />
-
-        {compositor}
-
-        <ConfirmarEnviarEmailDialog
-          endereco={emailParaConfirmar}
-          onCancelar={() => setEmailParaConfirmar(null)}
-          onConfirmar={(endereco) => {
-            setEmailParaConfirmar(null);
-            enviarPara(endereco);
-          }}
-        />
-
-        <AlertDialog
-          open={!!emailToDelete}
-          onOpenChange={(open) => !open && setEmailToDelete(null)}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Excluir este e-mail?</AlertDialogTitle>
-              <AlertDialogDescription>
-                O e-mail vai para a lixeira do Gmail e sai da sua caixa de
-                entrada. Dá para recuperar na lixeira por até 30 dias.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  if (emailToDelete) deleteEmailMutation.mutate(emailToDelete);
-                  setEmailToDelete(null);
-                }}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Excluir
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </AppLayout>
-    );
-  }
-
+  //
+  // Retorno único (fragmento + ternário), não dois `return` separados: o
+  // cartão encaixado (`compositorEncaixado`, acima) precisa ficar FORA da
+  // troca lista↔leitor abaixo — irmão do `AppLayout`, não filho — para
+  // sobreviver a ela em vez de remontar a cada `selectedEmail` que muda.
   return (
-    <AppLayout
-      title="E-mail"
-      subtitle={connectedEmail ?? "Caixa da empresa"}
-      mainClassName="flex-1 overflow-hidden p-0"
-    >
-      {/* CONTROLADO (`value`, não `defaultValue`). Com `defaultValue` o Radix
-          guarda a aba internamente e ignora o estado do React: `activeTab`
-          existia só como espelho, e chamar `setActiveTab` de fora — como faz o
-          `escolherPasta` ao clicar num marcador estando em Enviados — mudava a
-          variável sem mudar a aba na tela. A partir daí tudo que depende de
-          `activeTab` (o contador da barra, o marcador aceso, o "selecionar
-          todos", o tipo passado ao compositor) passava a falar de uma aba
-          diferente da que a pessoa está vendo. */}
-      <Tabs
-        value={activeTab}
-        className="flex flex-col h-full bg-background overflow-hidden"
-        onValueChange={(val) => {
-          setActiveTab(val);
-          setSelectedIds([]);
-        }}
-      >
-        {/* Header with Search and Tab Actions */}
-        <div className="px-4 py-3 flex items-center justify-between gap-4 border-b bg-background/95 sticky top-0 z-10">
-          {/* `min-w-0` + rolagem própria nesta fileira: sem os dois, as abas e a
-              busca não cediam espaço, a linha estourava para a direita e o
-              "Escrever" — que é o ÚNICO caminho para um e-mail novo — sumia por
-              inteiro entre ~768 e ~917px de janela, sem barra de rolagem em lugar
-              nenhum para alcançá-lo. Mesmo padrão de Negocios.tsx:1862.
-              `flex-wrap` até `xl` (exclusive): no celular, no tablet E no notebook
-              pequeno deixa a busca (que passou a aparecer ali) e o filtro
-              "Todas/Não lidas" quebrarem para a própria linha em vez de vazar
-              para fora da tela sem barra visível. Foi `md` (768px) até
-              11/09/2026 de manhã, depois `lg` (1024px) à tarde — mas o
-              levantamento no navegador real de 11/09/2026 mediu 1024×768 de
-              verdade e achou a busca ainda vazando: em `nowrap` a fileira pede
-              840px (`scrollWidth`) e só há 802px (`clientWidth`) — 38px
-              faltando, sem barra visível para alcançá-la. A 1280px a fileira
-              cabe exata (1058 = 1058). De `xl` (1280px) para cima volta a ser
-              `nowrap`. */}
-          <div className="flex flex-wrap xl:flex-nowrap items-center gap-4 flex-1 min-w-0 overflow-x-auto custom-scrollbar">
-            {selectedIds.length > 0 ? (
-              <div className="flex shrink-0 items-center gap-4 bg-primary/5 px-3 py-1 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-left-2 duration-200">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="select-all-bulk"
-                    checked={
-                      selectedIds.length > 0 &&
-                      selectedIds.length ===
-                        (activeTab === "received"
-                          ? receivedEmails?.length
-                          : emails?.length)
-                    }
-                    onCheckedChange={toggleSelectAll}
-                  />
-                  <span className="text-sm font-medium text-primary">
-                    {selectedIds.length} selecionado(s)
-                  </span>
-                </div>
-                <div className="h-4 w-[1px] bg-primary/20 mx-2" />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 gap-2"
-                  onClick={() => setIsBulkDeleting(true)}
+    <>
+      {selectedEmail ? (
+        <AppLayout
+          title="E-mail"
+          subtitle={connectedEmail ?? "Caixa da empresa"}
+          mainClassName="flex-1 overflow-hidden p-0"
+        >
+          <LeitorEmail
+            email={selectedEmail}
+            emailDaConta={connectedEmail}
+            onVoltar={() => setSelectedEmail(null)}
+            onExcluir={() =>
+              setEmailToDelete({
+                id: selectedEmail.id,
+                type:
+                  selectedEmail.type ||
+                  (selectedEmail.criado_em ? "received" : "sent"),
+              })
+            }
+            onResponder={responderMensagem}
+            onClicarEndereco={setEmailParaConfirmar}
+            onMarcarNaoLido={
+              selectedEmail.type === "received"
+                ? () => {
+                    marcarNaoLido(selectedEmail.id);
+                    setSelectedEmail(null);
+                  }
+                : undefined
+            }
+            onMover={
+              selectedEmail.type === "received" || selectedEmail.type === "sent"
+                ? () => setMensagensParaMover([selectedEmail.id])
+                : undefined
+            }
+            mensagensDaConversa={mensagensDaConversa}
+            carregandoConversa={carregandoConversa}
+            onAbrirMensagemDaConversa={abrirMensagemDaConversa}
+            compositorInline={compositorInline}
+          />
+
+          <MoverParaMarcadorDialog
+            open={mensagensParaMover.length > 0}
+            onOpenChange={(o) => !o && setMensagensParaMover([])}
+            contaId={conta?.id}
+            mensagemIds={mensagensParaMover}
+          />
+
+          <ConfirmarEnviarEmailDialog
+            endereco={emailParaConfirmar}
+            onCancelar={() => setEmailParaConfirmar(null)}
+            onConfirmar={(endereco) => {
+              setEmailParaConfirmar(null);
+              enviarPara(endereco);
+            }}
+          />
+
+          <AlertDialog
+            open={!!emailToDelete}
+            onOpenChange={(open) => !open && setEmailToDelete(null)}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir este e-mail?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  O e-mail vai para a lixeira do Gmail e sai da sua caixa de
+                  entrada. Dá para recuperar na lixeira por até 30 dias.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    if (emailToDelete) deleteEmailMutation.mutate(emailToDelete);
+                    setEmailToDelete(null);
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  <Trash2 className="h-4 w-4" />
                   Excluir
-                </Button>
-                {activeTab === "received" && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-primary hover:bg-primary/10 gap-2"
-                    onClick={() =>
-                      bulkUpdateReadStatusMutation.mutate({
-                        ids: selectedIds,
-                        lido: !selecaoTodaLida,
-                      })
-                    }
-                  >
-                    {selecaoTodaLida ? (
-                      <MailOpen className="h-4 w-4" />
-                    ) : (
-                      <CheckSquare className="h-4 w-4" />
-                    )}
-                    {selecaoTodaLida ? "Marcar não lido" : "Lido"}
-                  </Button>
-                )}
-                {/* Mensagem enviada também guarda `pastas` (a Edge Function de
-                    sincronização grava para as duas direções), então mover
-                    funciona igual nas duas abas. Só Rascunhos fica de fora —
-                    rascunho nunca existiu no provedor. */}
-                {(activeTab === "received" || activeTab === "sent") && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-primary hover:bg-primary/10 gap-2"
-                    onClick={() => setMensagensParaMover(selectedIds)}
-                  >
-                    <Tag className="h-4 w-4" />
-                    Mover
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-muted-foreground"
-                  onClick={() => setSelectedIds([])}
-                >
-                  Cancelar
-                </Button>
-              </div>
-            ) : (
-              <TabsList className={cn(TOGGLE_LIST_CLASS, "shrink-0")}>
-                <TabsTrigger value="received" className={TOGGLE_TRIGGER_CLASS}>
-                  <Inbox className="h-4 w-4" />
-                  <span className="hidden sm:inline">Recebidos</span>
-                  <Badge variant="secondary" className={TOGGLE_BADGE_CLASS}>
-                    {totalReceived}
-                  </Badge>
-                </TabsTrigger>
-                <TabsTrigger value="sent" className={TOGGLE_TRIGGER_CLASS}>
-                  <Send className="h-4 w-4" />
-                  <span className="hidden sm:inline">Enviados</span>
-                  <Badge variant="secondary" className={TOGGLE_BADGE_CLASS}>
-                    {totalSent}
-                  </Badge>
-                </TabsTrigger>
-                <TabsTrigger value="drafts" className={TOGGLE_TRIGGER_CLASS}>
-                  <PenBox className="h-4 w-4" />
-                  <span className="hidden sm:inline">Rascunhos</span>
-                  <Badge variant="secondary" className={TOGGLE_BADGE_CLASS}>
-                    {rascunhos?.length ?? 0}
-                  </Badge>
-                </TabsTrigger>
-              </TabsList>
-            )}
-
-            {/* Somente não lidas.
-                Fica FORA do bloco que a barra de seleção em massa substitui, e
-                fora do bloco de busca — visibilidade independente da busca, que
-                desde 11/09/2026 também aparece no celular (numa linha própria,
-                ver comentário no bloco abaixo), que é justamente onde triar o
-                que falta ler importa mais. Só na aba Recebidos: "não lida" não
-                quer dizer nada em Enviados. Mesmo padrão de botão do filtro do
-                WhatsApp Inbox. */}
-            {activeTab === "received" && selectedIds.length === 0 && (
-              <div className={cn(TOGGLE_LIST_CLASS, "w-fit shrink-0")}>
-                {[
-                  { valor: false, rotulo: "Todas" },
-                  { valor: true, rotulo: "Não lidas" },
-                ].map((opt) => (
-                  <button
-                    key={String(opt.valor)}
-                    type="button"
-                    onClick={() => {
-                      setSomenteNaoLidas(opt.valor);
-                      // Outra contagem, outra paginação: ficar na página 3 de
-                      // um filtro com 6 resultados mostraria lista vazia.
-                      setPageReceived(0);
-                    }}
-                    className={cn(
-                      TOGGLE_BUTTON_CLASS,
-                      somenteNaoLidas === opt.valor
-                        ? TOGGLE_BUTTON_ACTIVE
-                        : TOGGLE_BUTTON_INACTIVE,
-                    )}
-                  >
-                    {opt.rotulo}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Mesmo ponto de quebra da fileira acima (`xl`, 1280px — ver o
-                comentário no início do bloco): os dois mudam juntos porque são
-                a mesma fileira, e o campo de busca é o que mais precisa de
-                espaço nela. Ficar em `lg` deixaria a busca espremida contra o
-                filtro "Todas/Não lidas" bem no ponto que o levantamento de
-                11/09/2026 mediu como insuficiente (1024×768: 840px pedidos,
-                802px disponíveis). */}
-            <div className="flex items-center gap-2 w-full xl:w-auto xl:flex-1 xl:min-w-[14rem] xl:max-w-md">
-              {/* Marcador só filtra Recebidos (ver `escolherPasta`) — o chip só
-                  existe onde há filtro de verdade para limpar. Clicar de novo
-                  no marcador ativo na barra lateral não desmarca (o clique
-                  sempre grava o id, sem comparar com o atual); este chip é o
-                  atalho que resolve isso sem mexer naquele clique. */}
-              {activeTab === "received" &&
-                pastaSelecionada &&
-                pastaSelecionada !== CAIXA_DE_ENTRADA && (
-                <Badge
-                  variant="secondary"
-                  className="h-8 shrink-0 gap-1.5 rounded-full border-none bg-primary/10 pl-3 pr-1.5 text-xs font-medium text-primary"
-                >
-                  {nomeDaPastaSelecionada}
-                  <button
-                    type="button"
-                    // Limpar volta para a Caixa de entrada, que e o estado
-                    // padrao — nao para Todos os e-mails.
-                    onClick={() => escolherPasta(CAIXA_DE_ENTRADA)}
-                    className="rounded-full p-0.5 hover:bg-primary/20"
-                    title="Limpar filtro de marcador"
-                    aria-label="Limpar filtro de marcador"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-                <Input
-                  placeholder="Pesquisar e-mails..."
-                  className="pl-10 h-10 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-1 transition-all"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              {isConnected && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full hover:bg-muted shrink-0"
-                  onClick={() => sincronizar({ limit: 50 })}
-                  disabled={isSyncing}
-                  title="Buscar as mensagens mais recentes"
-                >
-                  <RefreshCw
-                    className={`h-5 w-5 text-muted-foreground ${isSyncing ? "animate-spin" : ""}`}
-                  />
-                </Button>
-              )}
-              {/* Engrenagem para TODOS (decisão do Lucas, 16/09/2026 — tela mais
-                  limpa, sem botão novo). Quem gerencia a caixa (dono/gestor)
-                  clica e abre "Gerenciar caixa" — único caminho para trocar de
-                  caixa; o card de conexão, que tem o botão de desconectar, só
-                  aparece quando NÃO há caixa conectada, então depois de
-                  conectar não sobrava outra saída. Quem NÃO gerencia vai direto
-                  para a própria assinatura em Configurações: a ação de
-                  gerenciar continua escondida dela só para não oferecer o que o
-                  servidor recusaria (a barreira real está na Edge Function),
-                  não porque ela não tenha nada para fazer aqui. */}
-              {isConnected && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full hover:bg-muted shrink-0"
-                  onClick={() =>
-                    podeGerenciarCaixa
-                      ? setGerenciarCaixaAberto(true)
-                      : navigate("/configuracoes?tab=perfil")
-                  }
-                  title={
-                    podeGerenciarCaixa
-                      ? `Gerenciar a caixa conectada (${connectedEmail ?? ""})`
-                      : "Configurar assinatura"
-                  }
-                  aria-label={
-                    podeGerenciarCaixa
-                      ? "Gerenciar a caixa de e-mail da empresa"
-                      : "Configurar assinatura"
-                  }
-                >
-                  <Settings className="h-5 w-5 text-muted-foreground" />
-                </Button>
-              )}
-            </div>
-          </div>
-          {/* `shrink-0`: a ação principal da tela nunca cede espaço para os
-              filtros. Quem tem de encolher é a fileira da esquerda, que agora
-              rola sozinha. */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              onClick={escreverNovo}
-              className="h-10 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm gap-2 text-sm font-bold px-4 transition-all"
-              title="Escrever um e-mail novo"
-              aria-label="Escrever um e-mail novo"
-            >
-              <PenBox className="h-4 w-4" />
-              <span className="hidden sm:inline">Escrever</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* A barra fica FORA do TabsContent, ao lado dele: ela vale para a tela
-            inteira, e repeti-la dentro de cada aba a faria remontar (perdendo a
-            rolagem) a cada troca de Recebidos/Enviados. */}
-        <div className="flex flex-1 overflow-hidden">
-          {isConnected && (
-            <BarraPastas
-              pastas={pastas}
-              carregando={pastasCarregando}
-              // Em Enviados nada fica destacado: o marcador não filtra aquela
-              // aba, e mostrar um item aceso ali afirmaria um filtro que não
-              // existe.
-              selecionada={activeTab === "sent" ? null : pastaSelecionada}
-              onSelecionar={escolherPasta}
-              // Em Enviados a barra fala da aba, não da caixa: os dois itens
-              // do topo mostram o total de enviados, que é o que a lista tem.
-              totalDaEntrada={activeTab === "sent" ? totalSent : totalDaEntrada}
-              totalDeTodos={activeTab === "sent" ? totalSent : totalDeTodos}
-              contagens={contagens}
-              contaId={conta?.id}
-              podeCriarMarcador={podeGerenciarCaixa}
-              // Arrastar é sempre ligado (alça própria na linha, item 2 do
-              // desenho) — só as linhas de Recebidos e Enviados têm
-              // `draggable`, então soltar aqui nunca dispara a partir de
-              // Rascunhos, mesmo com o handler sempre presente.
-              onMoverParaMarcador={(ids, pastaId) =>
-                moverParaMarcadorMut.mutate({ mensagemIds: ids, pastaId })
-              }
-            />
-          )}
-
-          <div className="relative min-w-0 flex-1 overflow-hidden">
-            <TabsContent value="sent" className="m-0 h-full overflow-hidden">
-              <div className="h-full overflow-hidden flex flex-col bg-background">
-                <div className="flex-1 overflow-y-auto">
-                  {isSentLoading ? (
-                    <div className="flex justify-center py-20">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                  ) : !emails || emails.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                      <Mail className="h-16 w-16 mb-4 opacity-10" />
-                      <p className="text-lg">Nenhum e-mail enviado</p>
-                    </div>
-                  ) : (
-                    <>
-                      <CabecalhoLista
-                        rotuloPrincipal="Destinatário"
-                        rotuloData="Enviado em"
-                        rotuloAssunto="Assunto e prévia"
-                        mostrarEspacoAlca
-                        checkbox={{
-                          checked:
-                            emails.length > 0 &&
-                            selectedIds.length === emails.length,
-                          onChange: toggleSelectAll,
-                        }}
-                      />
-                      <div className="divide-y divide-border/50">
-                        {emails.map((email) => (
-                          <div
-                            key={email.id}
-                            className={cn(
-                              "group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
-                              selectedIds.includes(email.id) && "bg-primary/5",
-                            )}
-                            onClick={() =>
-                              void abrirComCorpo({ ...email, type: "sent" })
-                            }
-                            draggable
-                            onDragStart={(e) => iniciarArrastoLinha(e, email.id)}
-                          >
-                            {/* Alça sempre presente, discreta — clique comum na
-                                linha não é arrasto (nativo não confunde os
-                                dois), então não há por que escondê-la atrás
-                                de um modo à parte. */}
-                            <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground opacity-60 group-hover:opacity-100" />
-                            <Checkbox
-                              className="shrink-0"
-                              checked={selectedIds.includes(email.id)}
-                              onCheckedChange={() => toggleSelectId(email.id)}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
-                              {iniciaisDe(email.destinatario)}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-medium text-foreground/70">
-                                Para: {email.destinatario}
-                              </span>
-                              <div className="mt-0.5 flex items-baseline gap-1.5 overflow-hidden">
-                                <span className="shrink-0 overflow-hidden whitespace-nowrap text-sm font-semibold text-foreground">
-                                  {truncarTexto(email.assunto, LIMITE_ASSUNTO)}
-                                </span>
-                                {email.corpo && (
-                                  <span className="overflow-hidden whitespace-nowrap text-xs text-muted-foreground">
-                                    {truncarTexto(email.corpo, LIMITE_PREVIA)}
-                                  </span>
-                                )}
-                                <SeloMarcadores
-                                  marcadores={marcadoresDaMensagem(email.pastas)}
-                                />
-                              </div>
-                            </div>
-                            <div
-                              className={cn(
-                                LARGURA_COL_DATA,
-                                "text-right text-xs font-medium text-muted-foreground",
-                              )}
-                            >
-                              {format(
-                                new Date(email.created_at),
-                                "dd 'de' MMM",
-                                { locale: ptBR },
-                              )}
-                            </div>
-                            <div
-                              className={cn(
-                                LARGURA_COL_ACOES,
-                                "flex items-center justify-end",
-                                // Some no hover/seleção só a partir de `sm:` —
-                                // no celular não há hover, então ali a ação
-                                // continua sempre visível (item 4 do desenho).
-                                "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
-                                selectedIds.includes(email.id) && "sm:opacity-100",
-                              )}
-                            >
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEmailToDelete({
-                                    id: email.id,
-                                    type: "sent",
-                                  });
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-                {totalSent > PAGE_SIZE && (
-                  <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/5 shrink-0">
-                    <div className="text-sm text-muted-foreground">
-                      Mostrando {pageSent * PAGE_SIZE + 1} -{" "}
-                      {Math.min((pageSent + 1) * PAGE_SIZE, totalSent)} de{" "}
-                      {totalSent}
-                    </div>
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </AppLayout>
+      ) : (
+        <AppLayout
+          title="E-mail"
+          subtitle={connectedEmail ?? "Caixa da empresa"}
+          mainClassName="flex-1 overflow-hidden p-0"
+        >
+          {/* CONTROLADO (`value`, não `defaultValue`). Com `defaultValue` o Radix
+              guarda a aba internamente e ignora o estado do React: `activeTab`
+              existia só como espelho, e chamar `setActiveTab` de fora — como faz o
+              `escolherPasta` ao clicar num marcador estando em Enviados — mudava a
+              variável sem mudar a aba na tela. A partir daí tudo que depende de
+              `activeTab` (o contador da barra, o marcador aceso, o "selecionar
+              todos", o tipo passado ao compositor) passava a falar de uma aba
+              diferente da que a pessoa está vendo. */}
+          <Tabs
+            value={activeTab}
+            className="flex flex-col h-full bg-background overflow-hidden"
+            onValueChange={(val) => {
+              setActiveTab(val);
+              setSelectedIds([]);
+            }}
+          >
+            {/* Header with Search and Tab Actions */}
+            <div className="px-4 py-3 flex items-center justify-between gap-4 border-b bg-background/95 sticky top-0 z-10">
+              {/* `min-w-0` + rolagem própria nesta fileira: sem os dois, as abas e a
+                  busca não cediam espaço, a linha estourava para a direita e o
+                  "Escrever" — que é o ÚNICO caminho para um e-mail novo — sumia por
+                  inteiro entre ~768 e ~917px de janela, sem barra de rolagem em lugar
+                  nenhum para alcançá-lo. Mesmo padrão de Negocios.tsx:1862.
+                  `flex-wrap` até `xl` (exclusive): no celular, no tablet E no notebook
+                  pequeno deixa a busca (que passou a aparecer ali) e o filtro
+                  "Todas/Não lidas" quebrarem para a própria linha em vez de vazar
+                  para fora da tela sem barra visível. Foi `md` (768px) até
+                  11/09/2026 de manhã, depois `lg` (1024px) à tarde — mas o
+                  levantamento no navegador real de 11/09/2026 mediu 1024×768 de
+                  verdade e achou a busca ainda vazando: em `nowrap` a fileira pede
+                  840px (`scrollWidth`) e só há 802px (`clientWidth`) — 38px
+                  faltando, sem barra visível para alcançá-la. A 1280px a fileira
+                  cabe exata (1058 = 1058). De `xl` (1280px) para cima volta a ser
+                  `nowrap`. */}
+              <div className="flex flex-wrap xl:flex-nowrap items-center gap-4 flex-1 min-w-0 overflow-x-auto custom-scrollbar">
+                {selectedIds.length > 0 ? (
+                  <div className="flex shrink-0 items-center gap-4 bg-primary/5 px-3 py-1 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-left-2 duration-200">
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPageSent(0)}
-                        disabled={pageSent === 0}
-                        className="h-8 w-8 p-0"
-                        title="Primeira página"
-                        aria-label="Primeira página"
-                      >
-                        <ChevronsLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPageSent((p) => Math.max(0, p - 1))}
-                        disabled={pageSent === 0}
-                        className="h-8"
-                      >
-                        <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPageSent((p) => p + 1)}
-                        disabled={(pageSent + 1) * PAGE_SIZE >= totalSent}
-                        className="h-8"
-                      >
-                        Próximo <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setPageSent(
-                            Math.max(0, Math.ceil(totalSent / PAGE_SIZE) - 1),
-                          )
+                      <Checkbox
+                        id="select-all-bulk"
+                        checked={
+                          selectedIds.length > 0 &&
+                          selectedIds.length ===
+                            (activeTab === "received"
+                              ? receivedEmails?.length
+                              : emails?.length)
                         }
-                        disabled={(pageSent + 1) * PAGE_SIZE >= totalSent}
-                        className="h-8 w-8 p-0"
-                        title="Última página"
-                        aria-label="Última página"
-                      >
-                        <ChevronsRight className="h-4 w-4" />
-                      </Button>
+                        onCheckedChange={toggleSelectAll}
+                      />
+                      <span className="text-sm font-medium text-primary">
+                        {selectedIds.length} selecionado(s)
+                      </span>
                     </div>
+                    <div className="h-4 w-[1px] bg-primary/20 mx-2" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 gap-2"
+                      onClick={() => setIsBulkDeleting(true)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Excluir
+                    </Button>
+                    {activeTab === "received" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-primary hover:bg-primary/10 gap-2"
+                        onClick={() =>
+                          bulkUpdateReadStatusMutation.mutate({
+                            ids: selectedIds,
+                            lido: !selecaoTodaLida,
+                          })
+                        }
+                      >
+                        {selecaoTodaLida ? (
+                          <MailOpen className="h-4 w-4" />
+                        ) : (
+                          <CheckSquare className="h-4 w-4" />
+                        )}
+                        {selecaoTodaLida ? "Marcar não lido" : "Lido"}
+                      </Button>
+                    )}
+                    {/* Mensagem enviada também guarda `pastas` (a Edge Function de
+                        sincronização grava para as duas direções), então mover
+                        funciona igual nas duas abas. Só Rascunhos fica de fora —
+                        rascunho nunca existiu no provedor. */}
+                    {(activeTab === "received" || activeTab === "sent") && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-primary hover:bg-primary/10 gap-2"
+                        onClick={() => setMensagensParaMover(selectedIds)}
+                      >
+                        <Tag className="h-4 w-4" />
+                        Mover
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-muted-foreground"
+                      onClick={() => setSelectedIds([])}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                ) : (
+                  <TabsList className={cn(TOGGLE_LIST_CLASS, "shrink-0")}>
+                    <TabsTrigger value="received" className={TOGGLE_TRIGGER_CLASS}>
+                      <Inbox className="h-4 w-4" />
+                      <span className="hidden sm:inline">Recebidos</span>
+                      <Badge variant="secondary" className={TOGGLE_BADGE_CLASS}>
+                        {totalReceived}
+                      </Badge>
+                    </TabsTrigger>
+                    <TabsTrigger value="sent" className={TOGGLE_TRIGGER_CLASS}>
+                      <Send className="h-4 w-4" />
+                      <span className="hidden sm:inline">Enviados</span>
+                      <Badge variant="secondary" className={TOGGLE_BADGE_CLASS}>
+                        {totalSent}
+                      </Badge>
+                    </TabsTrigger>
+                    <TabsTrigger value="drafts" className={TOGGLE_TRIGGER_CLASS}>
+                      <PenBox className="h-4 w-4" />
+                      <span className="hidden sm:inline">Rascunhos</span>
+                      <Badge variant="secondary" className={TOGGLE_BADGE_CLASS}>
+                        {rascunhos?.length ?? 0}
+                      </Badge>
+                    </TabsTrigger>
+                  </TabsList>
+                )}
+
+                {/* Somente não lidas.
+                    Fica FORA do bloco que a barra de seleção em massa substitui, e
+                    fora do bloco de busca — visibilidade independente da busca, que
+                    desde 11/09/2026 também aparece no celular (numa linha própria,
+                    ver comentário no bloco abaixo), que é justamente onde triar o
+                    que falta ler importa mais. Só na aba Recebidos: "não lida" não
+                    quer dizer nada em Enviados. Mesmo padrão de botão do filtro do
+                    WhatsApp Inbox. */}
+                {activeTab === "received" && selectedIds.length === 0 && (
+                  <div className={cn(TOGGLE_LIST_CLASS, "w-fit shrink-0")}>
+                    {[
+                      { valor: false, rotulo: "Todas" },
+                      { valor: true, rotulo: "Não lidas" },
+                    ].map((opt) => (
+                      <button
+                        key={String(opt.valor)}
+                        type="button"
+                        onClick={() => {
+                          setSomenteNaoLidas(opt.valor);
+                          // Outra contagem, outra paginação: ficar na página 3 de
+                          // um filtro com 6 resultados mostraria lista vazia.
+                          setPageReceived(0);
+                        }}
+                        className={cn(
+                          TOGGLE_BUTTON_CLASS,
+                          somenteNaoLidas === opt.valor
+                            ? TOGGLE_BUTTON_ACTIVE
+                            : TOGGLE_BUTTON_INACTIVE,
+                        )}
+                      >
+                        {opt.rotulo}
+                      </button>
+                    ))}
                   </div>
                 )}
-              </div>
-            </TabsContent>
 
-            <TabsContent
-              value="received"
-              className="m-0 h-full overflow-hidden"
-            >
-              <div className="h-full overflow-hidden flex flex-col bg-background">
-                <div className="relative flex-1 overflow-y-auto">
-                  {/* Com `keepPreviousData`, trocar de marcador mantém a lista
-                    antiga na tela e `isReceivedLoading` fica falso — só
-                    `isFetching` sobe. Sem esta faixa, a troca parecia não ter
-                    acontecido até os dados novos chegarem. */}
-                  {isReceivedFetching && !isReceivedLoading && (
-                    <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-center gap-2 border-b bg-background/95 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Atualizando mensagens…
-                    </div>
+                {/* Mesmo ponto de quebra da fileira acima (`xl`, 1280px — ver o
+                    comentário no início do bloco): os dois mudam juntos porque são
+                    a mesma fileira, e o campo de busca é o que mais precisa de
+                    espaço nela. Ficar em `lg` deixaria a busca espremida contra o
+                    filtro "Todas/Não lidas" bem no ponto que o levantamento de
+                    11/09/2026 mediu como insuficiente (1024×768: 840px pedidos,
+                    802px disponíveis). */}
+                <div className="flex items-center gap-2 w-full xl:w-auto xl:flex-1 xl:min-w-[14rem] xl:max-w-md">
+                  {/* Marcador só filtra Recebidos (ver `escolherPasta`) — o chip só
+                      existe onde há filtro de verdade para limpar. Clicar de novo
+                      no marcador ativo na barra lateral não desmarca (o clique
+                      sempre grava o id, sem comparar com o atual); este chip é o
+                      atalho que resolve isso sem mexer naquele clique. */}
+                  {activeTab === "received" &&
+                    pastaSelecionada &&
+                    pastaSelecionada !== CAIXA_DE_ENTRADA && (
+                    <Badge
+                      variant="secondary"
+                      className="h-8 shrink-0 gap-1.5 rounded-full border-none bg-primary/10 pl-3 pr-1.5 text-xs font-medium text-primary"
+                    >
+                      {nomeDaPastaSelecionada}
+                      <button
+                        type="button"
+                        // Limpar volta para a Caixa de entrada, que e o estado
+                        // padrao — nao para Todos os e-mails.
+                        onClick={() => escolherPasta(CAIXA_DE_ENTRADA)}
+                        className="rounded-full p-0.5 hover:bg-primary/20"
+                        title="Limpar filtro de marcador"
+                        aria-label="Limpar filtro de marcador"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
                   )}
-                  {isReceivedLoading ? (
-                    <div className="flex justify-center py-20">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                  ) : !isConnected && receivedEmails.length === 0 ? (
-                    // Antes do "caixa vazia": sem conta conectada a lista está
-                    // vazia por falta de conexão, não por falta de e-mail, e
-                    // mostrar "sua caixa está limpa" esconderia a ação necessária.
-                    <div className="mx-auto w-full max-w-2xl px-4 py-10">
-                      <ConectarEmailCard />
-                    </div>
-                  ) : !receivedEmails || receivedEmails.length === 0 ? (
-                    /* Lista vazia tem CAUSAS diferentes, e "sua caixa está limpa"
-                     só é verdade numa delas. Um marcador que ainda não foi
-                     sincronizado com essa frase fazia a funcionalidade parecer
-                     quebrada — o Gmail mostrava mensagens e o CRM dizia que não
-                     havia nenhuma. */
-                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground text-center px-4">
-                      {marcadorEmBusca &&
-                      marcadorEmBusca === pastaSelecionada ? (
-                        <>
-                          <Loader2 className="mb-4 h-10 w-10 animate-spin opacity-30" />
-                          <h3 className="mb-1 text-lg font-medium">
-                            Buscando as mensagens de {nomeDaPastaSelecionada}…
-                          </h3>
-                          <p className="max-w-xs text-sm opacity-60">
-                            É a primeira vez que este marcador é aberto aqui. Da
-                            próxima vez já estará pronto.
-                          </p>
-                        </>
-                      ) : pastaSelecionada ? (
-                        <>
-                          <Tag className="mb-4 h-16 w-16 opacity-10" />
-                          <h3 className="mb-1 text-lg font-medium">
-                            Nenhuma mensagem em {nomeDaPastaSelecionada}
-                          </h3>
-                          <p className="max-w-xs text-sm opacity-60">
-                            {somenteNaoLidas
-                              ? "Não há mensagens por ler neste marcador."
-                              : buscaAplicada
-                                ? `Nada encontrado para “${buscaAplicada}” neste marcador.`
-                                : "Este marcador não tem mensagens sincronizadas. Use o botão de atualizar para buscar de novo."}
-                          </p>
-                        </>
-                      ) : somenteNaoLidas || buscaAplicada ? (
-                        <>
-                          <Inbox className="mb-4 h-16 w-16 opacity-10" />
-                          <h3 className="mb-1 text-lg font-medium">
-                            Nada por aqui
-                          </h3>
-                          <p className="max-w-xs text-sm opacity-60">
-                            {somenteNaoLidas
-                              ? "Tudo lido — nenhuma mensagem por ler."
-                              : `Nada encontrado para “${buscaAplicada}”.`}
-                          </p>
-                        </>
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                    <Input
+                      placeholder="Pesquisar e-mails..."
+                      className="pl-10 h-10 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-1 transition-all"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  {isConnected && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full hover:bg-muted shrink-0"
+                      onClick={() => sincronizar({ limit: 50 })}
+                      disabled={isSyncing}
+                      title="Buscar as mensagens mais recentes"
+                    >
+                      <RefreshCw
+                        className={`h-5 w-5 text-muted-foreground ${isSyncing ? "animate-spin" : ""}`}
+                      />
+                    </Button>
+                  )}
+                  {/* Engrenagem para TODOS (decisão do Lucas, 16/09/2026 — tela mais
+                      limpa, sem botão novo). Quem gerencia a caixa (dono/gestor)
+                      clica e abre "Gerenciar caixa" — único caminho para trocar de
+                      caixa; o card de conexão, que tem o botão de desconectar, só
+                      aparece quando NÃO há caixa conectada, então depois de
+                      conectar não sobrava outra saída. Quem NÃO gerencia vai direto
+                      para a própria assinatura em Configurações: a ação de
+                      gerenciar continua escondida dela só para não oferecer o que o
+                      servidor recusaria (a barreira real está na Edge Function),
+                      não porque ela não tenha nada para fazer aqui. */}
+                  {isConnected && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full hover:bg-muted shrink-0"
+                      onClick={() =>
+                        podeGerenciarCaixa
+                          ? setGerenciarCaixaAberto(true)
+                          : navigate("/configuracoes?tab=perfil")
+                      }
+                      title={
+                        podeGerenciarCaixa
+                          ? `Gerenciar a caixa conectada (${connectedEmail ?? ""})`
+                          : "Configurar assinatura"
+                      }
+                      aria-label={
+                        podeGerenciarCaixa
+                          ? "Gerenciar a caixa de e-mail da empresa"
+                          : "Configurar assinatura"
+                      }
+                    >
+                      <Settings className="h-5 w-5 text-muted-foreground" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {/* `shrink-0`: a ação principal da tela nunca cede espaço para os
+                  filtros. Quem tem de encolher é a fileira da esquerda, que agora
+                  rola sozinha. */}
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  onClick={escreverNovo}
+                  className="h-10 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm gap-2 text-sm font-bold px-4 transition-all"
+                  title="Escrever um e-mail novo"
+                  aria-label="Escrever um e-mail novo"
+                >
+                  <PenBox className="h-4 w-4" />
+                  <span className="hidden sm:inline">Escrever</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* A barra fica FORA do TabsContent, ao lado dele: ela vale para a tela
+                inteira, e repeti-la dentro de cada aba a faria remontar (perdendo a
+                rolagem) a cada troca de Recebidos/Enviados. */}
+            <div className="flex flex-1 overflow-hidden">
+              {isConnected && (
+                <BarraPastas
+                  pastas={pastas}
+                  carregando={pastasCarregando}
+                  // Em Enviados nada fica destacado: o marcador não filtra aquela
+                  // aba, e mostrar um item aceso ali afirmaria um filtro que não
+                  // existe.
+                  selecionada={activeTab === "sent" ? null : pastaSelecionada}
+                  onSelecionar={escolherPasta}
+                  // Em Enviados a barra fala da aba, não da caixa: os dois itens
+                  // do topo mostram o total de enviados, que é o que a lista tem.
+                  totalDaEntrada={activeTab === "sent" ? totalSent : totalDaEntrada}
+                  totalDeTodos={activeTab === "sent" ? totalSent : totalDeTodos}
+                  contagens={contagens}
+                  contaId={conta?.id}
+                  podeCriarMarcador={podeGerenciarCaixa}
+                  // Arrastar é sempre ligado (alça própria na linha, item 2 do
+                  // desenho) — só as linhas de Recebidos e Enviados têm
+                  // `draggable`, então soltar aqui nunca dispara a partir de
+                  // Rascunhos, mesmo com o handler sempre presente.
+                  onMoverParaMarcador={(ids, pastaId) =>
+                    moverParaMarcadorMut.mutate({ mensagemIds: ids, pastaId })
+                  }
+                />
+              )}
+
+              <div className="relative min-w-0 flex-1 overflow-hidden">
+                <TabsContent value="sent" className="m-0 h-full overflow-hidden">
+                  <div className="h-full overflow-hidden flex flex-col bg-background">
+                    <div className="flex-1 overflow-y-auto">
+                      {isSentLoading ? (
+                        <div className="flex justify-center py-20">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                      ) : !emails || emails.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                          <Mail className="h-16 w-16 mb-4 opacity-10" />
+                          <p className="text-lg">Nenhum e-mail enviado</p>
+                        </div>
                       ) : (
                         <>
-                          <Inbox className="mb-4 h-16 w-16 opacity-10" />
-                          <h3 className="mb-1 text-lg font-medium">
-                            Sua caixa de entrada está limpa
-                          </h3>
-                          <p className="max-w-xs text-sm opacity-60">
-                            Os e-mails recebidos em {connectedEmail} aparecem
-                            aqui automaticamente.
-                          </p>
+                          <CabecalhoLista
+                            rotuloPrincipal="Destinatário"
+                            rotuloData="Enviado em"
+                            rotuloAssunto="Assunto e prévia"
+                            mostrarEspacoAlca
+                            checkbox={{
+                              checked:
+                                emails.length > 0 &&
+                                selectedIds.length === emails.length,
+                              onChange: toggleSelectAll,
+                            }}
+                          />
+                          <div className="divide-y divide-border/50">
+                            {emails.map((email) => (
+                              <div
+                                key={email.id}
+                                className={cn(
+                                  "group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
+                                  selectedIds.includes(email.id) && "bg-primary/5",
+                                )}
+                                onClick={() =>
+                                  void abrirComCorpo({ ...email, type: "sent" })
+                                }
+                                draggable
+                                onDragStart={(e) => iniciarArrastoLinha(e, email.id)}
+                              >
+                                {/* Alça sempre presente, discreta — clique comum na
+                                    linha não é arrasto (nativo não confunde os
+                                    dois), então não há por que escondê-la atrás
+                                    de um modo à parte. */}
+                                <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground opacity-60 group-hover:opacity-100" />
+                                <Checkbox
+                                  className="shrink-0"
+                                  checked={selectedIds.includes(email.id)}
+                                  onCheckedChange={() => toggleSelectId(email.id)}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                                  {iniciaisDe(email.destinatario)}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm font-medium text-foreground/70">
+                                    Para: {email.destinatario}
+                                  </span>
+                                  <div className="mt-0.5 flex items-baseline gap-1.5 overflow-hidden">
+                                    <span className="shrink-0 overflow-hidden whitespace-nowrap text-sm font-semibold text-foreground">
+                                      {truncarTexto(email.assunto, LIMITE_ASSUNTO)}
+                                    </span>
+                                    {email.corpo && (
+                                      <span className="overflow-hidden whitespace-nowrap text-xs text-muted-foreground">
+                                        {truncarTexto(email.corpo, LIMITE_PREVIA)}
+                                      </span>
+                                    )}
+                                    <SeloMarcadores
+                                      marcadores={marcadoresDaMensagem(email.pastas)}
+                                    />
+                                  </div>
+                                </div>
+                                <div
+                                  className={cn(
+                                    LARGURA_COL_DATA,
+                                    "text-right text-xs font-medium text-muted-foreground",
+                                  )}
+                                >
+                                  {format(
+                                    new Date(email.created_at),
+                                    "dd 'de' MMM",
+                                    { locale: ptBR },
+                                  )}
+                                </div>
+                                <div
+                                  className={cn(
+                                    LARGURA_COL_ACOES,
+                                    "flex items-center justify-end",
+                                    // Some no hover/seleção só a partir de `sm:` —
+                                    // no celular não há hover, então ali a ação
+                                    // continua sempre visível (item 4 do desenho).
+                                    "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
+                                    selectedIds.includes(email.id) && "sm:opacity-100",
+                                  )}
+                                >
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEmailToDelete({
+                                        id: email.id,
+                                        type: "sent",
+                                      });
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </>
                       )}
                     </div>
-                  ) : (
-                    <div
-                      className={cn(
-                        "divide-y divide-border/50 transition-opacity",
-                        isReceivedFetching && "opacity-50",
-                      )}
-                    >
-                      {/* Sem caixa conectada mas COM histórico: quem desconectou
-                        escolheu preservar, e a promessa foi que as mensagens
-                        continuariam aqui. Antes esta aba trocava a lista inteira
-                        pelo card de conexão, então o histórico preservado ficava
-                        invisível — a opção não entregava nada. Agora o convite a
-                        reconectar aparece acima do histórico, sem escondê-lo. */}
-                      {!isConnected && (
-                        <div className="border-b bg-muted/30 px-4 py-4">
-                          <div className="mx-auto w-full max-w-2xl">
-                            <ConectarEmailCard />
-                            <p className="mt-3 text-center text-xs text-muted-foreground">
-                              Abaixo está o histórico das caixas anteriores. Ele
-                              continua disponível para consulta, mas não recebe
-                              mensagens novas.
-                            </p>
-                          </div>
+                    {totalSent > PAGE_SIZE && (
+                      <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/5 shrink-0">
+                        <div className="text-sm text-muted-foreground">
+                          Mostrando {pageSent * PAGE_SIZE + 1} -{" "}
+                          {Math.min((pageSent + 1) * PAGE_SIZE, totalSent)} de{" "}
+                          {totalSent}
                         </div>
-                      )}
-                      <CabecalhoLista
-                        rotuloPrincipal="Remetente"
-                        rotuloData="Recebido em"
-                        rotuloAssunto="Assunto e prévia"
-                        mostrarEspacoAlca
-                        checkbox={{
-                          checked:
-                            receivedEmails.length > 0 &&
-                            selectedIds.length === receivedEmails.length,
-                          onChange: toggleSelectAll,
-                        }}
-                      />
-                      {receivedEmails.map((email) => (
-                        <div
-                          key={email.id}
-                          className={cn(
-                            "group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
-                            selectedIds.includes(email.id) && "bg-primary/5",
-                          )}
-                          // Marca lido aqui E no provedor (ver `marcarLido`).
-                          onClick={() => abrirRecebido(email)}
-                          draggable
-                          onDragStart={(e) => iniciarArrastoLinha(e, email.id)}
-                        >
-                          <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground opacity-60 group-hover:opacity-100" />
-                          <Checkbox
-                            className="shrink-0"
-                            checked={selectedIds.includes(email.id)}
-                            onCheckedChange={() => toggleSelectId(email.id)}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                          {/* Avatar-âncora da linha: tonal (bg-primary/10) quando não
-                            lida, para o olho encontrar rápido o que falta ler —
-                            mesmo recurso visual usado em Clientes.tsx. */}
-                          <div
-                            className={cn(
-                              "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                              !email.lido
-                                ? "bg-primary/10 text-primary"
-                                : "bg-muted text-muted-foreground",
-                            )}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPageSent(0)}
+                            disabled={pageSent === 0}
+                            className="h-8 w-8 p-0"
+                            title="Primeira página"
+                            aria-label="Primeira página"
                           >
-                            {iniciaisDe(email.remetente)}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            {/* Linha 1: remetente. Linha 2: assunto + prévia. Antes as
-                              quatro informações disputavam a mesma linha, todas em
-                              text-sm — nada se destacava. */}
-                            <div className="flex items-center gap-1.5">
-                              {/* Ponto laranja = PRIORIDADE (remetente já
-                                cadastrado ou assunto urgente), não "não lido".
-                                O não-lido é marcado pelo negrito abaixo e pelo
-                                avatar em tom laranja claro — padrão Gmail. */}
-                              {email.prioritaria && (
-                                <span
-                                  className="h-2 w-2 shrink-0 rounded-full bg-primary"
-                                  title="Prioritário: remetente conhecido ou assunto urgente"
-                                  aria-label="E-mail prioritário"
-                                />
-                              )}
-                              <span
-                                className={cn(
-                                  "truncate text-sm",
-                                  !email.lido
-                                    ? "font-bold text-foreground"
-                                    : "font-medium text-foreground/70",
-                                )}
-                              >
-                                {soNome(email.remetente)}
-                              </span>
-                              {/* "Você respondeu" — só existe hoje via `nylas_thread_id`
-                                  compartilhado (ver comentário em `threadsRespondidos`
-                                  acima); não há flag "respondido" na mensagem. */}
-                              {email.threadId && threadsRespondidos?.has(email.threadId) && (
-                                <CornerUpLeft
-                                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
-                                  title="Você respondeu esta conversa"
-                                />
-                              )}
-                            </div>
-                            <div className="mt-0.5 flex items-baseline gap-1.5 overflow-hidden">
-                              <span
-                                className={cn(
-                                  "shrink-0 overflow-hidden whitespace-nowrap text-sm",
-                                  !email.lido
-                                    ? "font-semibold text-foreground"
-                                    : "text-foreground/70",
-                                )}
-                              >
-                                {truncarTexto(email.assunto, LIMITE_ASSUNTO)}
-                              </span>
-                              {/* Prévia de verdade. Antes dizia literalmente
-                                "Conteúdo HTML", que não conta nada sobre a
-                                mensagem — e o snippet já vinha do Nylas. */}
-                              {email.snippet && (
-                                <span className="overflow-hidden whitespace-nowrap text-xs text-muted-foreground">
-                                  {truncarTexto(email.snippet, LIMITE_PREVIA)}
-                                </span>
-                              )}
-                              {/* Só aparece em mensagem de caixa já desconectada.
-                                Sem isto, depois de trocar de endereço a lista
-                                misturaria mensagens de duas caixas sem nenhuma
-                                forma de saber qual é qual — que era justamente o
-                                motivo de existir a coluna caixa_origem. */}
-                              {email.caixaOrigem && (
-                                <Badge
-                                  variant="secondary"
-                                  className="ml-1 h-5 shrink-0 gap-1 border-none bg-muted px-1.5 text-[11px] font-normal text-muted-foreground"
-                                  title={`Recebido na caixa ${email.caixaOrigem}, que não está mais conectada`}
-                                >
-                                  <Archive className="h-3 w-3" />
-                                  {email.caixaOrigem}
-                                </Badge>
-                              )}
-                              <SeloMarcadores
-                                marcadores={marcadoresDaMensagem(email.pastas)}
-                              />
-                            </div>
-                          </div>
-                          <div
-                            className={cn(
-                              LARGURA_COL_DATA,
-                              "text-right text-xs",
-                              !email.lido
-                                ? "font-semibold text-foreground"
-                                : "text-muted-foreground",
-                            )}
+                            <ChevronsLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPageSent((p) => Math.max(0, p - 1))}
+                            disabled={pageSent === 0}
+                            className="h-8"
                           >
-                            {email.criado_em &&
-                              format(new Date(email.criado_em), "HH:mm", {
-                                locale: ptBR,
-                              })}
-                          </div>
-                          <div
-                            className={cn(
-                              LARGURA_COL_ACOES,
-                              "flex items-center justify-end gap-1",
-                              "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
-                              selectedIds.includes(email.id) && "sm:opacity-100",
-                            )}
+                            <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPageSent((p) => p + 1)}
+                            disabled={(pageSent + 1) * PAGE_SIZE >= totalSent}
+                            className="h-8"
                           >
-                            {/* Alterna lido/não-lido no hover, à esquerda do
-                              excluir: e-mail lido ganha "marcar não lida", e o
-                              não-lido ganha o inverso, "marcar lida" (padrão
-                              Gmail — a ação oposta ao estado atual). */}
-                            {email.lido ? (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  marcarNaoLido(email.id);
-                                }}
-                                title="Marcar como não lida"
-                                aria-label="Marcar como não lida"
-                              >
-                                <MailOpen className="h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  marcarLido(email.id);
-                                }}
-                                title="Marcar como lida"
-                                aria-label="Marcar como lida"
-                              >
-                                <MailCheck className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEmailToDelete({
-                                  id: email.id,
-                                  type: "received",
-                                });
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                            Próximo <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setPageSent(
+                                Math.max(0, Math.ceil(totalSent / PAGE_SIZE) - 1),
+                              )
+                            }
+                            disabled={(pageSent + 1) * PAGE_SIZE >= totalSent}
+                            className="h-8 w-8 p-0"
+                            title="Última página"
+                            aria-label="Última página"
+                          >
+                            <ChevronsRight className="h-4 w-4" />
+                          </Button>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {totalReceived > PAGE_SIZE && (
-                  <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/5 shrink-0">
-                    <div className="text-sm text-muted-foreground">
-                      Mostrando {pageReceived * PAGE_SIZE + 1} -{" "}
-                      {Math.min((pageReceived + 1) * PAGE_SIZE, totalReceived)}{" "}
-                      de {totalReceived}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPageReceived(0)}
-                        disabled={pageReceived === 0}
-                        className="h-8 w-8 p-0"
-                        title="Primeira página"
-                        aria-label="Primeira página"
-                      >
-                        <ChevronsLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setPageReceived((p) => Math.max(0, p - 1))
-                        }
-                        disabled={pageReceived === 0}
-                        className="h-8"
-                      >
-                        <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPageReceived((p) => p + 1)}
-                        disabled={
-                          (pageReceived + 1) * PAGE_SIZE >= totalReceived
-                        }
-                        className="h-8"
-                      >
-                        Próximo <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setPageReceived(
-                            Math.max(
-                              0,
-                              Math.ceil(totalReceived / PAGE_SIZE) - 1,
-                            ),
-                          )
-                        }
-                        disabled={
-                          (pageReceived + 1) * PAGE_SIZE >= totalReceived
-                        }
-                        className="h-8 w-8 p-0"
-                        title="Última página"
-                        aria-label="Última página"
-                      >
-                        <ChevronsRight className="h-4 w-4" />
-                      </Button>
-                    </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </TabsContent>
+                </TabsContent>
 
-            <TabsContent value="drafts" className="m-0 h-full overflow-hidden">
-              <div className="h-full overflow-hidden flex flex-col bg-background">
-                <div className="flex-1 overflow-y-auto">
-                  {!rascunhos || rascunhos.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                      <PenBox className="h-16 w-16 mb-4 opacity-10" />
-                      <p className="text-lg">Nenhum rascunho salvo</p>
-                    </div>
-                  ) : (
-                    <>
-                      <CabecalhoLista
-                        rotuloPrincipal="Destinatário"
-                        rotuloData="Editado em"
-                        rotuloAssunto="Assunto e prévia"
-                      />
-                      <div className="divide-y divide-border/50">
-                        {rascunhos.map((r) => (
-                          <div
-                            key={r.id}
-                            className="group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
-                            onClick={() => continuarRascunho(r)}
-                          >
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                              <PenBox className="h-4 w-4" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-medium text-foreground/70">
-                                Para: {r.destinatario || "(sem destinatário)"}
-                              </span>
-                              <div className="mt-0.5 flex items-baseline gap-1.5 overflow-hidden">
-                                <span className="shrink-0 overflow-hidden whitespace-nowrap text-sm font-semibold text-foreground">
-                                  {truncarTexto(
-                                    r.assunto || "(sem assunto)",
-                                    LIMITE_ASSUNTO,
-                                  )}
-                                </span>
-                                {r.corpo && (
-                                  <span className="overflow-hidden whitespace-nowrap text-xs text-muted-foreground">
-                                    {truncarTexto(r.corpo, LIMITE_PREVIA)}
-                                  </span>
-                                )}
+                <TabsContent
+                  value="received"
+                  className="m-0 h-full overflow-hidden"
+                >
+                  <div className="h-full overflow-hidden flex flex-col bg-background">
+                    <div className="relative flex-1 overflow-y-auto">
+                      {/* Com `keepPreviousData`, trocar de marcador mantém a lista
+                        antiga na tela e `isReceivedLoading` fica falso — só
+                        `isFetching` sobe. Sem esta faixa, a troca parecia não ter
+                        acontecido até os dados novos chegarem. */}
+                      {isReceivedFetching && !isReceivedLoading && (
+                        <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-center gap-2 border-b bg-background/95 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Atualizando mensagens…
+                        </div>
+                      )}
+                      {isReceivedLoading ? (
+                        <div className="flex justify-center py-20">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                      ) : !isConnected && receivedEmails.length === 0 ? (
+                        // Antes do "caixa vazia": sem conta conectada a lista está
+                        // vazia por falta de conexão, não por falta de e-mail, e
+                        // mostrar "sua caixa está limpa" esconderia a ação necessária.
+                        <div className="mx-auto w-full max-w-2xl px-4 py-10">
+                          <ConectarEmailCard />
+                        </div>
+                      ) : !receivedEmails || receivedEmails.length === 0 ? (
+                        /* Lista vazia tem CAUSAS diferentes, e "sua caixa está limpa"
+                         só é verdade numa delas. Um marcador que ainda não foi
+                         sincronizado com essa frase fazia a funcionalidade parecer
+                         quebrada — o Gmail mostrava mensagens e o CRM dizia que não
+                         havia nenhuma. */
+                        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground text-center px-4">
+                          {marcadorEmBusca &&
+                          marcadorEmBusca === pastaSelecionada ? (
+                            <>
+                              <Loader2 className="mb-4 h-10 w-10 animate-spin opacity-30" />
+                              <h3 className="mb-1 text-lg font-medium">
+                                Buscando as mensagens de {nomeDaPastaSelecionada}…
+                              </h3>
+                              <p className="max-w-xs text-sm opacity-60">
+                                É a primeira vez que este marcador é aberto aqui. Da
+                                próxima vez já estará pronto.
+                              </p>
+                            </>
+                          ) : pastaSelecionada ? (
+                            <>
+                              <Tag className="mb-4 h-16 w-16 opacity-10" />
+                              <h3 className="mb-1 text-lg font-medium">
+                                Nenhuma mensagem em {nomeDaPastaSelecionada}
+                              </h3>
+                              <p className="max-w-xs text-sm opacity-60">
+                                {somenteNaoLidas
+                                  ? "Não há mensagens por ler neste marcador."
+                                  : buscaAplicada
+                                    ? `Nada encontrado para “${buscaAplicada}” neste marcador.`
+                                    : "Este marcador não tem mensagens sincronizadas. Use o botão de atualizar para buscar de novo."}
+                              </p>
+                            </>
+                          ) : somenteNaoLidas || buscaAplicada ? (
+                            <>
+                              <Inbox className="mb-4 h-16 w-16 opacity-10" />
+                              <h3 className="mb-1 text-lg font-medium">
+                                Nada por aqui
+                              </h3>
+                              <p className="max-w-xs text-sm opacity-60">
+                                {somenteNaoLidas
+                                  ? "Tudo lido — nenhuma mensagem por ler."
+                                  : `Nada encontrado para “${buscaAplicada}”.`}
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <Inbox className="mb-4 h-16 w-16 opacity-10" />
+                              <h3 className="mb-1 text-lg font-medium">
+                                Sua caixa de entrada está limpa
+                              </h3>
+                              <p className="max-w-xs text-sm opacity-60">
+                                Os e-mails recebidos em {connectedEmail} aparecem
+                                aqui automaticamente.
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <div
+                          className={cn(
+                            "divide-y divide-border/50 transition-opacity",
+                            isReceivedFetching && "opacity-50",
+                          )}
+                        >
+                          {/* Sem caixa conectada mas COM histórico: quem desconectou
+                            escolheu preservar, e a promessa foi que as mensagens
+                            continuariam aqui. Antes esta aba trocava a lista inteira
+                            pelo card de conexão, então o histórico preservado ficava
+                            invisível — a opção não entregava nada. Agora o convite a
+                            reconectar aparece acima do histórico, sem escondê-lo. */}
+                          {!isConnected && (
+                            <div className="border-b bg-muted/30 px-4 py-4">
+                              <div className="mx-auto w-full max-w-2xl">
+                                <ConectarEmailCard />
+                                <p className="mt-3 text-center text-xs text-muted-foreground">
+                                  Abaixo está o histórico das caixas anteriores. Ele
+                                  continua disponível para consulta, mas não recebe
+                                  mensagens novas.
+                                </p>
                               </div>
                             </div>
+                          )}
+                          <CabecalhoLista
+                            rotuloPrincipal="Remetente"
+                            rotuloData="Recebido em"
+                            rotuloAssunto="Assunto e prévia"
+                            mostrarEspacoAlca
+                            checkbox={{
+                              checked:
+                                receivedEmails.length > 0 &&
+                                selectedIds.length === receivedEmails.length,
+                              onChange: toggleSelectAll,
+                            }}
+                          />
+                          {receivedEmails.map((email) => (
                             <div
+                              key={email.id}
                               className={cn(
-                                LARGURA_COL_DATA,
-                                "text-right text-xs font-medium text-muted-foreground",
+                                "group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
+                                selectedIds.includes(email.id) && "bg-primary/5",
                               )}
+                              // Marca lido aqui E no provedor (ver `marcarLido`).
+                              onClick={() => abrirRecebido(email)}
+                              draggable
+                              onDragStart={(e) => iniciarArrastoLinha(e, email.id)}
                             >
-                              {format(
-                                new Date(r.atualizado_em),
-                                "dd 'de' MMM",
-                                { locale: ptBR },
-                              )}
-                            </div>
-                            <div
-                              className={cn(
-                                LARGURA_COL_ACOES,
-                                "flex items-center justify-end",
-                                // Rascunho não tem seleção em massa (sem checkbox
-                                // no cabeçalho), então só hover/foco decidem aqui.
-                                "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
-                              )}
-                            >
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  descartarRascunhoDaLista(r.id);
-                                }}
-                                title="Descartar rascunho"
-                                aria-label="Descartar rascunho"
+                              <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground opacity-60 group-hover:opacity-100" />
+                              <Checkbox
+                                className="shrink-0"
+                                checked={selectedIds.includes(email.id)}
+                                onCheckedChange={() => toggleSelectId(email.id)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              {/* Avatar-âncora da linha: tonal (bg-primary/10) quando não
+                                lida, para o olho encontrar rápido o que falta ler —
+                                mesmo recurso visual usado em Clientes.tsx. */}
+                              <div
+                                className={cn(
+                                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                                  !email.lido
+                                    ? "bg-primary/10 text-primary"
+                                    : "bg-muted text-muted-foreground",
+                                )}
                               >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                                {iniciaisDe(email.remetente)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                {/* Linha 1: remetente. Linha 2: assunto + prévia. Antes as
+                                  quatro informações disputavam a mesma linha, todas em
+                                  text-sm — nada se destacava. */}
+                                <div className="flex items-center gap-1.5">
+                                  {/* Ponto laranja = PRIORIDADE (remetente já
+                                    cadastrado ou assunto urgente), não "não lido".
+                                    O não-lido é marcado pelo negrito abaixo e pelo
+                                    avatar em tom laranja claro — padrão Gmail. */}
+                                  {email.prioritaria && (
+                                    <span
+                                      className="h-2 w-2 shrink-0 rounded-full bg-primary"
+                                      title="Prioritário: remetente conhecido ou assunto urgente"
+                                      aria-label="E-mail prioritário"
+                                    />
+                                  )}
+                                  <span
+                                    className={cn(
+                                      "truncate text-sm",
+                                      !email.lido
+                                        ? "font-bold text-foreground"
+                                        : "font-medium text-foreground/70",
+                                    )}
+                                  >
+                                    {soNome(email.remetente)}
+                                  </span>
+                                  {/* "Você respondeu" — só existe hoje via `nylas_thread_id`
+                                      compartilhado (ver comentário em `threadsRespondidos`
+                                      acima); não há flag "respondido" na mensagem. */}
+                                  {email.threadId && threadsRespondidos?.has(email.threadId) && (
+                                    <CornerUpLeft
+                                      className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                                      title="Você respondeu esta conversa"
+                                    />
+                                  )}
+                                </div>
+                                <div className="mt-0.5 flex items-baseline gap-1.5 overflow-hidden">
+                                  <span
+                                    className={cn(
+                                      "shrink-0 overflow-hidden whitespace-nowrap text-sm",
+                                      !email.lido
+                                        ? "font-semibold text-foreground"
+                                        : "text-foreground/70",
+                                    )}
+                                  >
+                                    {truncarTexto(email.assunto, LIMITE_ASSUNTO)}
+                                  </span>
+                                  {/* Prévia de verdade. Antes dizia literalmente
+                                    "Conteúdo HTML", que não conta nada sobre a
+                                    mensagem — e o snippet já vinha do Nylas. */}
+                                  {email.snippet && (
+                                    <span className="overflow-hidden whitespace-nowrap text-xs text-muted-foreground">
+                                      {truncarTexto(email.snippet, LIMITE_PREVIA)}
+                                    </span>
+                                  )}
+                                  {/* Só aparece em mensagem de caixa já desconectada.
+                                    Sem isto, depois de trocar de endereço a lista
+                                    misturaria mensagens de duas caixas sem nenhuma
+                                    forma de saber qual é qual — que era justamente o
+                                    motivo de existir a coluna caixa_origem. */}
+                                  {email.caixaOrigem && (
+                                    <Badge
+                                      variant="secondary"
+                                      className="ml-1 h-5 shrink-0 gap-1 border-none bg-muted px-1.5 text-[11px] font-normal text-muted-foreground"
+                                      title={`Recebido na caixa ${email.caixaOrigem}, que não está mais conectada`}
+                                    >
+                                      <Archive className="h-3 w-3" />
+                                      {email.caixaOrigem}
+                                    </Badge>
+                                  )}
+                                  <SeloMarcadores
+                                    marcadores={marcadoresDaMensagem(email.pastas)}
+                                  />
+                                </div>
+                              </div>
+                              <div
+                                className={cn(
+                                  LARGURA_COL_DATA,
+                                  "text-right text-xs",
+                                  !email.lido
+                                    ? "font-semibold text-foreground"
+                                    : "text-muted-foreground",
+                                )}
+                              >
+                                {email.criado_em &&
+                                  format(new Date(email.criado_em), "HH:mm", {
+                                    locale: ptBR,
+                                  })}
+                              </div>
+                              <div
+                                className={cn(
+                                  LARGURA_COL_ACOES,
+                                  "flex items-center justify-end gap-1",
+                                  "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
+                                  selectedIds.includes(email.id) && "sm:opacity-100",
+                                )}
+                              >
+                                {/* Alterna lido/não-lido no hover, à esquerda do
+                                  excluir: e-mail lido ganha "marcar não lida", e o
+                                  não-lido ganha o inverso, "marcar lida" (padrão
+                                  Gmail — a ação oposta ao estado atual). */}
+                                {email.lido ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      marcarNaoLido(email.id);
+                                    }}
+                                    title="Marcar como não lida"
+                                    aria-label="Marcar como não lida"
+                                  >
+                                    <MailOpen className="h-4 w-4" />
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      marcarLido(email.id);
+                                    }}
+                                    title="Marcar como lida"
+                                    aria-label="Marcar como lida"
+                                  >
+                                    <MailCheck className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEmailToDelete({
+                                      id: email.id,
+                                      type: "received",
+                                    });
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {totalReceived > PAGE_SIZE && (
+                      <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/5 shrink-0">
+                        <div className="text-sm text-muted-foreground">
+                          Mostrando {pageReceived * PAGE_SIZE + 1} -{" "}
+                          {Math.min((pageReceived + 1) * PAGE_SIZE, totalReceived)}{" "}
+                          de {totalReceived}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPageReceived(0)}
+                            disabled={pageReceived === 0}
+                            className="h-8 w-8 p-0"
+                            title="Primeira página"
+                            aria-label="Primeira página"
+                          >
+                            <ChevronsLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setPageReceived((p) => Math.max(0, p - 1))
+                            }
+                            disabled={pageReceived === 0}
+                            className="h-8"
+                          >
+                            <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPageReceived((p) => p + 1)}
+                            disabled={
+                              (pageReceived + 1) * PAGE_SIZE >= totalReceived
+                            }
+                            className="h-8"
+                          >
+                            Próximo <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setPageReceived(
+                                Math.max(
+                                  0,
+                                  Math.ceil(totalReceived / PAGE_SIZE) - 1,
+                                ),
+                              )
+                            }
+                            disabled={
+                              (pageReceived + 1) * PAGE_SIZE >= totalReceived
+                            }
+                            className="h-8 w-8 p-0"
+                            title="Última página"
+                            aria-label="Última página"
+                          >
+                            <ChevronsRight className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                    </>
-                  )}
-                </div>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="drafts" className="m-0 h-full overflow-hidden">
+                  <div className="h-full overflow-hidden flex flex-col bg-background">
+                    <div className="flex-1 overflow-y-auto">
+                      {!rascunhos || rascunhos.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                          <PenBox className="h-16 w-16 mb-4 opacity-10" />
+                          <p className="text-lg">Nenhum rascunho salvo</p>
+                        </div>
+                      ) : (
+                        <>
+                          <CabecalhoLista
+                            rotuloPrincipal="Destinatário"
+                            rotuloData="Editado em"
+                            rotuloAssunto="Assunto e prévia"
+                          />
+                          <div className="divide-y divide-border/50">
+                            {rascunhos.map((r) => (
+                              <div
+                                key={r.id}
+                                className="group flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
+                                onClick={() => continuarRascunho(r)}
+                              >
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                  <PenBox className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm font-medium text-foreground/70">
+                                    Para: {r.destinatario || "(sem destinatário)"}
+                                  </span>
+                                  <div className="mt-0.5 flex items-baseline gap-1.5 overflow-hidden">
+                                    <span className="shrink-0 overflow-hidden whitespace-nowrap text-sm font-semibold text-foreground">
+                                      {truncarTexto(
+                                        r.assunto || "(sem assunto)",
+                                        LIMITE_ASSUNTO,
+                                      )}
+                                    </span>
+                                    {r.corpo && (
+                                      <span className="overflow-hidden whitespace-nowrap text-xs text-muted-foreground">
+                                        {truncarTexto(r.corpo, LIMITE_PREVIA)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div
+                                  className={cn(
+                                    LARGURA_COL_DATA,
+                                    "text-right text-xs font-medium text-muted-foreground",
+                                  )}
+                                >
+                                  {format(
+                                    new Date(r.atualizado_em),
+                                    "dd 'de' MMM",
+                                    { locale: ptBR },
+                                  )}
+                                </div>
+                                <div
+                                  className={cn(
+                                    LARGURA_COL_ACOES,
+                                    "flex items-center justify-end",
+                                    // Rascunho não tem seleção em massa (sem checkbox
+                                    // no cabeçalho), então só hover/foco decidem aqui.
+                                    "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
+                                  )}
+                                >
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      descartarRascunhoDaLista(r.id);
+                                    }}
+                                    title="Descartar rascunho"
+                                    aria-label="Descartar rascunho"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
               </div>
-            </TabsContent>
-          </div>
-        </div>
-      </Tabs>
+            </div>
+          </Tabs>
 
-      {compositor}
+          <GerenciarCaixaDialog
+            open={gerenciarCaixaAberto}
+            onOpenChange={setGerenciarCaixaAberto}
+          />
 
-      <GerenciarCaixaDialog
-        open={gerenciarCaixaAberto}
-        onOpenChange={setGerenciarCaixaAberto}
-      />
+          <MoverParaMarcadorDialog
+            open={mensagensParaMover.length > 0}
+            onOpenChange={(o) => !o && setMensagensParaMover([])}
+            contaId={conta?.id}
+            mensagemIds={mensagensParaMover}
+            onMoved={() => setSelectedIds([])}
+          />
 
-      <MoverParaMarcadorDialog
-        open={mensagensParaMover.length > 0}
-        onOpenChange={(o) => !o && setMensagensParaMover([])}
-        contaId={conta?.id}
-        mensagemIds={mensagensParaMover}
-        onMoved={() => setSelectedIds([])}
-      />
+          <AlertDialog
+            open={!!emailToDelete}
+            onOpenChange={(open) => !open && setEmailToDelete(null)}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir este e-mail?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  O e-mail vai para a lixeira do Gmail e sai da sua caixa de
+                  entrada. Dá para recuperar na lixeira por até 30 dias.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    if (emailToDelete) {
+                      deleteEmailMutation.mutate(emailToDelete);
+                      setEmailToDelete(null);
+                    }
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Excluir
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <AlertDialog open={isBulkDeleting} onOpenChange={setIsBulkDeleting}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir e-mails em massa?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {selectedIds.length} e-mail(s) vão para a lixeira do Gmail e
+                  saem da sua caixa de entrada. Dá para recuperar na lixeira por
+                  até 30 dias.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setIsBulkDeleting(false)}>
+                  Cancelar
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    bulkDeleteMutation.mutate({
+                      ids: selectedIds,
+                      type: activeTab as "sent" | "received",
+                    });
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Excluir todos
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </AppLayout>
+      )}
 
+      {compositorEncaixado}
+
+      {/* "Um de cada vez": abrir outro compositor com o rascunho atual sujo
+          pergunta salvar (fecha, preserva o autosave) ou descartar (apaga)
+          antes de trocar. */}
       <AlertDialog
-        open={!!emailToDelete}
-        onOpenChange={(open) => !open && setEmailToDelete(null)}
+        open={!!trocaPendente}
+        onOpenChange={(open) => !open && setTrocaPendente(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir este e-mail?</AlertDialogTitle>
+            <AlertDialogTitle>Há um rascunho em edição</AlertDialogTitle>
             <AlertDialogDescription>
-              O e-mail vai para a lixeira do Gmail e sai da sua caixa de
-              entrada. Dá para recuperar na lixeira por até 30 dias.
+              Escrever ou responder outro e-mail agora vai substituir o que
+              está na tela. Quer salvar o rascunho atual antes de continuar?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (emailToDelete) {
-                  deleteEmailMutation.mutate(emailToDelete);
-                  setEmailToDelete(null);
-                }
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog open={isBulkDeleting} onOpenChange={setIsBulkDeleting}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir e-mails em massa?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {selectedIds.length} e-mail(s) vão para a lixeira do Gmail e
-              saem da sua caixa de entrada. Dá para recuperar na lixeira por
-              até 30 dias.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setIsBulkDeleting(false)}>
+            <AlertDialogCancel onClick={() => setTrocaPendente(null)}>
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                bulkDeleteMutation.mutate({
-                  ids: selectedIds,
-                  type: activeTab as "sent" | "received",
-                });
+              onClick={async () => {
+                const proxima = trocaPendente;
+                setTrocaPendente(null);
+                // Mesma exclusão explícita do botão de lixeira do compositor
+                // (`propsCompositor.onDescartar`, acima): some da aba
+                // Rascunhos e leva os anexos do balde junto.
+                await propsCompositor.onDescartar();
+                proxima?.();
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Excluir todos
+              Descartar e abrir novo
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => {
+                const proxima = trocaPendente;
+                setTrocaPendente(null);
+                // Fechar preserva o autosave — o rascunho continua salvo.
+                fecharCompositor();
+                proxima?.();
+              }}
+            >
+              Salvar e abrir novo
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AppLayout>
+    </>
   );
 };
 

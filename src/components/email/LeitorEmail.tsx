@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import DOMPurify from 'dompurify';
 import { ArrowLeft, Trash2, Reply, Loader2, Paperclip, MailOpen, CornerUpLeft, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -97,6 +97,12 @@ interface Props {
   carregandoConversa?: boolean;
   /** Clique num card de "Nesta conversa" — troca a mensagem aberta no leitor. */
   onAbrirMensagemDaConversa?: (id: string) => void;
+  /**
+   * O compositor de RESPOSTA (variante "inline" de `CompositorEmail`), já
+   * montado pela página — o leitor só decide ONDE ele aparece. `null`/
+   * `undefined` quando não se está respondendo esta conversa.
+   */
+  compositorInline?: ReactNode;
 }
 
 /** Separa "Fulano <fulano@x.com>" em nome e endereço. */
@@ -599,6 +605,7 @@ export function LeitorEmail({
   mensagensDaConversa,
   carregandoConversa,
   onAbrirMensagemDaConversa,
+  compositorInline,
 }: Props) {
   const { nome, endereco } = separarRemetente(email.remetente);
   const data = email.created_at ?? email.criado_em;
@@ -853,6 +860,12 @@ export function LeitorEmail({
               Carregando o resto da conversa...
             </div>
           )}
+
+          {/* A resposta entra em fluxo, no topo da conversa — não é mais modal
+              (reforma "estilo Gmail" de 21/09/2026). `compositorInline` já vem
+              montado pela página (`Emails.tsx`), que decide SE existe: aqui só
+              se decide ONDE. */}
+          {compositorInline && <div className="mt-4">{compositorInline}</div>}
 
           {/* Cada mensagem da conversa vira seu próprio card, já ABERTO (corpo
               completo, não só a prévia) — só o cabeçalho (quem/quando) fica
