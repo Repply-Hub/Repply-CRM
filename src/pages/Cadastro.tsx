@@ -1,6 +1,6 @@
 import { useId, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Building2, Check, Eye, EyeOff, KeyRound, Loader2, MailCheck } from "lucide-react";
+import { ArrowLeft, Building2, Check, Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthShell } from "@/components/auth/AuthShell";
@@ -105,25 +105,27 @@ function EscolhaCaminho({ onEscolher }: { onEscolher: (c: Caminho) => void }) {
 }
 
 /** Estado final do cadastro: diz o que aconteceu e qual é o passo seguinte. */
+/**
+ * Tela de "deu certo" do cadastro. NÃO fala em confirmar e-mail de propósito: a confirmação de
+ * e-mail está desligada (nenhum link é enviado — ver `use-auth.tsx`), então o cadastro já cria a
+ * sessão e o `AuthRoute` de `/cadastro` leva a pessoa para dentro sozinho. Este bloco é a ponte
+ * enquanto o perfil carrega, e o botão "Continuar" é a saída manual caso o redirecionamento demore.
+ */
 function ConfirmacaoCadastro({ email, proximoPasso }: { email: string; proximoPasso: string }) {
   return (
     <div className="space-y-5 text-center">
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
-        <MailCheck className="h-7 w-7 text-success" strokeWidth={1.75} />
+        <Check className="h-7 w-7 text-success" strokeWidth={2.5} />
       </div>
       <div className="space-y-2">
-        <h3 className="font-display text-lg font-bold text-foreground">Conta criada</h3>
+        <h3 className="font-display text-lg font-bold text-foreground">Conta criada!</h3>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Enviamos um link de confirmação para{" "}
-          <strong className="text-foreground">{email}</strong>. {proximoPasso}
+          Tudo pronto, <strong className="text-foreground">{email}</strong>. {proximoPasso}
         </p>
       </div>
       <Button asChild className="h-11 w-full font-semibold">
-        <Link to="/login">Ir para o login</Link>
+        <Link to="/app">Continuar</Link>
       </Button>
-      <p className="text-xs text-muted-foreground">
-        Não recebeu? Confira a caixa de spam antes de tentar de novo.
-      </p>
     </div>
   );
 }
@@ -205,7 +207,7 @@ function FormEmpresa({ onVoltar }: { onVoltar: () => void }) {
   const { signUpEmpresa } = useAuth();
   const [loading, setLoading] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
-  const [emailEnviado, setEmailEnviado] = useState<string | null>(null);
+  const [contaCriada, setContaCriada] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -221,7 +223,7 @@ function FormEmpresa({ onVoltar }: { onVoltar: () => void }) {
         form.get("cnpj") as string,
       );
       if (error) toast.error(traduzirErroAuth(error.message));
-      else setEmailEnviado(email);
+      else setContaCriada(email);
     } catch (err) {
       toast.error(
         traduzirErroAuth(err instanceof Error ? err.message : "Erro inesperado. Tente novamente."),
@@ -234,11 +236,11 @@ function FormEmpresa({ onVoltar }: { onVoltar: () => void }) {
   // Um toast que some em segundos não bastava: o formulário continuava
   // preenchido e habilitado, então reenviar parecia o caminho natural — e o
   // segundo envio devolve "este email já está cadastrado", que lê como falha.
-  if (emailEnviado) {
+  if (contaCriada) {
     return (
       <ConfirmacaoCadastro
-        email={emailEnviado}
-        proximoPasso="Depois de confirmar, entre na sua conta para ativar a assinatura da empresa."
+        email={contaCriada}
+        proximoPasso="Agora é só ativar a assinatura da empresa para liberar o acesso."
       />
     );
   }
@@ -383,7 +385,7 @@ function FormFuncionario({ onVoltar }: { onVoltar: () => void }) {
     return (
       <ConfirmacaoCadastro
         email={confirmado.email}
-        proximoPasso={`Depois de confirmar, entre na sua conta para começar a usar o Repply${
+        proximoPasso={`Você já pode começar a usar o Repply${
           confirmado.empresa ? ` na ${confirmado.empresa}` : ""
         }.`}
       />

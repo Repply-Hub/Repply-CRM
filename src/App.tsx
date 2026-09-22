@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { secaoDaRota } from "@/lib/secoes";
 import { useSecaoLigada } from "@/hooks/use-secoes";
 import { PAYWALL_ATIVO, deveAssinarPrimeiro } from "@/lib/plano-gate";
+import { linkSuporteWhatsApp } from "@/lib/suporte";
 // Todas as páginas entram por aqui, e não pelo `lazy` do React: o wrapper
 // traduz "o arquivo desta página sumiu do servidor depois de um deploy" num
 // erro reconhecível, em vez de deixar virar o "Algo deu errado" genérico.
@@ -226,7 +227,20 @@ function ProtectedRoute({
         titulo="Acesso restrito"
         descricao="Sua conta foi criada mas ainda não está vinculada a uma empresa. Peça o código de acesso ao gestor da sua empresa ou fale com o suporte."
       >
-        <Button onClick={handleSignOut} className="w-full">
+        {/* A descrição manda "fale com o suporte", então a tela precisa DAR esse caminho — antes
+            só tinha "Sair", e quem caía aqui não tinha como avançar. */}
+        <Button asChild className="w-full">
+          <a
+            href={linkSuporteWhatsApp(
+              "Oi! Criei minha conta no Repply, mas ela ainda não está vinculada a nenhuma empresa. Podem me ajudar?",
+            )}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Falar com o suporte
+          </a>
+        </Button>
+        <Button variant="outline" onClick={handleSignOut} className="w-full">
           Sair
         </Button>
       </TelaBloqueio>
