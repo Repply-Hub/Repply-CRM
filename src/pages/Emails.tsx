@@ -1981,9 +1981,13 @@ const Emails = () => {
    * mesclada com os corpos já buscados e o estado de "carregando".
    */
   const mensagensConversa = useMemo<MensagemDaConversa[]>(() => {
+    // A consulta quando há thread E devolveu algo; senão (sem thread, ainda
+    // carregando, ou vazia por RLS/timing) cai na mensagem aberta — que nunca
+    // pode sumir da tela por causa da lista da conversa.
+    const doQuery = selectedEmail?.threadId ? dadosConversa : undefined;
     const base =
-      selectedEmail?.threadId && dadosConversa
-        ? dadosConversa
+      doQuery && doQuery.length > 0
+        ? doQuery
         : selectedEmail
           ? [selecionadoComoMensagem(selectedEmail)]
           : [];
