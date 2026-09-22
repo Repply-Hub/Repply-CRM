@@ -1992,7 +1992,6 @@ const Emails = () => {
       ...(corposConversa[m.id] ?? {}),
       carregandoCorpo: carregandoCorpos.has(m.id),
     }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmail, dadosConversa, corposConversa, carregandoCorpos]);
 
 
