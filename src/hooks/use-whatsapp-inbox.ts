@@ -46,6 +46,7 @@ export interface WaResponsavel {
   id: string;
   nome: string;
   avatar_url: string | null;
+  atribuido_em?: string; // quando virou responsável (whatsapp_conversa_responsaveis.created_at)
 }
 
 export interface WaVisualizador extends WaResponsavel {
@@ -220,13 +221,15 @@ export function useWaConversas() {
       if (!empresaId) return [];
       const { data, error } = await supabase
         .from('whatsapp_conversas')
-        .select('*, responsaveis:whatsapp_conversa_responsaveis(usuario:usuarios(id, nome, avatar_url)), visualizadores:whatsapp_conversa_visualizacoes(visualizado_em, quantidade, usuario:usuarios(id, nome, avatar_url))')
+        .select('*, responsaveis:whatsapp_conversa_responsaveis(created_at, usuario:usuarios(id, nome, avatar_url)), visualizadores:whatsapp_conversa_visualizacoes(visualizado_em, quantidade, usuario:usuarios(id, nome, avatar_url))')
         .eq('empresa_id', empresaId);
       if (error) throw error;
       return ((data ?? []) as any[])
         .map(c => ({
           ...c,
-          responsaveis: (c.responsaveis ?? []).map((r: any) => r.usuario).filter(Boolean),
+          responsaveis: (c.responsaveis ?? [])
+            .map((r: any) => (r.usuario ? { ...r.usuario, atribuido_em: r.created_at } : null))
+            .filter(Boolean),
           // `visualizado_em` vem da linha de junção (não do usuário), então
           // não dá pra só extrair `v.usuario` como o campo de responsáveis
           // faz — precisa juntar os dois na mesma hora que filtra usuário nulo.
