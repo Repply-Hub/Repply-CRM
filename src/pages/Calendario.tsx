@@ -32,6 +32,7 @@ import {
   useUpdateEvento,
   useDeleteEvento,
 } from "@/hooks/use-eventos";
+import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { toast } from "sonner";
 import { validateFile } from "@/lib/file-validation";
 
@@ -307,7 +308,10 @@ export default function Calendario() {
       {
         onSuccess: () =>
           toast.success(organizou ? "Evento excluído para todos os participantes" : "Você saiu deste evento"),
-        onError: () => toast.error("Erro ao excluir evento"),
+        // A frase vem de `useDeleteEvento`, e ela diz o que NÃO aconteceu ("o compromisso
+        // continua na agenda de todos") e o que fazer. "Erro ao excluir evento" deixava a
+        // pessoa sem saber se o compromisso saiu ou não.
+        onError: (err) => toast.error(mensagemDeErro(err, "Não foi possível excluir o compromisso.")),
       },
     );
   };

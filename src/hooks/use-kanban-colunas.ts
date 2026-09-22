@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { invalidarPaineisDeNegocios } from './use-pedidos';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
+import { recusaSemErro } from '@/lib/recusa-do-banco';
 
 export interface KanbanColuna {
   id: string;
@@ -188,13 +189,37 @@ export function useReorderKanbanColunas() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (orderedIds: string[]) => {
-      await Promise.all(
+      // 🔴 ZERO LINHAS NÃO É SUCESSO (CLAUDE.md §4.6). Antes, o resultado destas gravações era
+      // descartado: nem o erro era conferido. Quem não é gestor arrastava as etapas, via
+      // "Alterações salvas", e a ordem voltava ao recarregar sem nada explicar (item 47).
+      // A causa mais provável nem é permissão: com a empresa bloqueada por cobrança, a política
+      // restritiva do plano zera as linhas de toda escrita do sistema, em silêncio.
+      const resultados = await Promise.all(
         orderedIds.map((id, idx) =>
-          supabase.from('kanban_colunas').update({ ordem: idx }).eq('id', id)
+          supabase.from('kanban_colunas').update({ ordem: idx }, { count: 'exact' }).eq('id', id)
         )
       );
+
+      const comErro = resultados.find(r => r.error);
+      if (comErro?.error) throw comErro.error;
+
+      // `count === 0`, nunca `!count`: o servidor pode não mandar o número, e tratar isso como
+      // recusa gritaria "não salvou" em cima de uma gravação que funcionou.
+      if (resultados.some(r => r.count === 0)) {
+        throw new Error(
+          recusaSemErro(
+            'A ordem das etapas NÃO foi salva: ela volta como estava ao recarregar.',
+            'Reordenar etapas do funil é coisa de gestor.',
+          ),
+        );
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['kanban_colunas'] }),
-    onError: (err: any) => toast.error(err?.message || 'Erro ao reordenar'),
+    onError: (err: unknown) => {
+      // Devolve a tela ao estado real: sem isto, a ordem recusada continua desenhada até a
+      // pessoa recarregar, contradizendo o aviso que ela acabou de ler.
+      qc.invalidateQueries({ queryKey: ['kanban_colunas'] });
+      toast.error(mensagemDeErro(err, 'Não foi possível salvar a ordem das etapas.'));
+    },
   });
 }

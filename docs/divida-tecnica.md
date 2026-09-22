@@ -63,7 +63,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 44 | [A matriz de permissões só é conferida em 2 dos 15 módulos](#44-a-matriz-de-permissões-só-é-conferida-pelo-banco-em-2-dos-15-módulos) | Alta | Não — mas a tela promete o que não entrega |
 | 45 | [Não existe conferência automática, e o `git push` publica](#45-não-existe-conferência-automática--e-agora-o-git-push-publica) | Alta | Não — protege todo o resto |
 | 46 | [`types.ts` com 21 objetos fora de sincronia, e dá para regerar](#46-typests-tem-21-objetos-fora-de-sincronia-e-pode-ser-regerado) | Alta | Não |
-| 47 | ["Salvo" quando o banco recusou — o mesmo defeito em 4 telas](#47-salvo-quando-o-banco-recusou--o-mesmo-defeito-em-quatro-telas) | Alta | Não |
+| 47 | ["Salvo" quando o banco recusou — o mesmo defeito em 4 telas](#47-salvo-quando-o-banco-recusou--o-mesmo-defeito-em-quatro-telas) | ✅ Resolvida | As 4 telas conferem o efeito; a varredura dos demais pontos é o item 68 |
 | 48 | [O Radar de Risco conta edição de campo como movimento](#48-o-radar-de-risco-conta-edição-de-campo-como-movimento) | Alta | Não — R$ 5,0 mi no lugar de R$ 14,4 mi |
 | 49 | [O filtro "Etapa" não filtra, em dois lugares](#49-o-filtro-etapa-não-filtra-em-dois-lugares) | Alta | Não — mas a Ação em massa não tem desfazer |
 | 50 | [A soma em reais do Kanban usa só os cartões carregados](#50-a-soma-em-reais-do-kanban-usa-só-os-cartões-carregados) | ✅ Resolvida | Corrigido em 22/09/2026 — a coluna pede o total da etapa ao banco |
@@ -1884,6 +1884,20 @@ Ao contrário, o problema volta e parece que a regeneração não funcionou.
 ---
 
 ## 47. "Salvo" quando o banco recusou — o mesmo defeito em quatro telas
+
+> ✅ **Resolvido em 22/09/2026 — as quatro telas.** Excluir etapa do Kanban virou uma operação
+> só no banco (item 39). Tarefas já tinha sido consertado, com teste. Faltavam duas, feitas
+> agora: **reordenar etapas**, que nem o erro conferia — um `Promise.all` cujo resultado era
+> descartado —, e **excluir compromisso**, que conferia o erro mas não a contagem. As duas
+> passaram a pedir `{ count: 'exact' }` e a tratar `count === 0` como recusa, com a frase de
+> `recusaSemErro`; a tela do Calendário deixou de trocar essa frase por "Erro ao excluir
+> evento", e a do Kanban devolve a ordem ao estado real quando o banco recusa.
+>
+> Guarda estrutural: `src/hooks/zero-linhas-kanban-e-agenda.test.tsx`, que cobre os dois casos e
+> também o inverso — `count` nulo NÃO é recusa (`count === 0`, nunca `!count`).
+>
+> **A regra de projeto continua valendo para o resto**: toda escrita que depende de permissão
+> pede a contagem e trata zero como recusa. A varredura dos pontos restantes é o item 68.
 
 **Gravidade: alta. É padrão, não caso isolado.**
 

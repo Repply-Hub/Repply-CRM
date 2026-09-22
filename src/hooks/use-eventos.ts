@@ -8,6 +8,7 @@ import { ancoraDoDia } from '@/lib/data-local';
 import { useAuth } from './use-auth';
 import { useCreateTarefa } from './use-tarefas';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
+import { recusaSemErro } from '@/lib/recusa-do-banco';
 import type { EspecificacaoDeTarefa } from '@/lib/rota-tarefas';
 import type { CalendarEvent, CalendarType, EventoForm } from '@/components/calendar/types';
 import { CALENDAR_COLORS } from '@/components/calendar/types';
@@ -959,11 +960,27 @@ export function useDeleteEvento() {
       const organizou = !!evento.criadoPor && evento.criadoPor === user?.id;
 
       const consulta = organizou && evento.grupoId
-        ? supabase.from('eventos').delete().eq('grupo_id', evento.grupoId)
-        : supabase.from('eventos').delete().eq('id', evento.id);
+        ? supabase.from('eventos').delete({ count: 'exact' }).eq('grupo_id', evento.grupoId)
+        : supabase.from('eventos').delete({ count: 'exact' }).eq('id', evento.id);
 
-      const { error } = await consulta;
+      const { error, count } = await consulta;
       if (error) throw error;
+
+      // 🔴 ZERO LINHAS NÃO É SUCESSO (CLAUDE.md §4.6). Aqui a consequência é de mundo real: a
+      // tela dizia "excluído para todos os participantes", o compromisso seguia na agenda de
+      // todo mundo, e alguém aparecia numa visita cancelada (item 47). Com a empresa bloqueada
+      // por cobrança, a política restritiva do plano zera as linhas sem devolver erro nenhum.
+      // `count === 0`, nunca `!count`: contagem nula é "o servidor não mandou o número".
+      if (count === 0) {
+        throw new Error(
+          recusaSemErro(
+            organizou
+              ? 'O compromisso NÃO foi excluído: ele continua na agenda de todos os participantes.'
+              : 'Você NÃO saiu deste compromisso: ele continua na sua agenda.',
+            'Só quem organizou ou participa do compromisso pode excluí-lo.',
+          ),
+        );
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['eventos'] });
