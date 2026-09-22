@@ -68,6 +68,7 @@ import {
 import { erroLegivelDaFunction } from "@/lib/erro-edge-function";
 import { parseEnderecos } from "@/lib/enderecos-email";
 import { montarCcResponderATodos } from "@/lib/responder-todos";
+import { ehTrocaDeModoNaMesmaMensagem } from "@/lib/troca-compositor";
 import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
 import {
   LeitorEmail,
@@ -321,6 +322,14 @@ const Emails = () => {
    * mesmo. O encaixado (e-mail novo) tem título próprio ("Nova mensagem").
    */
   const [tituloInline, setTituloInline] = useState("Responder");
+  /**
+   * Id da mensagem (`email_mensagens.id`) que a resposta inline aberta está
+   * respondendo/encaminhando. Serve para saber que trocar entre Responder /
+   * Responder a todos / Encaminhar É na MESMA mensagem — e então trocar direto,
+   * sem o aviso "há um rascunho" (ver `ehTrocaDeModoNaMesmaMensagem`). Nulo
+   * quando não há resposta inline aberta.
+   */
+  const [inlineParaId, setInlineParaId] = useState<string | null>(null);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [pageSent, setPageSent] = useState(0);
   const [pageReceived, setPageReceived] = useState(0);
@@ -1102,6 +1111,7 @@ const Emails = () => {
       setRespondendo(false);
       setRespondendoA(null);
       setEncaminhandoDe(null);
+      setInlineParaId(null);
       setFormData({
         destinatario: "",
         assunto: "",
@@ -1386,6 +1396,21 @@ const Emails = () => {
     }
   };
 
+  /**
+   * Abertura de uma RESPOSTA inline (Responder / Responder a todos / Encaminhar).
+   * Trocar entre esses modos na MESMA mensagem já aberta em resposta não é abrir
+   * outro compositor — é refinar a mesma resposta —, então substitui direto, sem
+   * o aviso "há um rascunho". Só protege (pergunta) quando a abertura é para
+   * OUTRA mensagem ou um e-mail novo. Sem isto, cada troca de modo caía no aviso.
+   */
+  const abrirRespostaProtegido = (abrir: () => void) => {
+    if (ehTrocaDeModoNaMesmaMensagem(modoCompositor, inlineParaId, selectedEmail?.id)) {
+      abrir();
+    } else {
+      abrirCompositorProtegido(abrir);
+    }
+  };
+
   /** Monta a resposta a partir da mensagem aberta e abre o compositor. */
   /**
    * Núcleo compartilhado de "Responder" e "Responder a todos": monta a citação,
@@ -1395,7 +1420,25 @@ const Emails = () => {
    */
   const iniciarRespostaInline = (ccTexto: string, titulo: string) => {
     if (!selectedEmail) return;
-    abrirCompositorProtegido(() => {
+    abrirRespostaProtegido(() => {
+      // Trocar ENTRE respostas (Responder ↔ Responder a todos) na mesma mensagem
+      // só muda o Cc: preserva o corpo já digitado E o mesmo rascunho (não
+      // re-semeia nem cria rascunho novo). Encaminhar é outra mensagem — não cai
+      // aqui (o título atual seria "Encaminhar"), então vindo de/para ele
+      // re-semeia normalmente.
+      const soTrocaCc =
+        ehTrocaDeModoNaMesmaMensagem(
+          modoCompositor,
+          inlineParaId,
+          selectedEmail.id,
+        ) &&
+        (tituloInline === "Responder" || tituloInline === "Responder a todos");
+      if (soTrocaCc) {
+        setFormData((f) => ({ ...f, cc: ccTexto }));
+        setTituloInline(titulo);
+        return;
+      }
+
       const assunto = selectedEmail.assunto ?? "";
       const replySubject = assunto.toLowerCase().startsWith("re:")
         ? assunto
@@ -1440,6 +1483,10 @@ const Emails = () => {
       // que jogava a pessoa de volta para a caixa de entrada no meio da resposta.
       setRespondendo(true);
       setTituloInline(titulo);
+      // Registra a QUAL mensagem esta resposta pertence, para uma próxima troca
+      // de modo (responder ↔ responder a todos ↔ encaminhar) nesta mesma
+      // mensagem ser direta, sem o aviso de rascunho.
+      setInlineParaId(selectedEmail.id);
       // Resposta é sempre INLINE — o cartão encaixado é só para e-mail novo.
       setModoCompositor("inline");
     });
@@ -1474,7 +1521,7 @@ const Emails = () => {
    */
   const encaminharMensagem = () => {
     if (!selectedEmail) return;
-    abrirCompositorProtegido(() => {
+    abrirRespostaProtegido(() => {
       const assunto = selectedEmail.assunto ?? "";
       const assuntoEnc = /^(enc:|fwd:|fw:)/i.test(assunto.trim())
         ? assunto
@@ -1525,6 +1572,9 @@ const Emails = () => {
       setRascunhoId(null);
       setRespondendo(true);
       setTituloInline("Encaminhar");
+      // Ver `iniciarRespostaInline`: marca a mensagem-alvo para a troca de modo
+      // nesta mesma mensagem ser direta.
+      setInlineParaId(selectedEmail.id);
       setModoCompositor("inline");
     });
   };
@@ -1944,6 +1994,7 @@ const Emails = () => {
     // anexos do original para uma mensagem que não é mais aquela.
     setRespondendoA(null);
     setEncaminhandoDe(null);
+    setInlineParaId(null);
   };
 
   // Props comuns aos dois compositores (encaixado e inline) — só a moldura
