@@ -3,6 +3,7 @@ import { ChevronUp, Loader2, Mail, Minus, Paperclip, Send, Settings, Trash2, X }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EditorTextoRico } from '@/components/shared/EditorTextoRico';
+import { CampoDestinatarios } from './CampoDestinatarios';
 import { tamanhoLegivel } from '@/lib/fabricante-arquivos';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +37,8 @@ interface Props {
   isEnviando: boolean;
   /** "Nova mensagem" na caixa; "Responder" quando sai de dentro de um e-mail. */
   titulo?: string;
+  /** Endereço da caixa da empresa — o autocompletar não sugere a própria caixa. */
+  emailDaConta?: string | null;
   /**
    * Anexos já presos ao rascunho deste e-mail. A lista vem do
    * `email_rascunho_anexos`; o binário mora no balde privado e só a função
@@ -85,6 +88,7 @@ export function CompositorEmail({
   isConnected,
   isEnviando,
   titulo = 'Nova mensagem',
+  emailDaConta,
   anexos,
   onAnexar,
   onRemoverAnexo,
@@ -125,12 +129,12 @@ export function CompositorEmail({
             <label htmlFor="to" className="min-w-[60px] text-sm text-muted-foreground">
               Para
             </label>
-            <Input
+            <CampoDestinatarios
               id="to"
-              placeholder="email@exemplo.com"
-              className="h-8 border-none bg-transparent px-0 shadow-none"
-              value={valores.destinatario}
-              onChange={(e) => onChange({ ...valores, destinatario: e.target.value })}
+              ariaLabel="Para"
+              valor={valores.destinatario}
+              onChange={(v) => onChange({ ...valores, destinatario: v })}
+              emailDaConta={emailDaConta}
             />
             {/* Estilo Gmail: o link some depois de clicado. */}
             <div className="flex shrink-0 items-center gap-2">
@@ -162,12 +166,12 @@ export function CompositorEmail({
               <label htmlFor="cc" className="min-w-[60px] text-sm text-muted-foreground">
                 Cc
               </label>
-              <Input
+              <CampoDestinatarios
                 id="cc"
-                placeholder="email@exemplo.com"
-                className="h-8 border-none bg-transparent px-0 shadow-none"
-                value={valores.cc}
-                onChange={(e) => onChange({ ...valores, cc: e.target.value })}
+                ariaLabel="Cc"
+                valor={valores.cc}
+                onChange={(v) => onChange({ ...valores, cc: v })}
+                emailDaConta={emailDaConta}
               />
             </div>
           </div>
@@ -179,12 +183,12 @@ export function CompositorEmail({
               <label htmlFor="cco" className="min-w-[60px] text-sm text-muted-foreground">
                 Cco
               </label>
-              <Input
+              <CampoDestinatarios
                 id="cco"
-                placeholder="email@exemplo.com"
-                className="h-8 border-none bg-transparent px-0 shadow-none"
-                value={valores.cco}
-                onChange={(e) => onChange({ ...valores, cco: e.target.value })}
+                ariaLabel="Cco"
+                valor={valores.cco}
+                onChange={(v) => onChange({ ...valores, cco: v })}
+                emailDaConta={emailDaConta}
               />
             </div>
           </div>

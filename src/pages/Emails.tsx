@@ -2119,6 +2119,8 @@ const Emails = () => {
   const propsCompositor = {
     valores: formData,
     onChange: setFormData,
+    // O autocompletar não sugere a própria caixa da empresa.
+    emailDaConta: connectedEmail,
     onEnviar: handleSubmit,
     onDescartar: async () => {
       // Diferente de fechar o compositor (que preserva o rascunho para

@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+
+// Os campos Para/Cc/Cco usam o autocompletar (useQuery); aqui não testamos
+// sugestões, então mockamos o hook (sem QueryClient no teste da moldura).
+vi.mock("@/hooks/use-buscar-destinatarios", () => ({
+  useBuscarDestinatarios: () => ({ sugestoes: [], carregando: false }),
+}));
+
 import { CompositorEmail, type RascunhoEmail } from "./CompositorEmail";
 
 const valores: RascunhoEmail = { destinatario: "", assunto: "", corpo: "<p></p>", cc: "", cco: "" };
@@ -59,8 +66,9 @@ describe("CompositorEmail — moldura", () => {
         {...props({ valores: { ...valores, cc: "Bia <bia@x.com>, caio@x.com" } })}
       />,
     );
-    const campoCc = screen.getByLabelText("Cc") as HTMLInputElement;
-    expect(campoCc).toBeInTheDocument();
-    expect(campoCc.value).toBe("Bia <bia@x.com>, caio@x.com");
+    // O campo Cc aparece; os endereços viram fichinhas (não texto no input).
+    expect(screen.getByLabelText("Cc")).toBeInTheDocument();
+    expect(screen.getByText("Bia")).toBeInTheDocument();
+    expect(screen.getByText("caio@x.com")).toBeInTheDocument();
   });
 });

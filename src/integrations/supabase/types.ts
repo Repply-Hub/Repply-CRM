@@ -4891,6 +4891,10 @@ export type Database = {
           com_quem: string | null
         }[]
       }
+      email_buscar_destinatarios: {
+        Args: { p_termo: string; p_limite?: number }
+        Returns: { nome: string; email: string; origem: string }[]
+      }
       empresa_tem_secao: { Args: { p_secao: string }; Returns: boolean }
       get_my_empresa_id: { Args: never; Returns: string }
       get_my_usuario_id: { Args: never; Returns: string }
