@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
+  baixarAnexoNylas,
   chamarNylas,
   corsHeaders,
   type EnderecoNylas,
@@ -17,7 +18,20 @@ function enderecos(valor: unknown): EnderecoNylas[] {
   if (!Array.isArray(valor)) return [];
   return valor
     .map((v) => {
-      if (typeof v === "string") return { email: v.trim() };
+      if (typeof v === "string") {
+        // Aceita "Nome <e@x.com>" além de "e@x.com": SEPARA o nome do endereço.
+        // Sem isto, o Nylas recebia o nome grudado dentro do campo de e-mail
+        // (`{email:"Bia <bia@x.com>"}`) — o "responder a todos" gera esse formato,
+        // e quem digitasse "Nome <email>" no Cc à mão caía no mesmo defeito.
+        const m = v.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+        if (m) {
+          const nome = m[1].trim();
+          const email = m[2].trim();
+          return email ? { email, ...(nome ? { name: nome } : {}) } : null;
+        }
+        const email = v.trim();
+        return email ? { email } : null;
+      }
       if (v && typeof v === "object" && typeof (v as EnderecoNylas).email === "string") {
         const e = v as EnderecoNylas;
         return { email: e.email.trim(), ...(e.name ? { name: e.name } : {}) };
@@ -207,6 +221,128 @@ serve(async (req) => {
       }
     }
 
+    // ---- anexos herdados de um ENCAMINHAR ------------------------------------
+    // Encaminhar leva os anexos do original. A tela manda `encaminhar_de` (o
+    // `nylas_message_id` da mensagem sendo encaminhada); o servidor rebaixa cada
+    // anexo dela do Nylas e o inclui no multipart, ao lado dos do rascunho.
+    //
+    // Ficam num array PRÓPRIO (sem `caminho`): não vieram do balde, então a
+    // faxina do fim — que remove os arquivos do rascunho — não deve tocá-los.
+    const anexosEncaminhados: { nome: string; mime: string; blob: Blob }[] = [];
+    const encaminharDe =
+      typeof body?.encaminhar_de === "string" && body.encaminhar_de
+        ? body.encaminhar_de
+        : null;
+
+    if (encaminharDe) {
+      // Acesso: só rebaixa anexo de mensagem que ESTA pessoa pode ler. Mesma
+      // trava do `reply_to_message_id` — quem autoriza é a RLS pelo `userClient`,
+      // não uma segunda regra aqui. `limit(1)` porque reconexão preservando
+      // histórico pode deixar a mesma `nylas_message_id` em duas linhas.
+      const { data: acessos, error: erroAcesso } = await userClient
+        .from("email_mensagens")
+        .select("id")
+        .eq("nylas_message_id", encaminharDe)
+        .limit(1);
+
+      if (erroAcesso) {
+        console.error("[email-enviar] falha ao verificar acesso ao encaminhado:", erroAcesso);
+        return json({ error: "Não consegui verificar seu acesso à mensagem encaminhada." }, 503);
+      }
+      if (!acessos?.[0]) {
+        console.warn(
+          `[email-enviar] encaminhar negado: usuario=${caller.id} mensagem=${encaminharDe}`,
+        );
+        return json(
+          { error: "Você não tem acesso à mensagem que está encaminhando.", code: "sem_acesso_a_conversa" },
+          403,
+        );
+      }
+
+      // Os anexos e a conta do original vêm da nossa linha (gravados ao abrir a
+      // mensagem), não da tela — assim o cliente não pode pedir anexo de um id
+      // arbitrário. Prefere a linha com conta viva (a arquivada, de caixa
+      // desconectada, fica com `conta_id` nulo e não tem credencial para baixar).
+      const { data: origRows } = await supabase
+        .from("email_mensagens")
+        .select("anexos, conta_id, nylas_message_id")
+        .eq("nylas_message_id", encaminharDe)
+        .eq("empresa_id", caller.empresa_id);
+      const orig = (origRows ?? []).find((r) => r.conta_id) ?? (origRows ?? [])[0];
+
+      const anexosOriginais = Array.isArray(orig?.anexos) ? orig!.anexos : [];
+
+      // Só faz sentido continuar se houver anexo para levar. Sem anexo, o
+      // encaminhar é só o corpo citado — nada a rebaixar.
+      if (anexosOriginais.length > 0) {
+        // Qual grant baixa: o da caixa do próprio original. No caso comum é a
+        // mesma que envia; se o original é de uma caixa desconectada (conta
+        // nula), não há credencial e os anexos não podem ser reenviados.
+        let grantParaAnexos = grantRow.grant_id;
+        if (orig?.conta_id && orig.conta_id !== conta.id) {
+          const { data: g2 } = await supabase
+            .from("email_conta_grants")
+            .select("grant_id")
+            .eq("conta_id", orig.conta_id)
+            .maybeSingle();
+          if (!g2?.grant_id) {
+            return json(
+              { error: "Os anexos da mensagem encaminhada estão numa caixa desconectada e não podem ser reenviados.", code: "encaminhar_sem_grant" },
+              409,
+            );
+          }
+          grantParaAnexos = g2.grant_id;
+        } else if (!orig?.conta_id) {
+          return json(
+            { error: "Os anexos da mensagem encaminhada estão numa caixa desconectada e não podem ser reenviados.", code: "encaminhar_sem_grant" },
+            409,
+          );
+        }
+
+        for (const a of anexosOriginais as Array<{ id?: string; filename?: string; content_type?: string }>) {
+          if (!a?.id) continue;
+          const resp = await baixarAnexoNylas(
+            `/v3/grants/${grantParaAnexos}/attachments/${encodeURIComponent(a.id)}/download` +
+              `?message_id=${encodeURIComponent(orig!.nylas_message_id)}`,
+            60_000,
+          );
+          if (!resp.ok || !resp.bytes) {
+            console.error(
+              `[email-enviar] falha ao rebaixar anexo ${a.id} da mensagem encaminhada: status ${resp.status}`,
+            );
+            // Fecha a porta em vez de mandar um encaminhado sem os anexos que a
+            // pessoa espera que sigam junto — melhor pedir para tentar de novo.
+            return json(
+              { error: `Não consegui carregar o anexo "${a.filename || "arquivo"}" da mensagem encaminhada. Tente de novo.` },
+              502,
+            );
+          }
+          const mime = a.content_type || resp.contentType || "application/octet-stream";
+          anexosEncaminhados.push({
+            nome: a.filename || "anexo",
+            mime,
+            blob: new Blob([resp.bytes], { type: mime }),
+          });
+        }
+
+        // Teto combinado (rascunho + encaminhados): o do rascunho já passou pelo
+        // seu próprio teto acima, mas juntos podem estourar o limite do Nylas.
+        const totalGeral =
+          anexos.reduce((s, x) => s + x.blob.size, 0) +
+          anexosEncaminhados.reduce((s, x) => s + x.blob.size, 0);
+        if (totalGeral > TETO_ANEXOS) {
+          return json(
+            { error: "Os anexos passam de 20 MB no total. Remova algum e tente de novo." },
+            413,
+          );
+        }
+      }
+    }
+
+    // Todos os anexos que vão no multipart: os do rascunho MAIS os herdados do
+    // encaminhar. A faxina do fim continua só sobre `anexos` (os do balde).
+    const todosAnexos = [...anexos, ...anexosEncaminhados];
+
     // ---- envio ------------------------------------------------------------
     const payload: Record<string, unknown> = {
       to: para,
@@ -284,7 +420,7 @@ serve(async (req) => {
     // do arquivo no Content-Disposition (3º argumento do `append`). O nome do
     // CAMPO é sufixado com o índice para dois anexos de mesmo nome não colidirem.
     let corpoDaChamada: BodyInit;
-    if (anexos.length === 0) {
+    if (todosAnexos.length === 0) {
       corpoDaChamada = JSON.stringify(payload);
     } else {
       // O `message` leva o JSON, com um manifesto `attachments` (nome + tipo +
@@ -294,7 +430,7 @@ serve(async (req) => {
       // o nome do arquivo no Content-Disposition (3º arg do `append`).
       const payloadMultipart = {
         ...payload,
-        attachments: anexos.map((a) => ({
+        attachments: todosAnexos.map((a) => ({
           filename: a.nome,
           content_type: a.mime,
           size: a.blob.size,
@@ -302,7 +438,7 @@ serve(async (req) => {
       };
       const form = new FormData();
       form.append("message", JSON.stringify(payloadMultipart));
-      anexos.forEach((a, i) => {
+      todosAnexos.forEach((a, i) => {
         form.append(`attachment${i}`, a.blob, a.nome);
       });
       corpoDaChamada = form;
@@ -380,7 +516,7 @@ serve(async (req) => {
           lido: true,
           envio_status: "enviado",
           enviado_por: caller.id,
-          ...(anexos.length ? { tem_anexo: true } : {}),
+          ...(todosAnexos.length ? { tem_anexo: true } : {}),
           data_mensagem: new Date((enviada.date ?? Math.floor(Date.now() / 1000)) * 1000).toISOString(),
         },
         { onConflict: "conta_id,nylas_message_id" },

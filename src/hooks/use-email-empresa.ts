@@ -25,6 +25,38 @@ export const ROTULO_PROVEDOR: Record<ProvedorEmail, string> = {
 };
 
 /**
+ * Um anexo NÃO-inline de uma mensagem, como `email_mensagens.anexos` guarda
+ * (jsonb, gravado ao abrir por `email-mensagem`). O `id` é o identificador do
+ * anexo no provedor — é o que o "Encaminhar" usa para o servidor rebaixar cada
+ * arquivo do Nylas e reanexar.
+ */
+export interface AnexoDeMensagem {
+  id?: string;
+  filename?: string;
+  content_type?: string;
+  size?: number;
+}
+
+/** Corpo carregado sob demanda, com os anexos que vieram junto. */
+export interface CorpoDeMensagem {
+  html: string | null;
+  anexos: AnexoDeMensagem[];
+}
+
+/** A coluna `anexos` chega tipada como `Json` (types.ts é gerado solto); normaliza. */
+function normalizarAnexos(valor: unknown): AnexoDeMensagem[] {
+  if (!Array.isArray(valor)) return [];
+  return valor
+    .filter((a): a is Record<string, unknown> => !!a && typeof a === 'object')
+    .map((a) => ({
+      id: typeof a.id === 'string' ? a.id : undefined,
+      filename: typeof a.filename === 'string' ? a.filename : undefined,
+      content_type: typeof a.content_type === 'string' ? a.content_type : undefined,
+      size: typeof a.size === 'number' ? a.size : undefined,
+    }));
+}
+
+/**
  * Caixa de e-mail da empresa, conectada via Nylas.
  *
  * A assinatura espelha de propósito a de `useGmail`
@@ -190,7 +222,7 @@ export function useEmailEmpresa() {
    * listagem inteira a cada e-mail aberto. Nada disso é preciso: quem guarda o
    * corpo agora é o cache por mensagem, e a lista não carrega mais corpo nenhum.
    */
-  const carregarCorpo = async (mensagemId: string): Promise<string | null> => {
+  const carregarCorpo = async (mensagemId: string): Promise<CorpoDeMensagem> => {
     const chave = ['email_corpo', mensagemId];
 
     // `cid:` pendente = corpo cacheado ANTES de `resolverImagensInline` existir
@@ -203,18 +235,24 @@ export function useEmailEmpresa() {
     const jaResolvido = (html: string | null | undefined): html is string =>
       !!html && !html.includes('cid:');
 
-    const emCache = queryClient.getQueryData<string>(chave);
-    if (jaResolvido(emCache)) return emCache;
+    // O cache agora guarda `{ html, anexos }` juntos: os anexos vêm da MESMA
+    // leitura que traz o corpo (a linha, ou a Edge Function), e o encaminhar
+    // precisa deles sem uma segunda ida ao banco.
+    const emCache = queryClient.getQueryData<CorpoDeMensagem>(chave);
+    if (emCache && jaResolvido(emCache.html)) return emCache;
 
     const { data: linha } = await supabase
       .from('email_mensagens')
-      .select('corpo_html, conta_id')
+      .select('corpo_html, conta_id, anexos')
       .eq('id', mensagemId)
       .maybeSingle();
 
+    const anexosDaLinha = normalizarAnexos(linha?.anexos);
+
     if (jaResolvido(linha?.corpo_html)) {
-      queryClient.setQueryData(chave, linha.corpo_html);
-      return linha.corpo_html;
+      const res: CorpoDeMensagem = { html: linha.corpo_html, anexos: anexosDaLinha };
+      queryClient.setQueryData(chave, res);
+      return res;
     }
 
     // Mensagem de caixa já desconectada (conta_id nulo) e sem corpo em cache: o
@@ -225,7 +263,7 @@ export function useEmailEmpresa() {
     // usuário veria "Credencial da caixa não encontrada. Reconecte." — que
     // engana duas vezes: sugere um defeito onde houve uma escolha, e propõe uma
     // ação que não recupera este corpo. Melhor ficar com a prévia, em silêncio.
-    if (linha && linha.conta_id === null) return null;
+    if (linha && linha.conta_id === null) return { html: null, anexos: anexosDaLinha };
 
     const { data, error } = await supabase.functions.invoke('email-mensagem', {
       body: { mensagem_id: mensagemId },
@@ -233,12 +271,18 @@ export function useEmailEmpresa() {
     if (error) {
       const e = await erroLegivelDaFunction(error, 'Não foi possível abrir a mensagem');
       toast.error(e.message);
-      return null;
+      return { html: null, anexos: anexosDaLinha };
     }
 
     const corpo = (data?.corpo_html as string) ?? '';
-    if (corpo) queryClient.setQueryData(chave, corpo);
-    return corpo;
+    const res: CorpoDeMensagem = {
+      // `|| null` para não gravar '' como se fosse corpo resolvido — combina com
+      // o `?? atual.html` de quem consome (corpo vazio é e-mail só de anexo).
+      html: corpo || null,
+      anexos: normalizarAnexos(data?.anexos),
+    };
+    if (corpo) queryClient.setQueryData(chave, res);
+    return res;
   };
 
   const enviarMutation = useMutation({
@@ -255,6 +299,12 @@ export function useEmailEmpresa() {
        * anexo dele passa), baixa do balde e monta o multipart pro Nylas.
        */
       rascunho_id?: string | null;
+      /**
+       * `nylas_message_id` da mensagem sendo ENCAMINHADA. A função de servidor
+       * confere o acesso (RLS), rebaixa cada anexo dela do Nylas e reanexa —
+       * é o que faz o encaminhar levar os anexos do original junto.
+       */
+      encaminhar_de?: string | null;
     }) => {
       const { data, error } = await supabase.functions.invoke('email-enviar', {
         body: {
@@ -267,6 +317,7 @@ export function useEmailEmpresa() {
             ? { reply_to_message_id: params.reply_to_message_id }
             : {}),
           ...(params.rascunho_id ? { rascunho_id: params.rascunho_id } : {}),
+          ...(params.encaminhar_de ? { encaminhar_de: params.encaminhar_de } : {}),
           // Chave de idempotência gerada aqui: o envio no Nylas é síncrono e sem
           // retry automático. Se a rede cair depois de o Nylas aceitar, o retry
           // não pode fazer o destinatário receber duas vezes.
@@ -333,6 +384,7 @@ export function useEmailEmpresa() {
       rascunhoId?: string | null,
       cc?: string[],
       bcc?: string[],
+      encaminharDe?: string | null,
     ) =>
       enviarMutation.mutateAsync({
         to,
@@ -342,6 +394,7 @@ export function useEmailEmpresa() {
         ...(rascunhoId ? { rascunho_id: rascunhoId } : {}),
         ...(cc?.length ? { cc } : {}),
         ...(bcc?.length ? { bcc } : {}),
+        ...(encaminharDe ? { encaminhar_de: encaminharDe } : {}),
       }),
     enviar: enviarMutation.mutateAsync,
 

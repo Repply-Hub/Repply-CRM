@@ -1,7 +1,25 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import DOMPurify from 'dompurify';
-import { ArrowLeft, Trash2, Reply, Loader2, Paperclip, MailOpen, CornerUpLeft, Tag } from 'lucide-react';
+import {
+  ArrowLeft,
+  Trash2,
+  Reply,
+  ReplyAll,
+  Forward,
+  MoreVertical,
+  Loader2,
+  Paperclip,
+  MailOpen,
+  CornerUpLeft,
+  Tag,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -59,7 +77,12 @@ export interface EmailAberto {
   criado_em?: string | null;
   created_at?: string | null;
   carregandoCorpo?: boolean;
-  anexos?: Array<{ filename?: string; size?: number }>;
+  /**
+   * Anexos NÃO-inline da mensagem (`email_mensagens.anexos`, gravado ao abrir).
+   * O `id` é o identificador do anexo no provedor — é o que o "Encaminhar"
+   * precisa para o servidor rebaixar cada arquivo do Nylas e reanexar.
+   */
+  anexos?: Array<{ id?: string; filename?: string; content_type?: string; size?: number }>;
   type?: 'sent' | 'received';
   /** Id da conversa no provedor — liga esta mensagem às demais do mesmo thread. */
   threadId?: string | null;
@@ -86,6 +109,14 @@ interface Props {
   onVoltar: () => void;
   onExcluir: () => void;
   onResponder: () => void;
+  /**
+   * "Responder a todos" (modelo Gmail). Só vira botão quando esta função vem E
+   * a mensagem tem mais de um destinatário — responder a todos de uma mensagem
+   * com um destinatário só é igual a responder, e o botão a mais só confunde.
+   */
+  onResponderATodos?: () => void;
+  /** "Encaminhar" (modelo Gmail). Ausente = o botão não aparece. */
+  onEncaminhar?: () => void;
   /** Clique num endereço de e-mail — no cabeçalho ou dentro do corpo da mensagem. */
   onClicarEndereco?: (endereco: string) => void;
   /** Ausente em mensagem enviada, que não tem "não lido" para marcar. */
@@ -599,6 +630,8 @@ export function LeitorEmail({
   onVoltar,
   onExcluir,
   onResponder,
+  onResponderATodos,
+  onEncaminhar,
   onClicarEndereco,
   onMarcarNaoLido,
   onMover,
@@ -619,6 +652,10 @@ export function LeitorEmail({
   const itensPara = itensDeEndereco(email.destinatarios);
   const itensCc = itensDeEndereco(email.cc);
   const itensCco = email.type === 'sent' ? itensDeEndereco(email.bcc) : [];
+  // "Responder a todos" só faz sentido com mais de um destinatário (Para + Cc);
+  // com um só, é igual a "Responder". Fora isso, precisa do handler vindo da página.
+  const podeResponderATodos =
+    !!onResponderATodos && itensPara.length + itensCc.length > 1;
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -633,44 +670,69 @@ export function LeitorEmail({
         </Button>
 
         <div className="ml-auto flex items-center gap-1">
+          {/* Trio em destaque, como no Gmail: Responder / Responder a todos /
+              Encaminhar. As duas primeiras variam conforme a mensagem (ver
+              `podeResponderATodos`) e o handler vindo da página. */}
           <Button variant="ghost" size="sm" onClick={onResponder} className="gap-2">
             <Reply className="h-4 w-4" />
             Responder
           </Button>
-          {onMarcarNaoLido && (
+          {podeResponderATodos && (
             <Button
               variant="ghost"
-              size="icon"
-              onClick={onMarcarNaoLido}
-              className="text-muted-foreground hover:text-foreground"
-              title="Marcar como não lido"
-              aria-label="Marcar como não lido"
+              size="sm"
+              onClick={onResponderATodos}
+              className="gap-2"
             >
-              <MailOpen className="h-4 w-4" />
+              <ReplyAll className="h-4 w-4" />
+              Responder a todos
             </Button>
           )}
-          {onMover && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onMover}
-              className="text-muted-foreground hover:text-foreground"
-              title="Mover para marcador"
-              aria-label="Mover para marcador"
-            >
-              <Tag className="h-4 w-4" />
+          {onEncaminhar && (
+            <Button variant="ghost" size="sm" onClick={onEncaminhar} className="gap-2">
+              <Forward className="h-4 w-4" />
+              Encaminhar
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onExcluir}
-            className="text-muted-foreground hover:text-destructive"
-            title="Excluir"
-            aria-label="Excluir"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+
+          {/* "⋮ mais": ações secundárias fora do caminho principal. Excluir vive
+              aqui (não é ação de todo dia e já tem confirmação própria), junto de
+              marcar não lida e mover — os dois só entram quando a página passa o
+              handler (mensagem enviada não tem "não lido", por exemplo). */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-foreground"
+                title="Mais ações"
+                aria-label="Mais ações"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {onMarcarNaoLido && (
+                <DropdownMenuItem onClick={onMarcarNaoLido} className="gap-2">
+                  <MailOpen className="h-4 w-4" />
+                  Marcar como não lida
+                </DropdownMenuItem>
+              )}
+              {onMover && (
+                <DropdownMenuItem onClick={onMover} className="gap-2">
+                  <Tag className="h-4 w-4" />
+                  Mover para marcador
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onClick={onExcluir}
+                className="gap-2 text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+                Excluir
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

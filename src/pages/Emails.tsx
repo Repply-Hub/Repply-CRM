@@ -67,6 +67,7 @@ import {
 } from "@/lib/email-anexos";
 import { erroLegivelDaFunction } from "@/lib/erro-edge-function";
 import { parseEnderecos } from "@/lib/enderecos-email";
+import { montarCcResponderATodos } from "@/lib/responder-todos";
 import { ConectarEmailCard } from "@/components/email/ConectarEmailCard";
 import {
   LeitorEmail,
@@ -306,6 +307,20 @@ const Emails = () => {
   const [activeTab, setActiveTab] = useState<string>("received");
   /** `nylas_message_id` da mensagem sendo respondida; nulo num e-mail novo. */
   const [respondendoA, setRespondendoA] = useState<string | null>(null);
+  /**
+   * `nylas_message_id` da mensagem sendo ENCAMINHADA — nulo em qualquer outra
+   * composição. É o que faz o envio levar os anexos do original junto: o
+   * servidor (`email-enviar`) rebaixa cada anexo daquele id no Nylas e reanexa.
+   * Diferente de `respondendoA`, encaminhar NÃO amarra a resposta à conversa (é
+   * mensagem nova), então os dois nunca ficam setados ao mesmo tempo.
+   */
+  const [encaminhandoDe, setEncaminhandoDe] = useState<string | null>(null);
+  /**
+   * Título do compositor INLINE (o que abre no topo da conversa): "Responder",
+   * "Responder a todos" ou "Encaminhar". Só a etiqueta muda — o formulário é o
+   * mesmo. O encaixado (e-mail novo) tem título próprio ("Nova mensagem").
+   */
+  const [tituloInline, setTituloInline] = useState("Responder");
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [pageSent, setPageSent] = useState(0);
   const [pageReceived, setPageReceived] = useState(0);
@@ -1075,6 +1090,9 @@ const Emails = () => {
         rascunhoId,
         parseEnderecos(data.cc),
         parseEnderecos(data.cco),
+        // Encaminhar: o servidor rebaixa os anexos desta mensagem do Nylas e os
+        // leva junto. Nulo em qualquer outra composição.
+        encaminhandoDe,
       );
     },
     onSuccess: () => {
@@ -1083,6 +1101,7 @@ const Emails = () => {
       setMinimizado(false);
       setRespondendo(false);
       setRespondendoA(null);
+      setEncaminhandoDe(null);
       setFormData({
         destinatario: "",
         assunto: "",
@@ -1368,7 +1387,13 @@ const Emails = () => {
   };
 
   /** Monta a resposta a partir da mensagem aberta e abre o compositor. */
-  const responderMensagem = () => {
+  /**
+   * Núcleo compartilhado de "Responder" e "Responder a todos": monta a citação,
+   * o assunto "Re:" e o formulário, e abre o compositor INLINE (no topo da
+   * conversa). Só o "Cc" e o título mudam entre os dois — o remetente sempre vai
+   * para o "Para", a citação é a mesma.
+   */
+  const iniciarRespostaInline = (ccTexto: string, titulo: string) => {
     if (!selectedEmail) return;
     abrirCompositorProtegido(() => {
       const assunto = selectedEmail.assunto ?? "";
@@ -1394,9 +1419,9 @@ const Emails = () => {
         ),
         assunto: replySubject,
         corpo: montarCorpoInicial(assinaturaParaCorpo, citacaoHtml),
-        // Contexto novo: Cc/Cco de uma composição anterior não continuam numa
-        // resposta diferente.
-        cc: "",
+        // "Responder a todos" traz os demais aqui; "Responder" deixa vazio.
+        cc: ccTexto,
+        // Contexto novo: Cco de uma composição anterior não continua.
         cco: "",
       });
       // Guarda a QUAL mensagem se está respondendo, no id do provedor. É o que o
@@ -1405,13 +1430,101 @@ const Emails = () => {
       // tem acesso por marcador não enxerga a própria resposta, porque a regra a
       // reconhece justamente por pertencer à conversa de origem.
       setRespondendoA(selectedEmail.gmail_message_id ?? null);
+      // Responder não é encaminhar: garante que um "encaminhar" anterior não
+      // deixe a mensagem original pendurada, fazendo esta resposta levar anexos.
+      setEncaminhandoDe(null);
       // Contexto novo: uma resposta não continua o rascunho de outra
       // composição — o autosave (abaixo) cria uma linha própria para ela.
       setRascunhoId(null);
       // O e-mail aberto CONTINUA aberto atrás do compositor. Fechá-lo aqui era o
       // que jogava a pessoa de volta para a caixa de entrada no meio da resposta.
       setRespondendo(true);
+      setTituloInline(titulo);
       // Resposta é sempre INLINE — o cartão encaixado é só para e-mail novo.
+      setModoCompositor("inline");
+    });
+  };
+
+  /** Responder só ao remetente. */
+  const responderMensagem = () => iniciarRespostaInline("", "Responder");
+
+  /**
+   * Responder ao remetente E a todos os demais. O remetente vai para o "Para"
+   * (dentro de `iniciarRespostaInline`); o "Cc" recebe os outros destinatários
+   * e quem estava em cópia, menos a própria caixa e o próprio remetente — ver
+   * `montarCcResponderATodos`.
+   */
+  const responderATodos = () => {
+    if (!selectedEmail) return;
+    const cc = montarCcResponderATodos(
+      soEndereco(selectedEmail.remetente),
+      selectedEmail.destinatarios ?? [],
+      selectedEmail.cc ?? [],
+      connectedEmail ?? "",
+    );
+    iniciarRespostaInline(cc, "Responder a todos");
+  };
+
+  /**
+   * Encaminha a mensagem aberta. "Para" em branco (a pessoa escolhe o destino),
+   * assunto "Enc:", e o corpo traz a mensagem original citada (cabeçalho De/
+   * Data/Assunto/Para + o conteúdo). Se o original tem anexos, guarda o id da
+   * mensagem em `encaminhandoDe` para o envio levá-los junto — o servidor
+   * rebaixa cada um do Nylas e reanexa (ver `email-enviar`).
+   */
+  const encaminharMensagem = () => {
+    if (!selectedEmail) return;
+    abrirCompositorProtegido(() => {
+      const assunto = selectedEmail.assunto ?? "";
+      const assuntoEnc = /^(enc:|fwd:|fw:)/i.test(assunto.trim())
+        ? assunto
+        : `Enc: ${assunto}`;
+      const quando = selectedEmail.created_at || selectedEmail.criado_em;
+      const paraTexto =
+        (selectedEmail.destinatarios ?? [])
+          .map((d) => (d?.name ? `${d.name} <${d.email}>` : d?.email))
+          .filter(Boolean)
+          .join(", ") ||
+        selectedEmail.destinatario ||
+        "";
+
+      // Cabeçalho do encaminhamento — texto escapado (vem de fora). O CORPO
+      // original é HTML já sanitizado na exibição; embute-se direto (escapá-lo
+      // mostraria as tags como texto). Sem HTML, cai na prévia com <br>.
+      const cabecalho =
+        `De: ${escaparHtml(selectedEmail.remetente ?? "")}<br>` +
+        `Data: ${quando ? escaparHtml(format(new Date(quando), "dd/MM/yyyy HH:mm")) : ""}<br>` +
+        `Assunto: ${escaparHtml(assunto)}<br>` +
+        `Para: ${escaparHtml(paraTexto)}<br><br>`;
+      const corpoOriginal =
+        selectedEmail.html ||
+        escaparHtml(selectedEmail.corpo || selectedEmail.snippet || "").replace(
+          /\n/g,
+          "<br>",
+        );
+      const citacao =
+        `<br><div style="border-left:2px solid #ccc;padding-left:12px;color:#555">` +
+        `---------- Mensagem encaminhada ----------<br>${cabecalho}${corpoOriginal}</div>`;
+
+      setFormData({
+        ...formData,
+        destinatario: "",
+        assunto: assuntoEnc,
+        corpo: montarCorpoInicial(assinaturaParaCorpo, citacao),
+        cc: "",
+        cco: "",
+      });
+      // Encaminhar é mensagem NOVA, não resposta — sem reply_to.
+      setRespondendoA(null);
+      // Só amarra os anexos do original quando existem: senão o servidor faria
+      // trabalho à toa (checar acesso e reler a mensagem para não achar anexo).
+      const temAnexos = (selectedEmail.anexos?.length ?? 0) > 0;
+      setEncaminhandoDe(
+        temAnexos ? (selectedEmail.gmail_message_id ?? null) : null,
+      );
+      setRascunhoId(null);
+      setRespondendo(true);
+      setTituloInline("Encaminhar");
       setModoCompositor("inline");
     });
   };
@@ -1433,6 +1546,7 @@ const Emails = () => {
         cco: "",
       });
       setRespondendoA(null);
+      setEncaminhandoDe(null);
       setRespondendo(false);
       setRascunhoId(null);
       setModoCompositor("encaixado");
@@ -1477,6 +1591,7 @@ const Emails = () => {
         setRascunhoId(null);
       }
       setRespondendoA(null);
+      setEncaminhandoDe(null);
       setRespondendo(false);
       setModoCompositor("encaixado");
       setMinimizado(false);
@@ -1502,6 +1617,7 @@ const Emails = () => {
       });
       setRascunhoId(r.id);
       setRespondendoA(null);
+      setEncaminhandoDe(null);
       setRespondendo(false);
       setModoCompositor("encaixado");
       setMinimizado(false);
@@ -1600,12 +1716,18 @@ const Emails = () => {
   const abrirComCorpo = async (base: EmailAberto) => {
     setSelectedEmail({ ...base, html: "", carregandoCorpo: true });
 
-    const corpo = await carregarCorpo(base.id);
+    const resultado = await carregarCorpo(base.id);
     setSelectedEmail((atual) =>
       // Só escreve se a pessoa ainda estiver nesta mensagem — ela pode ter
-      // clicado em outra enquanto a busca voava.
+      // clicado em outra enquanto a busca voava. Os anexos entram aqui (antes
+      // eram descartados): é o que o leitor exibe e o encaminhar leva junto.
       atual?.id === base.id
-        ? { ...atual, html: corpo ?? atual.html, carregandoCorpo: false }
+        ? {
+            ...atual,
+            html: resultado.html ?? atual.html,
+            anexos: resultado.anexos,
+            carregandoCorpo: false,
+          }
         : atual,
     );
   };
@@ -1744,7 +1866,7 @@ const Emails = () => {
           : (m.remetente_email ?? ""),
         data: m.data_mensagem,
         snippet: m.snippet ?? "",
-        html: corpos[i] ?? "",
+        html: corpos[i]?.html ?? "",
         lido: m.lido,
       }));
     },
@@ -1818,8 +1940,10 @@ const Emails = () => {
     setMinimizado(false);
     setRespondendo(false);
     // Sem isto, escrever um e-mail NOVO logo depois de fechar uma resposta
-    // sairia amarrado à conversa antiga.
+    // sairia amarrado à conversa antiga — ou, no caso do encaminhar, levaria os
+    // anexos do original para uma mensagem que não é mais aquela.
     setRespondendoA(null);
+    setEncaminhandoDe(null);
   };
 
   // Props comuns aos dois compositores (encaixado e inline) — só a moldura
@@ -1871,7 +1995,7 @@ const Emails = () => {
   // conversa).
   const compositorInline =
     modoCompositor === "inline" ? (
-      <CompositorEmail variante="inline" titulo="Responder" {...propsCompositor} />
+      <CompositorEmail variante="inline" titulo={tituloInline} {...propsCompositor} />
     ) : null;
 
   // Leitura ocupa a tela inteira, como no Gmail. Antes era um modal, mas e-mail
@@ -1903,6 +2027,8 @@ const Emails = () => {
               })
             }
             onResponder={responderMensagem}
+            onResponderATodos={responderATodos}
+            onEncaminhar={encaminharMensagem}
             onClicarEndereco={setEmailParaConfirmar}
             onMarcarNaoLido={
               selectedEmail.type === "received"
