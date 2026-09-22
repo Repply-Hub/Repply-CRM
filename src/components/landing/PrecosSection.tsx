@@ -3,7 +3,7 @@ import { ArrowRight, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePlanos } from '@/hooks/use-planos';
 import { PrecoLancamento } from '@/components/shared/PrecoLancamento';
-import { Eyebrow, LPSection } from './LPSection';
+import { LPSection } from './LPSection';
 
 export function PrecosSection() {
   // Preço vem do banco, com a constante como reserva — uma página de vendas sem
@@ -14,7 +14,6 @@ export function PrecosSection() {
   return (
     <LPSection id="precos" tom="creme">
       <div className="mx-auto max-w-2xl text-center">
-        <Eyebrow className="justify-center">Preços</Eyebrow>
         <h2 className="font-display text-3xl font-bold leading-[1.1] tracking-tight sm:text-4xl lg:text-[2.75rem]">
           Um plano. O time inteiro dentro.
         </h2>
