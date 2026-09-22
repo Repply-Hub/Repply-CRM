@@ -44,4 +44,23 @@ describe("CompositorEmail — moldura", () => {
     expect(screen.getByRole("button", { name: /expandir/i })).toBeInTheDocument();
     expect(screen.queryByLabelText("Para")).toBeNull();
   });
+
+  it("revela o campo Cc quando ele passa a ter conteúdo SEM remontar (Responder → Responder a todos)", () => {
+    const { rerender } = render(
+      <CompositorEmail variante="inline" titulo="Responder" {...props()} />,
+    );
+    // Sem Cc no início, o campo não aparece (só o link "Cc" para abrir).
+    expect(screen.queryByLabelText("Cc")).toBeNull();
+    // A página troca só o valor do Cc na MESMA instância (rerender, não novo mount).
+    rerender(
+      <CompositorEmail
+        variante="inline"
+        titulo="Responder a todos"
+        {...props({ valores: { ...valores, cc: "Bia <bia@x.com>, caio@x.com" } })}
+      />,
+    );
+    const campoCc = screen.getByLabelText("Cc") as HTMLInputElement;
+    expect(campoCc).toBeInTheDocument();
+    expect(campoCc.value).toBe("Bia <bia@x.com>, caio@x.com");
+  });
 });

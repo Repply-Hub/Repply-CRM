@@ -746,6 +746,14 @@ export function LeitorEmail({
             {email.assunto || '(sem assunto)'}
           </h1>
 
+          {/* A RESPOSTA (inline) entra no TOPO da conversa — logo abaixo do
+              assunto e ACIMA da mensagem aberta, como combinado. Com a conversa
+              em ordem "mais recente primeiro", a resposta é o item mais novo e
+              por isso fica em cima (antes ela caía depois do corpo, no meio da
+              conversa). `compositorInline` já vem montado pela página
+              (`Emails.tsx`), que decide SE existe; aqui só se decide ONDE. */}
+          {compositorInline && <div className="mb-6">{compositorInline}</div>}
+
           <div className="mb-6 flex items-start gap-3 border-b border-border/60 pb-5">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold uppercase text-primary ring-1 ring-primary/15">
               {inicial}
@@ -922,12 +930,6 @@ export function LeitorEmail({
               Carregando o resto da conversa...
             </div>
           )}
-
-          {/* A resposta entra em fluxo, no topo da conversa — não é mais modal
-              (reforma "estilo Gmail" de 21/09/2026). `compositorInline` já vem
-              montado pela página (`Emails.tsx`), que decide SE existe: aqui só
-              se decide ONDE. */}
-          {compositorInline && <div className="mt-4">{compositorInline}</div>}
 
           {/* Cada mensagem da conversa vira seu próprio card, já ABERTO (corpo
               completo, não só a prévia) — só o cabeçalho (quem/quando) fica

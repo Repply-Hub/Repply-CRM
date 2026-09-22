@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronUp, Loader2, Mail, Minus, Paperclip, Send, Settings, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -93,11 +93,23 @@ export function CompositorEmail({
   onEnviarImagemCorpo,
 }: Props) {
   const inputArquivoRef = useRef<HTMLInputElement>(null);
-  // Cc/Cco começam abertos só se já vierem preenchidos. Como a página monta um
-  // compositor NOVO a cada composição (não reusa a instância como o modal antigo
-  // fazia), o valor inicial no mount já resolve — sem o useEffect de antes.
+  // Cc/Cco começam abertos se já vierem preenchidos no mount (e-mail novo com
+  // cópia, ou "Responder a todos" recém-aberto).
   const [mostrarCc, setMostrarCc] = useState(!!valores.cc);
   const [mostrarCco, setMostrarCco] = useState(!!valores.cco);
+
+  // ...MAS o Cc também pode passar a ter conteúdo SEM remontar o compositor:
+  // trocar "Responder" → "Responder a todos" na mesma mensagem só muda o `cc`
+  // (a página não recria a instância, para preservar o corpo digitado). Sem
+  // isto, os endereços copiados ficavam preenchidos mas o campo continuava
+  // escondido. Só REVELA (nunca esconde): esconder enquanto a pessoa digita ou
+  // apaga seria hostil.
+  useEffect(() => {
+    if (valores.cc) setMostrarCc(true);
+  }, [valores.cc]);
+  useEffect(() => {
+    if (valores.cco) setMostrarCco(true);
+  }, [valores.cco]);
 
   const corpoForm = (
     <form onSubmit={onEnviar} className="flex min-h-0 flex-1 flex-col">
