@@ -508,6 +508,14 @@ UTC: das 21h à meia-noite já é amanhã. Foi assim que o cadastro de cliente e
 data de criação do dia seguinte e dez exportações saíram com a data de amanhã no nome (medido em
 11/09/2026). `src/test/hoje-no-fuso-local.test.ts` falha se o idioma voltar.
 
+**E data DO BANCO que vira `Date` para desenhar na tela é `ancoraDoDia()`**, do mesmo arquivo.
+`new Date('2026-09-01')` é meia-noite em UTC, que aqui é 21h de 31/08: a data cai na véspera, e
+no dia 1º cai no MÊS anterior. A âncora põe a data ao meio do dia, longe das duas bordas de fuso.
+Vale para coluna `date` (`prazo_resposta`) e para carimbo gravado à meia-noite em UTC
+(`historico_contatos.proximo_contato_em`) — **não** para carimbo com hora de verdade, onde a hora
+é informação. Medido em 22/09/2026: o Calendário desenhava o prazo do negócio um dia antes e o
+próximo contato às 21h da véspera, e os dois sumiam da visão Dia.
+
 ### 7.13 Calendário abre no mês de hoje, não no mês da data escolhida
 
 `react-day-picker` v8 decide o mês de abertura por `month ?? defaultMonth ?? hoje`.
@@ -734,6 +742,7 @@ Além disso, conforme o que mudou:
 - ❌ `<DialogContent>` cru em modal com formulário (use `ConteudoDialogo`)
 - ❌ Converter fuso na data que veio do calendário (§7.12) — a conversão recua um dia
 - ❌ `new Date().toISOString().slice(0, 10)` como "hoje" (§7.12) — é a data em UTC, e depois das 21h já é amanhã; use `hojeLocal()`
+- ❌ `new Date(<coluna de data>)` para desenhar na tela (§7.12) — é meia-noite em UTC e cai na véspera; use `ancoraDoDia()`
 - ❌ `<Calendar>` sem `defaultMonth` (§7.13) — abre no mês de hoje e ignora a data escolhida
 - ❌ Parâmetro que escolhe entre duas colunas de data dentro de uma RPC (§7.9)
 - ❌ Tratar `prazo_resposta` como prazo (§4.4) — é a data de fechamento, e o nome mente

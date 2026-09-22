@@ -165,6 +165,7 @@ Ponytail **não** está instalado, por decisão de 16/09/2026. As duas ideias bo
 | `.delete()`/`.update()` barrado pela regra de acesso volta **sem erro** | peça `{count:'exact'}`, trate `count===0` como recusa (nunca `!count`) | §4.6 |
 | Campo de dinheiro | nunca `type="number"` nem `parseFloat`; use `CampoMoeda`/`parseMoedaBRL` | §7.10 |
 | Data que veio do calendário | não converta fuso (recua um dia); "hoje" é `hojeLocal()`, não `toISOString().slice(0,10)` | §7.12 |
+| Data do banco desenhada na tela | `new Date(<coluna de data>)` é meia-noite em UTC e cai na véspera; use `ancoraDoDia()` | §7.12 |
 | `usuarios.id` ≠ `usuarios.user_id` | confira a chave estrangeira no banco antes de gravar | §4.5 |
 | Erro do Supabase não é `Error` | use `mensagemDeErro`/`mensagemDeErroDaFunction` | §4.6 |
 | Tela girando para sempre | é tempo limite de 8s, não lentidão; meça como usuário logado, não como admin | §7.15 |
