@@ -268,7 +268,7 @@ export function MensagemConversa({
                 Encaminhar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              {onMarcarNaoLido && (
+              {onMarcarNaoLido && !enviada && (
                 <DropdownMenuItem onClick={onMarcarNaoLido} className="gap-2">
                   <MailOpen className="h-4 w-4" />
                   Marcar como não lida

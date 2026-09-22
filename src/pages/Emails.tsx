@@ -59,7 +59,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { useEmailEmpresa } from "@/hooks/use-email-empresa";
+import { useEmailEmpresa, type CorpoDeMensagem } from "@/hooks/use-email-empresa";
 import { useEmailAnexos } from "@/hooks/use-email-anexos";
 import {
   validarSelecaoDeAnexos,
@@ -75,6 +75,7 @@ import {
   type EmailAberto,
   type EnderecoDoEmail,
 } from "@/components/email/LeitorEmail";
+import { type MensagemDaConversa } from "@/components/email/MensagemConversa";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
 import { ConfirmarEnviarEmailDialog } from "@/components/email/ConfirmarEnviarEmailDialog";
 import { normalizarAssinaturaAntiga } from "@/lib/assinatura-email";
@@ -1185,6 +1186,9 @@ const Emails = () => {
       // a function acabou de reescrever — sem isto o selo da barra lateral
       // ficaria contando a mensagem na pasta errada até um refresh manual.
       queryClient.invalidateQueries({ queryKey: ["email_contagem_por_pasta"] });
+      // A conversa aberta pode conter a mensagem excluída — refaz a lista para
+      // ela sumir. Se a excluída era a mensagem de ENTRADA, volta para a caixa.
+      queryClient.invalidateQueries({ queryKey: ["conversa"] });
       if (selectedEmail?.id === variables.id) {
         setSelectedEmail(null);
       }
@@ -1403,8 +1407,8 @@ const Emails = () => {
    * o aviso "há um rascunho". Só protege (pergunta) quando a abertura é para
    * OUTRA mensagem ou um e-mail novo. Sem isto, cada troca de modo caía no aviso.
    */
-  const abrirRespostaProtegido = (abrir: () => void) => {
-    if (ehTrocaDeModoNaMesmaMensagem(modoCompositor, inlineParaId, selectedEmail?.id)) {
+  const abrirRespostaProtegido = (alvoId: string, abrir: () => void) => {
+    if (ehTrocaDeModoNaMesmaMensagem(modoCompositor, inlineParaId, alvoId)) {
       abrir();
     } else {
       abrirCompositorProtegido(abrir);
@@ -1418,20 +1422,19 @@ const Emails = () => {
    * conversa). Só o "Cc" e o título mudam entre os dois — o remetente sempre vai
    * para o "Para", a citação é a mesma.
    */
-  const iniciarRespostaInline = (ccTexto: string, titulo: string) => {
-    if (!selectedEmail) return;
-    abrirRespostaProtegido(() => {
+  const iniciarRespostaInline = (
+    m: MensagemDaConversa,
+    ccTexto: string,
+    titulo: string,
+  ) => {
+    abrirRespostaProtegido(m.id, () => {
       // Trocar ENTRE respostas (Responder ↔ Responder a todos) na mesma mensagem
       // só muda o Cc: preserva o corpo já digitado E o mesmo rascunho (não
       // re-semeia nem cria rascunho novo). Encaminhar é outra mensagem — não cai
       // aqui (o título atual seria "Encaminhar"), então vindo de/para ele
       // re-semeia normalmente.
       const soTrocaCc =
-        ehTrocaDeModoNaMesmaMensagem(
-          modoCompositor,
-          inlineParaId,
-          selectedEmail.id,
-        ) &&
+        ehTrocaDeModoNaMesmaMensagem(modoCompositor, inlineParaId, m.id) &&
         (tituloInline === "Responder" || tituloInline === "Responder a todos");
       if (soTrocaCc) {
         setFormData((f) => ({ ...f, cc: ccTexto }));
@@ -1439,13 +1442,13 @@ const Emails = () => {
         return;
       }
 
-      const assunto = selectedEmail.assunto ?? "";
+      const assunto = m.assunto ?? "";
       const replySubject = assunto.toLowerCase().startsWith("re:")
         ? assunto
         : `Re: ${assunto}`;
-      const quando = selectedEmail.created_at || selectedEmail.criado_em;
-      const citado = selectedEmail.snippet || selectedEmail.corpo || "";
-      const cabecalho = `Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${selectedEmail.remetente} escreveu:`;
+      const quando = m.data;
+      const citado = m.snippet || "";
+      const cabecalho = `Em ${quando ? format(new Date(quando), "dd/MM/yyyy HH:mm") : ""}, ${m.remetente} escreveu:`;
       // Citação em HTML (o corpo agora é HTML, não texto puro) — escapa o texto
       // do e-mail original antes de colocar dentro da tag, senão `<`/`>`/`&` que
       // vierem no assunto ou no trecho citado quebrariam a marcação do corpo.
@@ -1455,11 +1458,9 @@ const Emails = () => {
 
       setFormData({
         ...formData,
-        // Só o endereço: o campo trazia "Nome <e-mail>" inteiro, que é o que o
+        // Só o endereço: o remetente vem como "Nome <e-mail>", que é o que o
         // leitor exibe, não o que o provedor aceita como destinatário.
-        destinatario: soEndereco(
-          selectedEmail.remetente || selectedEmail.destinatario,
-        ),
+        destinatario: soEndereco(m.remetente),
         assunto: replySubject,
         corpo: montarCorpoInicial(assinaturaParaCorpo, citacaoHtml),
         // "Responder a todos" traz os demais aqui; "Responder" deixa vazio.
@@ -1472,83 +1473,75 @@ const Emails = () => {
       // solta, o destinatário a recebe fora da conversa e — aqui dentro — quem
       // tem acesso por marcador não enxerga a própria resposta, porque a regra a
       // reconhece justamente por pertencer à conversa de origem.
-      setRespondendoA(selectedEmail.gmail_message_id ?? null);
+      setRespondendoA(m.gmail_message_id ?? null);
       // Responder não é encaminhar: garante que um "encaminhar" anterior não
       // deixe a mensagem original pendurada, fazendo esta resposta levar anexos.
       setEncaminhandoDe(null);
       // Contexto novo: uma resposta não continua o rascunho de outra
       // composição — o autosave (abaixo) cria uma linha própria para ela.
       setRascunhoId(null);
-      // O e-mail aberto CONTINUA aberto atrás do compositor. Fechá-lo aqui era o
-      // que jogava a pessoa de volta para a caixa de entrada no meio da resposta.
       setRespondendo(true);
       setTituloInline(titulo);
       // Registra a QUAL mensagem esta resposta pertence, para uma próxima troca
       // de modo (responder ↔ responder a todos ↔ encaminhar) nesta mesma
       // mensagem ser direta, sem o aviso de rascunho.
-      setInlineParaId(selectedEmail.id);
+      setInlineParaId(m.id);
       // Resposta é sempre INLINE — o cartão encaixado é só para e-mail novo.
       setModoCompositor("inline");
     });
   };
 
-  /** Responder só ao remetente. */
-  const responderMensagem = () => iniciarRespostaInline("", "Responder");
+  /** Responder só ao remetente da mensagem-alvo. */
+  const responderMensagem = (m: MensagemDaConversa) =>
+    iniciarRespostaInline(m, "", "Responder");
 
   /**
-   * Responder ao remetente E a todos os demais. O remetente vai para o "Para"
-   * (dentro de `iniciarRespostaInline`); o "Cc" recebe os outros destinatários
-   * e quem estava em cópia, menos a própria caixa e o próprio remetente — ver
-   * `montarCcResponderATodos`.
+   * Responder ao remetente E a todos os demais da mensagem-alvo. O remetente vai
+   * para o "Para" (dentro de `iniciarRespostaInline`); o "Cc" recebe os outros
+   * destinatários e quem estava em cópia, menos a própria caixa e o próprio
+   * remetente — ver `montarCcResponderATodos`.
    */
-  const responderATodos = () => {
-    if (!selectedEmail) return;
+  const responderATodos = (m: MensagemDaConversa) => {
     const cc = montarCcResponderATodos(
-      soEndereco(selectedEmail.remetente),
-      selectedEmail.destinatarios ?? [],
-      selectedEmail.cc ?? [],
+      soEndereco(m.remetente),
+      m.destinatarios ?? [],
+      m.cc ?? [],
       connectedEmail ?? "",
     );
-    iniciarRespostaInline(cc, "Responder a todos");
+    iniciarRespostaInline(m, cc, "Responder a todos");
   };
 
   /**
-   * Encaminha a mensagem aberta. "Para" em branco (a pessoa escolhe o destino),
+   * Encaminha a mensagem-alvo. "Para" em branco (a pessoa escolhe o destino),
    * assunto "Enc:", e o corpo traz a mensagem original citada (cabeçalho De/
-   * Data/Assunto/Para + o conteúdo). Se o original tem anexos, guarda o id da
-   * mensagem em `encaminhandoDe` para o envio levá-los junto — o servidor
-   * rebaixa cada um do Nylas e reanexa (ver `email-enviar`).
+   * Data/Assunto/Para + o conteúdo). Se o original tem anexos (`tem_anexo`),
+   * guarda o id da mensagem em `encaminhandoDe` para o envio levá-los junto — o
+   * servidor rebaixa cada um do Nylas e reanexa (ver `email-enviar`). Usar
+   * `tem_anexo` (e não a lista de anexos já carregada) faz o encaminhar levar os
+   * anexos mesmo quando a mensagem-alvo está recolhida (corpo ainda não buscado).
    */
-  const encaminharMensagem = () => {
-    if (!selectedEmail) return;
-    abrirRespostaProtegido(() => {
-      const assunto = selectedEmail.assunto ?? "";
+  const encaminharMensagem = (m: MensagemDaConversa) => {
+    abrirRespostaProtegido(m.id, () => {
+      const assunto = m.assunto ?? "";
       const assuntoEnc = /^(enc:|fwd:|fw:)/i.test(assunto.trim())
         ? assunto
         : `Enc: ${assunto}`;
-      const quando = selectedEmail.created_at || selectedEmail.criado_em;
-      const paraTexto =
-        (selectedEmail.destinatarios ?? [])
-          .map((d) => (d?.name ? `${d.name} <${d.email}>` : d?.email))
-          .filter(Boolean)
-          .join(", ") ||
-        selectedEmail.destinatario ||
-        "";
+      const quando = m.data;
+      const paraTexto = (m.destinatarios ?? [])
+        .map((d) => (d?.name ? `${d.name} <${d.email}>` : d?.email))
+        .filter(Boolean)
+        .join(", ");
 
       // Cabeçalho do encaminhamento — texto escapado (vem de fora). O CORPO
       // original é HTML já sanitizado na exibição; embute-se direto (escapá-lo
-      // mostraria as tags como texto). Sem HTML, cai na prévia com <br>.
+      // mostraria as tags como texto). Sem HTML carregado, cai na prévia com <br>.
       const cabecalho =
-        `De: ${escaparHtml(selectedEmail.remetente ?? "")}<br>` +
+        `De: ${escaparHtml(m.remetente ?? "")}<br>` +
         `Data: ${quando ? escaparHtml(format(new Date(quando), "dd/MM/yyyy HH:mm")) : ""}<br>` +
         `Assunto: ${escaparHtml(assunto)}<br>` +
         `Para: ${escaparHtml(paraTexto)}<br><br>`;
       const corpoOriginal =
-        selectedEmail.html ||
-        escaparHtml(selectedEmail.corpo || selectedEmail.snippet || "").replace(
-          /\n/g,
-          "<br>",
-        );
+        m.html || escaparHtml(m.snippet || "").replace(/\n/g, "<br>");
       const citacao =
         `<br><div style="border-left:2px solid #ccc;padding-left:12px;color:#555">` +
         `---------- Mensagem encaminhada ----------<br>${cabecalho}${corpoOriginal}</div>`;
@@ -1565,16 +1558,13 @@ const Emails = () => {
       setRespondendoA(null);
       // Só amarra os anexos do original quando existem: senão o servidor faria
       // trabalho à toa (checar acesso e reler a mensagem para não achar anexo).
-      const temAnexos = (selectedEmail.anexos?.length ?? 0) > 0;
-      setEncaminhandoDe(
-        temAnexos ? (selectedEmail.gmail_message_id ?? null) : null,
-      );
+      setEncaminhandoDe(m.tem_anexo ? (m.gmail_message_id ?? null) : null);
       setRascunhoId(null);
       setRespondendo(true);
       setTituloInline("Encaminhar");
       // Ver `iniciarRespostaInline`: marca a mensagem-alvo para a troca de modo
       // nesta mesma mensagem ser direta.
-      setInlineParaId(selectedEmail.id);
+      setInlineParaId(m.id);
       setModoCompositor("inline");
     });
   };
@@ -1705,6 +1695,11 @@ const Emails = () => {
             }
           : antigo,
     );
+    // Espelha na conversa aberta (o selo de não lida some na hora).
+    queryClient.setQueriesData<MensagemDaConversa[]>(
+      { queryKey: ["conversa"] },
+      (antigo) => antigo?.map((m) => (m.id === id ? { ...m, lido: true } : m)),
+    );
 
     // A gravação passa pela Edge Function, e não mais por um UPDATE direto,
     // porque agora ela tem DOIS destinos: a linha daqui e a caixa no provedor.
@@ -1742,6 +1737,11 @@ const Emails = () => {
               ),
             }
           : antigo,
+    );
+    // Espelha na conversa aberta (o selo de não lida aparece na hora).
+    queryClient.setQueriesData<MensagemDaConversa[]>(
+      { queryKey: ["conversa"] },
+      (antigo) => antigo?.map((m) => (m.id === id ? { ...m, lido: false } : m)),
     );
 
     void supabase.functions
@@ -1879,95 +1879,122 @@ const Emails = () => {
   }, [searchParams, setSearchParams, isConnected]);
 
   /**
-   * As DEMAIS mensagens da mesma conversa (`nylas_thread_id`) da mensagem
-   * aberta no leitor — alimenta os cards de "Nesta conversa" em
-   * `LeitorEmail`, já abertos (corpo completo, não só a prévia). Refaz ao
-   * trocar de mensagem (a chave leva o id) porque abrir outro card da MESMA
-   * conversa muda quem é "a atual" e quem entra na lista de "as outras".
+   * A conversa INTEIRA (todas as mensagens da mesma `nylas_thread_id`), mais
+   * recente primeiro, para o leitor por conversa (estilo Gmail). Chaveada só
+   * pela thread: recolher/expandir dentro da conversa não refaz a busca.
    */
-  const { data: mensagensDaConversa, isLoading: carregandoConversa } = useQuery({
-    queryKey: ["conversa", selectedEmail?.threadId, selectedEmail?.id],
-    queryFn: async () => {
+  const { data: dadosConversa, isLoading: carregandoConversa } = useQuery({
+    queryKey: ["conversa", selectedEmail?.threadId],
+    queryFn: async (): Promise<MensagemDaConversa[]> => {
       const { data, error } = await supabase
         .from("email_mensagens")
         .select(
-          "id, direcao, data_mensagem, remetente_nome, remetente_email, snippet, lido",
+          "id, direcao, data_mensagem, remetente_nome, remetente_email, destinatarios, cc, bcc, assunto, snippet, lido, nylas_message_id, caixa_origem, tem_anexo",
         )
         .eq("nylas_thread_id", selectedEmail!.threadId as string)
         .eq("excluido", false)
-        // Mais recente primeiro (pedido da MD, 21/09): a resposta nova aparece
-        // logo abaixo do e-mail aberto, sem precisar rolar até o fim da conversa.
+        // Mais recente primeiro (pedido da MD, 21/09): a resposta nova fica no
+        // topo, junto da caixa de resposta.
         .order("data_mensagem", { ascending: false });
       if (error) throw error;
 
-      const outras = (data ?? []).filter((m) => m.id !== selectedEmail!.id);
-
-      // Corpo completo de cada uma, para os cards virem já abertos — não só a
-      // prévia. `carregarCorpo` cacheia por mensagem (`use-email-empresa.ts`),
-      // então reabrir a mesma conversa depois não repete a busca nem a Edge
-      // Function.
-      const corpos = await Promise.all(outras.map((m) => carregarCorpo(m.id)));
-
-      return outras.map((m, i) => ({
+      // A conversa INTEIRA — inclusive a mensagem aberta. Sem corpo: o corpo de
+      // cada mensagem é buscado sob demanda ao abrir (`carregarCorpoConversa`),
+      // então abrir a conversa não gasta uma busca por mensagem que ninguém abriu.
+      return (data ?? []).map((m) => ({
         id: m.id,
         tipo: (m.direcao === "enviado" ? "sent" : "received") as "sent" | "received",
         remetente: m.remetente_nome
           ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
           : (m.remetente_email ?? ""),
+        destinatarios: normalizarEnderecos(m.destinatarios),
+        cc: normalizarEnderecos(m.cc),
+        bcc: normalizarEnderecos(m.bcc),
+        assunto: m.assunto,
         data: m.data_mensagem,
         snippet: m.snippet ?? "",
-        html: corpos[i]?.html ?? "",
+        gmail_message_id: m.nylas_message_id,
         lido: m.lido,
+        caixaOrigem: m.caixa_origem ?? null,
+        tem_anexo: !!m.tem_anexo,
       }));
     },
     enabled: !!selectedEmail?.threadId,
   });
 
-  /** Clique num card de "Nesta conversa": busca a linha inteira e troca a mensagem aberta. */
-  const abrirMensagemDaConversa = async (id: string) => {
-    const { data: m, error } = await supabase
-      .from("email_mensagens")
-      .select(
-        "id, direcao, data_mensagem, remetente_nome, remetente_email, destinatarios, cc, bcc, assunto, snippet, lido, nylas_message_id, nylas_thread_id, caixa_origem",
-      )
-      .eq("id", id)
-      .maybeSingle();
-    if (error || !m) {
-      toast.error("Não foi possível abrir esta mensagem.");
-      return;
-    }
+  /**
+   * Corpos já buscados das mensagens da conversa, por id. Entram aqui quando a
+   * mensagem é aberta; a lista final (`mensagensConversa`) mescla isto em cada
+   * mensagem. Zerados ao trocar de conversa — o cache por mensagem
+   * (`carregarCorpo`) faz o rebusca ser instantâneo.
+   */
+  const [corposConversa, setCorposConversa] = useState<Record<string, CorpoDeMensagem>>({});
+  const [carregandoCorpos, setCarregandoCorpos] = useState<Set<string>>(new Set());
+  // Ids já pedidos nesta conversa — evita disparar a busca duas vezes quando o
+  // efeito do leitor roda de novo antes de o corpo chegar.
+  const corposPedidosRef = useRef<Set<string>>(new Set());
 
-    const enviado = m.direcao === "enviado";
-    const destinatarios = normalizarEnderecos(m.destinatarios);
-    const destEmails = destinatarios.map((d) => d?.email).filter(Boolean);
-    if (!enviado && !m.lido) marcarLido(m.id);
+  const conversaAtual = selectedEmail?.threadId ?? selectedEmail?.id ?? null;
+  useEffect(() => {
+    // Nova conversa: zera o corpo carregado e o controle de "já pedido".
+    setCorposConversa({});
+    setCarregandoCorpos(new Set());
+    corposPedidosRef.current = new Set();
+  }, [conversaAtual]);
 
-    void abrirComCorpo({
-      id: m.id,
-      remetente: enviado
-        ? (connectedEmail ?? m.remetente_email ?? "")
-        : m.remetente_nome
-          ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
-          : (m.remetente_email ?? ""),
-      destinatario: enviado ? destEmails.join(", ") : (destEmails[0] ?? ""),
-      // Cru, para o leitor mostrar a lista inteira — igual aos outros
-      // caminhos que abrem uma mensagem (ver `abrirRecebido`/o efeito de
-      // `mensagemId`, acima).
-      destinatarios,
-      cc: normalizarEnderecos(m.cc),
-      bcc: normalizarEnderecos(m.bcc),
-      assunto: m.assunto,
-      corpo: m.snippet ?? "",
-      created_at: m.data_mensagem,
-      criado_em: m.data_mensagem,
-      type: enviado ? "sent" : "received",
-      threadId: m.nylas_thread_id ?? null,
-      gmail_message_id: m.nylas_message_id,
-      lido: m.lido,
-      caixaOrigem: m.caixa_origem ?? null,
-      respondida: !enviado && !!(m.nylas_thread_id && threadsRespondidos?.has(m.nylas_thread_id)),
+  const carregarCorpoConversa = async (id: string) => {
+    if (corposPedidosRef.current.has(id)) return;
+    corposPedidosRef.current.add(id);
+    setCarregandoCorpos((s) => new Set(s).add(id));
+    const res = await carregarCorpo(id);
+    setCorposConversa((m) => ({ ...m, [id]: res }));
+    setCarregandoCorpos((s) => {
+      const n = new Set(s);
+      n.delete(id);
+      return n;
     });
   };
+
+  /** Converte a mensagem ABERTA (EmailAberto) para o formato da lista da conversa. */
+  const selecionadoComoMensagem = (e: EmailAberto): MensagemDaConversa => ({
+    id: e.id,
+    tipo: e.type ?? (e.criado_em ? "received" : "sent"),
+    remetente: e.remetente ?? "",
+    destinatarios: e.destinatarios ?? [],
+    cc: e.cc ?? [],
+    bcc: e.bcc ?? [],
+    assunto: e.assunto ?? null,
+    data: e.created_at ?? e.criado_em ?? null,
+    snippet: e.snippet || e.corpo || "",
+    gmail_message_id: e.gmail_message_id ?? null,
+    lido: e.lido,
+    caixaOrigem: e.caixaOrigem ?? null,
+    tem_anexo: (e.anexos?.length ?? 0) > 0,
+    html: e.html ?? null,
+    anexos: e.anexos ?? [],
+    respondida: e.respondida,
+  });
+
+  /**
+   * A lista final que o leitor recebe: a consulta (quando há thread) OU só a
+   * mensagem aberta (thread de uma mensagem, ou enquanto a consulta carrega),
+   * mesclada com os corpos já buscados e o estado de "carregando".
+   */
+  const mensagensConversa = useMemo<MensagemDaConversa[]>(() => {
+    const base =
+      selectedEmail?.threadId && dadosConversa
+        ? dadosConversa
+        : selectedEmail
+          ? [selecionadoComoMensagem(selectedEmail)]
+          : [];
+    return base.map((m) => ({
+      ...m,
+      ...(corposConversa[m.id] ?? {}),
+      carregandoCorpo: carregandoCorpos.has(m.id),
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmail, dadosConversa, corposConversa, carregandoCorpos]);
+
 
   const escolherPasta = (p: PastaSelecionada) => {
     // Outro marcador = outra contagem; ficar na pagina 3 mostraria vazio.
@@ -2066,38 +2093,20 @@ const Emails = () => {
           mainClassName="flex-1 overflow-hidden p-0"
         >
           <LeitorEmail
-            email={selectedEmail}
+            mensagens={mensagensConversa}
+            idAbertoInicial={selectedEmail.id}
             emailDaConta={connectedEmail}
+            carregandoConversa={carregandoConversa}
             onVoltar={() => setSelectedEmail(null)}
-            onExcluir={() =>
-              setEmailToDelete({
-                id: selectedEmail.id,
-                type:
-                  selectedEmail.type ||
-                  (selectedEmail.criado_em ? "received" : "sent"),
-              })
-            }
+            onClicarEndereco={setEmailParaConfirmar}
+            onCarregarCorpo={carregarCorpoConversa}
+            compositorInline={compositorInline}
             onResponder={responderMensagem}
             onResponderATodos={responderATodos}
             onEncaminhar={encaminharMensagem}
-            onClicarEndereco={setEmailParaConfirmar}
-            onMarcarNaoLido={
-              selectedEmail.type === "received"
-                ? () => {
-                    marcarNaoLido(selectedEmail.id);
-                    setSelectedEmail(null);
-                  }
-                : undefined
-            }
-            onMover={
-              selectedEmail.type === "received" || selectedEmail.type === "sent"
-                ? () => setMensagensParaMover([selectedEmail.id])
-                : undefined
-            }
-            mensagensDaConversa={mensagensDaConversa}
-            carregandoConversa={carregandoConversa}
-            onAbrirMensagemDaConversa={abrirMensagemDaConversa}
-            compositorInline={compositorInline}
+            onMarcarNaoLido={(m) => marcarNaoLido(m.id)}
+            onMover={(m) => setMensagensParaMover([m.id])}
+            onExcluir={(m) => setEmailToDelete({ id: m.id, type: m.tipo })}
           />
 
           <MoverParaMarcadorDialog

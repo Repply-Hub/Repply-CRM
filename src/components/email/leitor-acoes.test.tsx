@@ -1,60 +1,73 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { LeitorEmail, type EmailAberto } from "./LeitorEmail";
+import { LeitorEmail } from "./LeitorEmail";
+import { type MensagemDaConversa } from "./MensagemConversa";
 
-function emailBase(extra: Partial<EmailAberto> = {}): EmailAberto {
+function msg(extra: Partial<MensagemDaConversa> = {}): MensagemDaConversa {
   return {
     id: "1",
+    tipo: "received",
+    remetente: "Ana Souza <ana@x.com>",
+    destinatarios: [{ email: "eu@empresa.com" }],
+    cc: [],
+    bcc: [],
     assunto: "Assunto de teste",
-    remetente: "Ana Souza <ana@exemplo.com>",
-    destinatario: "eu@empresa.com",
+    data: "2026-09-22T12:00:00Z",
+    snippet: "trecho",
+    gmail_message_id: "n1",
+    lido: true,
+    tem_anexo: false,
     html: "<p>Olá</p>",
-    snippet: "Olá",
-    type: "received",
     ...extra,
   };
 }
 
 function props(extra: Record<string, unknown> = {}) {
   return {
-    email: emailBase(),
+    mensagens: [msg()],
+    idAbertoInicial: "1",
     emailDaConta: "eu@empresa.com",
     onVoltar: vi.fn(),
-    onExcluir: vi.fn(),
+    onClicarEndereco: vi.fn(),
+    onCarregarCorpo: vi.fn(),
     onResponder: vi.fn(),
+    onEncaminhar: vi.fn(),
+    onExcluir: vi.fn(),
     ...extra,
   };
 }
 
-describe("LeitorEmail — barra de ações (estilo Gmail)", () => {
-  it("mostra Responder, Encaminhar e o menu de mais ações", () => {
-    render(<LeitorEmail {...props({ onEncaminhar: vi.fn() })} />);
-    // "Responder" aparece na barra e no rodapé — basta existir ao menos um.
-    expect(screen.getAllByRole("button", { name: /^responder$/i }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: /encaminhar/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /mais ações/i })).toBeInTheDocument();
+describe("LeitorEmail — barra de ações da conversa (estilo Gmail)", () => {
+  it("mostra Responder e Encaminhar no topo", () => {
+    render(<LeitorEmail {...props()} />);
+    expect(
+      screen.getAllByRole("button", { name: /^responder$/i }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole("button", { name: /encaminhar/i }).length,
+    ).toBeGreaterThan(0);
   });
 
-  it("mostra 'Responder a todos' quando há mais de um destinatário", () => {
+  it("mostra 'Responder a todos' no topo quando a mais recente tem mais de um destinatário", () => {
     render(
       <LeitorEmail
         {...props({
           onResponderATodos: vi.fn(),
-          email: emailBase({
-            destinatarios: [{ email: "eu@empresa.com" }, { email: "outro@x.com" }],
-          }),
+          mensagens: [
+            msg({ destinatarios: [{ email: "eu@empresa.com" }, { email: "outro@x.com" }] }),
+          ],
         })}
       />,
     );
     expect(screen.getByRole("button", { name: /responder a todos/i })).toBeInTheDocument();
   });
 
-  it("esconde 'Responder a todos' quando só há um destinatário", () => {
+  it("esconde 'Responder a todos' no topo quando a mais recente tem um destinatário só", () => {
     render(
       <LeitorEmail
         {...props({
           onResponderATodos: vi.fn(),
-          email: emailBase({ destinatarios: [{ email: "eu@empresa.com" }] }),
+          mensagens: [msg({ destinatarios: [{ email: "eu@empresa.com" }] })],
         })}
       />,
     );
