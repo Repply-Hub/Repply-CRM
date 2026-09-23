@@ -28,7 +28,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import {
   Send, Loader2, MessageCircle, MessageSquare, Users, Circle, PanelLeftClose, PanelLeftOpen,
   Paperclip, FileText, X, Download, Users2, Calendar, Eraser, ChevronDown,
-  Video, Link2, ExternalLink, Play, Pause, Camera, Pencil, Check, CheckCheck, Search, Trash2, UserPlus, Mic, Square, Reply, ArrowLeft, Bookmark
+  Video, Link2, ExternalLink, Play, Pause, Pencil, Check, CheckCheck, Search, Trash2, UserPlus, Mic, Square, Reply, ArrowLeft, Bookmark
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -42,6 +42,7 @@ import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from '@/comp
 import { VisualizadorDeMidia, type MidiaParaVer } from '@/components/chat/VisualizadorDeMidia';
 import { ImagemPrivada } from '@/components/shared/ImagemPrivada';
 import { AvatarDeChat } from '@/components/chat/AvatarDeChat';
+import { SeletorDeAparencia } from '@/components/chat/SeletorDeAparencia';
 import { useArquivosPrivados } from '@/hooks/use-arquivo-privado';
 import { ChatMessageSearch } from '@/components/chat/ChatMessageSearch';
 import {
@@ -842,12 +843,10 @@ const Chat = () => {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingGrupoNome, setEditingGrupoNome] = useState(false);
   const [grupoNomeInput, setGrupoNomeInput] = useState('');
-  const grupoFotoInputRef = useRef<HTMLInputElement>(null);
   const { data: geralConfig } = useChatGeralConfig();
   const updateGeralConfig = useUpdateChatGeralConfig();
   const [editingGeralNome, setEditingGeralNome] = useState(false);
   const [geralNomeInput, setGeralNomeInput] = useState('');
-  const geralFotoInputRef = useRef<HTMLInputElement>(null);
   const geralNome = geralConfig?.nome || 'Chat Geral';
   const markAsRead = useMarkChatAsRead();
   const { data: unreadCounts = {} } = useUnreadChatByTarget();
@@ -1398,13 +1397,6 @@ const Chat = () => {
     }
   }
 
-  const handleGrupoFotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || !activeGrupoId) return;
-    updateGrupo.mutate({ grupoId: activeGrupoId, foto: file });
-  };
-
   const handleSaveGrupoNome = () => {
     if (!activeGrupoId) return;
     const nome = grupoNomeInput.trim();
@@ -1442,13 +1434,6 @@ const Chat = () => {
         setAddMembersSearch('');
       }
     });
-  };
-
-  const handleGeralFotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    updateGeralConfig.mutate({ foto: file });
   };
 
   const handleSaveGeralNome = () => {
@@ -1719,33 +1704,13 @@ const Chat = () => {
                     {target.type === 'grupo' && (
                       <>
                         <div className="flex items-center gap-3 mb-4">
-                          <input
-                            ref={grupoFotoInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleGrupoFotoSelect}
+                          <SeletorDeAparencia
+                            nome={chatHeaderName}
+                            IconePadrao={Users2}
+                            valor={{ icone: activeGrupo?.icone ?? null, corFundo: activeGrupo?.cor_fundo ?? null, corIcone: activeGrupo?.cor_icone ?? null, fotoUrl: activeGrupo?.foto_url ?? null }}
+                            onChange={(v) => activeGrupoId && updateGrupo.mutate({ grupoId: activeGrupoId, icone: v.icone, corFundo: v.corFundo, corIcone: v.corIcone })}
+                            onEscolherImagem={(file) => activeGrupoId && updateGrupo.mutate({ grupoId: activeGrupoId, foto: file })}
                           />
-                          <button
-                            type="button"
-                            onClick={() => grupoFotoInputRef.current?.click()}
-                            className="relative group shrink-0"
-                            title="Trocar foto do grupo"
-                          >
-                            <AvatarDeChat
-                              className="h-14 w-14 border border-border"
-                              fotoUrl={activeGrupo?.foto_url}
-                              icone={activeGrupo?.icone}
-                              corFundo={activeGrupo?.cor_fundo}
-                              corIcone={activeGrupo?.cor_icone}
-                              IconePadrao={Users2}
-                              nome={chatHeaderName}
-                              tamanhoIcone="h-6 w-6"
-                            />
-                            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Camera className="h-4 w-4 text-white" />
-                            </span>
-                          </button>
                           <div className="min-w-0 flex-1">
                             {editingGrupoNome ? (
                               <div className="flex items-center gap-1.5">
@@ -1822,33 +1787,13 @@ const Chat = () => {
                       {target.type === 'geral' && (
                         <>
                           <div className="flex items-center gap-3 mb-4">
-                            <input
-                              ref={geralFotoInputRef}
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={handleGeralFotoSelect}
+                            <SeletorDeAparencia
+                              nome={geralNome}
+                              IconePadrao={MessageCircle}
+                              valor={{ icone: geralConfig?.icone ?? null, corFundo: geralConfig?.cor_fundo ?? null, corIcone: geralConfig?.cor_icone ?? null, fotoUrl: geralConfig?.foto_url ?? null }}
+                              onChange={(v) => updateGeralConfig.mutate({ icone: v.icone, corFundo: v.corFundo, corIcone: v.corIcone })}
+                              onEscolherImagem={(file) => updateGeralConfig.mutate({ foto: file })}
                             />
-                            <button
-                              type="button"
-                              onClick={() => geralFotoInputRef.current?.click()}
-                              className="relative group shrink-0"
-                              title="Trocar foto do Chat Geral"
-                            >
-                              <AvatarDeChat
-                                className="h-14 w-14 border border-border"
-                                fotoUrl={geralConfig?.foto_url}
-                                icone={geralConfig?.icone}
-                                corFundo={geralConfig?.cor_fundo}
-                                corIcone={geralConfig?.cor_icone}
-                                IconePadrao={MessageCircle}
-                                nome={geralNome}
-                                tamanhoIcone="h-6 w-6"
-                              />
-                              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Camera className="h-4 w-4 text-white" />
-                              </span>
-                            </button>
                             <div className="min-w-0 flex-1">
                               {editingGeralNome ? (
                                 <div className="flex items-center gap-1.5">
