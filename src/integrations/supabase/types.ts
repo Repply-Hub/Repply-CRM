@@ -311,25 +311,34 @@ export type Database = {
       }
       chat_geral_config: {
         Row: {
+          cor_fundo: string | null
+          cor_icone: string | null
           created_at: string
           empresa_id: string
           foto_url: string | null
+          icone: string | null
           id: string
           nome: string
           updated_at: string
         }
         Insert: {
+          cor_fundo?: string | null
+          cor_icone?: string | null
           created_at?: string
           empresa_id: string
           foto_url?: string | null
+          icone?: string | null
           id?: string
           nome?: string
           updated_at?: string
         }
         Update: {
+          cor_fundo?: string | null
+          cor_icone?: string | null
           created_at?: string
           empresa_id?: string
           foto_url?: string | null
+          icone?: string | null
           id?: string
           nome?: string
           updated_at?: string
@@ -396,29 +405,38 @@ export type Database = {
       }
       chat_grupos: {
         Row: {
+          cor_fundo: string | null
+          cor_icone: string | null
           created_at: string
           criado_por: string
           descricao: string | null
           empresa_id: string
           foto_url: string | null
+          icone: string | null
           id: string
           nome: string | null
         }
         Insert: {
+          cor_fundo?: string | null
+          cor_icone?: string | null
           created_at?: string
           criado_por: string
           descricao?: string | null
           empresa_id: string
           foto_url?: string | null
+          icone?: string | null
           id?: string
           nome?: string | null
         }
         Update: {
+          cor_fundo?: string | null
+          cor_icone?: string | null
           created_at?: string
           criado_por?: string
           descricao?: string | null
           empresa_id?: string
           foto_url?: string | null
+          icone?: string | null
           id?: string
           nome?: string | null
         }

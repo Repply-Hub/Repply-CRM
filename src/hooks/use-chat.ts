@@ -43,6 +43,9 @@ export interface ChatGrupo {
   nome: string;
   descricao?: string | null;
   foto_url?: string | null;
+  icone?: string | null;
+  cor_fundo?: string | null;
+  cor_icone?: string | null;
   empresa_id: string;
   criado_por: string;
   created_at: string;
@@ -295,6 +298,9 @@ export interface ChatGeralConfig {
   empresa_id: string;
   nome: string;
   foto_url?: string | null;
+  icone?: string | null;
+  cor_fundo?: string | null;
+  cor_icone?: string | null;
 }
 
 export function useChatGeralConfig() {
