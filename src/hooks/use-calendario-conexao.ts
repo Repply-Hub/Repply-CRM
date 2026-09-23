@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
-import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { mensagemDeErroDaFunction } from '@/lib/erro-edge-function';
 
 export interface ConexaoCalendario {
@@ -71,7 +70,9 @@ export function useConexaoCalendario() {
       qc.invalidateQueries({ queryKey: ['calendario_conexao', userId] });
       toast.success('Calendário desconectado.');
     },
-    onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível desconectar.')),
+    // Erro de `functions.invoke` (função de servidor): usar mensagemDeErroDaFunction (async),
+    // senão a frase genérica em inglês da biblioteca vaza para a tela (ver mensagem-de-erro.ts).
+    onError: async (e) => toast.error(await mensagemDeErroDaFunction(e, 'Não foi possível desconectar.')),
   });
 
   return {
