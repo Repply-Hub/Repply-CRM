@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '@/components/shared/DialogoResponsivo';
 import { Button } from '@/components/ui/button';
@@ -6,12 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Plus, Loader2, Users2, Camera, Search } from 'lucide-react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Plus, Loader2, Users2, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { sanitizeFileName } from '@/lib/file-validation';
+import { SeletorDeAparencia } from '@/components/chat/SeletorDeAparencia';
 
 function getInitials(name: string) {
   return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
@@ -43,17 +44,9 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
   const [creating, setCreating] = useState(false);
   const [foto, setFoto] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+  const [aparencia, setAparencia] = useState<{ icone: string | null; corFundo: string | null; corIcone: string | null }>({ icone: null, corFundo: null, corIcone: null });
   const [memberSearch, setMemberSearch] = useState('');
-  const fotoInputRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
-
-  const handleFotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setFoto(file);
-    setFotoPreview(URL.createObjectURL(file));
-  };
 
   const toggleMember = (id: string) => {
     setSelectedMembers(prev =>
@@ -89,6 +82,9 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
           nome: nome.trim(),
           empresa_id: vendedor.empresa_id!,
           criado_por: vendedor.id,
+          icone: aparencia.icone,
+          cor_fundo: aparencia.corFundo,
+          cor_icone: aparencia.corIcone,
         } as any)
         .select()
         .single();
@@ -130,6 +126,7 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
       setSelectedMembers([]);
       setFoto(null);
       setFotoPreview(null);
+      setAparencia({ icone: null, corFundo: null, corIcone: null });
       setMemberSearch('');
     } catch (err: any) {
       toast.error('Erro ao criar grupo: ' + err.message);
@@ -154,34 +151,13 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
           </DialogTitle>
         </CabecalhoDialogo>
         <CorpoDialogo className="space-y-4">
-          <div className="flex justify-center">
-            <input
-              ref={fotoInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFotoSelect}
-            />
-            <button
-              type="button"
-              onClick={() => fotoInputRef.current?.click()}
-              className="relative group"
-              title="Adicionar foto do grupo"
-            >
-              <Avatar className="h-16 w-16">
-                {fotoPreview && <AvatarImage src={fotoPreview} alt="Foto do grupo" className="h-full w-full object-cover" />}
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  <Users2 className="h-6 w-6" />
-                </AvatarFallback>
-              </Avatar>
-              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Camera className="h-5 w-5 text-white" />
-              </span>
-            </button>
-          </div>
-          <p className="-mt-2 text-center text-[11px] text-muted-foreground">
-            Clique no ícone para adicionar uma foto do grupo (opcional)
-          </p>
+          <SeletorDeAparencia
+            nome={nome || 'Grupo'}
+            IconePadrao={Users2}
+            valor={{ icone: aparencia.icone, corFundo: aparencia.corFundo, corIcone: aparencia.corIcone, fotoUrl: fotoPreview }}
+            onChange={(v) => { setAparencia({ icone: v.icone, corFundo: v.corFundo, corIcone: v.corIcone }); if (v.icone) { setFoto(null); setFotoPreview(null); } }}
+            onEscolherImagem={(file) => { setFoto(file); setFotoPreview(URL.createObjectURL(file)); setAparencia((a) => ({ ...a, icone: null })); }}
+          />
           <div className="space-y-2">
             <Label htmlFor="group-name">Nome do grupo</Label>
             <Input
