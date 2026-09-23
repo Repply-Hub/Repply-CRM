@@ -64,7 +64,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 45 | [Não existe conferência automática, e o `git push` publica](#45-não-existe-conferência-automática--e-agora-o-git-push-publica) | Alta | Não — protege todo o resto |
 | 46 | [`types.ts` com 21 objetos fora de sincronia, e dá para regerar](#46-typests-tem-21-objetos-fora-de-sincronia-e-pode-ser-regerado) | Alta | Não |
 | 47 | ["Salvo" quando o banco recusou — o mesmo defeito em 4 telas](#47-salvo-quando-o-banco-recusou--o-mesmo-defeito-em-quatro-telas) | ✅ Resolvida | As 4 telas conferem o efeito; a varredura dos demais pontos é o item 68 |
-| 48 | [O Radar de Risco conta edição de campo como movimento](#48-o-radar-de-risco-conta-edição-de-campo-como-movimento) | Alta | Não — R$ 5,0 mi no lugar de R$ 14,4 mi |
+| 48 | [O Radar de Risco conta edição de campo como movimento](#48-o-radar-de-risco-conta-edição-de-campo-como-movimento) | ✅ Resolvida | Corrigida em 22/09/2026 — o "parado há X dias" estava errado em 26 negócios, até 14 dias |
 | 49 | [O filtro "Etapa" não filtra, em dois lugares](#49-o-filtro-etapa-não-filtra-em-dois-lugares) | ✅ Resolvida | Os dois lugares corrigidos em 22/09/2026 — Kanban agora, Ação em massa antes |
 | 50 | [A soma em reais do Kanban usa só os cartões carregados](#50-a-soma-em-reais-do-kanban-usa-só-os-cartões-carregados) | ✅ Resolvida | Corrigido em 22/09/2026 — a coluna pede o total da etapa ao banco |
 | 51 | [O Calendário mostra menos de 10% dos prazos, e um dia antes](#51-o-calendário-mostra-menos-de-10-dos-prazos-e-desenha-um-dia-antes) | ✅ Resolvida | Recorte de período em 27/08 e âncora de meio-dia em 22/09/2026 |
@@ -1923,22 +1923,51 @@ as linhas de volta (`.select('id')`) e trata "veio vazio" como recusa. O padrão
 
 ## 48. O Radar de Risco conta edição de campo como movimento
 
-**Gravidade: alta.**
+> ✅ **Resolvido em 22/09/2026** — migration `20260922190000_radar_ignora_edicao_de_campo.sql`,
+> aplicada e conferida em produção. As duas funções (`dashboard_negocios_risco` e
+> `negocios_em_risco_de`) passaram a olhar só `h.tipo = 'status'` ao procurar a última
+> atividade, copiando o que `pauta_do_dia_de` já fazia certo. Decisão do dono do produto no
+> mesmo dia: **editar campo NÃO é cuidar do negócio.**
 
-A consulta de `20260824220000_dashboard_negocios_risco.sql` mede "há quanto tempo este negócio
-não anda" olhando `pedidos_historico_status` **sem separar o tipo `status`**. Corrigir uma
-observação tira o orçamento da lista de parados na hora, sem ele ter andado.
+**Gravidade: alta.** Registrado com os números medidos, porque o diagnóstico da auditoria estava
+certo na causa e errado no efeito.
 
-Medido: **R$ 5,0 milhões no lugar de R$ 14,4 milhões** em risco. O comentário no topo da própria
-migration diz que a consulta existe justamente para evitar isso.
+A consulta media "há quanto tempo este negócio não anda" olhando a linha mais recente de
+`pedidos_historico_status` **sem separar o tipo**. Essa tabela guarda duas coisas na mesma
+pilha: mudança de etapa (`tipo = 'status'`) e edição de campo (`tipo = 'campo'`). Corrigir uma
+observação zerava o cronômetro do negócio, sem ele ter andado.
 
-Agravante: **toda correção em massa de dados zera o radar** — o reparo de datas de 20/08 já
-gravou 61 linhas de histórico que contam como movimento.
+### O que a auditoria errou, e o que é verdade
 
-### Conserto
+A auditoria dizia **R$ 5,0 milhões no lugar de R$ 14,4 milhões**. Medido em 22/09/2026 na base
+de produção, os dois jeitos dão **o mesmo número**: 102 negócios, R$ 5.084.868.
 
-Migration nova com `CREATE OR REPLACE`, acrescentando a condição de tipo na cláusula da LATERAL.
-O índice existente continua servindo.
+O motivo é acaso, não acerto: existiam **6 negócios da MD escondidos pelo defeito** (R$ 537.804),
+e os 6 já estavam fora da lista pela regra "sem próxima ação" que entrou em 17/09 (item
+`pede-atencao`). **Uma regra tapava o buraco da outra.** Os números verdadeiros da MD no dia:
+179 abertos (R$ 10.469.353), 142 sem próxima ação (R$ 7.072.997), 102 parados 7+ dias
+(R$ 5.084.868).
+
+### O estrago que é real, e foi medido
+
+1. **O "parado há X dias" estava errado em 26 negócios da MD**, o maior deles em **14 dias**,
+   somando **R$ 3,5 mi**. É a coluna que o gestor usa para priorizar — ela mentia para menos.
+2. 🔴 **Toda operação em massa cega o radar por 7 dias.** O tipo `campo` só começou em
+   01/09/2026 e em 3 semanas já tinha 13.179 linhas em 5.157 negócios, contra 13.047 linhas de
+   `status` desde 27/07/2025. Em **08/09/2026 uma única operação gravou 9.498 edições em 4.630
+   negócios** — para o radar, todos "andaram" naquele dia e sumiram da lista de parados pela
+   semana seguinte. Em 04/09 foram 3.383 edições em 393 negócios. Dia normal tem 30 a 100.
+
+### Como foi aplicado
+
+Ensaio em transação desfeita antes (`RAISE` no fim), com prova de que a troca pegou (2 funções,
+as 2 com o filtro dentro). Depois, conferência por `md5(pg_get_functiondef(...))` calculado
+**antes** de aplicar e comparado **depois** — os dois bateram, provando que subiu só a linha
+`AND h.tipo = 'status'` em cada LATERAL. Permissões preservadas pelo `CREATE OR REPLACE`
+(a `_de` segue fechada). Tempo: 77 ms para as duas chamadas.
+
+O índice `idx_pedidos_historico_status_pedido_created` continua servindo: a condição só pula as
+linhas de edição, e cada negócio tem ~2 linhas de histórico.
 
 ---
 
