@@ -69,7 +69,7 @@ describe('qual arquivo toca', () => {
 
   it('a amostra de um id desconhecido toca o padrão', () => {
     ouvirAmostra('nao-existe');
-    expect(criados).toContain('/sons/notificacao.mp3');
+    expect(criados).toContain('/sons/opcoes/toque-suave.mp3');
   });
 
   it('a notificação toca o som escolhido', () => {
