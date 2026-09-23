@@ -810,7 +810,7 @@ const AdminWhatsAppInstancias = () => {
       ] = await Promise.all([
         supabase.from('usuarios').select('id, nome, role, empresa_id, user_id').neq('role', 'admin'),
         supabase.from('empresas').select('id, nome'),
-        supabase.from('configuracoes_wapi').select('*'),
+        supabase.from('configuracoes_wapi').select('id, empresa_id, instance_name, api_instance_name, instance_url, provisionada, status, apelido, cor, created_at, updated_at'),
         supabase.from('wapi_instancia_usuarios').select('instancia_id, usuario_auth_id'),
       ]);
 
@@ -820,13 +820,17 @@ const AdminWhatsAppInstancias = () => {
       if (errL) throw errL;
 
       const configById = new Map((configs ?? []).map(c => [c.id, c]));
-      // Legado: configuracoes_wapi.usuario_id ainda é usado por instâncias criadas antes do
-      // desacoplamento (migration 20260620_wapi_instancia_desacoplada). A tabela de vínculo
-      // wapi_instancia_usuarios é a fonte de verdade para instâncias criadas depois.
-      const configByAuthId = new Map((configs ?? []).map(c => [c.usuario_id, c]));
+      // 🔴 O ramo legado `configuracoes_wapi.usuario_id` SAIU em 23/09/2026: a coluna não existe
+      // mais na tabela (conferido no banco), então ele semeava uma entrada de chave `undefined`
+      // que ninguém buscava. Vivia escondido atrás de um `select('*')`; ao trocar pela lista
+      // explícita de colunas (item 74, passo 2), o compilador apontou.
+      // `wapi_instancia_usuarios` é a única fonte de verdade do vínculo.
+      const configByAuthId = new Map<string, WaConfig>();
       for (const link of links ?? []) {
         const config = configById.get(link.instancia_id);
-        if (config) configByAuthId.set(link.usuario_auth_id, config);
+        // `status` vem do banco como texto solto; `WaConfig` o estreita para as três opções.
+        // É a mesma conversão que a linha de `instanciasPorEmpresa` já fazia logo abaixo.
+        if (config) configByAuthId.set(link.usuario_auth_id, config as WaConfig);
       }
       const empresaMap = new Map((empresas ?? []).map(e => [e.id, e.nome]));
 

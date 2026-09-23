@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
 import { erroLegivelDaFunction } from '@/lib/erro-edge-function';
+import { lerRespostaDeConexao, estaConectadoNaResposta } from '@/lib/whatsapp-instancia';
 import { infoPreviewMensagem } from '@/lib/wa-mensagem-preview';
 import { tocarEnvio } from '@/lib/som';
 import { somLigado } from '@/hooks/use-som-ligado';
@@ -177,16 +178,25 @@ export interface WaMensagem {
   } | null;
 }
 
+/**
+ * Os dados de um número de WhatsApp COMO O NAVEGADOR OS VÊ.
+ *
+ * 🔴 `api_key` e `webhook_secret` NÃO estão aqui, e a falta é o ponto (item 74, passo 2): a
+ * credencial da operadora não chega mais ao navegador, e o tipo tem de dizer isso. Enquanto ele
+ * prometia a chave, bastava escrever `config.api_key` para pô-la de volta na tela sem ninguém
+ * notar — o compilador aprovava.
+ *
+ * Quem precisa da chave é a função de servidor `whatsapp-instancia`, que a lê com a chave de
+ * serviço e fala com a operadora de lá.
+ */
 export interface WaConfig {
   id: string;
   empresa_id: string;
   instance_url: string;
-  api_key: string;
   instance_name: string;
   apelido: string | null;
   cor: string | null;
   status: 'connected' | 'disconnected' | 'connecting';
-  webhook_secret: string | null;
   provisionada: boolean;
 }
 
@@ -1274,11 +1284,19 @@ export function useWaMarcarNaoLida() {
  *
  * 🔴 SÃO DUAS COISAS DIFERENTES, e tratá-las como uma só é um bug que já existe hoje.
  *
- * A junção `instancia:configuracoes_wapi(*)` passa pela regra de segurança de
- * `configuracoes_wapi`, que só mostra a instância ao DONO dela, ao admin e a gestor. Desde
- * 20260620000000 a instância é reaproveitada entre pessoas: a segunda, a terceira e a décima
- * ganham vínculo mas não viram donas. Para elas a linha do vínculo vem e o `instancia`
- * embutido volta NULO.
+ * A junção `instancia:configuracoes_wapi(...)` passa pela regra de segurança de
+ * `configuracoes_wapi`. Desde 20260620000000 a instância é reaproveitada entre pessoas: a
+ * segunda, a terceira e a décima ganham vínculo mas não viram donas.
+ *
+ * ⚠️ ESTE COMENTÁRIO JÁ ESTEVE ERRADO. Ele afirmava que a regra "só mostra a instância ao DONO
+ * dela, ao admin e a gestor" — medido em 23/09/2026, a regra `wapi_config_select` também
+ * libera QUEM TEM VÍNCULO, então o `instancia` embutido NÃO volta nulo para o vinculado. O
+ * comentário descrevia a migration, não o banco. A ressalva abaixo continua valendo para quem
+ * não tem vínculo nenhum.
+ *
+ * 🔴 A lista de colunas é explícita de propósito (item 74, passo 2): sem `api_key` nem
+ * `webhook_secret`. A chave da operadora não chega mais ao navegador — quem fala com ela é a
+ * função de servidor `whatsapp-instancia`. Voltar para `(*)` aqui repõe o segredo na tela.
  *
  * Ou seja: `config === null` NÃO significa "não tenho número". Hoje esse vendedor lê
  * "Configure o uazapi para enviar mensagens" (WhatsAppInbox.tsx) enquanto o envio dele
@@ -1305,7 +1323,7 @@ function opcoesDoVinculoWa() {
         // 🔴 `usuario_auth_id` é da família `auth.users(id)`, e `getUsuarioId()` devolve
         // exatamente isso (o nome dela engana). Trocar por `usuarios.id` não daria erro:
         // daria zero linhas, e todo mundo veria o aviso de "sem número".
-        .select('instancia_id, instancia:configuracoes_wapi(*)')
+        .select('instancia_id, instancia:configuracoes_wapi(id, empresa_id, instance_name, api_instance_name, instance_url, provisionada, status, apelido, cor, created_at, updated_at)')
         .eq('usuario_auth_id', usuarioId)
         .limit(1)
         .maybeSingle();
@@ -1946,40 +1964,19 @@ export function useWaParticipantePhoto(telefone: string | null | undefined) {
 export function useWaConnect() {
   return useMutation({
     mutationFn: async (config: WaConfig) => {
-      const baseUrl = config.instance_url.replace(/\/$/, '');
-      // Body is empty — instance is identified by the `token` header alone
-      const res = await fetch(`${baseUrl}/instance/connect`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', token: config.api_key },
-        body: JSON.stringify({}),
+      // 🔴 A chamada sai do SERVIDOR (item 74, passo 2). Antes saía daqui, com a chave da
+      // operadora no cabeçalho — e era só por isso que a chave precisava chegar ao navegador.
+      const res = await supabase.functions.invoke('whatsapp-instancia', {
+        body: { acao: 'conectar', instancia_id: config.id },
       });
-      const text = await res.text().catch(() => '');
-      if (!res.ok) throw new Error(`Erro ${res.status}: ${text}`);
-      let data: Record<string, any> = {};
-      try { data = JSON.parse(text); } catch { /* ok */ }
+      if (res.error) throw await erroLegivelDaFunction(res.error, 'Erro ao gerar o QR code');
 
-      // uazapi returns QR in data.instance.qrcode (base64 PNG). Normaliza string
-      // vazia ("") para null — a uazapi retorna qrcode: "" quando não há QR a
-      // gerar (ex.: instância já conectada), e "??" não trata "" como nulo.
-      const rawQr: string | null =
-        data?.instance?.qrcode ??
-        data?.qrcode?.base64 ??
-        (typeof data?.qrcode === 'string' ? data.qrcode : null) ??
-        data?.base64 ??
-        null;
-      const qr = rawQr && rawQr.length > 0 ? rawQr : null;
-
-      // Detecta "já conectado" para diferenciar de uma falha real ao gerar QR
-      const alreadyConnected: boolean =
-        data?.connected === true ||
-        data?.status?.connected === true ||
-        data?.status?.loggedIn === true ||
-        data?.instance?.status === 'connected' ||
-        (typeof data?.response === 'string' && data.response.toLowerCase().includes('already connected'));
+      const data = res.data?.payload ?? {};
+      const { qr, jaConectado: alreadyConnected } = lerRespostaDeConexao(data);
 
       if (!qr) {
-        // Loga a resposta completa da uazapi sempre que não há QR, para
-        // diagnosticar formatos de payload não previstos no parsing acima.
+        // Sem QR, registra a resposta inteira: é assim que se descobre formato novo da
+        // operadora (ela já mudou antes — daí os quatro caminhos em lerRespostaDeConexao).
         console.log('[useWaConnect] sem QR na resposta da uazapi', {
           instanceName: config.instance_name, alreadyConnected, response: data,
         });
@@ -1994,18 +1991,11 @@ export function useWaSyncStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (config: WaConfig) => {
-      const baseUrl = config.instance_url.replace(/\/$/, '');
-      // GET /instance/status — instance identified by token header
-      const res = await fetch(`${baseUrl}/instance/status`, {
-        method: 'GET',
-        headers: { token: config.api_key },
+      const res = await supabase.functions.invoke('whatsapp-instancia', {
+        body: { acao: 'status', instancia_id: config.id },
       });
-      if (!res.ok) throw new Error(`Status check failed: ${res.status}`);
-      const data = await res.json();
-      // Response: { status: { connected: bool, loggedIn: bool } }
-      const isConnected: boolean =
-        (data?.status?.connected === true && data?.status?.loggedIn === true) ||
-        data?.connected === true;
+      if (res.error) throw await erroLegivelDaFunction(res.error, 'Erro ao conferir a conexão');
+      const isConnected = estaConectadoNaResposta(res.data?.payload);
       const dbStatus: WaConfig['status'] = isConnected ? 'connected' : 'disconnected';
       await supabase
         .from('configuracoes_wapi')
@@ -2025,14 +2015,10 @@ export function useWaDisconnect() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (config: WaConfig) => {
-      const baseUrl = config.instance_url.replace(/\/$/, '');
-      const res = await fetch(`${baseUrl}/instance/disconnect`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', token: config.api_key },
-        body: JSON.stringify({}),
+      const res = await supabase.functions.invoke('whatsapp-instancia', {
+        body: { acao: 'desconectar', instancia_id: config.id },
       });
-      const text = await res.text().catch(() => '');
-      if (!res.ok) throw new Error(`Erro ${res.status}: ${text}`);
+      if (res.error) throw await erroLegivelDaFunction(res.error, 'Erro ao desconectar');
       await supabase
         .from('configuracoes_wapi')
         .update({ status: 'disconnected' })

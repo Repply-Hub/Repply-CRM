@@ -87,6 +87,7 @@ import { ParticipantesMultiSelect } from "@/components/tarefas/ParticipantesMult
 import { MarcadoresMultiSelect } from "@/components/tarefas/MarcadoresMultiSelect";
 import { useAuth } from "@/hooks/use-auth";
 import { podeVincularWhatsapp } from "@/lib/vinculo-de-whatsapp";
+import { podeConectarNumero } from "@/lib/whatsapp-instancia";
 import { marcaDaEmpresa } from "@/lib/marca-da-empresa";
 import { CriarContatoDaConversaDialog } from "@/components/whatsapp/CriarContatoDaConversaDialog";
 import { DesvincularConversa } from "@/components/whatsapp/DesvincularConversa";
@@ -2724,6 +2725,9 @@ function ConfigDialog({
   const { data: config, refetch } = useWaConfig();
   const { profile } = useAuth();
   const podeVincular = podeVincularWhatsapp(profile?.role);
+  // 🔴 Conectar e desconectar um número é ato de gestor (item 74, passo 2). A recusa de
+  // verdade está na função `whatsapp-instancia`; aqui só não oferecemos o botão.
+  const podeConectar = podeConectarNumero(profile?.role);
   const { provision, isPending: isProvisioning } = useWaProvision();
   const connect = useWaConnect();
   const syncStatus = useWaSyncStatus();
@@ -2885,8 +2889,13 @@ function ConfigDialog({
               </p>
             )}
 
-            {/* Ações */}
-            {!isConnected && (
+            {/* Ações — só para quem pode conectar (item 74, passo 2) */}
+            {!podeConectar && (
+              <p className="text-xs text-muted-foreground text-center">
+                Conectar ou desconectar este número é com o gestor da sua organização.
+              </p>
+            )}
+            {podeConectar && !isConnected && (
               <Button
                 className="w-full"
                 variant="secondary"
@@ -2901,7 +2910,7 @@ function ConfigDialog({
                 {qr ? "Atualizar QR code" : "Conectar via QR code"}
               </Button>
             )}
-            {isConnected && (
+            {podeConectar && isConnected && (
               <Button
                 className="w-full"
                 variant="outline"
@@ -4223,6 +4232,8 @@ function LeadSheet({
 export default function WhatsAppInbox() {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  /** Reconectar o número é ato de gestor (item 74, passo 2) — ver `podeConectarNumero`. */
+  const podeConectarNumeroNaCaixa = podeConectarNumero(profile?.role);
   const { modo, listaUnica } = useModoCaixaWhatsapp();
   const modoCaixa = elementosDaCaixa(modo);
   const { data: conversas = [], isLoading: loadingConversas } =
@@ -9065,13 +9076,20 @@ export default function WhatsAppInbox() {
                     <div className="mb-2 text-xs text-red-600 dark:text-red-400 flex items-center gap-1.5 px-2">
                       <WifiOff className="h-3.5 w-3.5" />
                       WhatsApp desconectado —{" "}
-                      <button
-                        type="button"
-                        className="underline underline-offset-2 hover:opacity-80"
-                        onClick={() => setShowConfig(true)}
-                      >
-                        conectar via QR code
-                      </button>
+                      {/* 🔴 Reconectar é do gestor (item 74, passo 2). Para quem não pode, o
+                          aviso continua — é informação útil —, mas sem um atalho que levaria a
+                          um diálogo onde o botão não existe. */}
+                      {podeConectarNumeroNaCaixa ? (
+                        <button
+                          type="button"
+                          className="underline underline-offset-2 hover:opacity-80"
+                          onClick={() => setShowConfig(true)}
+                        >
+                          conectar via QR code
+                        </button>
+                      ) : (
+                        <span>fale com o gestor da sua organização</span>
+                      )}
                     </div>
                   )}
                   {/* 🔴 `semNumero`, NÃO `!config`. Quem está vinculado a uma instância de

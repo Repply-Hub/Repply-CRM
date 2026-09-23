@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { WaConfig } from './use-whatsapp-inbox';
+import { erroLegivelDaFunction } from '@/lib/erro-edge-function';
+import { lerRespostaDeConexao, estaConectadoNaResposta } from '@/lib/whatsapp-instancia';
 
 async function getSession() {
   const { data: { session } } = await supabase.auth.getSession();
@@ -120,31 +122,16 @@ export function useAdminDeleteInstance() {
 export function useAdminConnect() {
   return useMutation({
     mutationFn: async (config: WaConfig) => {
-      const baseUrl = config.instance_url.replace(/\/$/, '');
-      const res = await fetch(`${baseUrl}/instance/connect`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', token: config.api_key },
-        body: JSON.stringify({}),
+      // 🔴 A chamada sai do SERVIDOR (item 74, passo 2) — a chave da operadora não chega mais
+      // ao navegador, nem ao do admin. A leitura da resposta é a mesma da caixa de entrada,
+      // agora numa função só (antes esta lógica vivia duplicada nos dois arquivos).
+      const res = await supabase.functions.invoke('whatsapp-instancia', {
+        body: { acao: 'conectar', instancia_id: config.id },
       });
-      const text = await res.text().catch(() => '');
-      if (!res.ok) throw new Error(`Erro ${res.status}: ${text}`);
-      let data: Record<string, any> = {};
-      try { data = JSON.parse(text); } catch { /* ok */ }
+      if (res.error) throw await erroLegivelDaFunction(res.error, 'Erro ao gerar o QR code');
 
-      const rawQr: string | null =
-        data?.instance?.qrcode ??
-        data?.qrcode?.base64 ??
-        (typeof data?.qrcode === 'string' ? data.qrcode : null) ??
-        data?.base64 ??
-        null;
-      const qr = rawQr && rawQr.length > 0 ? rawQr : null;
-
-      const alreadyConnected: boolean =
-        data?.connected === true ||
-        data?.status?.connected === true ||
-        data?.status?.loggedIn === true ||
-        data?.instance?.status === 'connected' ||
-        (typeof data?.response === 'string' && data.response.toLowerCase().includes('already connected'));
+      const data = res.data?.payload ?? {};
+      const { qr, jaConectado: alreadyConnected } = lerRespostaDeConexao(data);
 
       return { qr, alreadyConnected, data };
     },
@@ -158,16 +145,11 @@ export function useAdminSyncStatus() {
 
   return useMutation({
     mutationFn: async (config: WaConfig) => {
-      const baseUrl = config.instance_url.replace(/\/$/, '');
-      const res = await fetch(`${baseUrl}/instance/status`, {
-        method: 'GET',
-        headers: { token: config.api_key },
+      const res = await supabase.functions.invoke('whatsapp-instancia', {
+        body: { acao: 'status', instancia_id: config.id },
       });
-      if (!res.ok) throw new Error(`Status check failed: ${res.status}`);
-      const data = await res.json();
-      const isConnected: boolean =
-        (data?.status?.connected === true && data?.status?.loggedIn === true) ||
-        data?.connected === true;
+      if (res.error) throw await erroLegivelDaFunction(res.error, 'Erro ao conferir a conexão');
+      const isConnected = estaConectadoNaResposta(res.data?.payload);
       const dbStatus = isConnected ? 'connected' : 'disconnected';
 
       await supabase
@@ -190,14 +172,10 @@ export function useAdminDisconnect() {
 
   return useMutation({
     mutationFn: async (config: WaConfig) => {
-      const baseUrl = config.instance_url.replace(/\/$/, '');
-      const res = await fetch(`${baseUrl}/instance/disconnect`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', token: config.api_key },
-        body: JSON.stringify({}),
+      const res = await supabase.functions.invoke('whatsapp-instancia', {
+        body: { acao: 'desconectar', instancia_id: config.id },
       });
-      const text = await res.text().catch(() => '');
-      if (!res.ok) throw new Error(`Erro ${res.status}: ${text}`);
+      if (res.error) throw await erroLegivelDaFunction(res.error, 'Erro ao desconectar');
 
       await supabase
         .from('configuracoes_wapi')

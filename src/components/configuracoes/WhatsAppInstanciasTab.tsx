@@ -952,7 +952,7 @@ export function WhatsAppInstanciasTab() {
         { data: instancias, error: errI },
         { data: usuarios, error: errU },
       ] = await Promise.all([
-        supabase.from('configuracoes_wapi').select('*').eq('empresa_id', empresaId).order('instance_name'),
+        supabase.from('configuracoes_wapi').select('id, empresa_id, instance_name, api_instance_name, instance_url, provisionada, status, apelido, cor, created_at, updated_at').eq('empresa_id', empresaId).order('instance_name'),
         supabase.from('usuarios').select('id, nome, role, user_id').eq('empresa_id', empresaId).neq('role', 'admin').order('nome'),
       ]);
 
