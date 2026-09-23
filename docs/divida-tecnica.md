@@ -75,7 +75,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 56 | [Onze pontos da documentação afirmam o que não é verdade](#56-onze-pontos-da-documentação-afirmam-coisa-que-não-é-verdade-hoje) | Média | Não |
 | 57 | [Os módulos que justificam o produto estão vazios](#57-os-módulos-que-justificam-o-produto-estão-vazios) | Produto | Decisão de produto pendente |
 | 58 | [Contato sem responsável aparece para TODAS as empresas](#58-contato-sem-responsável-aparece-para-todas-as-empresas) | **Alta** | Latente — 0 órfãos hoje, mas 3 caminhos podem criar um |
-| 59 | [O link de redefinir senha aponta para `localhost`](#59-o-link-de-redefinir-senha-aponta-para-localhost) | **Alta** | **Sim — ninguém consegue redefinir a própria senha hoje.** O conserto é de painel |
+| 59 | [O link de redefinir senha aponta para `localhost`](#59-o-link-de-redefinir-senha-aponta-para-localhost) | Média | Não — sintoma encerrado em 22/09. Falta ler 3 coisas no painel e ensaiar o caminho inteiro |
 | 60 | [O ranking de vendedores chega inteiro no navegador de todo mundo](#60-o-ranking-de-vendedores-chega-inteiro-no-navegador-de-todo-mundo) | **Alta** | Não — mas entrega pela porta dos fundos o que foi fechado pela da frente em 31/08 |
 | 63 | [`plano_vendas_progresso` não checa permissão nenhuma](#63-plano_vendas_progresso-não-checa-permissão-nenhuma) | Média | Não — não atravessa empresa, mas fura a permissão de módulo |
 | 64 | [Regra de banco alterada à mão diverge do código](#64-regra-de-banco-alterada-à-mão-volta-a-divergir-do-código-e-ninguém-percebe) | Média | Não — mas `create or replace` a partir do arquivo desfaz a correção em silêncio |
@@ -2274,111 +2274,136 @@ Ver `docs/superpowers/specs/2026-08-30-base-demo-repply-design.md` §2.5.
 
 ## 59. O link de redefinir senha aponta para `localhost`
 
-**Gravidade: alta. Em produção, afetando todo mundo. O conserto NÃO é de código.**
+> ✅ **O sintoma acabou** (medido em 22/09/2026), **mas o item não fechou.** O Site URL foi
+> corrigido em algum momento entre 31/08 e 22/09 — não está no histórico do git porque é
+> configuração de painel. Em 8.136 requisições de autenticação das últimas 24h **nenhuma** aponta
+> para localhost. O que sobra está em "O que ainda falta", no fim desta seção.
 
-Relatado pelo Lucas em 27/08/2026: ele pediu redefinição de senha e o e-mail chegou com um
-link para `http://localhost:3000`.
+**Gravidade: média** (era alta). **O conserto de código já foi feito; o resto é leitura de painel.**
 
-### A causa
+Relatado pelo Lucas em 27/08/2026: ele pediu redefinição de senha e o e-mail chegou com um link
+para `http://localhost:3000` — sobra do andaime original, que nunca foi trocada. O servidor de
+desenvolvimento daqui roda na porta **8080**, então aquele valor não correspondia nem à produção
+nem ao ambiente local.
 
-O **Site URL** da autenticação, no painel do Supabase, está como `http://localhost:3000`.
+Medição de 31/08/2026: 3.306 requisições, **634 endereços de internet distintos**, destino
+efetivo `http://localhost:3000` em **todas**.
 
-O Supabase usa esse valor sempre que o endereço de retorno pedido pelo app **não está na
-lista de endereços autorizados** (Redirect URLs). Ele não recusa nem avisa: troca em
-silêncio e manda o e-mail.
+---
 
-### A medição que fecha o diagnóstico
+### 🔴 A regra real do Supabase — a que este documento e o código erraram
 
-Nos registros de autenticação, em 31/08/2026:
+Escrever "o caminho precisa estar na lista de Redirect URLs" é **falso**, e acreditar nisso já
+levou a conclusão errada duas vezes. A ordem que o Supabase usa para decidir o destino é:
 
-| | |
-|---|---|
-| requisições | 3.306 |
-| endereços de internet **distintos** | **634** |
-| destino efetivo registrado | `http://localhost:3000` em **todas** |
-| qualquer outro valor | **nenhum** |
+1. o `redirect_to` pedido, **se for autorizado**;
+2. o cabeçalho `Referer`, **se for autorizado**;
+3. o **Site URL**, puro.
 
-634 endereços distintos, de usuários reais da MD, da JHS e da PR & Cocentino, em cidades
-diferentes. Não é gente rodando servidor local.
+E "autorizado" é aprovado **antes** de a lista ser consultada quando o endereço tem o **mesmo
+domínio, mesmo esquema e mesma porta do Site URL** — ou quando é um **endereço de loopback
+numérico** (`127.0.0.1`, `[::1]`), em qualquer porta. A lista só decide o que estiver fora disso.
 
-**O detalhe que confirma:** o servidor de desenvolvimento deste projeto roda na porta
-**8080** (`vite.config.ts:10`). `localhost:3000` não corresponde nem à produção **nem ao
-ambiente local daqui** — é sobra do andaime original, que nunca foi trocada.
+**Consequência prática:** com o Site URL em `https://crm.repplyhub.com.br`, todo caminho do
+próprio domínio passa sozinho, a lista estando vazia ou não. Isso é bom hoje e frágil amanhã —
+quem encostar no Site URL (domínio novo, uma barra sobrando, um endereço de prévia) derruba
+**todos** os caminhos no mesmo segundo, sem uma linha de código mudar.
 
-### Por que só a redefinição de senha aparece quebrada
+### Como medir sem mandar e-mail para ninguém
 
-Porque é o único e-mail de autenticação em uso. Medido em `auth.users`: **os 30 logins do
-sistema foram confirmados em menos de 5 segundos após a criação**, ou seja, a confirmação
-de e-mail está DESLIGADA e aquele e-mail nunca é enviado. Não há convite nem link mágico
-no produto.
-
-Três pessoas já pediram redefinição; a mais recente em 27/08/2026 — o teste do Lucas.
-
-### O conserto
-
-No painel do Supabase, **Authentication → URL Configuration**:
-
-- **Site URL:** `https://crm.repplyhub.com.br`
-- **Redirect URLs:** incluir `https://crm.repplyhub.com.br/**` e, para o desenvolvimento
-  continuar funcionando, `http://localhost:8080/**` — com **8080**, não 3000.
-
-> ⚠️ **Ao ligar a confirmação de e-mail um dia, confira isto ANTES.** Com o Site URL
-> errado, todo link de confirmação nasce quebrado, e o sintoma não aponta para a causa.
-
-### 🔴 As DUAS configurações importam, e falhar na segunda é PIOR
-
-Corrigir só o Site URL troca uma falha barulhenta por uma silenciosa.
-
-Se `https://crm.repplyhub.com.br/redefinir-senha` **não estiver** na lista de endereços
-autorizados, o Supabase descarta o caminho e manda a pessoa para o Site URL puro —
-`https://crm.repplyhub.com.br`. E aí:
-
-1. O cliente do Supabase lê o token da barra de endereço sozinho (`detectSessionInUrl` é
-   ligado por padrão) e **cria a sessão**.
-2. `LandingRoute` (`App.tsx:366-371`) vê sessão e manda a pessoa para dentro do app.
-3. Ela **nunca vê o formulário de nova senha**. `RedefinirSenha.tsx` é quem chama
-   `updateUser({ password })`, e essa tela não foi aberta.
-
-Resultado: a pessoa clica no link, entra no CRM, conclui que deu certo — e descobre no
-próximo login que **a senha continua a antiga**. O link para localhost pelo menos falhava
-na cara; este não.
-
-### Como conferir qual dos dois casos você está
-
-Peça uma redefinição e olhe o **fim** do link no e-mail:
-
-| o link termina em… | significa |
-|---|---|
-| `/redefinir-senha` | as duas configurações certas ✅ |
-| o domínio puro, sem caminho | falta o caminho na lista de endereços autorizados |
-
-Nos registros, um pedido de redefinição (`/recover`) grava o destino COMPLETO — então dá
-para confirmar sem abrir o e-mail:
+Peça uma redefinição para um e-mail **inexistente** em domínio reservado (`...@example.com`),
+variando o `redirect_to`, e leia o destino que ficou registrado. Nenhum e-mail sai (não há
+conta), e o destino é calculado por uma função que só olha o pedido e a configuração — nunca a
+conta:
 
 ```sql
-select log_attributes['referer'] as destino, log_attributes['path'] as endpoint
-from logs where source = 'auth_logs' and log_attributes['path'] = '/recover'
-order by timestamp desc limit 5;
+select timestamp, log_attributes['referer'] as destino_resolvido
+from logs
+where source = 'auth_logs' and log_attributes['path'] = '/recover'
+order by timestamp desc limit 10;
 ```
 
-As chamadas do dia a dia (`/user`, `/token`, `/logout`) **não** servem para isso: elas não
-carregam endereço de retorno, então sempre mostram o Site URL e nunca o caminho.
+| o destino registrado é… | significa |
+|---|---|
+| o endereço **com** o caminho que você pediu | autorizado ✅ |
+| o domínio puro, sem caminho | recusado, e trocado pelo Site URL em silêncio |
 
-### O que JÁ foi feito no código (31/08/2026)
+Medido assim em 22/09/2026: `/redefinir-senha`, `/app` e até um caminho inventado passaram;
+`localhost:8080`, `localhost:3000`, esquema `http`, porta diferente, subdomínio de fora e domínio
+parecido por prefixo foram todos trocados.
 
-Não conserta o acima — conserta a fragilidade que estava do lado e produziria o **mesmo
-sintoma por outra causa**:
+**Esta consulta é a vigilância do item.** A configuração de autenticação não está versionada
+(`supabase/config.toml` não tem seção `[auth]`), então nada avisa se alguém mexer no painel de
+novo — rodá-la depois de qualquer mexida é uma conferência de um minuto.
 
-- `EsqueciSenha.tsx` montava o link com `window.location.origin`, que é "onde o navegador
-  está agora". Da produção acerta; **de uma prévia da Vercel manda o endereço da prévia**,
-  que não está autorizado — e aí o Supabase cai no Site URL de novo, em silêncio.
-- Os três `signUp` de `use-auth.tsx` não mandavam endereço de retorno nenhum. Hoje é
-  inofensivo (confirmação desligada), mas viraria bug no dia em que alguém a ligasse.
+### Por que só a redefinição de senha aparecia quebrada
 
-A regra ficou em `src/lib/endereco-de-retorno.ts`, com 8 testes: em máquina de
-desenvolvimento vale o endereço local (senão ninguém testa), em qualquer outro lugar vale o
-canônico. A comparação de hostname é **exata**, nunca por substring — `localhost.exemplo.com`
-é um domínio público como outro qualquer.
+É o único e-mail de autenticação em uso. Medido em `auth.users` em 22/09/2026: **as 36 contas
+foram confirmadas em menos de 5 segundos após a criação** — a confirmação de e-mail está
+DESLIGADA e aquele e-mail nunca é enviado. Não há convite nem link mágico no produto.
+
+> ⚠️ **Ao ligar a confirmação de e-mail um dia, confira o Site URL ANTES.** E saiba que ligá-la
+> muda o cadastro que está vendendo hoje: as contas passariam a nascer sem confirmar.
+
+### O conserto de código — feito em 22/09/2026
+
+A tela de escolher a nova senha (`RedefinirSenha.tsx`) fingia que o link vencido estava válido.
+O detalhe que torna isso consertável: no caminho do **erro** a biblioteca lança a exceção
+**antes** de limpar o endereço, então o motivo continua legível; no caminho do sucesso ela limpa
+(`window.location.hash = ''`) e quem avisa é o evento `PASSWORD_RECOVERY`.
+
+Três estragos, todos fechados (regra pura em `src/lib/link-de-recuperacao.ts`, com testes):
+
+1. **Beco sem saída.** A pessoa digitava a senha duas vezes para só então levar um aviso
+   genérico, sem botão nenhum. Agora o motivo aparece antes, com "Pedir um link novo", e há
+   "Voltar ao login" em todos os estados.
+2. 🔴 **Senha trocada na conta errada.** Num computador compartilhado, com um colega logado em
+   outra aba, a biblioteca do Supabase **preserva a sessão que já existia** quando o link falha
+   ("Don't remove existing session on URL login failure", em `GoTrueClient`) — e o `updateUser`
+   usava ela. Agora o formulário só aparece para quem veio mesmo do link. A marca fica na **aba**
+   (`sessionStorage`), não no navegador: o colega não a tem, e quem recarrega não é mandado
+   embora.
+3. **Toda recusa virava "o link pode ter expirado".** As três recusas de senha entraram em
+   `traduzirErroAuth` — ver a ordem obrigatória abaixo.
+
+### O que ainda falta
+
+| # | O quê | Quem faz |
+|---|---|---|
+| 1 | **Ler** a lista de Redirect URLs (Authentication → URL Configuration). Se estiver vazia, acrescentar `https://crm.repplyhub.com.br/**` — não muda nada hoje, e protege o dia em que o Site URL mudar | dono da conta |
+| 2 | **Ler** o modelo do e-mail (Authentication → Emails → Reset password) e comparar com `supabase/templates/redefinir-senha.html`. O README registra que a cópia é manual e ninguém nunca conferiu — se a variável ali estiver errada, o link nasce sem caminho e o sintoma é idêntico ao que já medimos | dono da conta |
+| 3 | **Ler** a configuração de SMTP. Se ainda for o serviço embutido do Supabase, o envio é limitado e o e-mail pode não chegar — e aí a redefinição não existe como produto | dono da conta |
+| 4 | Ensaio de ponta a ponta com conta da empresa de demonstração: pedir, cronometrar o e-mail, abrir no celular, trocar a senha, entrar com ela. **Nunca com conta de cliente.** Deixar uma segunda aba logada antes, para responder se a troca derruba as outras sessões | os dois |
+
+🔴 **Ordem obrigatória.** Na mesma tela do painel há um aviso do Supabase pedindo para ligar a
+proteção contra senhas vazadas (`auth_leaked_password_protection`, hoje desligada). É boa ideia,
+mas **só depois** do conserto da mensagem de erro — que subiu em 22/09. Ligá-la antes faria toda
+senha fraca recusada virar "o link pode ter expirado", e a pessoa pediria link novo para sempre
+sem descobrir que o problema era a senha.
+
+### Hipóteses fechadas em 22/09 (não refaça)
+
+- **Pessoa que aparece no CRM sem conta de login** pediria redefinição e nada chegaria, em
+  silêncio: existem 5 — **todas na empresa de demonstração**, zero em cliente.
+- **Pessoa com e-mail da tela diferente do e-mail de login**: existe 1, também na demonstração.
+- **Ninguém está impedido hoje.** São 31 contas de clientes reais em 10 empresas; 2 pedidos de
+  redefinição em toda a vida do sistema, ambos anteriores ao conserto do painel, nenhum concluído.
+
+### Desenvolvimento local: use `127.0.0.1`, não `localhost`
+
+`http://localhost:8080` **não** é autorizado, mas `http://127.0.0.1:8080` é — o Supabase libera
+endereço de loopback numérico por regra própria, e `src/lib/endereco-de-retorno.ts` já trata as
+três formas como máquina local. O Vite imprime "localhost" no terminal, e é daí que vem a
+pegadinha. **Não vale editar a configuração de produção por causa disto.**
+
+### O que já tinha sido feito no código em 31/08/2026
+
+`EsqueciSenha.tsx` montava o link com `window.location.origin` — de uma prévia da Vercel isso
+manda o endereço da prévia, que não está autorizado, e o Supabase cai no Site URL em silêncio:
+mesmo sintoma, outra causa. Os três `signUp` de `use-auth.tsx` não mandavam endereço nenhum.
+A regra ficou em `src/lib/endereco-de-retorno.ts`, com testes. **Falta o mesmo tratamento na
+troca de e-mail** (`Configuracoes.tsx`), que continua sem endereço de retorno e grava o e-mail
+novo em `usuarios` antes de a pessoa confirmar.
 
 ---
 

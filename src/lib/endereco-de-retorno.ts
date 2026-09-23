@@ -31,9 +31,21 @@
  * ---------------------------------------------------------------------------------
  * AO ACRESCENTAR UM DESTINO NOVO
  * ---------------------------------------------------------------------------------
- * Todo caminho passado aqui precisa estar na lista **Redirect URLs** do painel
- * (Authentication → URL Configuration). Não basta existir como rota no React: se o
- * endereço não estiver autorizado, o Supabase o troca pelo Site URL sem avisar.
+ * 🔴 A regra do Supabase NÃO é "todo caminho precisa estar na lista Redirect URLs" — este
+ * comentário já afirmou isso e estava errado. Medido em 22/09/2026: o Supabase aprova o
+ * endereço ANTES de consultar a lista quando ele tem o **mesmo domínio, mesmo esquema e
+ * mesma porta do Site URL**, ou quando é um endereço de loopback NUMÉRICO (`127.0.0.1`,
+ * `[::1]`) em qualquer porta. A lista só decide o que estiver fora disso.
+ *
+ * Na prática: caminho novo do próprio domínio de produção passa sozinho. O que NÃO passa é
+ * endereço de prévia da Vercel, outro subdomínio, outro esquema, outra porta — e o nome
+ * `localhost` escrito por extenso, que não é IP e por isso depende da lista. Para testar
+ * redefinição de senha na sua máquina, abra `http://127.0.0.1:8080`, não `localhost:8080`
+ * (o Vite imprime "localhost" no terminal; é daí que vem a pegadinha).
+ *
+ * Quando o endereço não é autorizado, o Supabase o troca pelo Site URL **sem avisar**.
+ * Detalhe completo, com a consulta que mede isso sem mandar e-mail a ninguém, no item 59 de
+ * `docs/divida-tecnica.md`.
  */
 
 /** Sem barra no fim: a montagem é `canônico + caminho`, e a barra dupla não casa com a lista. */
