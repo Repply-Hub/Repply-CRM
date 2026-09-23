@@ -130,15 +130,42 @@ describe('CampoDeAnexos', () => {
     expect(screen.getByRole('button', { name: /adicionar anexo/i })).toBeDisabled();
 
     // Escolher um arquivo válido enquanto `enviando` já está true (o pai desabilitou o botão,
-    // mas o campo escondido pode disparar via teclado/automação) ainda assim mostra a linha
-    // provisória com o nome do arquivo escolhido.
+    // mas o campo escondido pode disparar via teclado/automação) ainda assim chama `onAdicionar`.
+    // A linha de envio é genérica ("Enviando…"), sem o nome do arquivo: agora o campo aceita
+    // VÁRIOS de uma vez (botão e arrastar), e apontar um único nome no meio de um envio em lote
+    // enganaria — o nome real aparece na lista assim que o anexo termina de subir.
     const input = screen.getByTestId('input-anexo') as HTMLInputElement;
     const pdf = new File(['conteudo'], 'orcamento.pdf', { type: 'application/pdf' });
     fireEvent.change(input, { target: { files: [pdf] } });
 
     expect(onAdicionar).toHaveBeenCalledWith(pdf);
-    expect(screen.getByText('orcamento.pdf')).toBeInTheDocument();
     expect(screen.getByText(/enviando/i)).toBeInTheDocument();
+  });
+
+  it('o botão e o arrastar aceitam VÁRIOS arquivos de uma vez', () => {
+    const onAdicionar = vi.fn();
+    render(<CampoDeAnexos anexos={[]} onAdicionar={onAdicionar} onRemover={vi.fn()} />);
+
+    // O input precisa aceitar seleção múltipla (o navegador só deixa escolher vários com isto).
+    const input = screen.getByTestId('input-anexo') as HTMLInputElement;
+    expect(input.multiple).toBe(true);
+
+    // Escolher dois de uma vez chama `onAdicionar` para CADA um — nada de "um por clique".
+    const pdf = new File(['a'], 'orcamento.pdf', { type: 'application/pdf' });
+    const jpg = new File(['b'], 'planta.jpg', { type: 'image/jpeg' });
+    fireEvent.change(input, { target: { files: [pdf, jpg] } });
+    expect(onAdicionar).toHaveBeenCalledTimes(2);
+    expect(onAdicionar).toHaveBeenCalledWith(pdf);
+    expect(onAdicionar).toHaveBeenCalledWith(jpg);
+
+    // Arrastar-e-soltar vários faz o mesmo (a funcionalidade que tinha sumido).
+    onAdicionar.mockClear();
+    const zona = screen.getByTestId('input-anexo').closest('div')!;
+    const outro = new File(['c'], 'contrato.pdf', { type: 'application/pdf' });
+    fireEvent.drop(zona, { dataTransfer: { files: [pdf, outro] } });
+    expect(onAdicionar).toHaveBeenCalledTimes(2);
+    expect(onAdicionar).toHaveBeenCalledWith(pdf);
+    expect(onAdicionar).toHaveBeenCalledWith(outro);
   });
 
   it('o campo de arquivo sugere só os tipos aceitos (accept)', () => {
