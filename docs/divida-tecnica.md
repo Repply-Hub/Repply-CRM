@@ -12,6 +12,40 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 
 ---
 
+## Placar — quanto falta
+
+> Contado em **23/09/2026**. Para recontar a qualquer momento, na raiz do repositório:
+> `node scripts/contar-divida.mjs` — ele lê a tabela abaixo e imprime tudo isto atualizado.
+
+| | |
+|---|---|
+| Itens no inventário | **75** |
+| ✅ Resolvidos | **19** |
+| Abertos | **56** |
+
+**Dos 56 abertos:** 5 críticos · 14 altos · 20 médios · 14 baixos · 3 outros.
+
+**Os 5 críticos**, que são a fila de cima:
+
+- **16 — Webhook do WhatsApp aceita qualquer um.** 80.631 eventos, nenhum com segredo
+  conferido. É o de maior dano possível: mexer errado PARA as mensagens da MD. Vai em etapas,
+  com plano escrito.
+- **37 — A pré-visualização de anexo executa o HTML do arquivo.**
+- **38 — Excluir usuário não tira o acesso.** O banco foi fechado em 23/09 e a pessoa que
+  estava exposta teve o login revogado; falta o botão "Remover" revogar sozinho, senão a
+  próxima saída repete.
+- **1 — Chave do WhatsApp legível.** A exposição foi fechada em 20/08; restam 3 fases da
+  blindagem.
+- **2 — Titularidade dos serviços.** Decisão do dono, não conserto técnico.
+
+⚠️ **Os números acima são mantidos à mão e envelhecem** — quem marcar um item como resolvido
+atualiza aqui no mesmo commit. **A verdade está sempre na coluna `Gravidade` da tabela abaixo:
+`✅` significa fechado.** A coluna "Bloqueia?" é texto livre e NÃO serve para contar: ela tem ✅
+e ⏳ falando de outras coisas (o item 3, por exemplo, diz "✅ código corrigido · ⚠️ o dado
+gravado continua errado" — e é um item ABERTO). Foi assim que a primeira contagem saiu errada.
+
+---
+
 ## Resumo
 
 | # | Item | Gravidade | Bloqueia? |
@@ -52,7 +86,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 34 | [A etapa da configuração não é verificada contra a tela](#34-a-etapa-gravada-na-configuração-não-é-verificada-contra-a-tela) | Média | Já travou o Novo Negócio 3 vezes — campo obrigatório sem onde preencher |
 | 35 | [Logo de e-mail é um arquivo único para todas as empresas](#35-logo-de-e-mail-é-um-arquivo-único-para-todas-as-empresas) | ✅ Resolvida | Corrigido na migration `20260831140000` |
 | 36 | [Matriz de permissões ainda decorativa em criar/editar, e em 3 módulos que não são tabela](#36-matriz-de-permissões-ainda-decorativa-em-criareditar-e-em-3-módulos-que-não-são-tabela) | Média | Não — falsa sensação de controle, não vazamento |
-| 36 | [As 8 visões `v_md_*` entregam a carteira de clientes sem login](#36-as-8-visões-v_md_-entregam-a-carteira-de-clientes-sem-login) | **Crítica** | Sim — 1.305 clientes legíveis sem login |
+| 36 | [As 8 visões `v_md_*` entregam a carteira de clientes sem login](#36-as-8-visões-v_md_-entregam-a-carteira-de-clientes-sem-login) | ✅ Resolvida | Acesso revogado em 03/09/2026 — reconferido em 23/09: **0 das 9 visões** abertas a visitante |
 | 37 | [A pré-visualização de anexo executa o HTML do arquivo](#37-a-pré-visualização-de-anexo-executa-o-html-do-arquivo-recebido) | **Crítica** | Sim — arquivo de estranho roda na sessão de quem abre |
 | 38 | [Excluir usuário não tira o acesso](#38-excluir-usuário-não-tira-o-acesso) | **Crítica** | ⏳ Banco conferido em 23/09; falta revogar o login (16 funções de servidor passam por cima) |
 | 39 | [Excluir etapa do Kanban move negócios mesmo quando o banco recusa](#39-excluir-etapa-do-kanban-move-os-negócios-mesmo-quando-o-banco-recusa) | ✅ Resolvida | 22/09/2026 — as duas gravações viraram uma operação só no banco |
@@ -74,7 +108,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 55 | [Coisas que deveriam ser por empresa e são globais](#55-coisas-que-deveriam-ser-por-empresa-e-são-compartilhadas-por-todas) | Média | Não |
 | 56 | [Onze pontos da documentação afirmam o que não é verdade](#56-onze-pontos-da-documentação-afirmam-coisa-que-não-é-verdade-hoje) | Média | Não |
 | 57 | [Os módulos que justificam o produto estão vazios](#57-os-módulos-que-justificam-o-produto-estão-vazios) | Produto | Decisão de produto pendente |
-| 58 | [Contato sem responsável aparece para TODAS as empresas](#58-contato-sem-responsável-aparece-para-todas-as-empresas) | **Alta** | Latente — 0 órfãos hoje, mas 3 caminhos podem criar um |
+| 58 | [Contato sem responsável aparece para TODAS as empresas](#58-contato-sem-responsável-aparece-para-todas-as-empresas) | Alta | Latente — o furo existe na regra, mas medido em 23/09 há **0 contatos sem responsável**; nada cai nele hoje |
 | 59 | [O link de redefinir senha aponta para `localhost`](#59-o-link-de-redefinir-senha-aponta-para-localhost) | Baixa | Não — painel e tela conferidos em 22/09. Falta só ensaiar o caminho inteiro numa conta de demonstração |
 | 60 | [O ranking de vendedores chega inteiro no navegador de todo mundo](#60-o-ranking-de-vendedores-chega-inteiro-no-navegador-de-todo-mundo) | **Alta** | Não — mas entrega pela porta dos fundos o que foi fechado pela da frente em 31/08 |
 | 63 | [`plano_vendas_progresso` não checa permissão nenhuma](#63-plano_vendas_progresso-não-checa-permissão-nenhuma) | Média | Não — não atravessa empresa, mas fura a permissão de módulo |
