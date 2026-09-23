@@ -4,26 +4,13 @@ import { ConteudoDialogo, CabecalhoDialogo, CorpoDialogo, RodapeDialogo } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Plus, Loader2, Users2, Search } from 'lucide-react';
+import { Plus, Loader2, Users2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { sanitizeFileName } from '@/lib/file-validation';
 import { SeletorDeAparencia } from '@/components/chat/SeletorDeAparencia';
-
-function getInitials(name: string) {
-  return name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
-}
-
-const COLORS = ['bg-primary', 'bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-pink-500', 'bg-amber-500'];
-function colorForId(id: string) {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
-  return COLORS[Math.abs(hash) % COLORS.length];
-}
+import { SeletorDeMembros } from '@/components/chat/SeletorDeMembros';
 
 interface Member {
   id: string;
@@ -45,17 +32,7 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
   const [foto, setFoto] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [aparencia, setAparencia] = useState<{ icone: string | null; corFundo: string | null; corIcone: string | null }>({ icone: null, corFundo: null, corIcone: null });
-  const [memberSearch, setMemberSearch] = useState('');
   const qc = useQueryClient();
-
-  const toggleMember = (id: string) => {
-    setSelectedMembers(prev =>
-      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
-    );
-  };
-
-  const otherMembers = members.filter(m => m.id !== myId);
-  const allSelected = otherMembers.length > 0 && otherMembers.every(m => selectedMembers.includes(m.id));
 
   const handleCreate = async () => {
     if (!nome.trim()) {
@@ -127,7 +104,6 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
       setFoto(null);
       setFotoPreview(null);
       setAparencia({ icone: null, corFundo: null, corIcone: null });
-      setMemberSearch('');
     } catch (err: any) {
       toast.error('Erro ao criar grupo: ' + err.message);
     } finally {
@@ -136,7 +112,7 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setMemberSearch(''); }}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-xs text-muted-foreground hover:text-foreground">
           <Plus className="h-3.5 w-3.5" />
@@ -168,63 +144,13 @@ export function CreateGroupDialog({ members, myId }: CreateGroupDialogProps) {
             />
           </div>
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Membros</Label>
-              {otherMembers.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedMembers(allSelected ? [] : otherMembers.map(m => m.id))}
-                  className="text-[11px] font-semibold text-primary hover:underline"
-                >
-                  {allSelected ? 'Remover todos' : 'Selecionar todos'}
-                </button>
-              )}
-            </div>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Buscar membro..."
-                value={memberSearch}
-                onChange={e => setMemberSearch(e.target.value)}
-                className="h-8 pl-8 text-xs"
-              />
-            </div>
-             <ScrollArea className="h-[220px] border rounded-lg p-2">
-              <div className="space-y-1">
-                {members.filter(m => m.id !== myId).length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 py-8">
-                    <Users2 className="h-8 w-8 opacity-30" />
-                    <p className="text-xs text-center">Nenhum outro membro na sua empresa. Cadastre funcionários primeiro.</p>
-                  </div>
-                )}
-                {members.filter(m => m.id !== myId).filter(m => m.nome.toLowerCase().includes(memberSearch.trim().toLowerCase())).length === 0 && members.filter(m => m.id !== myId).length > 0 && (
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 py-8">
-                    <Search className="h-8 w-8 opacity-30" />
-                    <p className="text-xs text-center">Nenhum membro encontrado para "{memberSearch}".</p>
-                  </div>
-                )}
-                {members.filter(m => m.id !== myId).filter(m => m.nome.toLowerCase().includes(memberSearch.trim().toLowerCase())).map(m => (
-                  <label
-                    key={m.id}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-muted/50 cursor-pointer transition-colors"
-                  >
-                    <Checkbox
-                      checked={selectedMembers.includes(m.id)}
-                      onCheckedChange={() => toggleMember(m.id)}
-                    />
-                    <Avatar className="h-7 w-7">
-                      <AvatarFallback className={`${colorForId(m.id)} text-white text-[9px] font-semibold`}>
-                        {getInitials(m.nome)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-foreground truncate">{m.nome}</p>
-                      <p className="text-[10px] text-muted-foreground capitalize">{m.role}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </ScrollArea>
+            <SeletorDeMembros
+              titulo="Membros"
+              membros={members}
+              meuId={myId}
+              selecionados={selectedMembers}
+              onChange={setSelectedMembers}
+            />
             {selectedMembers.length > 0 && (
               <p className="text-[10px] text-muted-foreground">
                 {selectedMembers.length} selecionado(s) + você
