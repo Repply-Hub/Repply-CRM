@@ -207,15 +207,16 @@ export function useUpdateChatGrupo() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ grupoId, nome, foto, icone, corFundo, corIcone }: { grupoId: string, nome?: string, foto?: File | null, icone?: string | null, corFundo?: string | null, corIcone?: string | null }) => {
+    mutationFn: async ({ grupoId, nome, foto, icone, corFundo, corIcone, limparFoto }: { grupoId: string, nome?: string, foto?: File | null, icone?: string | null, corFundo?: string | null, corIcone?: string | null, limparFoto?: boolean }) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Usuário não autenticado');
 
-      const updates: { nome?: string; foto_url?: string; icone?: string | null; cor_fundo?: string | null; cor_icone?: string | null } = {};
+      const updates: { nome?: string; foto_url?: string | null; icone?: string | null; cor_fundo?: string | null; cor_icone?: string | null } = {};
       if (nome !== undefined) updates.nome = nome;
       if (icone !== undefined) updates.icone = icone;
       if (corFundo !== undefined) updates.cor_fundo = corFundo;
       if (corIcone !== undefined) updates.cor_icone = corIcone;
+      if (limparFoto) updates.foto_url = null; // escolher símbolo/cor larga a imagem
 
       if (foto) {
         const safeName = sanitizeFileName(foto.name);
@@ -339,18 +340,19 @@ export function useUpdateChatGeralConfig() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ nome, foto, icone, corFundo, corIcone }: { nome?: string, foto?: File | null, icone?: string | null, corFundo?: string | null, corIcone?: string | null }) => {
+    mutationFn: async ({ nome, foto, icone, corFundo, corIcone, limparFoto }: { nome?: string, foto?: File | null, icone?: string | null, corFundo?: string | null, corIcone?: string | null, limparFoto?: boolean }) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Usuário não autenticado');
 
       const { data: me } = await supabase.from('usuarios').select('empresa_id').eq('user_id', userData.user.id).single();
       if (!me?.empresa_id) throw new Error('Empresa não encontrada');
 
-      const updates: { nome?: string; foto_url?: string; icone?: string | null; cor_fundo?: string | null; cor_icone?: string | null } = {};
+      const updates: { nome?: string; foto_url?: string | null; icone?: string | null; cor_fundo?: string | null; cor_icone?: string | null } = {};
       if (nome !== undefined) updates.nome = nome;
       if (icone !== undefined) updates.icone = icone;
       if (corFundo !== undefined) updates.cor_fundo = corFundo;
       if (corIcone !== undefined) updates.cor_icone = corIcone;
+      if (limparFoto) updates.foto_url = null; // escolher símbolo/cor larga a imagem
 
       if (foto) {
         const safeName = sanitizeFileName(foto.name);

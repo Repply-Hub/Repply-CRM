@@ -1708,7 +1708,7 @@ const Chat = () => {
                             nome={chatHeaderName}
                             IconePadrao={Users2}
                             valor={{ icone: activeGrupo?.icone ?? null, corFundo: activeGrupo?.cor_fundo ?? null, corIcone: activeGrupo?.cor_icone ?? null, fotoUrl: activeGrupo?.foto_url ?? null }}
-                            onChange={(v) => activeGrupoId && updateGrupo.mutate({ grupoId: activeGrupoId, icone: v.icone, corFundo: v.corFundo, corIcone: v.corIcone })}
+                            onChange={(v) => activeGrupoId && updateGrupo.mutate({ grupoId: activeGrupoId, icone: v.icone, corFundo: v.corFundo, corIcone: v.corIcone, limparFoto: true })}
                             onEscolherImagem={(file) => activeGrupoId && updateGrupo.mutate({ grupoId: activeGrupoId, foto: file })}
                           />
                           <div className="min-w-0 flex-1">
@@ -1791,7 +1791,7 @@ const Chat = () => {
                               nome={geralNome}
                               IconePadrao={MessageCircle}
                               valor={{ icone: geralConfig?.icone ?? null, corFundo: geralConfig?.cor_fundo ?? null, corIcone: geralConfig?.cor_icone ?? null, fotoUrl: geralConfig?.foto_url ?? null }}
-                              onChange={(v) => updateGeralConfig.mutate({ icone: v.icone, corFundo: v.corFundo, corIcone: v.corIcone })}
+                              onChange={(v) => updateGeralConfig.mutate({ icone: v.icone, corFundo: v.corFundo, corIcone: v.corIcone, limparFoto: true })}
                               onEscolherImagem={(file) => updateGeralConfig.mutate({ foto: file })}
                             />
                             <div className="min-w-0 flex-1">
