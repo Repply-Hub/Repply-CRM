@@ -194,6 +194,9 @@ describe('useAdicionarAnexoDaTarefa', () => {
     // A lista da tela precisa se atualizar — sem esta invalidação, o anexo novo não aparece até
     // recarregar. Sem este assert, apagar a invalidação passaria despercebido.
     expect(invalidou).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['tarefa_anexos', TAREFA] }));
+    // O clipe de contagem no card do Kanban lê da lista de tarefas (`['tarefas']`), não da lista
+    // de anexos — sem esta invalidação ele fica parado até o próximo refetch.
+    expect(invalidou).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['tarefas'] }));
   });
 
   it('🔴 arquivo recusado não sobe nem grava linha', async () => {
@@ -285,6 +288,9 @@ describe('useRemoverAnexoDaTarefa', () => {
     expect(toastSucesso).toHaveBeenCalled();
     // A lista se atualiza depois de tirar — o teste prova a invalidação, não só o nome dele.
     expect(invalidou).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['tarefa_anexos', TAREFA] }));
+    // O clipe de contagem no card do Kanban lê da lista de tarefas (`['tarefas']`), não da lista
+    // de anexos — sem esta invalidação ele fica parado até o próximo refetch.
+    expect(invalidou).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['tarefas'] }));
   });
 
   it('🔴 tirar anexo que a regra do banco recusa NÃO diz que removeu', async () => {

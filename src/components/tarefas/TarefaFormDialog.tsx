@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { DialogPortal } from '@/components/ui/dialog';
 import {
   Dialog,
@@ -60,6 +61,7 @@ const emptyForm = {
 };
 
 export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStages, defaultStatus, extraFields }: TarefaFormDialogProps) {
+  const qc = useQueryClient();
   const { profile } = useAuth();
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const { data: vendedores = [] } = useVendedores();
@@ -202,6 +204,9 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
             } else {
               toast.success('Tarefa criada');
             }
+            // Ao menos um anexo subiu: o clipe de contagem do card lê da lista de tarefas, não da
+            // de anexos — sem isto ele fica parado até o próximo refetch.
+            qc.invalidateQueries({ queryKey: ['tarefas'] });
           }
         } else {
           toast.success('Tarefa criada');

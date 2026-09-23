@@ -141,6 +141,7 @@ export function useAdicionarAnexoDaTarefa(tarefaId: string) {
     },
     onSuccess: () => {
       invalidarLista(qc, tarefaId);
+      qc.invalidateQueries({ queryKey: ['tarefas'] }); // o card do Kanban conta pela lista de tarefas
       toast.success('Anexo enviado.');
     },
     onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível enviar o anexo.')),
@@ -176,6 +177,7 @@ export function useRemoverAnexoDaTarefa(tarefaId: string) {
     },
     onSuccess: () => {
       invalidarLista(qc, tarefaId);
+      qc.invalidateQueries({ queryKey: ['tarefas'] }); // o card do Kanban conta pela lista de tarefas
       toast.success('Anexo removido.');
     },
     onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível remover o anexo.')),
