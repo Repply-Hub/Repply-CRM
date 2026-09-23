@@ -6,6 +6,9 @@ import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdate
 import { useOnlineUsers } from '@/hooks/use-presence';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
 import { alvoInicialDaUrl, chaveDoAlvo } from '@/lib/alvo-do-chat';
+import { estadoDaBolinha } from '@/lib/bolinha-nao-lida';
+import { useChatMarcadosNaoLidos, useMarcarConversaNaoLida, useDesmarcarConversaNaoLida } from '@/hooks/use-chat-nao-lida';
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from '@/components/ui/context-menu';
 import { useVendedores } from '@/hooks/use-clientes';
 import { useCampoComMencao } from '@/hooks/use-campo-com-mencao';
 import { ListaDeMencao } from '@/components/mencao/ListaDeMencao';
@@ -109,6 +112,9 @@ function MembersList({
   onToggle,
   grupos,
   unreadCounts,
+  marcadosNaoLidos,
+  onMarcarNaoLida,
+  onMarcarLida,
   mencoesPorChave,
   geralNome,
   geralFotoUrl,
@@ -124,6 +130,9 @@ function MembersList({
   onToggle: () => void;
   grupos: ChatGrupo[];
   unreadCounts: Record<string, number>;
+  marcadosNaoLidos: Set<string>;
+  onMarcarNaoLida: (t: ChatTarget) => void;
+  onMarcarLida: (t: ChatTarget) => void;
   /** Não lidas por conversa (Geral/grupo) — chave `mencoesPorChave` do @, ver `useMencoesNaoLidas`. */
   mencoesPorChave: Record<string, number>;
   geralNome: string;
@@ -134,6 +143,22 @@ function MembersList({
    *  cima não faz diferença — as duas colunas ficam lado a lado, como sempre. */
   showOnMobile: boolean;
 }) {
+  // O selo de não-lida: número quando há mensagem nova; bolinha quando só há marca
+  // manual; nada quando está tudo lido. `grande` = lista expandida, `pequeno` = trilho.
+  const seloNaoLido = (chave: string, tamanho: 'grande' | 'pequeno') => {
+    const estado = estadoDaBolinha(unreadCounts[chave] ?? 0, marcadosNaoLidos.has(chave));
+    if (estado === 'nada') return null;
+    if (estado === 'ponto') {
+      return tamanho === 'grande'
+        ? <span aria-label="Não lida" className="h-2.5 w-2.5 rounded-full bg-destructive" />
+        : <span aria-label="Não lida" className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-destructive ring-1 ring-background" />;
+    }
+    const n = unreadCounts[chave];
+    return tamanho === 'grande'
+      ? <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">{n}</span>
+      : <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground ring-1 ring-background">{n}</span>;
+  };
+
   const [memberSearch, setMemberSearch] = useState('');
   const searching = memberSearch.trim().length > 0;
   const searchTerm = memberSearch.trim().toLowerCase();
@@ -162,11 +187,7 @@ function MembersList({
               </AvatarFallback>
             </Avatar>
           </button>
-          {unreadCounts['geral'] > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground ring-1 ring-background">
-              {unreadCounts['geral']}
-            </span>
-          )}
+          {seloNaoLido('geral', 'pequeno')}
           {(mencoesPorChave['geral'] ?? 0) > 0 && !(unreadCounts['geral'] > 0) && (
             <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-primary text-[7px] font-bold text-primary-foreground ring-1 ring-background">@</span>
           )}
@@ -189,11 +210,7 @@ function MembersList({
                   </AvatarFallback>
                 </Avatar>
               </button>
-              {count > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground ring-1 ring-background">
-                  {count}
-                </span>
-              )}
+              {seloNaoLido(`grupo_${g.id}`, 'pequeno')}
               {(mencoesPorChave[`grupo_${g.id}`] ?? 0) > 0 && !(count > 0) && (
                 <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-primary text-[7px] font-bold text-primary-foreground ring-1 ring-background">@</span>
               )}
@@ -221,11 +238,7 @@ function MembersList({
               {onlineIds.has(m.id) && (
                 <Circle className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 fill-emerald-500 text-background stroke-[3]" />
               )}
-              {count > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full bg-destructive text-[7px] font-bold text-destructive-foreground ring-1 ring-background">
-                  {count}
-                </span>
-              )}
+              {seloNaoLido(`dm_${m.id}`, 'pequeno')}
             </div>
           );
         })}
@@ -267,36 +280,43 @@ function MembersList({
           {!searching && (
             <>
               {/* Chat geral */}
-              <button
-                onClick={() => onSelect({ type: 'geral' })}
-                className={cn(
-                  'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
-                  target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50'
-                )}
-              >
-                <Avatar className="h-8 w-8 border border-border">
-                  {geralFotoUrl && (
-                    <ImagemPrivada src={geralFotoUrl} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+              <ContextMenu>
+                <ContextMenuTrigger asChild>
+                  <button
+                    onClick={() => onSelect({ type: 'geral' })}
+                    className={cn(
+                      'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
+                      target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50'
+                    )}
+                  >
+                    <Avatar className="h-8 w-8 border border-border">
+                      {geralFotoUrl && (
+                        <ImagemPrivada src={geralFotoUrl} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                      )}
+                      <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
+                        <Users className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-foreground truncate">{geralNome}</p>
+                      <p className="text-[10px] text-muted-foreground">Toda a equipe</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {(mencoesPorChave['geral'] ?? 0) > 0 && (
+                        <span aria-label="Você foi mencionado" className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">@</span>
+                      )}
+                      {seloNaoLido('geral', 'grande')}
+                    </div>
+                  </button>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  {estadoDaBolinha(unreadCounts['geral'] ?? 0, marcadosNaoLidos.has('geral')) === 'nada' ? (
+                    <ContextMenuItem onClick={() => onMarcarNaoLida({ type: 'geral' })}>Marcar como não lida</ContextMenuItem>
+                  ) : (
+                    <ContextMenuItem onClick={() => onMarcarLida({ type: 'geral' })}>Marcar como lida</ContextMenuItem>
                   )}
-                  <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
-                    <Users className="h-4 w-4" />
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-foreground truncate">{geralNome}</p>
-                  <p className="text-[10px] text-muted-foreground">Toda a equipe</p>
-                </div>
-                <div className="flex items-center gap-1">
-                  {(mencoesPorChave['geral'] ?? 0) > 0 && (
-                    <span aria-label="Você foi mencionado" className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">@</span>
-                  )}
-                  {unreadCounts['geral'] > 0 && (
-                    <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
-                      {unreadCounts['geral']}
-                    </span>
-                  )}
-                </div>
-              </button>
+                </ContextMenuContent>
+              </ContextMenu>
 
             </>
           )}
@@ -308,37 +328,43 @@ function MembersList({
             </div>
           )}
           {(searching ? filteredGrupos : grupos).map(g => (
-            <button
-              key={g.id}
-              onClick={() => onSelect({ type: 'grupo', grupoId: g.id })}
-              className={cn(
-                'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
-                target.type === 'grupo' && target.grupoId === g.id ? 'bg-primary/10' : 'hover:bg-muted/50'
-              )}
-            >
-              <Avatar className="h-8 w-8 border border-border">
-                {g.foto_url && (
-                  <ImagemPrivada src={g.foto_url} alt={g.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+            <ContextMenu key={g.id}>
+              <ContextMenuTrigger asChild>
+                <button
+                  onClick={() => onSelect({ type: 'grupo', grupoId: g.id })}
+                  className={cn(
+                    'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
+                    target.type === 'grupo' && target.grupoId === g.id ? 'bg-primary/10' : 'hover:bg-muted/50'
+                  )}
+                >
+                  <Avatar className="h-8 w-8 border border-border">
+                    {g.foto_url && (
+                      <ImagemPrivada src={g.foto_url} alt={g.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                    )}
+                    <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
+                      <Users2 className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-foreground truncate">{g.nome}</p>
+                    <p className="text-[10px] text-muted-foreground">Grupo</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {(mencoesPorChave[`grupo_${g.id}`] ?? 0) > 0 && (
+                      <span aria-label="Você foi mencionado" className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">@</span>
+                    )}
+                    {seloNaoLido(`grupo_${g.id}`, 'grande')}
+                  </div>
+                </button>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                {estadoDaBolinha(unreadCounts[`grupo_${g.id}`] ?? 0, marcadosNaoLidos.has(`grupo_${g.id}`)) === 'nada' ? (
+                  <ContextMenuItem onClick={() => onMarcarNaoLida({ type: 'grupo', grupoId: g.id })}>Marcar como não lida</ContextMenuItem>
+                ) : (
+                  <ContextMenuItem onClick={() => onMarcarLida({ type: 'grupo', grupoId: g.id })}>Marcar como lida</ContextMenuItem>
                 )}
-                <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
-                  <Users2 className="h-4 w-4" />
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-foreground truncate">{g.nome}</p>
-                <p className="text-[10px] text-muted-foreground">Grupo</p>
-              </div>
-              <div className="flex items-center gap-1">
-                {(mencoesPorChave[`grupo_${g.id}`] ?? 0) > 0 && (
-                  <span aria-label="Você foi mencionado" className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">@</span>
-                )}
-                {unreadCounts[`grupo_${g.id}`] > 0 && (
-                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
-                    {unreadCounts[`grupo_${g.id}`]}
-                  </span>
-                )}
-              </div>
-            </button>
+              </ContextMenuContent>
+            </ContextMenu>
           ))}
 
           {!searching && (
@@ -368,41 +394,47 @@ function MembersList({
               ? `${lastMsg.usuario_id === myId ? 'Você: ' : ''}${lastMsg.conteudo?.trim() || (lastMsg.arquivo_nome ? 'Enviou um arquivo' : '')}`
               : '';
             return (
-              <button
-                key={m.id}
-                onClick={() => onSelect({ type: 'dm', memberId: m.id, recipientId: m.id })}
-                className={cn(
-                  'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
-                  isSelected ? 'bg-primary/10' : 'hover:bg-muted/50'
-                )}
-              >
-                <div className="relative">
-                  <Avatar className="h-8 w-8 border border-border">
-                    {m.avatar_url && (
-                      <ImagemPrivada src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+              <ContextMenu key={m.id}>
+                <ContextMenuTrigger asChild>
+                  <button
+                    onClick={() => onSelect({ type: 'dm', memberId: m.id, recipientId: m.id })}
+                    className={cn(
+                      'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
+                      isSelected ? 'bg-primary/10' : 'hover:bg-muted/50'
                     )}
-                    <AvatarFallback className={`${colorForId(m.id)} text-white text-[10px] font-semibold`}>
-                      {getInitials(m.nome)}
-                    </AvatarFallback>
-                  </Avatar>
-                  {onlineIds.has(m.id) && (
-                    <Circle className="absolute -bottom-0.5 -right-0.5 h-3 w-3 fill-emerald-500 text-background stroke-[3]" />
+                  >
+                    <div className="relative">
+                      <Avatar className="h-8 w-8 border border-border">
+                        {m.avatar_url && (
+                          <ImagemPrivada src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
+                        )}
+                        <AvatarFallback className={`${colorForId(m.id)} text-white text-[10px] font-semibold`}>
+                          {getInitials(m.nome)}
+                        </AvatarFallback>
+                      </Avatar>
+                      {onlineIds.has(m.id) && (
+                        <Circle className="absolute -bottom-0.5 -right-0.5 h-3 w-3 fill-emerald-500 text-background stroke-[3]" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-foreground truncate">
+                        {m.nome} {isMe && <span className="text-muted-foreground font-normal">(você)</span>}
+                      </p>
+                      {lastMsgPreview && (
+                        <p className="text-[10px] text-muted-foreground truncate">{lastMsgPreview}</p>
+                      )}
+                    </div>
+                    {seloNaoLido(`dm_${m.id}`, 'grande')}
+                  </button>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  {estadoDaBolinha(unreadCounts[`dm_${m.id}`] ?? 0, marcadosNaoLidos.has(`dm_${m.id}`)) === 'nada' ? (
+                    <ContextMenuItem onClick={() => onMarcarNaoLida({ type: 'dm', memberId: m.id, recipientId: m.id })}>Marcar como não lida</ContextMenuItem>
+                  ) : (
+                    <ContextMenuItem onClick={() => onMarcarLida({ type: 'dm', memberId: m.id, recipientId: m.id })}>Marcar como lida</ContextMenuItem>
                   )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-foreground truncate">
-                    {m.nome} {isMe && <span className="text-muted-foreground font-normal">(você)</span>}
-                  </p>
-                  {lastMsgPreview && (
-                    <p className="text-[10px] text-muted-foreground truncate">{lastMsgPreview}</p>
-                  )}
-                </div>
-                {unreadCounts[`dm_${m.id}`] > 0 && (
-                  <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
-                    {unreadCounts[`dm_${m.id}`]}
-                  </span>
-                )}
-              </button>
+                </ContextMenuContent>
+              </ContextMenu>
             );
           })}
         </div>
@@ -777,6 +809,9 @@ const Chat = () => {
   const geralNome = geralConfig?.nome || 'Chat Geral';
   const markAsRead = useMarkChatAsRead();
   const { data: unreadCounts = {} } = useUnreadChatByTarget();
+  const { data: marcadosNaoLidos = new Set<string>() } = useChatMarcadosNaoLidos();
+  const marcarNaoLida = useMarcarConversaNaoLida();
+  const desmarcarNaoLida = useDesmarcarConversaNaoLida();
   const { data: lastActivity = {} } = useChatLastActivity();
   const [expandedMediaTab, setExpandedMediaTab] = useState<
     'imagens' | 'videos' | 'documentos' | 'links' | null
@@ -1068,6 +1103,8 @@ const Chat = () => {
     inputRef.current?.focus();
     // Also mark as read when switching chat
     markAsRead.mutate({ grupoId: activeGrupoId, recipientId: activeRecipientId });
+    // Abrir a conversa também tira a marca "não lida" manual (se houver).
+    desmarcarNaoLida.mutate(chaveDoAlvo(target));
   }, [target]);
 
   useEffect(() => {
@@ -1463,6 +1500,12 @@ const Chat = () => {
           onToggle={() => setTeamCollapsed(prev => !prev)}
           grupos={sortedGrupos}
           unreadCounts={unreadCounts}
+          marcadosNaoLidos={marcadosNaoLidos}
+          onMarcarNaoLida={(t) => marcarNaoLida.mutate(chaveDoAlvo(t))}
+          onMarcarLida={(t) => {
+            markAsRead.mutate({ grupoId: t.type === 'grupo' ? t.grupoId : null, recipientId: t.type === 'dm' ? t.recipientId : null });
+            desmarcarNaoLida.mutate(chaveDoAlvo(t));
+          }}
           mencoesPorChave={mencoes?.chat ?? {}}
           geralNome={geralNome}
           geralFotoUrl={geralConfig?.foto_url}
