@@ -104,6 +104,28 @@ Outra sessão mexeu nos baldes enquanto este plano era executado. O quadro real 
 | `branding` | sim | 0 | — | — |
 | `fabricante-arquivos` | **não** | 2 | não | não |
 
+> 🔴 **ESTE RETRATO VENCEU. Quadro real em 23/09/2026** — a coluna LISTAR virou **não em
+> todos os baldes**, e a coluna BAIXAR não mudou em nenhum.
+>
+> | Balde | `public` | Objetos | Estranho LISTAR? | Estranho BAIXAR? |
+> |---|---|---:|---|---|
+> | `pedido-anexos` | sim | 23.099 | não (27/08) | **sim** |
+> | `whatsapp-media` | sim | 15.174 | não (28/08) | **sim** |
+> | `email-assets` | sim | 481 | não (23/09) | **sim** |
+> | `chat-files` | sim | 409 | não (28/08) | **sim** |
+> | `avatars` | sim | 28 | não (23/09) | **sim** |
+> | `ajuda-imagens` | sim | 20 | não (23/09) | **sim** |
+> | `tarefa-anexos` | sim | 7 | não | **sim** |
+> | `branding` | sim | 3 | não (23/09) | **sim** |
+> | `extremoz-dom` · `fabricante-arquivos` · `dom-natal` · `email-anexos` | **não** | 221 | não | não |
+>
+> Medido pelo caminho HTTP real, com a chave pública e sem sessão: a listagem devolve `[]` em
+> todos. **Nenhuma regra de `storage.objects` vale mais para o papel `public`** (migration
+> `20260923180000`, item 43 da dívida técnica).
+>
+> Ou seja: o eixo da LISTAGEM está fechado por inteiro, e o que resta deste plano é só o
+> Passo 7 — o eixo do DOWNLOAD, que depende de `buckets.public` e mexe em tela.
+
 **O que mudou, e é bom:** a política `pedido_anexos_select` (27/08, outra sessão) fechou a
 ENUMERAÇÃO do maior balde. Um estranho não consegue mais pedir a lista dos 14.997 anexos.
 Nasceu também `fabricante-arquivos`, privado desde o berço — o padrão certo. E
@@ -259,6 +281,24 @@ E as regras de leitura de hoje estão escritas assim (medido):
 | `Avatars are publicly accessible` | **toda identidade** | `bucket_id = 'avatars'` |
 | `Logos são acessíveis publicamente` | **toda identidade** | `bucket_id = 'branding'` |
 | `catalogo_produtos_public_read` | **toda identidade** | `bucket_id = 'catalogo-produtos'` |
+
+> 🔴 **ESTA TABELA É O RETRATO DE 27/08 E JÁ NÃO DESCREVE O BANCO.** As oito regras acima
+> foram substituídas; hoje **nenhuma** delas existe com esse nome, e **nenhuma** vale para a
+> identidade anônima:
+>
+> | regra de 27/08 | o que é hoje |
+> |---|---|
+> | `Qualquer um pode ver anexos de pedidos` | `pedido_anexos_select`, só logado da empresa dona (27/08) |
+> | `public_read_whatsapp_media` | `whatsapp_media_select`, só logado da empresa dona (28/08) |
+> | `Public read access for chat files` · `Temporary full access to chat files` | `chat_files_select`, só logado da mesma empresa (28/08) |
+> | `Public Access` | `email_assets_select`, só logado (23/09) |
+> | `Avatars are publicly accessible` | `avatars_select`, só logado (23/09) |
+> | `Logos são acessíveis publicamente` | `branding_select`, só logado (23/09) |
+> | `catalogo_produtos_public_read` | o balde deixou de existir |
+>
+> **O raciocínio do parágrafo abaixo continua válido e é o ponto do Passo 7** — ele só não
+> vale mais para estes nomes. A porta com identidade deixou de ser a saída fácil; quem for
+> fechar o balde agora precisa checar as regras vigentes, não esta tabela.
 
 A identidade anônima do projeto viaja na chave pública que vai **dentro do arquivo do site**
 (`VITE_SUPABASE_PUBLISHABLE_KEY`) — ou seja, qualquer visitante tem essa chave. Com ela e uma

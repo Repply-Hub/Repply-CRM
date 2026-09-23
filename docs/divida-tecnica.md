@@ -19,11 +19,11 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 
 | | |
 |---|---|
-| Itens no inventário | **75** |
-| ✅ Resolvidos | **21** |
+| Itens no inventário | **76** |
+| ✅ Resolvidos | **22** |
 | Abertos | **54** |
 
-**Dos 54 abertos:** 3 críticos · 14 altos · 20 médios · 14 baixos · 3 outros.
+**Dos 54 abertos:** 3 críticos · 13 altos · 20 médios · 15 baixos · 3 outros.
 
 **Os 3 críticos**, que são a fila de cima:
 
@@ -89,7 +89,7 @@ gravado continua errado" — e é um item ABERTO). Foi assim que a primeira cont
 | 40 | [O conserto de datas não alcança a tela de Negócios](#40--o-conserto-de-datas-da-importação-não-alcançava-a-tela-de-negócios) | ✅ Código resolvido | 01/09/2026 · ⚠️ o dado já gravado continua errado — ver item 3 |
 | 41 | [Duas funções do banco atravessam a fronteira entre empresas](#41-duas-funções-do-banco-atravessam-a-fronteira-entre-empresas) | ✅ Resolvido | Corrigido na migration `20260829120000` — a tela só acompanhou em 31/08 |
 | 42 | [Funções de servidor abertas sem motivo, e duas sem conferir quem chamou](#42-seis-funções-de-servidor-abertas-sem-motivo-escrito-e-duas-sem-conferir-quem-chamou) | Alta | Não |
-| 43 | [Os 22.276 arquivos do Storage podem ser LISTADOS sem login](#43-os-22276-arquivos-do-storage-podem-ser-listados-sem-login) | Alta | Complementa o plano dos baldes |
+| 43 | [Listar arquivo do Storage sem login](#43-os-22276-arquivos-do-storage-podem-ser-listados-sem-login) | ✅ Resolvido | Fechado em 23/09/2026 — 532 → 0, e os links continuam abrindo |
 | 44 | [A matriz de permissões só é conferida em 2 dos 15 módulos](#44-a-matriz-de-permissões-só-é-conferida-pelo-banco-em-2-dos-15-módulos) | Alta | Não — mapa levantado em 22/09; implementação adiada por decisão do dono |
 | 45 | [Não existe conferência automática, e o `git push` publica](#45-não-existe-conferência-automática--e-agora-o-git-push-publica) | ✅ Resolvida | Robô de conferência em 23/09 — recusa quando o número piora. Avisa, não bloqueia |
 | 46 | [`types.ts` com 21 objetos fora de sincronia, e dá para regerar](#46-typests-tem-21-objetos-fora-de-sincronia-e-pode-ser-regerado) | Alta | Não |
@@ -116,6 +116,7 @@ gravado continua errado" — e é um item ABERTO). Foi assim que a primeira cont
 | 73 | [Dono de conta apagava o chat de TODAS as empresas](#73-dono-de-conta-apagava-o-chat-de-todas-as-empresas) | ✅ Resolvida | Corrigida em 23/09/2026 — apagava 748 mensagens de 11 empresas, inclusive as 715 do cliente pagante |
 | 74 | [Vendedor vinculado ao WhatsApp lê E ALTERA a configuração da instância](#74-vendedor-vinculado-ao-whatsapp-lê-e-altera-a-configuração-da-instância) | ✅ Resolvida | Os 3 passos fechados em 23/09 — a chave não chega a navegador nenhum |
 | 75 | [Dá para forjar conversa no chat](#75-dá-para-forjar-conversa-no-chat-e-a-reescrita-não-se-fecha-por-regra-de-acesso) | Alta | Não — mas inserir mensagem em grupo alheio, com data no passado, funciona hoje |
+| 76 | ["Remover imagem" não apaga a foto do armazenamento](#76-remover-imagem-não-apaga-a-foto-do-armazenamento) | Baixa | Não — 12 arquivos órfãos, 6 MB; o botão promete o que não faz |
 
 > ⚠️ Os itens **61 e 62** existem no corpo deste documento mas não têm linha aqui — quem os
 > escreveu esqueceu a tabela. Vale acrescentar ao passar por perto.
@@ -1919,29 +1920,104 @@ de IA paga. **Apagar as duas do Supabase resolve inteiro.**
 
 ## 43. Os 22.276 arquivos do Storage podem ser LISTADOS sem login
 
-**Gravidade: alta. Complementa `operacao/plano-baldes-privados.md`, não o substitui.**
+> ✅ **Resolvido em 23/09/2026.** Migration `20260923180000_listar_arquivo_exige_login.sql`.
+> **532 arquivos listáveis sem login → 0**, sem que um único link parasse de abrir.
 
-Aquele plano mapeou muito bem que os 7 baldes estão abertos, mas o modelo de risco dele diz
-*"qualquer pessoa **com o link** baixa o arquivo"*. **Não é preciso ter o link.**
+**Gravidade original: alta. Complementava `operacao/plano-baldes-privados.md`, não o substituía.**
 
-Testado em 28/08/2026 pelo caminho exato que o `.list()` do JavaScript usa
-(`storage.search`), assumindo o papel `anon`: dá para listar a raiz do balde, obter as pastas
-(que são os `empresa_id`) e enumerar os arquivos de cada uma. Cadeia completa, sem credencial.
+Aquele plano mapeou muito bem que os baldes estavam abertos, mas o modelo de risco dele dizia
+*"qualquer pessoa **com o link** baixa o arquivo"*. **Não era preciso ter o link.**
+
+Testado em 28/08/2026 pelo caminho exato que o `.list()` do JavaScript usa (`storage.search`),
+assumindo o papel `anon`: dava para listar a raiz do balde, obter as pastas (que são os
+`empresa_id`) e enumerar os arquivos de cada uma. Cadeia completa, sem credencial — **22.276
+arquivos**. Não era "link vazado", era inventário.
+
+### 🔴 O número de 22.276 envelheceu, e o item mentia por isso
+
+Medido de novo em 23/09/2026, antes de mexer em nada: o grosso **já tinha sido fechado no
+mesmo 28/08**, por passos do próprio plano dos baldes. `pedido-anexos` ganhou
+`pedido_anexos_select` em 27/08; `whatsapp-media` e `chat-files` em 28/08 (migration
+`20260828120615`). Sobravam **532** arquivos, em quatro baldes:
+
+| balde | arquivos | o que é |
+|---|---|---|
+| `email-assets` | 481 | imagens embutidas em e-mail e assinaturas |
+| `avatars` | 28 | fotos de perfil da equipe |
+| `ajuda-imagens` | 20 | imagens da tela de Ajuda |
+| `branding` | 3 | logo das empresas |
+
+Continuava sendo inventário — as pastas são os `empresa_id` —, mas 4% do que o item anunciava.
+**Lição para o inventário inteiro: item de segurança com número dentro precisa ser remedido
+antes de virar plano de trabalho.** Metade deste já estava consertado por outro caminho, e
+ninguém tinha voltado aqui para dizer.
+
+### Por que esses quatro tinham ficado de fora
+
+A §8 do plano dos baldes decidiu explicitamente manter `avatars`, `branding` e `email-assets`
+públicos. **Aquela decisão era sobre outro eixo.**
+
+São dois, e confundi-los é o que deixou isto aberto por um mês:
+
+| eixo | quem decide | o que controla |
+|---|---|---|
+| `buckets.public` | coluna do balde | o **download**: a porta `/object/public/...` pula a autorização inteira |
+| regra de leitura em `storage.objects` | política de acesso | a **listagem**: quem pode perguntar "o que existe aí dentro" |
+
+O plano decidiu o primeiro. Ninguém decidiu o segundo — ele veio aberto de fábrica e ficou.
+
+### O conserto: as quatro regras de leitura passam de "todo mundo" para "logado"
+
+O balde continua público, então **o link continua abrindo sem credencial**. Já havia prova
+disso rodando em produção: `pedido-anexos` é público E tem a leitura só para logados desde
+27/08. Medido em 23/09/2026, sem nenhuma credencial:
+
+| balde | configuração | link direto |
+|---|---|---|
+| `pedido-anexos` | público + leitura só logado | **HTTP 200**, baixou |
+| `branding` | público + leitura para todos | HTTP 200 |
+| `email-anexos` | privado | HTTP 400 |
+
+A primeira linha é a configuração que os outros quatro passaram a ter.
+
+**E o sistema não perde nada:** não existe **uma única** chamada de `.list()` em todo o
+repositório, e nenhuma das cinco telas sem login (`/`, `/login`, `/cadastro`, `/esqueci-senha`,
+`/redefinir-senha`) encosta no Storage. A imagem da assinatura de e-mail — que quem busca é o
+programa de e-mail de **quem recebe**, anônimo e fora do sistema — passa pela porta pública,
+que não consulta regra nenhuma.
+
+### O que foi medido depois de aplicar
+
+Pelo caminho HTTP real, com a chave pública e sem sessão — exatamente o que o navegador de um
+visitante faz:
 
 ```
-set role anon;
-select count(*) from storage.objects;                            --> 22.276
-select count(*) from storage.search('', 'pedido-anexos', ...);   -->     42 pastas na raiz
+POST /storage/v1/object/list/{balde}   →  []   nos cinco baldes testados
 ```
 
-Isso muda a natureza do problema: não é "link vazado", é **inventário completo** — 14.997
-anexos de negócio e 6.924 mídias de WhatsApp de clientes.
+| | antes | depois |
+|---|---|---|
+| visitante sem login, tabela inteira | 532 | **0** |
+| vendedor comum da MD | 532 | **532** |
+| link direto sem credencial | 200 | **200** |
 
-### Consequência para o plano
+### De quebra: as três regras de gravação do avatar
 
-A listagem deveria subir para os primeiros passos: é ela que transforma o resto em algo fácil de
-explorar. Enquanto o balde for público mas não listável, é preciso ter o link; listável, basta
-querer.
+Também valiam para "todo mundo". Elas já barravam o visitante, mas **por acidente**: exigem
+`(storage.foldername(name))[1] = auth.uid()::text`, e sem login `auth.uid()` é nulo, então a
+comparação dá NULO e não passa. Defesa que depende de um nulo está a uma linha de deixar de
+existir. A condição ficou idêntica; só o papel mudou.
+
+Isto completa, no esquema `storage`, o que a migration `20260922140000` fez nas 41 regras do
+esquema `public` — ela não alcançava o Storage. **Depois deste conserto, nenhuma política de
+`storage.objects` vale para o papel `public`.**
+
+### O que este item NÃO fecha
+
+O balde continua **público**: quem tiver o link baixa o arquivo, e isso vale para os 39.221
+arquivos dos 8 baldes públicos — inclusive os 23.099 anexos de negócio e as 15.174 mídias de
+WhatsApp. Esse é o Passo 7 do `operacao/plano-baldes-privados.md`, que troca a porta por URL
+assinada e mexe em tela. Continua aberto, e agora é o único eixo que sobrou.
 
 ---
 
@@ -3505,3 +3581,52 @@ ninguém.
   A maioria herda um `USING` que já prende a empresa, mas merece frente própria.
 - Conferidas e **fechadas**: `chat_mensagens_leituras` (sem UPDATE nem DELETE),
   `chat_grupo_membros` (sem permissiva de UPDATE), `chat_geral_config`.
+
+---
+
+## 76. "Remover imagem" não apaga a foto do armazenamento
+
+**Gravidade: baixa.** Achado em 23/09/2026 por um time de revisão que varria o efeito colateral
+do item 43 — não é estrago daquele conserto, é bug anterior que só apareceu porque alguém foi
+olhar o ciclo de vida do balde inteiro.
+
+### O que acontece
+
+Em Configurações › Meu perfil, o ícone de lixeira **só grava `null` em `usuarios.avatar_url`**
+(`src/pages/Configuracoes.tsx:426`). Nenhuma remoção é feita no armazenamento — e não existe
+**uma única** chamada de remoção do balde `avatars` em todo o repositório: as duas menções ao
+balde são a subida (linha 230) e a montagem do endereço (linha 236).
+
+Trocar a foto tem o mesmo efeito. O caminho é `${user.id}/${Math.random()}.jpg` (linha 227):
+nome novo a cada envio, então a anterior fica para trás.
+
+Medido em produção em 23/09/2026:
+
+| | |
+|---|---|
+| arquivos no balde `avatars` | 28 |
+| pessoas com foto de perfil | 16 |
+| **arquivos órfãos** (nenhuma linha aponta para eles) | **12** |
+| espaço ocupado pelo balde | 6,2 MB |
+
+### Por que é baixa, e por que não é zero
+
+**Baixa** porque o balde deixou de ser listável sem login em 23/09 (item 43): não há mais como
+descobrir um órfão por enumeração — só quem já tinha o endereço na mão consegue abri-lo, e
+endereço de órfão não está gravado em lugar nenhum do sistema.
+
+**Não é zero** por duas razões. A primeira é que o botão promete o que não faz: é o mesmo
+padrão de "a tela comemora e o banco não mudou" que o `CLAUDE.md` §4.6 persegue, só que aqui a
+mentira é sobre o arquivo, não sobre a linha. A segunda é que quem sai da equipe (item 38) tem
+o acesso revogado e a linha marcada, mas **a foto continua no armazenamento**, baixável para
+sempre por quem guardou o endereço.
+
+### Conserto
+
+Chamar `supabase.storage.from('avatars').remove([caminho])` antes de zerar a coluna, e
+**também** ao trocar a foto (apagar a anterior). A regra `avatars_delete` já existe e está
+correta desde 23/09 — hoje ela não tem chamador nenhum.
+
+⚠️ **Os 12 órfãos de hoje são limpeza de dado de produção**: listar, conferir um a um que
+nenhuma linha os referencia, e só então apagar — com o "pode" do dono, pelo método do
+`AGENTS.md` §4. O conserto do código não depende disso e vem primeiro.
