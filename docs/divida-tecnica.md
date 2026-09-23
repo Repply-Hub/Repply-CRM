@@ -75,7 +75,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 56 | [Onze pontos da documentação afirmam o que não é verdade](#56-onze-pontos-da-documentação-afirmam-coisa-que-não-é-verdade-hoje) | Média | Não |
 | 57 | [Os módulos que justificam o produto estão vazios](#57-os-módulos-que-justificam-o-produto-estão-vazios) | Produto | Decisão de produto pendente |
 | 58 | [Contato sem responsável aparece para TODAS as empresas](#58-contato-sem-responsável-aparece-para-todas-as-empresas) | **Alta** | Latente — 0 órfãos hoje, mas 3 caminhos podem criar um |
-| 59 | [O link de redefinir senha aponta para `localhost`](#59-o-link-de-redefinir-senha-aponta-para-localhost) | Média | Não — sintoma encerrado em 22/09. Falta ler 3 coisas no painel e ensaiar o caminho inteiro |
+| 59 | [O link de redefinir senha aponta para `localhost`](#59-o-link-de-redefinir-senha-aponta-para-localhost) | Baixa | Não — painel e tela conferidos em 22/09. Falta só ensaiar o caminho inteiro numa conta de demonstração |
 | 60 | [O ranking de vendedores chega inteiro no navegador de todo mundo](#60-o-ranking-de-vendedores-chega-inteiro-no-navegador-de-todo-mundo) | **Alta** | Não — mas entrega pela porta dos fundos o que foi fechado pela da frente em 31/08 |
 | 63 | [`plano_vendas_progresso` não checa permissão nenhuma](#63-plano_vendas_progresso-não-checa-permissão-nenhuma) | Média | Não — não atravessa empresa, mas fura a permissão de módulo |
 | 64 | [Regra de banco alterada à mão diverge do código](#64-regra-de-banco-alterada-à-mão-volta-a-divergir-do-código-e-ninguém-percebe) | Média | Não — mas `create or replace` a partir do arquivo desfaz a correção em silêncio |
@@ -2368,11 +2368,18 @@ Três estragos, todos fechados (regra pura em `src/lib/link-de-recuperacao.ts`, 
 
 ### O que ainda falta
 
+**As três leituras de painel foram feitas pelo Lucas em 22/09/2026.** O que elas responderam:
+
+| # | O quê | Resposta |
+|---|---|---|
+| 1 | Lista de Redirect URLs (Authentication → URL Configuration) | ✅ tem `https://crm.repplyhub.com.br`. Endurecimento opcional: trocar por `https://crm.repplyhub.com.br/**`, que cobre os caminhos por conta própria caso o Site URL mude um dia. Não muda nada hoje |
+| 2 | Modelo do e-mail (Authentication → Emails → Reset password) | ✅ bate com `supabase/templates/redefinir-senha.html` e funciona |
+| 3 | Configuração de SMTP | ✅ remetente **externo, pelo Resend** — não é o serviço embutido do Supabase, então o envio não tem o limite baixo dele |
+
+Sobra **uma** coisa:
+
 | # | O quê | Quem faz |
 |---|---|---|
-| 1 | **Ler** a lista de Redirect URLs (Authentication → URL Configuration). Se estiver vazia, acrescentar `https://crm.repplyhub.com.br/**` — não muda nada hoje, e protege o dia em que o Site URL mudar | dono da conta |
-| 2 | **Ler** o modelo do e-mail (Authentication → Emails → Reset password) e comparar com `supabase/templates/redefinir-senha.html`. O README registra que a cópia é manual e ninguém nunca conferiu — se a variável ali estiver errada, o link nasce sem caminho e o sintoma é idêntico ao que já medimos | dono da conta |
-| 3 | **Ler** a configuração de SMTP. Se ainda for o serviço embutido do Supabase, o envio é limitado e o e-mail pode não chegar — e aí a redefinição não existe como produto | dono da conta |
 | 4 | Ensaio de ponta a ponta com conta da empresa de demonstração: pedir, cronometrar o e-mail, abrir no celular, trocar a senha, entrar com ela. **Nunca com conta de cliente.** Deixar uma segunda aba logada antes, para responder se a troca derruba as outras sessões | os dois |
 
 🔴 **Ordem obrigatória.** Na mesma tela do painel há um aviso do Supabase pedindo para ligar a
