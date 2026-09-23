@@ -94,6 +94,16 @@ Toda mudança passa por este crivo, e a resposta diz o que muda para quem:
 Explique a **consequência prática antes do mecanismo**, sem jargão (`CLAUDE.md` §3). Quando uma
 perspectiva levantar decisão de produto, **pergunte** em vez de escolher sozinho.
 
+🔴 **Funcionalidade nova cobre TODAS as superfícies que ela toca — não só a que o pedido citou.**
+Ao acrescentar algo, liste ANTES de codar onde aquilo aparece de verdade: cadastro, edição,
+ficha/detalhe (a folha lateral), card do quadro, linha da lista, exportação, notificação. O pedido
+nomeia um ponto; a funcionalidade vive em vários. Percorra as superfícies irmãs da que você mexeu e
+confirme que a funcionalidade chegou a cada uma antes de dizer "feito".
+
+> Foi assim que o campo de anexo de tarefa entrou na criação e na edição mas ficou de fora da ficha
+> lateral (o detalhe) — uma superfície padrão que passou batido e o dono teve de apontar. "Adicionar
+> anexo à tarefa" não é uma tela, são todas as telas onde a tarefa se mostra.
+
 ---
 
 ## 4. Publicar: autonomia com cuidados
@@ -136,6 +146,19 @@ Rode e confira a saída **antes** de publicar, não depois (`CLAUDE.md` §9):
 
 Mexeu em permissão/RLS → teste como vendedor comum, não só gestor. Mexeu em consulta pesada →
 meça antes e depois. Mexeu no banco → confirme que a migration foi mesmo aplicada.
+
+🔴 **Depois de aplicar funcionalidade nova, confirme os três "não" — prática diária, sempre:**
+
+1. **Não quebrou o que já funcionava.** Rode a suíte **inteira**, não só o arquivo que você tocou:
+   um teste de outra parte que passou a falhar é a funcionalidade nova mexendo onde não devia. Foi
+   assim que o campo de multi-arquivo derrubou um teste do anexo de negócio — a suíte pegou, o
+   arquivo isolado não pegaria.
+2. **Não quebra em produção nem altera dado de cliente.** Mudança de comportamento que o cliente vê,
+   ou de banco que toque linha de cliente, **para e conversa antes** (§4) — não se descobre depois de
+   publicar. Na dúvida sobre o alcance, meça (contagem, não olho) e mostre o número.
+3. **É ação supervisionada.** Vale o §4: quem publica é você, mas só com o "pode" do dono e a
+   evidência dos itens 1 e 2 na mão. Rode a verificação **antes** de pedir autorização, não depois —
+   `git push` publica para cliente pagante no mesmo gesto (`CLAUDE.md` §16).
 
 ---
 

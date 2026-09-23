@@ -752,6 +752,25 @@ Além disso, conforme o que mudou:
 - **Mexeu em rota ou no `vercel.json`?** Teste link direto (`/clientes`,
   `/pedidos/:id/editar`), não só a navegação pelo menu.
 
+### 🔴 Ao aplicar funcionalidade nova, os três "não" (prática diária, sempre)
+
+Antes de dizer "feito" e **antes** de pedir o "pode" para publicar (`git push` publica para cliente
+pagante no mesmo gesto — §16), confirme, com evidência na mão:
+
+1. **Não quebrou o que já funcionava.** Rode a suíte **inteira**, não só o arquivo que tocou. Um
+   teste de outra parte que passou a falhar é a funcionalidade nova mexendo onde não devia — a suíte
+   inteira pega, o arquivo isolado não. (Aconteceu ao tornar o campo de anexo multi-arquivo: derrubou
+   um teste do anexo de negócio que só a suíte completa acusou.)
+2. **Não quebra em produção nem altera dado de cliente.** Mudança que o cliente vê, ou que toque
+   linha de cliente no banco, **para e conversa antes** (§11), não se descobre depois de publicado.
+3. **É ação supervisionada.** A publicação é com o "pode" do Lucas e a verificação já feita (§13). A
+   rede de proteção automática é fraca; a etapa humana é a que resta.
+
+E **a funcionalidade cobre TODAS as superfícies que ela toca**, não só a que o pedido citou: cadastro,
+edição, ficha/detalhe (a folha lateral), card, lista, exportação. O pedido nomeia um ponto; a
+funcionalidade vive em vários — percorra as superfícies irmãs antes de fechar. (O campo de anexo de
+tarefa entrou na criação e na edição mas ficou de fora da ficha lateral; o dono teve de apontar.)
+
 ---
 
 ## 10. Anti-padrões (proibidos)
