@@ -60,7 +60,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 41 | [Duas funções do banco atravessam a fronteira entre empresas](#41-duas-funções-do-banco-atravessam-a-fronteira-entre-empresas) | ✅ Resolvido | Corrigido na migration `20260829120000` — a tela só acompanhou em 31/08 |
 | 42 | [Funções de servidor abertas sem motivo, e duas sem conferir quem chamou](#42-seis-funções-de-servidor-abertas-sem-motivo-escrito-e-duas-sem-conferir-quem-chamou) | Alta | Não |
 | 43 | [Os 22.276 arquivos do Storage podem ser LISTADOS sem login](#43-os-22276-arquivos-do-storage-podem-ser-listados-sem-login) | Alta | Complementa o plano dos baldes |
-| 44 | [A matriz de permissões só é conferida em 2 dos 15 módulos](#44-a-matriz-de-permissões-só-é-conferida-pelo-banco-em-2-dos-15-módulos) | Alta | Não — mas a tela promete o que não entrega |
+| 44 | [A matriz de permissões só é conferida em 2 dos 15 módulos](#44-a-matriz-de-permissões-só-é-conferida-pelo-banco-em-2-dos-15-módulos) | Alta | Não — mapa levantado em 22/09; implementação adiada por decisão do dono |
 | 45 | [Não existe conferência automática, e o `git push` publica](#45-não-existe-conferência-automática--e-agora-o-git-push-publica) | Alta | Não — protege todo o resto |
 | 46 | [`types.ts` com 21 objetos fora de sincronia, e dá para regerar](#46-typests-tem-21-objetos-fora-de-sincronia-e-pode-ser-regerado) | Alta | Não |
 | 47 | ["Salvo" quando o banco recusou — o mesmo defeito em 4 telas](#47-salvo-quando-o-banco-recusou--o-mesmo-defeito-em-quatro-telas) | ✅ Resolvida | As 4 telas conferem o efeito; a varredura dos demais pontos é o item 68 |
@@ -1818,19 +1818,42 @@ querer.
 
 ## 44. A matriz de permissões só é conferida pelo banco em 2 dos 15 módulos
 
-**Gravidade: alta.**
+**Gravidade: alta.** Decisão do dono do produto em 22/09/2026: **o conserto fica para um momento
+dedicado**, com atenção total. Não implementar ao esbarrar no assunto.
 
-A tela de Configurações promete ver / criar / editar / excluir por módulo, e o `SPEC.md` §5.11
-descreve o controle como granular "para cada um dos 14 módulos". No banco, **só Negócios e Plano
-de Vendas têm a checagem correspondente**. Nos outros 13 as caixinhas mudam o menu, não o acesso.
+> 📍 **O mapa completo foi levantado em 22/09/2026** e vive FORA deste repositório (que é
+> público), em `_revisao-codigo-2026-09/MAPA-PERMISSOES.md`: inventário módulo a módulo, o que
+> cada empresa configurou, o custo medido de ligar cada ação e a ordem segura. Quatro frentes
+> independentes mais um cético que derrubou 7 afirmações delas.
+
+A tela de Configurações promete ver / criar / editar / excluir por módulo. **Das 442 políticas
+do banco, 18 consultam a matriz, em 11 tabelas, cobrindo 8 pares módulo/ação.** Das 85 políticas
+de LEITURA, exatamente uma consulta a matriz — e é a da própria tabela de permissões.
+
+### 🔴 Dois erros deste item, corrigidos em 22/09
+
+1. **"Plano de Vendas tem a checagem" é falso.** Nunca teve.
+2. **"Negócios tem a checagem" é meia verdade.** Tem em *editar* e *excluir*; não em *ver* nem
+   em *criar*.
+
+**Nenhum módulo tem checagem de "ver" ou de "criar".** Desmarcar "ver" muda o menu lateral e
+nada mais — nenhuma das 30 rotas consulta a matriz. Medido num ensaio como vendedor comum sem
+nenhuma linha de permissão: saíram 1.314 clientes, 12.143 negócios, 90 obras e 936 metas de
+venda.
 
 O risco não é técnico, é de confiança: a gestora acredita que restringiu, para de vigiar, e o
 acesso continua para quem souber o endereço direto.
 
 ### Conserto
 
-**Não ligar tudo de uma vez** — isso trancaria gente que trabalha hoje. Medir antes o que as 8
-empresas de fato configuraram nas linhas de `permissoes_usuario`, e ligar módulo a módulo.
+**Não ligar tudo de uma vez.** O custo medido: ligar *ver* custa ZERO (o padrão é liberado),
+ligar *excluir* custa ZERO nos 6 módulos que já têm política, e ligar *criar*/*editar* trava
+**2 pessoas** — não 9, porque 7 dos 9 sem linha são da conta de demonstração e de empresas de
+teste. A ordem completa está no mapa.
+
+E três consertos fecham mais buraco que qualquer caixinha, e vêm antes: a chave de API do
+WhatsApp legível por vendedor, a segurança do banco que não conhece `deleted_at` (item 38) e os
+baldes de arquivo públicos (item 43).
 
 ---
 
