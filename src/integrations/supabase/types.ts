@@ -288,6 +288,93 @@ export type Database = {
         }
         Relationships: []
       }
+      calendario_contas: {
+        Row: {
+          id: string
+          user_id: string
+          empresa_id: string
+          provedor: string
+          conta_email: string | null
+          calendario_externo_id: string | null
+          refresh_token: string | null
+          access_token: string | null
+          token_expira_em: string | null
+          sync_token: string | null
+          status: string
+          ultimo_erro: string | null
+          ultima_sync_em: string | null
+          criado_em: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          empresa_id: string
+          provedor: string
+          conta_email?: string | null
+          calendario_externo_id?: string | null
+          refresh_token?: string | null
+          access_token?: string | null
+          token_expira_em?: string | null
+          sync_token?: string | null
+          status?: string
+          ultimo_erro?: string | null
+          ultima_sync_em?: string | null
+          criado_em?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          empresa_id?: string
+          provedor?: string
+          conta_email?: string | null
+          calendario_externo_id?: string | null
+          refresh_token?: string | null
+          access_token?: string | null
+          token_expira_em?: string | null
+          sync_token?: string | null
+          status?: string
+          ultimo_erro?: string | null
+          ultima_sync_em?: string | null
+          criado_em?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      evento_sync_externo: {
+        Row: {
+          id: string
+          evento_id: string
+          calendario_conta_id: string
+          evento_externo_id: string
+          etag_externo: string | null
+          atualizado_repply_em: string | null
+          ultima_sync_em: string | null
+          criado_em: string
+        }
+        Insert: {
+          id?: string
+          evento_id: string
+          calendario_conta_id: string
+          evento_externo_id: string
+          etag_externo?: string | null
+          atualizado_repply_em?: string | null
+          ultima_sync_em?: string | null
+          criado_em?: string
+        }
+        Update: {
+          id?: string
+          evento_id?: string
+          calendario_conta_id?: string
+          evento_externo_id?: string
+          etag_externo?: string | null
+          atualizado_repply_em?: string | null
+          ultima_sync_em?: string | null
+          criado_em?: string
+        }
+        Relationships: []
+      }
       chat_conversa_nao_lida: {
         Row: {
           usuario_id: string
