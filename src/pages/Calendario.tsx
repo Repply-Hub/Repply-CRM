@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarHeader } from "@/components/calendar/CalendarHeader";
+import { ConexaoCalendarioExterno } from "@/components/calendar/ConexaoCalendarioExterno";
 import { TimeGridView } from "@/components/calendar/TimeGridView";
 import { CalendarMonthView } from "@/components/calendar/CalendarMonthView";
 import { EventDialog } from "@/components/calendar/EventDialog";
@@ -493,6 +494,9 @@ export default function Calendario() {
                 )}
               </div>
             </div>
+
+            {/* Conectar/desconectar o Google Agenda */}
+            <ConexaoCalendarioExterno />
           </aside>
 
           {/* Vista do calendário */}
