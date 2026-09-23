@@ -1,6 +1,7 @@
 import {
   MessageCircle, Users2, Lightbulb, NotebookPen, Briefcase,
-  Target, Megaphone, Calendar, ListChecks, Folder, type LucideIcon,
+  Target, Megaphone, Calendar, ListChecks, Folder,
+  HardHat, Hammer, Ruler, Building2, Truck, type LucideIcon,
 } from 'lucide-react';
 
 /** Os símbolos que grupo/Geral podem escolher. Puro: chave estável + rótulo + ícone.
@@ -22,6 +23,11 @@ export const SIMBOLOS_DE_CHAT: readonly SimboloDeChat[] = [
   { chave: 'agenda', rotulo: 'Agenda', Icone: Calendar },
   { chave: 'checklist', rotulo: 'Checklist', Icone: ListChecks },
   { chave: 'pasta', rotulo: 'Pasta', Icone: Folder },
+  { chave: 'capacete', rotulo: 'Capacete de obra', Icone: HardHat },
+  { chave: 'martelo', rotulo: 'Martelo', Icone: Hammer },
+  { chave: 'regua', rotulo: 'Régua', Icone: Ruler },
+  { chave: 'predio', rotulo: 'Prédio', Icone: Building2 },
+  { chave: 'caminhao', rotulo: 'Caminhão', Icone: Truck },
 ];
 
 export function simboloDoCatalogo(chave: string | null | undefined): SimboloDeChat | null {
