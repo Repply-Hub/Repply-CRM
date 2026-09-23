@@ -28,7 +28,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import {
   Send, Loader2, MessageCircle, MessageSquare, Users, Circle, PanelLeftClose, PanelLeftOpen,
   Paperclip, FileText, X, Download, Users2, Calendar, Eraser, ChevronDown,
-  Video, Link2, ExternalLink, Play, Pause, Camera, Pencil, Check, CheckCheck, Search, Trash2, UserPlus, Mic, Square, Reply, ArrowLeft
+  Video, Link2, ExternalLink, Play, Pause, Camera, Pencil, Check, CheckCheck, Search, Trash2, UserPlus, Mic, Square, Reply, ArrowLeft, Bookmark
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -172,6 +172,19 @@ function MembersList({
         showOnMobile ? 'flex' : 'hidden',
         'md:flex'
       )}>
+        {myId && (
+          <button
+            onClick={() => onSelect({ type: 'dm', memberId: myId, recipientId: myId })}
+            className={cn('p-1 rounded-lg transition-colors', target.type === 'dm' && target.memberId === myId ? 'bg-primary/10' : 'hover:bg-muted/50')}
+            title="Anotações"
+          >
+            <Avatar className="h-7 w-7 border border-border">
+              <AvatarFallback className="bg-primary/15 text-primary text-[8px]">
+                <Bookmark className="h-3.5 w-3.5" />
+              </AvatarFallback>
+            </Avatar>
+          </button>
+        )}
         <div className="relative">
           <button
             onClick={() => onSelect({ type: 'geral' })}
@@ -217,7 +230,7 @@ function MembersList({
             </div>
           );
         })}
-        {members.map((m) => {
+        {members.filter((m) => m.id !== myId).map((m) => {
           const count = unreadCounts[`dm_${m.id}`];
           return (
             <div key={m.id} className="relative">
@@ -279,6 +292,27 @@ function MembersList({
         <div className="p-2 space-y-0.5">
           {!searching && (
             <>
+              {/* Anotações: conversa de você com você — espaço pessoal, só você vê. */}
+              {myId && (
+                <button
+                  onClick={() => onSelect({ type: 'dm', memberId: myId, recipientId: myId })}
+                  className={cn(
+                    'flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors w-full text-left',
+                    target.type === 'dm' && target.memberId === myId ? 'bg-primary/10' : 'hover:bg-muted/50'
+                  )}
+                >
+                  <Avatar className="h-8 w-8 border border-border">
+                    <AvatarFallback className="bg-primary/15 text-primary text-[10px] font-semibold">
+                      <Bookmark className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-foreground truncate">Anotações</p>
+                    <p className="text-[10px] text-muted-foreground">Recados e arquivos para você</p>
+                  </div>
+                </button>
+              )}
+
               {/* Chat geral */}
               <ContextMenu>
                 <ContextMenuTrigger asChild>
@@ -387,7 +421,6 @@ function MembersList({
             </div>
           )}
           {(searching ? filteredMembers : members.filter(m => m.id !== myId)).map((m) => {
-            const isMe = m.id === myId;
             const isSelected = target.type === 'dm' && target.memberId === m.id;
             const lastMsg = lastActivity[`dm_${m.id}`];
             const lastMsgPreview = lastMsg
@@ -418,7 +451,7 @@ function MembersList({
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium text-foreground truncate">
-                        {m.nome} {isMe && <span className="text-muted-foreground font-normal">(você)</span>}
+                        {m.nome}
                       </p>
                       {lastMsgPreview && (
                         <p className="text-[10px] text-muted-foreground truncate">{lastMsgPreview}</p>
@@ -1448,7 +1481,10 @@ const Chat = () => {
   
   let chatHeaderName = geralNome;
   let chatHeaderSub = `${members.length} membros`;
-  if (target.type === 'grupo' && activeGrupo) {
+  if (target.type === 'dm' && target.memberId === myVendedor) {
+    chatHeaderName = 'Anotações';
+    chatHeaderSub = 'Só você';
+  } else if (target.type === 'grupo' && activeGrupo) {
     chatHeaderName = activeGrupo.nome;
     chatHeaderSub = 'Grupo';
   } else if (target.type === 'dm' && selectedMemberData) {
