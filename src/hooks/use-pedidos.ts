@@ -75,6 +75,19 @@ export interface PedidoWithRelations {
 export type PeriodoDateField = 'data_pedido' | 'prazo_resposta';
 
 export interface PedidosFilters {
+  /**
+   * 🔴 ESTE CAMPO NÃO FILTRA NADA SOZINHO. Ele é só o lugar onde a tela GUARDA a escolha de
+   * etapa; quem recorta é o argumento posicional `stages` de `usePedidos`/`usePedidosStats`
+   * (e o campo `stages` do alvo, nas ações em massa). `montarQueryDeNegocios` lê o argumento e
+   * ignora este campo.
+   *
+   * Passá-lo só aqui deixa o filtro "Etapa" inerte — o selo do botão mostra "1" e a lista não
+   * muda uma linha. Era assim no modal de Ação em massa, a única tela que altera centenas de
+   * negócios com um clique e não tem desfazer (item 49 da dívida técnica).
+   *
+   * Ao chamar, passe nos DOIS lugares, como `Negocios.tsx` faz:
+   * `usePedidos(empresaId, pagina, tamanho, meusFiltros.stages, meusFiltros, ...)`.
+   */
   stages?: string[];
   vendedorIds?: string[];
   fabricanteIds?: string[];

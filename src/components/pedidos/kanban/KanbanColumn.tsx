@@ -48,7 +48,14 @@ export const KanbanColumn = memo(function KanbanColumn({
   const safeColor = typeof colorClass === 'string' ? colorClass : 'muted';
   const safeLabel = typeof label === 'string' ? label : String(label ?? '');
   const navigate = useNavigate();
-  const stageEnabled = (!etapaFilter || etapaFilter.includes(stageKey)) && !searchPending;
+  // 🔴 O filtro "Etapa" NÃO esconde colunas — quais aparecem é outra configuração ("Colunas",
+  // guardada por funil). Então a coluna excluída continua na tela e precisa aparecer VAZIA.
+  // Desligar a busca não basta: a chave de cache da coluna é a mesma com ou sem o filtro, e o
+  // TanStack devolve as linhas já guardadas. Até 22/09/2026 a coluna excluída seguia com os
+  // cartões e a contagem de antes (item 49 da dívida). Por isso tudo o que a coluna "tem" passa
+  // por esta condição, não só a busca.
+  const excluidaPeloFiltroDeEtapa = !!etapaFilter && !etapaFilter.includes(stageKey);
+  const stageEnabled = !excluidaPeloFiltroDeEtapa && !searchPending;
 
   // Cada coluna busca SÓ o seu próprio status — queryKey/cache/fetch totalmente
   // independentes entre colunas. "Ver mais" aumenta apenas o limit desta coluna.
@@ -61,12 +68,12 @@ export const KanbanColumn = memo(function KanbanColumn({
   const stageFilter = useMemo(() => [stageKey], [stageKey]);
   const { data: pedidosData, isLoading, isFetching } = usePedidos(empresaId, 0, limit, stageFilter, filters, stageEnabled, true, resolvedSearchMatches);
 
-  const rawRows = pedidosData?.data ?? EMPTY_ROWS;
+  const rawRows = excluidaPeloFiltroDeEtapa ? EMPTY_ROWS : (pedidosData?.data ?? EMPTY_ROWS);
   // Total real desta etapa (count exato do Postgres, ignora o limit) — permite saber com
   // certeza se ainda há mais para buscar, sem depender de heurística. Precisa de `withCount:
   // true` explícito porque usePedidos não computa o count por padrão (custa caro em tabelas
   // grandes e a maioria dos chamadores não usa esse valor).
-  const stageTotal = pedidosData?.count ?? 0;
+  const stageTotal = excluidaPeloFiltroDeEtapa ? 0 : (pedidosData?.count ?? 0);
 
   const q = (filters?.search ?? '').trim().toLowerCase();
   const filteredRows = useMemo(() => {
@@ -88,7 +95,6 @@ export const KanbanColumn = memo(function KanbanColumn({
   // já mostrava a contagem exata: numa coluna Fechamento de milhares de negócios a tela exibia
   // 0,16% do valor, sem nada indicar que era parcial (CLAUDE.md §6.4: some no banco).
   const { data: statsDaEtapa } = usePedidosStats(empresaId, stageFilter, filters, stageEnabled);
-  const excluidaPeloFiltroDeEtapa = !!etapaFilter && !etapaFilter.includes(stageKey);
   // Enquanto o total não chega, "—": mostrar a soma parcial no lugar seria repetir o defeito.
   const totalDaEtapa = excluidaPeloFiltroDeEtapa
     ? formatarMoedaBRL(0)

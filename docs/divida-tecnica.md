@@ -65,7 +65,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 46 | [`types.ts` com 21 objetos fora de sincronia, e dá para regerar](#46-typests-tem-21-objetos-fora-de-sincronia-e-pode-ser-regerado) | Alta | Não |
 | 47 | ["Salvo" quando o banco recusou — o mesmo defeito em 4 telas](#47-salvo-quando-o-banco-recusou--o-mesmo-defeito-em-quatro-telas) | ✅ Resolvida | As 4 telas conferem o efeito; a varredura dos demais pontos é o item 68 |
 | 48 | [O Radar de Risco conta edição de campo como movimento](#48-o-radar-de-risco-conta-edição-de-campo-como-movimento) | Alta | Não — R$ 5,0 mi no lugar de R$ 14,4 mi |
-| 49 | [O filtro "Etapa" não filtra, em dois lugares](#49-o-filtro-etapa-não-filtra-em-dois-lugares) | Alta | Não — mas a Ação em massa não tem desfazer |
+| 49 | [O filtro "Etapa" não filtra, em dois lugares](#49-o-filtro-etapa-não-filtra-em-dois-lugares) | ✅ Resolvida | Os dois lugares corrigidos em 22/09/2026 — Kanban agora, Ação em massa antes |
 | 50 | [A soma em reais do Kanban usa só os cartões carregados](#50-a-soma-em-reais-do-kanban-usa-só-os-cartões-carregados) | ✅ Resolvida | Corrigido em 22/09/2026 — a coluna pede o total da etapa ao banco |
 | 51 | [O Calendário mostra menos de 10% dos prazos, e um dia antes](#51-o-calendário-mostra-menos-de-10-dos-prazos-e-desenha-um-dia-antes) | ✅ Resolvida | Recorte de período em 27/08 e âncora de meio-dia em 22/09/2026 |
 | 52 | [Importar contatos cria construtoras duplicadas](#52-importar-contatos-cria-construtoras-duplicadas) | ✅ Resolvida | Corrigido em 22/09/2026 — a busca pergunta só pelos nomes que a planilha cita |
@@ -1944,22 +1944,64 @@ O índice existente continua servindo.
 
 ## 49. O filtro "Etapa" não filtra, em dois lugares
 
-**Gravidade: alta.**
+> ✅ **Resolvido em 22/09/2026, nos dois lugares — mas por caminhos diferentes.**
+>
+> **No Kanban:** consertado agora. O filtro de Etapa **não esconde colunas** (quais colunas
+> aparecem é outra configuração, "Colunas", guardada por funil), então a coluna excluída
+> continua na tela e precisa aparecer VAZIA. Desligar a busca (`enabled: false`) não bastava: a
+> chave de cache da coluna é **a mesma com ou sem o filtro**, e o TanStack Query devolve as
+> linhas já guardadas. Agora tudo o que a coluna "tem" — cartões, contagem, "Ver mais" e o que
+> ela reporta ao quadro — passa por `excluidaPeloFiltroDeEtapa`, não só a busca. Teste:
+> `src/components/pedidos/kanban/KanbanColumn.filtro-de-etapa.test.tsx` (6 casos).
+>
+> **No modal de Ação em massa:** já estava consertado quando este item foi reaberto, em outra
+> sessão. `Negocios.tsx` passa a etapa pelo **argumento posicional** `stages` em `usePedidos`,
+> em `usePedidosStats` e no campo `stages` do alvo da mutação — os três lugares. Ficou
+> documentado no próprio tipo (ver abaixo).
 
-**No Kanban:** marcar uma etapa não recorta nada. `KanbanColumn.tsx:50` usa a etapa só para
-ligar/desligar o `enabled` da consulta — e, com a mesma `queryKey`, o TanStack devolve o cache.
-As colunas seguem com os cartões e as contagens de antes, enquanto a linha de resumo em cima
-(que passa por `usePedidosStats`) **obedece** ao filtro. Dois números que se contradizem na mesma
-tela, sem nada indicando qual está certo.
+**Gravidade: alta.** Registrado para não voltar.
 
-**No modal de Ação em massa:** é inerte de ponta a ponta. `PedidosFilters.stages` está declarado
-em `use-pedidos.ts:57` e **não é lido por ninguém** — nem `montarQueryDeNegocios` (linha 418) nem
-`usePedidosStats` (806). O selo do botão mostra "1" e a lista não muda uma linha.
+**O que acontecia no Kanban:** marcar uma etapa não recortava nada. As colunas seguiam com os
+cartões e as contagens de antes, enquanto a linha de resumo em cima (que passa por
+`usePedidosStats`) **obedecia** ao filtro. Dois números que se contradizem na mesma tela, sem
+nada indicando qual está certo.
 
-É a única tela que altera centenas de negócios com um clique, e não tem desfazer.
+O caminho que expõe o defeito é o comum: abrir o quadro (todas as colunas carregam), **depois**
+marcar uma etapa. Quem abre o quadro já filtrado não vê nada de errado, porque não houve busca
+anterior para ficar no cache — e é por isso que sobreviveu tanto tempo.
 
-> `docs/modulos/negocios.md` §6 descreve a versão benigna ("renderiza vazia com contagem 0"). O
-> comportamento real é o oposto — a auditoria está desatualizada e não serve de cobertura.
+A partir de 22/09 ficou pior de ler antes de melhorar: o conserto do valor em reais (item 50)
+passou a mostrar R$ 0,00 na coluna excluída, enquanto o selo de contagem e os cartões
+continuavam os antigos. Três números sobre a mesma coluna, dois deles mentindo.
+
+**O que acontecia na Ação em massa:** era inerte de ponta a ponta. O selo do botão mostrava "1"
+e a lista não mudava uma linha. É a única tela que altera centenas de negócios com um clique, e
+**não tem desfazer**.
+
+### 🔴 A armadilha que sobra, e onde ela está marcada
+
+`PedidosFilters.stages` **existe e não filtra nada sozinho**. Quem recorta é o argumento
+posicional `stages`; `montarQueryDeNegocios` lê o argumento e ignora o campo. Passar a etapa só
+dentro de `filters` deixa o filtro inerte **sem erro nenhum** — foi exatamente isso na Ação em
+massa.
+
+O campo ganhou um aviso em bloco na própria definição (`use-pedidos.ts`), que é onde qualquer
+pessoa esbarra antes de usá-lo. **Não foi removido nem "consertado" no hook de propósito:**
+
+- `filters` é a identidade do RECORTE — é o que a exclusão/edição em massa manda ao servidor
+  quando alguém escolhe "todos os filtrados", e o que `assinaturaDoFiltro` compara para saber se
+  a seleção de milhares de negócios ainda vale;
+- fazer o hook honrar `filters.stages` como reserva exigiria colocá-lo **também nas chaves de
+  cache** de `usePedidos` e `usePedidosStats` — que hoje só carregam o argumento posicional.
+  Sem isso, dois recortes de etapa diferentes dividiriam a mesma chave e um serviria o resultado
+  do outro. Mexer nisso é tocar a consulta mais usada do sistema para cobrir um risco que hoje
+  não acontece.
+
+Se um dia valer a pena, o conserto certo é esse: resolver a etapa uma vez (`stages ?? filters
+.stages`), usar a resolvida na consulta E na chave, e aí sim remover o aviso.
+
+> `docs/modulos/negocios.md` §6 descrevia a versão benigna ("renderiza vazia com contagem 0") —
+> que era o comportamento ESPERADO, não o real. Agora é o real.
 
 ---
 
