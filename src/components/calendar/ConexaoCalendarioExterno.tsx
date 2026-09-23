@@ -2,6 +2,16 @@ import { CalendarClock, Link2, Unlink, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useConexaoCalendario } from '@/hooks/use-calendario-conexao';
 
+/**
+ * 🔴 TRAVA DE RECURSO — a sincronização com o Google só fica ATIVA quando a Fase 1 estiver
+ * completa em produção: migration `calendario_contas` aplicada, funções de servidor
+ * (`calendario-conectar`/`calendario-sincronizar`) implantadas e app aprovado no Google.
+ * Enquanto `false`, a agenda NÃO mostra este bloco (o gate está no ponto de uso, em Calendario.tsx),
+ * senão o vendedor veria um "Conectar meu Google" que dá erro (a tabela e a função ainda não
+ * existem em produção). Virar para `true` numa linha quando a Fase 1 estiver de pé.
+ */
+export const SINCRONIZACAO_CALENDARIO_ATIVA = false;
+
 /** Bloco de conectar/desconectar o calendário externo, na barra lateral da agenda. */
 export function ConexaoCalendarioExterno() {
   const { conexao, carregando, iniciarGoogle, desconectar, desconectando } = useConexaoCalendario();
