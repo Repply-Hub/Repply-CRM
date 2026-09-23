@@ -67,13 +67,18 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
   const createTarefa = useCreateTarefa();
   const updateTarefa = useUpdateTarefa();
   const [form, setForm] = useState(emptyForm);
+  // Cobre o `handleSave` inteiro, inclusive o upload dos anexos: sem isto, um duplo clique no
+  // botão dispara duas gravações (a mutação em si já tem `isPending`, mas o laço de upload que
+  // vem depois dela, no ramo CRIAR, não é coberto por nenhum `isPending`).
+  const [salvando, setSalvando] = useState(false);
 
   // EDITAR: anexos vêm do banco; cada gesto grava na hora.
   const anexosSalvos = useAnexosDaTarefa(editingTarefa?.id);
   const adicionarAnexo = useAdicionarAnexoDaTarefa(editingTarefa?.id ?? '');
   const removerAnexo = useRemoverAnexoDaTarefa(editingTarefa?.id ?? '');
-  // CRIAR: a tarefa ainda não existe — arquivos ficam em memória até ela nascer.
-  const [anexosPendentes, setAnexosPendentes] = useState<File[]>([]);
+  // CRIAR: a tarefa ainda não existe — arquivos ficam em memória até ela nascer. Cada um carrega
+  // um id estável (não o índice do array) para sobreviver à remoção de um anexo do meio da lista.
+  const [anexosPendentes, setAnexosPendentes] = useState<{ id: string; file: File }[]>([]);
 
   // Busca de negócio: represada por 300ms porque cada mudança de termo custa uma
   // consulta ao servidor — a lista tem 11.907 negócios e não cabe no navegador.
@@ -161,7 +166,11 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
   }, [open, editingTarefa, kanbanStages, defaultStatus, profile]);
 
   async function handleSave() {
+    // Reentrada: um segundo clique enquanto o primeiro ainda está salvando (upload de anexo
+    // incluído) não dispara uma segunda gravação — sem isto, duplo clique cria duas tarefas.
+    if (salvando) return;
     if (!form.titulo.trim()) { toast.error('Título é obrigatório'); return; }
+    setSalvando(true);
     try {
       const { pedido_id, cliente_id, ...rest } = form;
       const payload = {
@@ -181,19 +190,22 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
             toast.error('Tarefa criada, mas os anexos não subiram: seu usuário/empresa não foi identificado.');
           } else {
             const falhas: string[] = [];
-            for (const arquivo of anexosPendentes) {
+            for (const { file } of anexosPendentes) {
               try {
-                await enviarAnexoDeTarefa(id, arquivo, { id: profile.id, empresa_id: profile.empresa_id });
+                await enviarAnexoDeTarefa(id, file, { id: profile.id, empresa_id: profile.empresa_id });
               } catch {
-                falhas.push(arquivo.name);
+                falhas.push(file.name);
               }
             }
             if (falhas.length > 0) {
               toast.error(`Tarefa criada, mas ${falhas.length} anexo(s) não subiram: ${falhas.join(', ')}.`);
+            } else {
+              toast.success('Tarefa criada');
             }
           }
+        } else {
+          toast.success('Tarefa criada');
         }
-        toast.success('Tarefa criada');
       }
       onOpenChange(false);
     } catch (err) {
@@ -204,6 +216,8 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
       toast.error(mensagemDeErro(err, 'Não foi possível salvar a tarefa.'));
       // O formulário fica aberto de propósito: fechá-lo depois de uma recusa apagaria o que a
       // pessoa digitou, e ela não teria como tentar de novo nem copiar o que escreveu.
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -325,24 +339,24 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
               />
             ) : (
               <CampoDeAnexosDaTarefa
-                anexos={anexosPendentes.map((f, i) => ({
-                  id: `pendente-${i}`,
+                anexos={anexosPendentes.map((p, i) => ({
+                  id: p.id,
                   url: '',
-                  nome: f.name,
-                  tipo: f.type || null,
-                  tamanhoBytes: f.size,
+                  nome: p.file.name,
+                  tipo: p.file.type || null,
+                  tamanhoBytes: p.file.size,
                   criadoEm: new Date(Date.now() + i).toISOString(),
                 }))}
-                onAdicionar={(f) => setAnexosPendentes((xs) => [...xs, f])}
-                onRemover={(id) => setAnexosPendentes((xs) => xs.filter((_, i) => `pendente-${i}` !== id))}
+                onAdicionar={(f) => setAnexosPendentes((xs) => [...xs, { id: crypto.randomUUID(), file: f }])}
+                onRemover={(id) => setAnexosPendentes((xs) => xs.filter((p) => p.id !== id))}
               />
             )}
           </div>
         </CorpoDialogo>
         <RodapeDialogo className="mt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={createTarefa.isPending || updateTarefa.isPending}>
-            {(createTarefa.isPending || updateTarefa.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          <Button onClick={handleSave} disabled={createTarefa.isPending || updateTarefa.isPending || salvando}>
+            {(createTarefa.isPending || updateTarefa.isPending || salvando) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {editingTarefa ? 'Salvar Alterações' : 'Criar Tarefa'}
           </Button>
         </RodapeDialogo>
