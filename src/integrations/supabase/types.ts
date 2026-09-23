@@ -288,6 +288,27 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_conversa_nao_lida: {
+        Row: {
+          usuario_id: string
+          empresa_id: string
+          alvo: string
+          criado_em: string
+        }
+        Insert: {
+          usuario_id: string
+          empresa_id: string
+          alvo: string
+          criado_em?: string
+        }
+        Update: {
+          usuario_id?: string
+          empresa_id?: string
+          alvo?: string
+          criado_em?: string
+        }
+        Relationships: []
+      }
       chat_geral_config: {
         Row: {
           created_at: string
