@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
-import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, useDeleteChatMessage, useAddChatGrupoMembros, ChatGrupo, ChatMessage, QuotedMessage, useMarkChatAsRead, useMarkGroupMessagesRead, useMessageReadReceipts, useChatGeralConfig, useUpdateChatGeralConfig, useChatLastActivity, ChatLastActivity } from '@/hooks/use-chat';
+import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, useDeleteChatMessage, useAddChatGrupoMembros, ChatGrupo, ChatMessage, QuotedMessage, useMarkChatAsRead, useMarkGroupMessagesRead, useMessageReadReceipts, useChatGeralConfig, useUpdateChatGeralConfig, useChatLastActivity, ChatLastActivity, ChatGeralConfig } from '@/hooks/use-chat';
 import { useOnlineUsers } from '@/hooks/use-presence';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
 import { alvoInicialDaUrl, chaveDoAlvo } from '@/lib/alvo-do-chat';
@@ -41,6 +41,7 @@ import { validateFile } from '@/lib/file-validation';
 import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
 import { VisualizadorDeMidia, type MidiaParaVer } from '@/components/chat/VisualizadorDeMidia';
 import { ImagemPrivada } from '@/components/shared/ImagemPrivada';
+import { AvatarDeChat } from '@/components/chat/AvatarDeChat';
 import { useArquivosPrivados } from '@/hooks/use-arquivo-privado';
 import { ChatMessageSearch } from '@/components/chat/ChatMessageSearch';
 import {
@@ -117,7 +118,7 @@ function MembersList({
   onMarcarLida,
   mencoesPorChave,
   geralNome,
-  geralFotoUrl,
+  geralConfig,
   onlineIds,
   lastActivity,
   showOnMobile,
@@ -136,7 +137,7 @@ function MembersList({
   /** Não lidas por conversa (Geral/grupo) — chave `mencoesPorChave` do @, ver `useMencoesNaoLidas`. */
   mencoesPorChave: Record<string, number>;
   geralNome: string;
-  geralFotoUrl?: string | null;
+  geralConfig?: Pick<ChatGeralConfig, 'foto_url' | 'icone' | 'cor_fundo' | 'cor_icone'> | null;
   onlineIds: Set<string>;
   lastActivity: Record<string, ChatLastActivity>;
   /** Abaixo de `md`: mostra esta coluna (a lista) em vez da conversa. De `md` para
@@ -191,14 +192,16 @@ function MembersList({
             className={cn('p-1 rounded-lg transition-colors', target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50')}
             title={geralNome}
           >
-            <Avatar className="h-7 w-7 border border-border">
-              {geralFotoUrl && (
-                <ImagemPrivada src={geralFotoUrl} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
-              )}
-              <AvatarFallback className="bg-primary text-primary-foreground text-[8px]">
-                <Users className="h-3.5 w-3.5" />
-              </AvatarFallback>
-            </Avatar>
+            <AvatarDeChat
+              className="h-7 w-7 border border-border"
+              fotoUrl={geralConfig?.foto_url}
+              icone={geralConfig?.icone}
+              corFundo={geralConfig?.cor_fundo}
+              corIcone={geralConfig?.cor_icone}
+              IconePadrao={MessageCircle}
+              nome={geralNome}
+              tamanhoIcone="h-3.5 w-3.5"
+            />
           </button>
           {seloNaoLido('geral', 'pequeno')}
           {(mencoesPorChave['geral'] ?? 0) > 0 && !(unreadCounts['geral'] > 0) && (
@@ -214,14 +217,16 @@ function MembersList({
                 className={cn('p-1 rounded-lg transition-colors', target.type === 'grupo' && target.grupoId === g.id ? 'bg-primary/10' : 'hover:bg-muted/50')}
                 title={g.nome}
               >
-                <Avatar className="h-7 w-7 border border-border">
-                  {g.foto_url && (
-                    <ImagemPrivada src={g.foto_url} alt={g.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
-                  )}
-                  <AvatarFallback className="bg-primary text-primary-foreground text-[8px] font-semibold">
-                    <Users2 className="h-3.5 w-3.5" />
-                  </AvatarFallback>
-                </Avatar>
+                <AvatarDeChat
+                  className="h-7 w-7 border border-border"
+                  fotoUrl={g.foto_url}
+                  icone={g.icone}
+                  corFundo={g.cor_fundo}
+                  corIcone={g.cor_icone}
+                  IconePadrao={Users2}
+                  nome={g.nome}
+                  tamanhoIcone="h-3.5 w-3.5"
+                />
               </button>
               {seloNaoLido(`grupo_${g.id}`, 'pequeno')}
               {(mencoesPorChave[`grupo_${g.id}`] ?? 0) > 0 && !(count > 0) && (
@@ -323,14 +328,16 @@ function MembersList({
                       target.type === 'geral' ? 'bg-primary/10' : 'hover:bg-muted/50'
                     )}
                   >
-                    <Avatar className="h-8 w-8 border border-border">
-                      {geralFotoUrl && (
-                        <ImagemPrivada src={geralFotoUrl} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
-                      )}
-                      <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
-                        <Users className="h-4 w-4" />
-                      </AvatarFallback>
-                    </Avatar>
+                    <AvatarDeChat
+                      className="h-8 w-8 border border-border"
+                      fotoUrl={geralConfig?.foto_url}
+                      icone={geralConfig?.icone}
+                      corFundo={geralConfig?.cor_fundo}
+                      corIcone={geralConfig?.cor_icone}
+                      IconePadrao={MessageCircle}
+                      nome={geralNome}
+                      tamanhoIcone="h-4 w-4"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium text-foreground truncate">{geralNome}</p>
                       <p className="text-[10px] text-muted-foreground">Toda a equipe</p>
@@ -371,14 +378,16 @@ function MembersList({
                     target.type === 'grupo' && target.grupoId === g.id ? 'bg-primary/10' : 'hover:bg-muted/50'
                   )}
                 >
-                  <Avatar className="h-8 w-8 border border-border">
-                    {g.foto_url && (
-                      <ImagemPrivada src={g.foto_url} alt={g.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
-                    )}
-                    <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
-                      <Users2 className="h-4 w-4" />
-                    </AvatarFallback>
-                  </Avatar>
+                  <AvatarDeChat
+                    className="h-8 w-8 border border-border"
+                    fotoUrl={g.foto_url}
+                    icone={g.icone}
+                    corFundo={g.cor_fundo}
+                    corIcone={g.cor_icone}
+                    IconePadrao={Users2}
+                    nome={g.nome}
+                    tamanhoIcone="h-4 w-4"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-foreground truncate">{g.nome}</p>
                     <p className="text-[10px] text-muted-foreground">Grupo</p>
@@ -1544,7 +1553,7 @@ const Chat = () => {
           }}
           mencoesPorChave={mencoes?.chat ?? {}}
           geralNome={geralNome}
-          geralFotoUrl={geralConfig?.foto_url}
+          geralConfig={geralConfig}
           onlineIds={onlineIds}
           lastActivity={lastActivity}
           showOnMobile={painelCelular === 'lista'}
@@ -1597,14 +1606,16 @@ const Chat = () => {
                 >
                   {target.type === 'grupo' ? (
                     <>
-                      <Avatar className="h-8 w-8 border border-border">
-                        {activeGrupo?.foto_url && (
-                          <ImagemPrivada src={activeGrupo.foto_url} alt={chatHeaderName} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
-                        )}
-                        <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                          <Users2 className="h-4 w-4" />
-                        </AvatarFallback>
-                      </Avatar>
+                      <AvatarDeChat
+                        className="h-8 w-8 border border-border"
+                        fotoUrl={activeGrupo?.foto_url}
+                        icone={activeGrupo?.icone}
+                        corFundo={activeGrupo?.cor_fundo}
+                        corIcone={activeGrupo?.cor_icone}
+                        IconePadrao={Users2}
+                        nome={chatHeaderName}
+                        tamanhoIcone="h-4 w-4"
+                      />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">{chatHeaderName}</p>
                         <p className="text-[10px] text-muted-foreground capitalize">{chatHeaderSub}</p>
@@ -1632,14 +1643,16 @@ const Chat = () => {
                     </>
                   ) : (
                     <>
-                      <Avatar className="h-8 w-8 border border-border">
-                        {geralConfig?.foto_url && (
-                          <ImagemPrivada src={geralConfig.foto_url} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
-                        )}
-                        <AvatarFallback className="bg-primary text-primary-foreground">
-                          <Users className="h-4 w-4" />
-                        </AvatarFallback>
-                      </Avatar>
+                      <AvatarDeChat
+                        className="h-8 w-8 border border-border"
+                        fotoUrl={geralConfig?.foto_url}
+                        icone={geralConfig?.icone}
+                        corFundo={geralConfig?.cor_fundo}
+                        corIcone={geralConfig?.cor_icone}
+                        IconePadrao={MessageCircle}
+                        nome={geralNome}
+                        tamanhoIcone="h-4 w-4"
+                      />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">{geralNome}</p>
                         <p className="text-[10px] text-muted-foreground">{chatHeaderSub}</p>
@@ -1719,14 +1732,16 @@ const Chat = () => {
                             className="relative group shrink-0"
                             title="Trocar foto do grupo"
                           >
-                            <Avatar className="h-14 w-14 border border-border">
-                              {activeGrupo?.foto_url && (
-                                <ImagemPrivada src={activeGrupo.foto_url} alt={chatHeaderName} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
-                              )}
-                              <AvatarFallback className="bg-primary text-primary-foreground">
-                                <Users2 className="h-6 w-6" />
-                              </AvatarFallback>
-                            </Avatar>
+                            <AvatarDeChat
+                              className="h-14 w-14 border border-border"
+                              fotoUrl={activeGrupo?.foto_url}
+                              icone={activeGrupo?.icone}
+                              corFundo={activeGrupo?.cor_fundo}
+                              corIcone={activeGrupo?.cor_icone}
+                              IconePadrao={Users2}
+                              nome={chatHeaderName}
+                              tamanhoIcone="h-6 w-6"
+                            />
                             <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
                               <Camera className="h-4 w-4 text-white" />
                             </span>
@@ -1820,14 +1835,16 @@ const Chat = () => {
                               className="relative group shrink-0"
                               title="Trocar foto do Chat Geral"
                             >
-                              <Avatar className="h-14 w-14 border border-border">
-                                {geralConfig?.foto_url && (
-                                  <ImagemPrivada src={geralConfig.foto_url} alt={geralNome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
-                                )}
-                                <AvatarFallback className="bg-primary text-primary-foreground">
-                                  <Users className="h-6 w-6" />
-                                </AvatarFallback>
-                              </Avatar>
+                              <AvatarDeChat
+                                className="h-14 w-14 border border-border"
+                                fotoUrl={geralConfig?.foto_url}
+                                icone={geralConfig?.icone}
+                                corFundo={geralConfig?.cor_fundo}
+                                corIcone={geralConfig?.cor_icone}
+                                IconePadrao={MessageCircle}
+                                nome={geralNome}
+                                tamanhoIcone="h-6 w-6"
+                              />
                               <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Camera className="h-4 w-4 text-white" />
                               </span>
