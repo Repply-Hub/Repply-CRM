@@ -98,6 +98,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from "@/components/ui/context-menu";
 import { useModoCaixaWhatsapp } from "@/hooks/use-modo-caixa-whatsapp";
 import { elementosDaCaixa, ultimoResponsavel } from "@/lib/modo-caixa-whatsapp";
 import { iniciais } from "@/lib/iniciais";
@@ -6735,18 +6736,19 @@ export default function WhatsAppInbox() {
       ? (infoCorPorInstanciaId.get(conv.instancia_id) ?? { tipo: "nenhuma" })
       : { tipo: "nenhuma" };
     return (
-      <button
-        key={conv.id}
-        onClick={onSelect}
-        className={cn(
-          "flex flex-col gap-1.5 rounded-lg px-3 py-2.5 transition-colors w-full text-left",
-          modoSelecao && selecionadas.has(conv.id)
-            ? "bg-primary/10 ring-1 ring-primary/20"
-            : conversaAtiva?.id === conv.id && !modoSelecao
-              ? "bg-primary/10"
-              : "hover:bg-muted/50",
-        )}
-      >
+      <ContextMenu key={conv.id}>
+        <ContextMenuTrigger asChild>
+          <button
+            onClick={onSelect}
+            className={cn(
+              "flex flex-col gap-1.5 rounded-lg px-3 py-2.5 transition-colors w-full text-left",
+              modoSelecao && selecionadas.has(conv.id)
+                ? "bg-primary/10 ring-1 ring-primary/20"
+                : conversaAtiva?.id === conv.id && !modoSelecao
+                  ? "bg-primary/10"
+                  : "hover:bg-muted/50",
+            )}
+          >
         <div className="flex items-center gap-2.5">
           {modoSelecao ? (
             <div
@@ -6904,7 +6906,20 @@ export default function WhatsAppInbox() {
             )}
           </div>
         )}
-      </button>
+          </button>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          {conversaNaoLida(conv, profile?.id) ? (
+            <ContextMenuItem onClick={() => marcarLida.mutate(conv.id)}>
+              Marcar como lida
+            </ContextMenuItem>
+          ) : (
+            <ContextMenuItem onClick={() => marcarNaoLida.mutate(conv.id)}>
+              Marcar como não lida
+            </ContextMenuItem>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
     );
   }
 
