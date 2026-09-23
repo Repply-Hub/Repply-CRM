@@ -8,16 +8,22 @@ const CHAVE = ['chat_marcados_nao_lidos'];
 /** As conversas que EU marquei como não lidas (chaves de chaveDoAlvo). */
 export function useChatMarcadosNaoLidos() {
   const qc = useQueryClient();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const meuId = profile?.id;
 
   const query = useQuery({
-    queryKey: [...CHAVE, user?.id],
+    queryKey: [...CHAVE, meuId],
     queryFn: async (): Promise<Set<string>> => {
-      const { data, error } = await supabase.from('chat_conversa_nao_lida').select('alvo');
+      // Filtra pela própria pessoa mesmo tendo a RLS: a política de SELECT libera is_admin(),
+      // então um super-admin veria as marcas de todo mundo (bolinhas fantasmas) sem este .eq.
+      const { data, error } = await supabase
+        .from('chat_conversa_nao_lida')
+        .select('alvo')
+        .eq('usuario_id', meuId);
       if (error) throw error;
       return new Set((data ?? []).map((r) => r.alvo as string));
     },
-    enabled: !!user,
+    enabled: !!meuId,
   });
 
   // Marcar/limpar num aparelho reflete no outro (a tabela está no supabase_realtime).
