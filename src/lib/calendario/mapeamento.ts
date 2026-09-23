@@ -34,7 +34,10 @@ export function paraGoogle(e: EventoParaSincronizar, fusoHorario: string): Recur
   if (e.diaInteiro) {
     // Google usa data-fim EXCLUSIVA: o dia seguinte ao último dia do evento.
     const inicio = dataISO(e.inicio);
-    const fimExclusivo = format(addDays(new Date(dataISO(e.fim) + 'T12:00:00Z'), 1), 'yyyy-MM-dd');
+    // Âncora de meio-dia em fuso LOCAL (sem 'Z') — mesma família do começo ao fim, imune a
+    // qualquer fuso do host (CLAUDE.md §7.12). Com 'Z' (UTC) + format() local, acima de UTC+12
+    // o dia escorregaria.
+    const fimExclusivo = format(addDays(new Date(dataISO(e.fim) + 'T12:00:00'), 1), 'yyyy-MM-dd');
     base.start = { date: inicio };
     base.end = { date: fimExclusivo };
   } else {
@@ -53,7 +56,7 @@ export function paraRepply(g: RecursoGoogle): {
   if (g.start.date && g.end.date) {
     const inicio = g.start.date + 'T00:00:00.000Z';
     // Desfaz a data-fim exclusiva: último dia real = fim exclusivo - 1 dia, às 23:59:59.
-    const ultimoDia = format(subDays(new Date(g.end.date + 'T12:00:00Z'), 1), 'yyyy-MM-dd');
+    const ultimoDia = format(subDays(new Date(g.end.date + 'T12:00:00'), 1), 'yyyy-MM-dd');
     return { titulo, descricao, inicio, fim: ultimoDia + 'T23:59:59.000Z', diaInteiro: true };
   }
 
