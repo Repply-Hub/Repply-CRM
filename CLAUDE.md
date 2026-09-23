@@ -713,6 +713,13 @@ interlocutor é um profissional que respeita precisão e detesta ser vendido.
 
 Nunca afirme que algo funciona sem ter rodado. Evidência antes de afirmação.
 
+> ✅ **Desde 23/09/2026 existe um robô conferindo isto a cada envio** —
+> `.github/workflows/conferencia.yml`, com a memória em `.github/linha-de-base.json`. Ele roda
+> os três comandos abaixo e **recusa quando o número piora** (e avisa quando melhora, para você
+> baixar a linha de base). Rode você mesmo antes, com `node scripts/conferir-linha-de-base.mjs`
+> — o robô não é portão: o `main` não tem proteção de ramo, então a Vercel publica em paralelo
+> com a conferência. Ele marca o commit de vermelho; não segura o código.
+
 ```sh
 npm run test      # 152 testes em 10 arquivos. Tem que passar limpo
 npm run build     # tem que compilar

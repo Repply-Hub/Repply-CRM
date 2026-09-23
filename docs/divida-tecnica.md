@@ -61,7 +61,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 42 | [Funções de servidor abertas sem motivo, e duas sem conferir quem chamou](#42-seis-funções-de-servidor-abertas-sem-motivo-escrito-e-duas-sem-conferir-quem-chamou) | Alta | Não |
 | 43 | [Os 22.276 arquivos do Storage podem ser LISTADOS sem login](#43-os-22276-arquivos-do-storage-podem-ser-listados-sem-login) | Alta | Complementa o plano dos baldes |
 | 44 | [A matriz de permissões só é conferida em 2 dos 15 módulos](#44-a-matriz-de-permissões-só-é-conferida-pelo-banco-em-2-dos-15-módulos) | Alta | Não — mapa levantado em 22/09; implementação adiada por decisão do dono |
-| 45 | [Não existe conferência automática, e o `git push` publica](#45-não-existe-conferência-automática--e-agora-o-git-push-publica) | Alta | Não — protege todo o resto |
+| 45 | [Não existe conferência automática, e o `git push` publica](#45-não-existe-conferência-automática--e-agora-o-git-push-publica) | ✅ Resolvida | Robô de conferência em 23/09 — recusa quando o número piora. Avisa, não bloqueia |
 | 46 | [`types.ts` com 21 objetos fora de sincronia, e dá para regerar](#46-typests-tem-21-objetos-fora-de-sincronia-e-pode-ser-regerado) | Alta | Não |
 | 47 | ["Salvo" quando o banco recusou — o mesmo defeito em 4 telas](#47-salvo-quando-o-banco-recusou--o-mesmo-defeito-em-quatro-telas) | ✅ Resolvida | As 4 telas conferem o efeito; a varredura dos demais pontos é o item 68 |
 | 48 | [O Radar de Risco conta edição de campo como movimento](#48-o-radar-de-risco-conta-edição-de-campo-como-movimento) | ✅ Resolvida | Corrigida em 22/09/2026 — o "parado há X dias" estava errado em 26 negócios, até 14 dias |
@@ -1919,22 +1919,53 @@ baldes de arquivo públicos (item 43).
 
 ## 45. Não existe conferência automática — e agora o `git push` publica
 
-**Gravidade: alta.**
+> ✅ **Resolvido em 23/09/2026.** Robô `.github/workflows/conferencia.yml`, com a regra em
+> `scripts/comparar-linha-de-base.mjs` (12 testes em `src/test/linha-de-base.test.ts`) e a
+> memória em `.github/linha-de-base.json`.
 
-A regra do projeto é sensata: como o lint e os erros de tipo já vêm com saldo herdado, o critério
-é **o número não subir**. Só que **nada confere isso**. O único robô no GitHub raspa o Diário
-Oficial de Natal.
+**Gravidade: alta.** Registrado porque explica por que o robô é assim, e não "passar limpo".
 
-Até 26/08/2026 havia duas travas entre o commit e o cliente: a autorização do dono do produto, e
-alguém rodando o comando de publicar. **A segunda deixou de existir** quando o repositório voltou
-a ser público. Agora o "pode" solta o código direto, e a rede de proteção inteira é memória
-humana.
+`git push` no `main` publica para cliente pagante em minutos. Até 26/08/2026 havia duas travas
+entre o commit e o cliente: a autorização do dono e alguém rodando o comando de publicar. A
+segunda sumiu quando o repositório voltou a ser público. Desde então a rede de proteção inteira
+era alguém **lembrar** de rodar os três comandos do `CLAUDE.md` §9 — e o único robô do
+repositório raspava o Diário Oficial de Natal.
 
-### Conserto
+### A regra: o número não piora
 
-Um workflow que rode `npm run test`, `npx tsc --noEmit -p tsconfig.app.json` e `npm run lint` a
-cada envio, compare com um arquivo de linha de base commitado, e recuse quando o número subir. É
-a regra que o projeto já escolheu — só deixa de depender de lembrar.
+Exigir "passar limpo" recusaria todo envio no primeiro dia (o projeto tem **416** problemas de
+lint e **35** erros de tipo herdados) e o robô seria desligado na primeira semana. A regra é a
+que o projeto já tinha escolhido; o robô só a tira da memória humana.
+
+| métrica | o que é piorar |
+|---|---|
+| erros de tipo | **subir** |
+| problemas de lint | **subir** |
+| testes que passam | **cair** — apagar teste é o jeito silencioso de ficar verde |
+
+E o outro lado, que é o que faz a regra durar: quando um número **melhora**, o robô passa mas
+**avisa para baixar a linha de base**. Sem isso, um conserto abre folga e a próxima regressão
+cabe dentro dela sem ninguém notar.
+
+### Duas armadilhas que o próprio robô pegou, nele mesmo
+
+1. 🔴 **A saída do vitest e do eslint vem COLORIDA**, e os códigos de escape caem no meio dos
+   números. Um contador que procure `"Tests 2411 passed"` no texto cru devolve `NaN` — e um robô
+   que não consegue ler o número ou recusa todo envio (e é desligado) ou aprova qualquer
+   regressão. Foi pego na mão, medindo a linha de base com `grep`: o comando voltou vazio.
+   Os contadores tiram as cores antes de contar, e há teste para isso.
+2. 🔴 **Chave faltando na linha de base NÃO vira zero.** Com `?? 0`, um arquivo incompleto faria
+   o robô tratar tudo como regressão. Ele falha dizendo qual chave falta.
+
+E, na primeira execução de verdade, **o robô recusou o próprio commit que o criava**: o lint
+tinha subido de 416 para 417, por uma diretiva `eslint-disable` que não era usada. Consertado
+antes de publicar — que é exatamente o que ele existe para fazer.
+
+### ⚠️ O que ele NÃO faz
+
+**Não impede a publicação.** O `main` não tem proteção de ramo, então a Vercel publica em
+paralelo com a conferência. O robô **avisa** — marca o commit de vermelho no GitHub. Virar
+portão exige ligar proteção de ramo, o que muda o fluxo do time e é decisão do dono do produto.
 
 ---
 

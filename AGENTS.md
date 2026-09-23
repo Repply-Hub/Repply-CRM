@@ -136,7 +136,10 @@ Cuidados de git que **não** mudam (várias sessões dividem esta pasta — `CLA
 
 ## 5. Verificar antes de dizer "feito" (evidência antes de afirmação)
 
-Rode e confira a saída **antes** de publicar, não depois (`CLAUDE.md` §9):
+Rode e confira a saída **antes** de publicar, não depois (`CLAUDE.md` §9). Desde 23/09/2026 um
+robô confere isto a cada envio (`.github/workflows/conferencia.yml`) e recusa quando o número
+piora — mas ele **avisa, não bloqueia**: a Vercel publica em paralelo. Para rodar a mesma
+conferência aqui: `node scripts/conferir-linha-de-base.mjs`.
 
 - `npm run test` — a bateria tem que passar; o número de testes não pode cair.
 - `npx tsc --noEmit -p tsconfig.app.json` — **com o `-p`**; sem ele não confere nada e mente

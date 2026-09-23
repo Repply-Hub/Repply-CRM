@@ -1,0 +1,63 @@
+# Conferência automática a cada envio — item 45 da dívida técnica.
+#
+# 🔴 POR QUE ELE EXISTE. `git push` no `main` PUBLICA para cliente pagante em minutos
+# (CLAUDE.md §16). Até 26/08/2026 havia duas travas entre o commit e o cliente: a autorização
+# do dono e alguém rodando o comando de publicar. A segunda sumiu quando o repositório voltou a
+# ser público. Desde então a rede de proteção inteira era alguém LEMBRAR de rodar os três
+# comandos do CLAUDE.md §9 antes de publicar — e o único robô do repositório raspava o Diário
+# Oficial de Natal.
+#
+# O QUE ELE FAZ: roda testes, tipos e lint, e recusa quando o número PIORA em relação a
+# `.github/linha-de-base.json`. Não exige "passar limpo": o projeto convive com saldo herdado
+# (416 problemas de lint e 35 erros de tipo em 23/09/2026), e exigir zero faria o robô ser
+# desligado na primeira semana. A regra é a que o projeto já tinha escolhido — o número não
+# sobe. Detalhe e testes em `scripts/comparar-linha-de-base.mjs`.
+#
+# ⚠️ O QUE ELE **NÃO** FAZ: impedir a publicação. O `main` não tem proteção de ramo, então a
+# Vercel publica em paralelo com esta conferência. O robô AVISA (marca o commit de vermelho no
+# GitHub); ele não é um portão. Para virar portão, seria preciso ligar proteção de ramo — o que
+# muda o fluxo do time e é decisão do dono do produto.
+#
+# VARIÁVEIS: os testes montam o cliente do Supabase na carga do módulo e quebram sem
+# `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY`. Os valores abaixo são FICTÍCIOS de
+# propósito: nenhum teste vai à rede, e credencial de verdade não entra em arquivo público.
+
+name: Conferência
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  conferir:
+    name: Testes, tipos e lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      VITE_SUPABASE_URL: https://exemplo.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: chave-ficticia-para-a-conferencia
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # `npm ci` e não `npm install`: instala exatamente o que está no package-lock, então a
+      # conferência mede o mesmo código que a Vercel constrói.
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Conferir contra a linha de base
+        run: node scripts/conferir-linha-de-base.mjs
+
+      # O build fica FORA do script porque não tem número para comparar: ou compila, ou não.
+      # E ele pega o que o `tsc` não pega — `npm run build` é `vite build` puro, sem checagem
+      # de tipo, então os dois se completam (CLAUDE.md §9).
+      - name: Compilar
+        run: npm run build
