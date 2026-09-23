@@ -1593,6 +1593,17 @@ catálogos sem dado de cliente.
 | vendedor vivo | `1314 12150 1101 90 2 503 288 378 7` |
 | gestor | igual, **e vê o negócio e a ficha de quem saiu** |
 
+### A pessoa que estava exposta: resolvida em 23/09
+
+O login removido em 11/09 foi banido e as credenciais dele derrubadas (feito pelo Lucas, por SQL
+— o diálogo de ban do painel não chegou a gravar na primeira tentativa, e o `banned_until`
+continuou vazio; vale conferir sempre depois de usar aquele diálogo). Conferido: banido,
+**0 sessões abertas**, **0 tokens de renovação vivos**, e é a **única** conta banida do projeto.
+Último login dela havia sido em 20/07, então nunca foi alguém usando o sistema — era porta
+destrancada, não alguém entrando.
+
+**O que sobra é estrutural: isso foi feito à mão, e a próxima saída repete o problema.**
+
 ### O que ainda falta
 
 1. 🔴 **Revogar o login.** Existem **16 funções de servidor** que consultam `usuarios` com chave
