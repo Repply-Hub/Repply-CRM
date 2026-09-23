@@ -20,19 +20,16 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | | |
 |---|---|
 | Itens no inventário | **75** |
-| ✅ Resolvidos | **20** |
-| Abertos | **55** |
+| ✅ Resolvidos | **21** |
+| Abertos | **54** |
 
-**Dos 55 abertos:** 4 críticos · 14 altos · 20 médios · 14 baixos · 3 outros.
+**Dos 54 abertos:** 3 críticos · 14 altos · 20 médios · 14 baixos · 3 outros.
 
-**Os 4 críticos**, que são a fila de cima:
+**Os 3 críticos**, que são a fila de cima:
 
 - **16 — Webhook do WhatsApp aceita qualquer um.** 80.631 eventos, nenhum com segredo
   conferido. É o de maior dano possível: mexer errado PARA as mensagens da MD. Vai em etapas,
   com plano escrito.
-- **38 — Excluir usuário não tira o acesso.** O banco foi fechado em 23/09 e a pessoa que
-  estava exposta teve o login revogado; falta o botão "Remover" revogar sozinho, senão a
-  próxima saída repete.
 - **1 — Chave do WhatsApp legível.** A exposição foi fechada em 20/08; restam 3 fases da
   blindagem.
 - **2 — Titularidade dos serviços.** Decisão do dono, não conserto técnico.
@@ -87,7 +84,7 @@ gravado continua errado" — e é um item ABERTO). Foi assim que a primeira cont
 | 36 | [Matriz de permissões ainda decorativa em criar/editar, e em 3 módulos que não são tabela](#36-matriz-de-permissões-ainda-decorativa-em-criareditar-e-em-3-módulos-que-não-são-tabela) | Média | Não — falsa sensação de controle, não vazamento |
 | 36 | [As 8 visões `v_md_*` entregam a carteira de clientes sem login](#36-as-8-visões-v_md_-entregam-a-carteira-de-clientes-sem-login) | ✅ Resolvida | Acesso revogado em 03/09/2026 — reconferido em 23/09: **0 das 9 visões** abertas a visitante |
 | 37 | [A pré-visualização de anexo executa o HTML do arquivo](#37-a-pré-visualização-de-anexo-executa-o-html-do-arquivo-recebido) | ✅ Resolvida | Corrigida em 23/09/2026 — os dois pontos limpam o HTML antes de virar tela |
-| 38 | [Excluir usuário não tira o acesso](#38-excluir-usuário-não-tira-o-acesso) | **Crítica** | ⏳ Banco conferido em 23/09; falta revogar o login (16 funções de servidor passam por cima) |
+| 38 | [Excluir usuário não tira o acesso](#38-excluir-usuário-não-tira-o-acesso) | ✅ Resolvida | Banco e login fechados em 23/09/2026 — "Remover" bane e carimba numa operação só |
 | 39 | [Excluir etapa do Kanban move negócios mesmo quando o banco recusa](#39-excluir-etapa-do-kanban-move-os-negócios-mesmo-quando-o-banco-recusa) | ✅ Resolvida | 22/09/2026 — as duas gravações viraram uma operação só no banco |
 | 40 | [O conserto de datas não alcança a tela de Negócios](#40--o-conserto-de-datas-da-importação-não-alcançava-a-tela-de-negócios) | ✅ Código resolvido | 01/09/2026 · ⚠️ o dado já gravado continua errado — ver item 3 |
 | 41 | [Duas funções do banco atravessam a fronteira entre empresas](#41-duas-funções-do-banco-atravessam-a-fronteira-entre-empresas) | ✅ Resolvido | Corrigido na migration `20260829120000` — a tela só acompanhou em 31/08 |
@@ -1588,9 +1585,30 @@ Duas linhas. `dompurify` já é dependência e já é usado certo em `LeitorEmai
 
 ## 38. Excluir usuário não tira o acesso
 
-> ⏳ **Metade resolvida em 23/09/2026.** O BANCO passou a barrar (migrations
-> `20260923130000` e `20260923130100`, aplicadas e conferidas). Falta **revogar o login**, que
-> nenhuma migration alcança — ver "O que ainda falta" no fim.
+> ✅ **Resolvido em 23/09/2026, nas duas partes.**
+>
+> **Parte 1 — o BANCO** (migrations `20260923130000` e `20260923130100`). Conferido: a conta
+> removida vai a 0 em tudo, e o gestor continua vendo o negócio e a ficha de quem saiu.
+>
+> **Parte 2 — o LOGIN** (função `usuario-acesso` v1 + `src/hooks/use-acesso-de-usuario.ts`,
+> 3 testes). "Remover" e "Restaurar" deixaram de gravar `deleted_at` direto na tabela: agora
+> chamam a função, que **bane o login e carimba a linha numa operação só** — a lição do item
+> 39. A ordem importa: revoga primeiro, carimba depois; se o carimbo falhar sobra alguém sem
+> acesso e visível na tela, que é o erro barato. Ao contrário sobraria alguém "removido" com
+> acesso, que é o bug que isto fecha.
+>
+> **É reversível:** o banimento é desfeito por "Restaurar". Nunca `deleteUser` — apagaria a
+> conta e levaria junto o rastro de autoria no histórico.
+>
+> 🔴 **Guardas que o teste prende:** ninguém revoga o próprio acesso (um gestor desatento se
+> trancaria para fora, e só o painel do Supabase o traria de volta); gestor só alcança a própria
+> empresa; e a tela não pode voltar a gravar direto na tabela — há teste que falha se alguém
+> "simplificar".
+>
+> ⚠️ **O que não fecha:** o token que a pessoa já tem na mão vale até expirar (no máximo 1
+> hora). O banimento barra login novo e renovação, não o token em curso. O banco já barra desde
+> a parte 1, então a janela só alcança o caminho das funções de servidor. Fechá-la por completo
+> exige apagar a sessão no esquema `auth`, que o PostgREST não expõe.
 
 **Gravidade: crítica.** ⚠️ Este item dizia "latente: hoje há 0 usuários excluídos". Estava
 desatualizado: em 23/09 havia **1 pessoa removida em 11/09, com login ativo, 1 sessão aberta e 1

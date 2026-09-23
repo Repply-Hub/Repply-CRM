@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -28,6 +28,7 @@ import { PerfilSelect } from './PerfilSelect';
 import { CodigoAcessoButton } from './CodigoAcessoButton';
 import { PermissaoMatrizChecklist } from './PermissaoMatrizChecklist';
 import { PermissaoPresetsDialog } from './PermissaoPresetsDialog';
+import { useRevogarAcesso, useDevolverAcesso } from '@/hooks/use-acesso-de-usuario';
 
 // ─── Role utils ───
 const ROLE_CONFIG: Record<string, { label: string; color: string; icon: typeof Users; badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -623,36 +624,18 @@ export function UsuariosTab() {
     return result;
   }, [vendedoresData, empresaFilter, roleFilter, searchQuery]);
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('usuarios')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['usuarios'] });
-      qc.invalidateQueries({ queryKey: ['usuarios_removidos'] });
-      toast.success('Usuário removido!');
-      setSelectedVendedor(null);
-    },
-  });
+  // 🔴 REMOVER PASSOU A TIRAR O ACESSO DE VERDADE (item 38, parte 2). Antes, estas duas
+  // gravavam `deleted_at` direto na tabela e o login continuava vivo — e 16 funções de servidor
+  // consultam `usuarios` com chave de serviço, ignorando a regra do banco. Agora quem faz é a
+  // função `usuario-acesso`, numa operação só: o login e a linha andam juntos (lição do item
+  // 39). Há teste que falha se alguém voltar a gravar direto: `use-acesso-de-usuario.test.tsx`.
+  const deleteMutation = useRevogarAcesso();
+  const restoreMutation = useDevolverAcesso();
 
-  const restoreMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('usuarios')
-        .update({ deleted_at: null })
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['usuarios'] });
-      qc.invalidateQueries({ queryKey: ['usuarios_removidos'] });
-      toast.success('Usuário restaurado com sucesso!');
-    },
-  });
+  // Fechar a ficha lateral continua sendo coisa da tela, não do hook compartilhado.
+  useEffect(() => {
+    if (deleteMutation.isSuccess) setSelectedVendedor(null);
+  }, [deleteMutation.isSuccess]);
 
   const reativarMutation = useMutation({
     mutationFn: async (data: { email: string; nome: string; role: string; empresa_id: string }) => {
