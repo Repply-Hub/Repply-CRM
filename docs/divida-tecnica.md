@@ -83,6 +83,9 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 66 | [A grade de figurinhas usa endereço público cru](#66-a-grade-de-figurinhas-usa-endereço-público-cru-e-para-quando-o-balde-fechar) | Média | Não hoje — **sim** no dia em que `whatsapp-media` fechar |
 | 67 | [Falta a contagem distinta de negócios em risco](#67-falta-a-contagem-distinta-de-negócios-em-risco) | Baixa | Não — só limita o cartão "Valor em Risco" a mostrar valor sem quantidade |
 | 70 | [Datas que mudam de dia fora do banco](#70-datas-que-mudam-de-dia-fora-do-banco-o-que-sobrou-da-varredura-de-1109) | Baixa | Não — código consertado em 11/09; sobram os cadastros antigos feitos depois das 21h (dado, pede conversa) e o Calendário (item 51) |
+| 73 | [Dono de conta apagava o chat de TODAS as empresas](#73-dono-de-conta-apagava-o-chat-de-todas-as-empresas) | ✅ Resolvida | Corrigida em 23/09/2026 — apagava 748 mensagens de 11 empresas, inclusive as 715 do cliente pagante |
+| 74 | [Vendedor vinculado ao WhatsApp lê E ALTERA a configuração da instância](#74-vendedor-vinculado-ao-whatsapp-lê-e-altera-a-configuração-da-instância) | **Crítica** | **Sim** — troca o endereço do servidor e o nosso servidor entrega a chave e as mensagens |
+| 75 | [Dá para forjar conversa no chat](#75-dá-para-forjar-conversa-no-chat-e-a-reescrita-não-se-fecha-por-regra-de-acesso) | Alta | Não — mas inserir mensagem em grupo alheio, com data no passado, funciona hoje |
 
 > ⚠️ Os itens **61 e 62** existem no corpo deste documento mas não têm linha aqui — quem os
 > escreveu esqueceu a tabela. Vale acrescentar ao passar por perto.
@@ -3171,3 +3174,140 @@ mais grave do que parece: aumentar a fonte pode fazer conteúdo desaparecer.
 | **`whatsapp-webhook` rejeitava 100% dos eventos com 401** — não estava em `config.toml`, então valia `verify_jwt = true` e o gateway barrava antes do código. Sintoma: instância `connected` na uazapi e `disconnected` no banco | commit `0715119` | `[functions.whatsapp-webhook] verify_jwt = false` |
 | **Identificador de grupo do WhatsApp quebrado** por limpeza de não-dígitos, que apagava o hífen do formato antigo | 05/08/2026 | Silencioso por meses: a uazapi respondia sucesso e não entregava nada |
 | **Nono dígito enfiado em telefone fixo**, que respondia por 100% das falhas de envio | — | `normalizeWhatsappPhone`, com testes fixando o contrato em `src/hooks/whatsapp-phone.test.ts` |
+
+---
+
+## 73. Dono de conta apagava o chat de TODAS as empresas
+
+> ✅ **Resolvido em 23/09/2026** — migration
+> `20260923120000_dono_de_conta_so_apaga_o_chat_da_propria_empresa.sql`, aplicada e conferida em
+> produção.
+
+**Gravidade: crítica.** Não era leitura indevida: era **perda de dado do cliente, sem volta,
+atravessando a fronteira entre inquilinos.**
+
+A regra `chat_delete` autorizava assim:
+
+```sql
+usuario_id = get_my_usuario_id()                 -- o autor da mensagem, correto
+OR exists (select 1 from usuarios
+            where user_id = auth.uid()
+              and role = 'empresa')              -- 🔴 NÃO OLHA A LINHA
+```
+
+O segundo ramo **não menciona a mensagem**. Ele é verdadeiro ou falso **para a pessoa** — e,
+quando verdadeiro, vale para **todas as linhas da tabela**, de todas as empresas. Não havia nada
+a somar que corrigisse: a regra restritiva de cobrança (`chat_mensagens_exige_plano_delete`)
+também é por pessoa, não por linha.
+
+**Medido em produção, em transação desfeita**, com o dono de conta da empresa de **demonstração**
+(20 mensagens próprias, e que não lê nenhuma das outras):
+
+| | |
+|---|---|
+| Antes | um `delete` sem filtro apagava **748** linhas — o banco inteiro, incluindo as **715** do cliente pagante |
+| Depois | apaga **20**, exatamente as da própria empresa |
+
+Eram **11 contas com `role='empresa'`, em 11 empresas diferentes**. Qualquer uma fazia isso com
+uma linha de código.
+
+### O detalhe que explica por que ninguém percebeu
+
+O Postgres aplica **também** a regra de leitura em qualquer `DELETE` cujo filtro leia uma coluna.
+Então apagar **uma** mensagem escolhida de outra empresa devolvia zero linhas — parecia protegido.
+O estrago só aparecia no `delete` **sem filtro**, que não lê coluna nenhuma e por isso escapa da
+regra de leitura. Quem testou "consigo apagar aquela mensagem ali?" concluiu que estava fechado.
+
+### O que mudou para quem usa
+
+Nada. O produto não tem tela para apagar mensagem de outra empresa; as duas exclusões que
+existem (`use-chat.ts:794` limpar conversa e `:823` excluir a própria mensagem) continuam
+iguais. Conferido depois de aplicar: o vendedor comum da MD continua alcançando só as 62
+mensagens dele, e o dono de conta segue apagando tudo o que é da empresa dele.
+
+---
+
+## 74. Vendedor vinculado ao WhatsApp lê E ALTERA a configuração da instância
+
+**Gravidade: crítica. Aberto.**
+
+`configuracoes_wapi` guarda `api_key` e `webhook_secret`. As regras `wapi_config_select` e
+`wapi_config_update` têm a **mesma** condição: basta ter vínculo com a instância
+(`wapi_instancia_usuarios`). Hoje a chave chega ao navegador de **21 pessoas** — 9 vendedores por
+vínculo e 12 gestores/donos/admin.
+
+**A leitura já é grave** (a credencial da operadora vale **fora** do produto), mas a escrita é
+pior. Ensaiado em transação desfeita, como vendedor vinculado, alterando 1 linha em cada
+tentativa:
+
+- trocou o **endereço do servidor** da instância;
+- trocou a própria chave;
+- **moveu a instância para outra empresa**;
+- mudou status e nome.
+
+🔴 **O endereço é o pior.** `supabase/functions/whatsapp-send/index.ts:357` monta a URL a partir
+de `instance_url` e `:436` manda a chave verdadeira no cabeçalho — ou seja, o vendedor aponta o
+campo para um servidor dele e **o nosso servidor entrega a chave e o texto das mensagens na mão
+dele**, no próximo envio. Mover `empresa_id` desvia o WhatsApp que **entra** para outro
+inquilino (`whatsapp-webhook/index.ts:171-185` carimba a empresa a partir dessa coluna).
+
+### Conserto desenhado (não aplicado)
+
+Corte por **coluna** (`GRANT`), não por linha — é a única opção em que a chave para de sair para
+**todo** navegador, inclusive o do gestor e o do admin. Nenhuma tela exibe a chave: em `src/` ela
+só serve de cabeçalho para 3 chamadas à uazapi (conectar, conferir status, desconectar), que
+precisam virar função de servidor. O vendedor só precisa de `id`, `instance_name`, apelido, cor e
+`status` — todos continuam legíveis.
+
+**Ordem obrigatória: função nova + código PRIMEIRO, migration depois.** As 3 telas que pedem
+`select('*')` (`use-whatsapp-inbox.ts:1308`, `WhatsAppInstanciasTab.tsx:955`,
+`AdminWhatsAppInstancias.tsx:813`) param com erro 42501 se a migration subir sozinha.
+
+⚠️ **Duas armadilhas medidas:** estreitar a política **não** fecha o vendedor (quem fecha é o
+corte por coluna — com a política nova, 18 pessoas ainda passam no UPDATE); e o "desfazer"
+óbvio (`grant select, update ... to authenticated`) **reabre o pior buraco**, porque devolve
+UPDATE em todas as colunas. O desfazer tem de ser só de leitura.
+
+🔴 **Depende de um problema anterior:** qualquer pessoa logada se vincula sozinha ao número
+principal da empresa pelo botão "Ativar WhatsApp" (`whatsapp-provision/index.ts:113-170` não
+confere cargo no caminho sem `target_usuario_id`). Na MD isso abre 772 conversas sem responsável
+de imediato. Sem tratar isso, qualquer conserto por vínculo se apoia em areia.
+
+---
+
+## 75. Dá para forjar conversa no chat, e a reescrita não se fecha por regra de acesso
+
+**Gravidade: alta. Aberto.**
+
+Três descobertas que andam juntas, todas medidas em produção em transação desfeita (23/09):
+
+**1. O caminho prático de forjar conversa é INSERIR, não alterar.** A regra `chat_insert` só
+confere autor e empresa — não confere se a pessoa participa do grupo, nem a data. Medido: um
+vendedor inseriu mensagem num **grupo privado de que não participa**, datada de 30 dias atrás
+(entra no meio do histórico, não no fim), com citação inventada atribuída a outra pessoa.
+
+**2. Regra de acesso não tranca coluna.** Existem três regras de `UPDATE` em `chat_mensagens`;
+duas são sobra de versão anterior (dizem só "é da minha empresa", sem cláusula de checagem) e a
+terceira, `chat_update_lida`, é bem-feita. **Mas remover as duas frouxas não fecha o buraco:**
+a regra autoriza a **linha**, e o `WITH CHECK` enxerga só a linha nova, nunca a antiga — não há
+como proibir a troca de `conteudo` por esse mecanismo. Quem tranca coluna é privilégio por
+coluna (`GRANT`). Medido, depois de remover as duas frouxas: o vendedor **ainda** reescreveu o
+texto e a data da mensagem de um colega.
+
+**3. O alcance depende do filtro.** `UPDATE` com filtro que lê coluna também passa pela regra de
+leitura (só alcança o que a pessoa já vê); `UPDATE` **sem filtro** alcança as 715 da empresa,
+inclusive 336 conversas privadas que a pessoa não pode ler. Dá para estragar às cegas, não dá
+para escolher a vítima.
+
+O único `UPDATE` que o app faz é marcar como lida (`use-chat.ts:682-683`, grava só `lida` e
+`lida_em`), e **não existe edição de mensagem no produto** — então o conserto não tira botão de
+ninguém.
+
+### Parentes do mesmo padrão
+
+- `chat_grupos`: `UPDATE` sem cláusula de checagem e sem prender a empresa — um gestor move o
+  grupo para outra empresa.
+- **33 políticas de `UPDATE` permissivas sem `WITH CHECK`, em 32 tabelas** no esquema `public`.
+  A maioria herda um `USING` que já prende a empresa, mas merece frente própria.
+- Conferidas e **fechadas**: `chat_mensagens_leituras` (sem UPDATE nem DELETE),
+  `chat_grupo_membros` (sem permissiva de UPDATE), `chat_geral_config`.
