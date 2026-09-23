@@ -18,7 +18,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Calendar as CalendarRangePicker } from '@/components/ui/calendar';
-import { Plus, Search, Trash2, Pencil, Loader2, Calendar, Check, User, LayoutGrid, List as ListIcon, Settings2, ChevronDown, ClipboardList, Tag, FolderKanban } from 'lucide-react';
+import { Plus, Search, Trash2, Pencil, Loader2, Calendar, Check, User, LayoutGrid, List as ListIcon, Settings2, ChevronDown, ClipboardList, Tag, FolderKanban, Paperclip } from 'lucide-react';
 import { format, subDays, subMonths, subYears, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -26,6 +26,8 @@ import { ListPagination } from '@/components/shared/ListPagination';
 import { ResizableTh } from '@/components/shared/ResizableTh';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { TarefaFormDialog } from '@/components/tarefas/TarefaFormDialog';
+import { CampoDeAnexosDaTarefa } from '@/components/tarefas/CampoDeAnexosDaTarefa';
+import { useAnexosDaTarefa, useAdicionarAnexoDaTarefa, useRemoverAnexoDaTarefa } from '@/hooks/use-tarefa-anexos';
 import { TarefaKanbanColumn } from '@/components/tarefas/TarefaKanbanColumn';
 import { TarefaKanbanColunasDialog } from '@/components/tarefas/TarefaKanbanColunasDialog';
 import { ColumnSettings, type ColumnDefinition } from '@/components/shared/ColumnSettings';
@@ -116,6 +118,16 @@ export default function Tarefas() {
   // mostrava "—" num vínculo que existe. Buscamos aquele negócio pelo id — o mesmo remédio que o
   // TarefaFormDialog já usa no próprio seletor (`usePedidoOptionPorId`).
   const { data: negocioDaFichaPorId } = usePedidoOptionPorId(selectedTarefa?.pedido_id ?? null);
+
+  // Anexos da tarefa aberta na ficha lateral: os MESMOS ganchos da edição, para ver, baixar,
+  // acrescentar e tirar anexo sem sair do detalhe (espelha a ficha do negócio). Chamados aqui no
+  // topo — nunca dentro do IIFE do <Sheet> — porque gancho não pode ficar dentro de condição.
+  // Quem pode acrescentar/tirar é a regra de segurança do banco que decide: o remover já trata
+  // "zero linhas não é sucesso" (recusa clara, sem falso sucesso) e o acrescentar é recusado
+  // barulhento pela RLS — o mesmo padrão do Select de etapa que esta ficha já mostra sem trava.
+  const anexosDaFicha = useAnexosDaTarefa(selectedTarefa?.id);
+  const adicionarAnexoDaFicha = useAdicionarAnexoDaTarefa(selectedTarefa?.id ?? '');
+  const removerAnexoDaFicha = useRemoverAnexoDaTarefa(selectedTarefa?.id ?? '');
 
   // Bulk selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -821,6 +833,17 @@ export default function Tarefas() {
                         <p className="text-sm whitespace-pre-wrap">{selectedTarefa.descricao}</p>
                       </div>
                     )}
+                    <div className="space-y-2 md:col-span-2">
+                      <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Paperclip className="h-3 w-3" /> Anexos
+                      </Label>
+                      <CampoDeAnexosDaTarefa
+                        anexos={anexosDaFicha.data ?? []}
+                        onAdicionar={(f) => adicionarAnexoDaFicha.mutate(f)}
+                        onRemover={(id) => removerAnexoDaFicha.mutate(id)}
+                        enviando={adicionarAnexoDaFicha.isPending}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
