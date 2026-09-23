@@ -7,6 +7,14 @@ const MENSAGENS: Record<string, string> = {
   'Invalid login credentials': 'Email ou senha incorretos.',
   'Email not confirmed': 'Email não confirmado. Verifique sua caixa de entrada.',
   'Password should be at least 6 characters': 'A senha deve ter pelo menos 6 caracteres.',
+  // As três recusas de SENHA. Sem elas, a tela de redefinição culpa o link e a pessoa fica
+  // pedindo link novo para sempre — ver src/lib/erros-auth.test.ts.
+  'Password is known to be weak and easy to guess':
+    'Esta senha apareceu em vazamentos conhecidos. Escolha outra.',
+  'New password should be different from the old password':
+    'A nova senha precisa ser diferente da atual.',
+  'Password should contain at least one character of each':
+    'A senha precisa misturar letras, números e símbolos.',
   'Signup requires a valid password': 'Informe uma senha válida.',
   'Unable to validate email address: invalid format': 'Formato de email inválido.',
   'Email rate limit exceeded': 'Muitas tentativas. Aguarde alguns minutos.',
