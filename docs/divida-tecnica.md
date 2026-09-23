@@ -54,7 +54,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 36 | [Matriz de permissões ainda decorativa em criar/editar, e em 3 módulos que não são tabela](#36-matriz-de-permissões-ainda-decorativa-em-criareditar-e-em-3-módulos-que-não-são-tabela) | Média | Não — falsa sensação de controle, não vazamento |
 | 36 | [As 8 visões `v_md_*` entregam a carteira de clientes sem login](#36-as-8-visões-v_md_-entregam-a-carteira-de-clientes-sem-login) | **Crítica** | Sim — 1.305 clientes legíveis sem login |
 | 37 | [A pré-visualização de anexo executa o HTML do arquivo](#37-a-pré-visualização-de-anexo-executa-o-html-do-arquivo-recebido) | **Crítica** | Sim — arquivo de estranho roda na sessão de quem abre |
-| 38 | [Excluir usuário não tira o acesso](#38-excluir-usuário-não-tira-o-acesso) | **Crítica** | Latente — 0 excluídos hoje, mas não há como revogar |
+| 38 | [Excluir usuário não tira o acesso](#38-excluir-usuário-não-tira-o-acesso) | **Crítica** | ⏳ Banco conferido em 23/09; falta revogar o login (16 funções de servidor passam por cima) |
 | 39 | [Excluir etapa do Kanban move negócios mesmo quando o banco recusa](#39-excluir-etapa-do-kanban-move-os-negócios-mesmo-quando-o-banco-recusa) | ✅ Resolvida | 22/09/2026 — as duas gravações viraram uma operação só no banco |
 | 40 | [O conserto de datas não alcança a tela de Negócios](#40--o-conserto-de-datas-da-importação-não-alcançava-a-tela-de-negócios) | ✅ Código resolvido | 01/09/2026 · ⚠️ o dado já gravado continua errado — ver item 3 |
 | 41 | [Duas funções do banco atravessam a fronteira entre empresas](#41-duas-funções-do-banco-atravessam-a-fronteira-entre-empresas) | ✅ Resolvido | Corrigido na migration `20260829120000` — a tela só acompanhou em 31/08 |
@@ -1537,34 +1537,80 @@ Duas linhas. `dompurify` já é dependência e já é usado certo em `LeitorEmai
 
 ## 38. Excluir usuário não tira o acesso
 
-**Gravidade: crítica. Latente: hoje há 0 usuários excluídos.**
+> ⏳ **Metade resolvida em 23/09/2026.** O BANCO passou a barrar (migrations
+> `20260923130000` e `20260923130100`, aplicadas e conferidas). Falta **revogar o login**, que
+> nenhuma migration alcança — ver "O que ainda falta" no fim.
 
-`UsuariosTab.tsx:620` só carimba `deleted_at` na linha de `usuarios`. O login em `auth.users`
-continua existindo e **não há nenhuma chamada de revogação em todo o repositório**.
+**Gravidade: crítica.** ⚠️ Este item dizia "latente: hoje há 0 usuários excluídos". Estava
+desatualizado: em 23/09 havia **1 pessoa removida em 11/09, com login ativo, 1 sessão aberta e 1
+token de renovação não revogado** — lendo 1.314 clientes e 12.148 negócios.
 
-Pior: as quatro funções que respondem "quem é você" **não conferem a exclusão** — conferido no
-banco de produção:
+`UsuariosTab.tsx` só carimba `deleted_at` na linha de `usuarios`. O `ProtectedRoute` barra a
+TELA; o banco continuava liberando pelo endereço direto.
 
-| função | confere `deleted_at`? |
+### 🔴 O conserto que estava escrito aqui NÃO consertava
+
+Este item mandava filtrar `get_my_usuario_id`, `get_my_empresa_id` e `is_gestor`. Ensaiado
+exatamente assim, a pessoa removida **continuou lendo os mesmos 1.314 clientes**.
+
+O motivo: `usuario_in_my_empresa()` tem uma consulta PRÓPRIA de identidade dentro dela, que não
+passa por nenhuma das três. **53 regras de acesso dependem dessa função.**
+
+### 🔴 E a armadilha anotada aqui estava certa pela metade — a metade errada
+
+Dizia que filtrar `usuario_in_my_empresa` apagaria da tela o histórico de quem saiu. A função
+tem **dois lados**:
+
+| lado | o que é | leva filtro? |
+|---|---|---|
+| `id = _usuario_id` | **de quem é a linha** | **não** — é ele que mantém o histórico visível |
+| `empresa_id = (… auth.uid())` | **quem está perguntando** | **sim** — e aqui não apaga histórico nenhum |
+
+Conferido depois de aplicar: o gestor continua vendo o negócio e a ficha de quem saiu.
+
+### Por que foram duas migrations
+
+A primeira fecha o grosso. Varrendo **todas** as tabelas com a conta removida, já com ela
+aplicada, ainda sobravam: `whatsapp_contatos_fotos` (**503**, e essa tabela **tem telefone de
+cliente**), `eventos` (109), `configuracoes_wapi` (2, com a chave da operadora),
+`configuracoes_tabelas` (7) e `wapi_instancia_usuarios` (2) — mais oito tabelas onde ela ainda
+**gravaria**, porque a regra cita `auth.uid()` direto e não passa pelas funções consertadas.
+
+A segunda migration cria `conta_viva()` e uma regra **restritiva** em 9 tabelas. Restritiva, e
+não remendo regra a regra, porque os ramos que sobram não passam por `usuarios` — só um `AND`
+por cima alcança todos. É o mesmo desenho das `*_exige_plano_*` que a casa já usa.
+
+**Ficam de fora de propósito:** `public.usuarios` (a própria linha sustenta a tela "Conta
+suspensa"; fechar ali faz o app deslogar em looping — medido), as tabelas de escopo pessoal
+(`sidebar_preferences`, `app_erros`, `gmail_tokens`, `user_domains`, `user_integrations`) e os
+catálogos sem dado de cliente.
+
+### Conferido em produção depois de aplicar
+
+| quem | clientes · pedidos · contatos · obras · wapi · fotos · eventos · chat · tabelas |
 |---|---|
-| `get_my_usuario_id()` | não |
-| `get_my_empresa_id()` | não |
-| `is_gestor()` | não |
-| `usuario_in_my_empresa()` | não |
+| conta excluída | `0 0 0 0 0 0 0 0 0` — e vê a própria linha (1) |
+| vendedor vivo | `1314 12150 1101 90 2 503 288 378 7` |
+| gestor | igual, **e vê o negócio e a ficha de quem saiu** |
 
-Ou seja: o `ProtectedRoute` barra a TELA, e a política do banco continua liberando. Quem foi
-removido, com a sessão salva ou entrando de novo com a mesma senha, continua lendo e gravando
-o que o cargo dele permitia — pelo endereço direto, sem passar pela tela.
+### O que ainda falta
 
-**Não existe, hoje, caminho no produto para tirar o acesso de um ex-funcionário.**
-
-### Conserto, e a armadilha dele
-
-Acrescentar a checagem de exclusão **somente** às funções que respondem "quem sou eu"
-(`get_my_usuario_id`, `get_my_empresa_id`, `is_gestor`). Pôr em `usuario_in_my_empresa`
-apagaria da tela os negócios e clientes de quem já saiu — que é histórico legítimo.
-
-A revogação do login é passo à parte, e não tem tela: hoje só pelo painel do Supabase.
+1. 🔴 **Revogar o login.** Existem **16 funções de servidor** que consultam `usuarios` com chave
+   de serviço e ignoram toda regra do banco: `empresa-excluir`, `gmail-send`, `import-data`,
+   `import-licencas`, `resolve-pedido-anexo`, `whatsapp-admin-provision`,
+   `whatsapp-contact-photo`, `whatsapp-contact-rename`, `whatsapp-delete-message`,
+   `whatsapp-edit-message`, `whatsapp-group-create`, `whatsapp-group-participants`,
+   `whatsapp-participant-photo`, `whatsapp-provision`, `whatsapp-send`,
+   `whatsapp-send-reaction`. Enquanto o login viver, quem saiu ainda manda WhatsApp em nome da
+   empresa por esse caminho. O molde de uma linha está em `supabase/functions/email-enviar/index.ts:78-79`.
+2. **O botão "Remover" precisa revogar junto.** Hoje só carimba a data. Função de servidor nova
+   no molde de `supabase/functions/empresa-excluir/index.ts`, chamando
+   `auth.admin.updateUserById(id, { ban_duration: … })` — **reversível**, o que casa com o botão
+   "Restaurar" que já existe. Nunca `deleteUser`: apagaria a linha de `auth.users` e levaria
+   junto o rastro de autoria.
+3. **Anexos:** `pedido_anexos_delete` e `tarefa_anexos_obj_delete` liberam por
+   `owner_id = auth.uid()`, sem passar por função nenhuma — quem saiu continua podendo apagar os
+   arquivos que subiu. A pessoa de hoje é dona de 0 objetos; morde na próxima saída.
 
 ---
 
