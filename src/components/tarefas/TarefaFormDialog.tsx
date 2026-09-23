@@ -35,6 +35,8 @@ import { ParticipantesMultiSelect } from '@/components/tarefas/ParticipantesMult
 import { MarcadoresMultiSelect } from '@/components/tarefas/MarcadoresMultiSelect';
 import { EventDateTimeField } from '@/components/calendar/EventDateTimeField';
 import { paraCampoDataHora } from '@/lib/campo-de-data-hora';
+import { CampoDeAnexosDaTarefa } from '@/components/tarefas/CampoDeAnexosDaTarefa';
+import { useAnexosDaTarefa, useAdicionarAnexoDaTarefa, useRemoverAnexoDaTarefa, enviarAnexoDeTarefa } from '@/hooks/use-tarefa-anexos';
 
 interface KanbanStage {
   key: string;
@@ -65,6 +67,13 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
   const createTarefa = useCreateTarefa();
   const updateTarefa = useUpdateTarefa();
   const [form, setForm] = useState(emptyForm);
+
+  // EDITAR: anexos vêm do banco; cada gesto grava na hora.
+  const anexosSalvos = useAnexosDaTarefa(editingTarefa?.id);
+  const adicionarAnexo = useAdicionarAnexoDaTarefa(editingTarefa?.id ?? '');
+  const removerAnexo = useRemoverAnexoDaTarefa(editingTarefa?.id ?? '');
+  // CRIAR: a tarefa ainda não existe — arquivos ficam em memória até ela nascer.
+  const [anexosPendentes, setAnexosPendentes] = useState<File[]>([]);
 
   // Busca de negócio: represada por 300ms porque cada mudança de termo custa uma
   // consulta ao servidor — a lista tem 11.907 negócios e não cabe no navegador.
@@ -126,6 +135,9 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
 
   useEffect(() => {
     if (!open) return;
+    // Arquivo escolhido antes de a tarefa existir não pode sobreviver a uma abertura seguinte —
+    // senão o anexo de uma tarefa nova aparece grudado na próxima.
+    setAnexosPendentes([]);
     if (editingTarefa) {
       setForm({
         titulo: editingTarefa.titulo, descricao: editingTarefa.descricao || '', status: editingTarefa.status,
@@ -163,7 +175,24 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
         await updateTarefa.mutateAsync({ id: editingTarefa.id, ...payload });
         toast.success('Tarefa atualizada');
       } else {
-        await createTarefa.mutateAsync(payload);
+        const { id } = await createTarefa.mutateAsync(payload);
+        if (anexosPendentes.length > 0) {
+          if (!profile?.empresa_id || !profile?.id) {
+            toast.error('Tarefa criada, mas os anexos não subiram: seu usuário/empresa não foi identificado.');
+          } else {
+            const falhas: string[] = [];
+            for (const arquivo of anexosPendentes) {
+              try {
+                await enviarAnexoDeTarefa(id, arquivo, { id: profile.id, empresa_id: profile.empresa_id });
+              } catch {
+                falhas.push(arquivo.name);
+              }
+            }
+            if (falhas.length > 0) {
+              toast.error(`Tarefa criada, mas ${falhas.length} anexo(s) não subiram: ${falhas.join(', ')}.`);
+            }
+          }
+        }
         toast.success('Tarefa criada');
       }
       onOpenChange(false);
@@ -284,6 +313,30 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
           <div className="space-y-1.5">
             <Label>Marcadores</Label>
             <MarcadoresMultiSelect value={form.marcadores} onChange={v => setForm(f => ({ ...f, marcadores: v }))} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Anexos</Label>
+            {editingTarefa ? (
+              <CampoDeAnexosDaTarefa
+                anexos={anexosSalvos.data ?? []}
+                onAdicionar={(f) => adicionarAnexo.mutate(f)}
+                onRemover={(id) => removerAnexo.mutate(id)}
+                enviando={adicionarAnexo.isPending}
+              />
+            ) : (
+              <CampoDeAnexosDaTarefa
+                anexos={anexosPendentes.map((f, i) => ({
+                  id: `pendente-${i}`,
+                  url: '',
+                  nome: f.name,
+                  tipo: f.type || null,
+                  tamanhoBytes: f.size,
+                  criadoEm: new Date(Date.now() + i).toISOString(),
+                }))}
+                onAdicionar={(f) => setAnexosPendentes((xs) => [...xs, f])}
+                onRemover={(id) => setAnexosPendentes((xs) => xs.filter((_, i) => `pendente-${i}` !== id))}
+              />
+            )}
           </div>
         </CorpoDialogo>
         <RodapeDialogo className="mt-2">

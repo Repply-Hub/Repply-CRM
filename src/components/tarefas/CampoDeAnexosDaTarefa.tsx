@@ -106,28 +106,41 @@ export function CampoDeAnexosDaTarefa({
               >
                 {/* O nome (e a miniatura/ícone) inteiros clicáveis, abrindo o arquivo por
                     `LinkAnexoPrivado` — o mesmo componente que o resto do sistema já usa para
-                    anexo privado (ele assina o endereço e abre no aplicativo do aparelho). */}
-                <LinkAnexoPrivado
-                  url={anexo.url}
-                  title={anexo.nome}
-                  className="flex min-w-0 flex-1 items-center gap-2 text-foreground hover:underline"
-                >
-                  {ehImagem(anexo.tipo) ? (
-                    <ImagemPrivada
-                      src={anexo.url}
-                      alt=""
-                      data-testid="miniatura-anexo"
-                      className="h-8 w-8 shrink-0 rounded object-cover"
-                    />
-                  ) : (
+                    anexo privado (ele assina o endereço e abre no aplicativo do aparelho).
+                    Anexo PENDENTE (ainda sem `url`, no modo criar) não tem o que abrir nem
+                    miniatura para buscar — vira texto simples, sem link nem `ImagemPrivada`. */}
+                {anexo.url ? (
+                  <LinkAnexoPrivado
+                    url={anexo.url}
+                    title={anexo.nome}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-foreground hover:underline"
+                  >
+                    {ehImagem(anexo.tipo) ? (
+                      <ImagemPrivada
+                        src={anexo.url}
+                        alt=""
+                        data-testid="miniatura-anexo"
+                        className="h-8 w-8 shrink-0 rounded object-cover"
+                      />
+                    ) : (
+                      <FileText
+                        className="h-4 w-4 shrink-0 text-muted-foreground"
+                        data-testid="icone-arquivo"
+                        aria-hidden
+                      />
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{anexo.nome}</span>
+                  </LinkAnexoPrivado>
+                ) : (
+                  <span className="flex min-w-0 flex-1 items-center gap-2 text-foreground">
                     <FileText
                       className="h-4 w-4 shrink-0 text-muted-foreground"
                       data-testid="icone-arquivo"
                       aria-hidden
                     />
-                  )}
-                  <span className="min-w-0 flex-1 truncate">{anexo.nome}</span>
-                </LinkAnexoPrivado>
+                    <span className="min-w-0 flex-1 truncate">{anexo.nome}</span>
+                  </span>
+                )}
                 {tamanho && <span className="shrink-0 text-xs text-muted-foreground">{tamanho}</span>}
                 {editavel && (
                   <button
