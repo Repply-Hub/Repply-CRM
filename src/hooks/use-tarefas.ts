@@ -78,6 +78,7 @@ export interface Tarefa {
   pedido_id: string | null;
   created_at: string;
   updated_at: string;
+  tarefa_anexos?: { count: number }[];
 }
 
 export function useTarefas() {
@@ -86,7 +87,7 @@ export function useTarefas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('tarefas' as any)
-        .select('*')
+        .select('*, tarefa_anexos(count)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return (data as unknown as Tarefa[]) ?? [];

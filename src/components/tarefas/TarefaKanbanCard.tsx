@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
-import { AlertTriangle, Calendar, GripVertical, User } from 'lucide-react';
+import { AlertTriangle, Calendar, GripVertical, Paperclip, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,7 @@ interface TarefaKanbanCardProps {
 
 export const TarefaKanbanCard = memo(function TarefaKanbanCard({ tarefa, index, onClick }: TarefaKanbanCardProps) {
   const isOverdue = !!tarefa.prazo_final && new Date(tarefa.prazo_final) < new Date() && tarefa.status !== 'concluida';
+  const qtdAnexos = tarefa.tarefa_anexos?.[0]?.count ?? 0;
 
   return (
     <Draggable draggableId={tarefa.id} index={index}>
@@ -70,6 +71,12 @@ export const TarefaKanbanCard = memo(function TarefaKanbanCard({ tarefa, index, 
                   <div className={cn('flex items-center gap-1.5 text-[11px]', isOverdue ? 'text-destructive font-medium' : 'text-muted-foreground')}>
                     <Calendar className="h-3 w-3 shrink-0" />
                     {format(new Date(tarefa.prazo_final), 'dd/MM/yyyy', { locale: ptBR })}
+                  </div>
+                )}
+                {qtdAnexos > 0 && (
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Paperclip className="h-3 w-3 shrink-0" />
+                    {qtdAnexos}
                   </div>
                 )}
               </div>
