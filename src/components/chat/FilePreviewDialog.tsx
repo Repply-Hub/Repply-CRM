@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Download, Loader2, FileText, MessageSquareText } from 'lucide-react';
 import { downloadFile } from '@/lib/download-file';
+import { sanitizarHtmlDeAnexo } from '@/lib/sanitizar-html-de-anexo';
 
 export interface FilePreviewTarget {
   url: string;
@@ -54,7 +55,10 @@ function SpreadsheetPreview({ url }: { url: string }) {
         if (cancelled) return;
         const workbook = XLSX.read(buf, { type: 'array' });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        setHtml(XLSX.utils.sheet_to_html(firstSheet, { editable: false }));
+        // 🔴 LIMPA ANTES DE VIRAR TELA (item 37). Célula com formatação mista carrega HTML
+        // próprio (o campo `h` do SheetJS), e este HTML veio do ARQUIVO — que qualquer pessoa
+        // com o número de WhatsApp da empresa manda.
+        setHtml(sanitizarHtmlDeAnexo(XLSX.utils.sheet_to_html(firstSheet, { editable: false })));
       })
       .catch(() => !cancelled && setError(true));
     return () => { cancelled = true; };
@@ -85,7 +89,8 @@ function DocxPreview({ url }: { url: string }) {
         const res = await fetch(url);
         const buf = await res.arrayBuffer();
         const result = await mammoth.convertToHtml({ arrayBuffer: buf });
-        if (!cancelled) setHtml(result.value);
+        // 🔴 O mammoth NÃO sanitiza — está escrito no contrato dele. Ver item 37.
+        if (!cancelled) setHtml(sanitizarHtmlDeAnexo(result.value));
       } catch {
         if (!cancelled) setError(true);
       }

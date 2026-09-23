@@ -20,17 +20,16 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | | |
 |---|---|
 | Itens no inventário | **75** |
-| ✅ Resolvidos | **19** |
-| Abertos | **56** |
+| ✅ Resolvidos | **20** |
+| Abertos | **55** |
 
-**Dos 56 abertos:** 5 críticos · 14 altos · 20 médios · 14 baixos · 3 outros.
+**Dos 55 abertos:** 4 críticos · 14 altos · 20 médios · 14 baixos · 3 outros.
 
-**Os 5 críticos**, que são a fila de cima:
+**Os 4 críticos**, que são a fila de cima:
 
 - **16 — Webhook do WhatsApp aceita qualquer um.** 80.631 eventos, nenhum com segredo
   conferido. É o de maior dano possível: mexer errado PARA as mensagens da MD. Vai em etapas,
   com plano escrito.
-- **37 — A pré-visualização de anexo executa o HTML do arquivo.**
 - **38 — Excluir usuário não tira o acesso.** O banco foi fechado em 23/09 e a pessoa que
   estava exposta teve o login revogado; falta o botão "Remover" revogar sozinho, senão a
   próxima saída repete.
@@ -87,7 +86,7 @@ gravado continua errado" — e é um item ABERTO). Foi assim que a primeira cont
 | 35 | [Logo de e-mail é um arquivo único para todas as empresas](#35-logo-de-e-mail-é-um-arquivo-único-para-todas-as-empresas) | ✅ Resolvida | Corrigido na migration `20260831140000` |
 | 36 | [Matriz de permissões ainda decorativa em criar/editar, e em 3 módulos que não são tabela](#36-matriz-de-permissões-ainda-decorativa-em-criareditar-e-em-3-módulos-que-não-são-tabela) | Média | Não — falsa sensação de controle, não vazamento |
 | 36 | [As 8 visões `v_md_*` entregam a carteira de clientes sem login](#36-as-8-visões-v_md_-entregam-a-carteira-de-clientes-sem-login) | ✅ Resolvida | Acesso revogado em 03/09/2026 — reconferido em 23/09: **0 das 9 visões** abertas a visitante |
-| 37 | [A pré-visualização de anexo executa o HTML do arquivo](#37-a-pré-visualização-de-anexo-executa-o-html-do-arquivo-recebido) | **Crítica** | Sim — arquivo de estranho roda na sessão de quem abre |
+| 37 | [A pré-visualização de anexo executa o HTML do arquivo](#37-a-pré-visualização-de-anexo-executa-o-html-do-arquivo-recebido) | ✅ Resolvida | Corrigida em 23/09/2026 — os dois pontos limpam o HTML antes de virar tela |
 | 38 | [Excluir usuário não tira o acesso](#38-excluir-usuário-não-tira-o-acesso) | **Crítica** | ⏳ Banco conferido em 23/09; falta revogar o login (16 funções de servidor passam por cima) |
 | 39 | [Excluir etapa do Kanban move negócios mesmo quando o banco recusa](#39-excluir-etapa-do-kanban-move-os-negócios-mesmo-quando-o-banco-recusa) | ✅ Resolvida | 22/09/2026 — as duas gravações viraram uma operação só no banco |
 | 40 | [O conserto de datas não alcança a tela de Negócios](#40--o-conserto-de-datas-da-importação-não-alcançava-a-tela-de-negócios) | ✅ Código resolvido | 01/09/2026 · ⚠️ o dado já gravado continua errado — ver item 3 |
@@ -1548,6 +1547,24 @@ investigação já está corretamente guardado.
 ---
 
 ## 37. A pré-visualização de anexo executa o HTML do arquivo recebido
+
+> ✅ **Resolvido em 23/09/2026.** Os dois pontos de `FilePreviewDialog` passam por
+> `sanitizarHtmlDeAnexo` (`src/lib/sanitizar-html-de-anexo.ts`, 10 testes).
+>
+> **Por que um limpador novo, e não o de e-mail:** `sanitizarHtmlEmail` barra `table`, e
+> planilha é toda tabela — reusá-lo mostraria a planilha vazia.
+>
+> 🔴 **Nenhum endereço de fora passa, nem em imagem nem em link.** O DOMPurify aplica a mesma
+> regra de endereço a `src` e a `href`, então aceitar `http(s)` para o link aceitaria a imagem
+> de fora junto — e imagem de fora, num arquivo de remetente desconhecido, é farol de leitura:
+> quem mandou descobre quem abriu e quando. O que se perde é o link clicável dentro da planilha
+> (o texto fica, o endereço sai) — numa pré-visualização de arquivo que chegou pelo WhatsApp,
+> isso é ganho, porque link clicável ali é phishing pronto. `data:image/` continua passando,
+> senão documento com figura abriria sem as figuras.
+>
+> **Varredura dos outros pontos de injeção do app**, feita no mesmo dia: `CorpoEmail.tsx` e
+> `Configuracoes.tsx` já limpavam; `ui/chart.tsx` injeta CSS montado pelo próprio código, não
+> por dado de fora. Este era o único ponto sujo.
 
 **Gravidade: crítica.**
 
