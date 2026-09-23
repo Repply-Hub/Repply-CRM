@@ -84,7 +84,7 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 | 67 | [Falta a contagem distinta de negócios em risco](#67-falta-a-contagem-distinta-de-negócios-em-risco) | Baixa | Não — só limita o cartão "Valor em Risco" a mostrar valor sem quantidade |
 | 70 | [Datas que mudam de dia fora do banco](#70-datas-que-mudam-de-dia-fora-do-banco-o-que-sobrou-da-varredura-de-1109) | Baixa | Não — código consertado em 11/09; sobram os cadastros antigos feitos depois das 21h (dado, pede conversa) e o Calendário (item 51) |
 | 73 | [Dono de conta apagava o chat de TODAS as empresas](#73-dono-de-conta-apagava-o-chat-de-todas-as-empresas) | ✅ Resolvida | Corrigida em 23/09/2026 — apagava 748 mensagens de 11 empresas, inclusive as 715 do cliente pagante |
-| 74 | [Vendedor vinculado ao WhatsApp lê E ALTERA a configuração da instância](#74-vendedor-vinculado-ao-whatsapp-lê-e-altera-a-configuração-da-instância) | **Crítica** | ⏳ Escrita e vínculo fechados em 23/09; só a LEITURA da chave segue aberta |
+| 74 | [Vendedor vinculado ao WhatsApp lê E ALTERA a configuração da instância](#74-vendedor-vinculado-ao-whatsapp-lê-e-altera-a-configuração-da-instância) | ✅ Resolvida | Os 3 passos fechados em 23/09 — a chave não chega a navegador nenhum |
 | 75 | [Dá para forjar conversa no chat](#75-dá-para-forjar-conversa-no-chat-e-a-reescrita-não-se-fecha-por-regra-de-acesso) | Alta | Não — mas inserir mensagem em grupo alheio, com data no passado, funciona hoje |
 
 > ⚠️ Os itens **61 e 62** existem no corpo deste documento mas não têm linha aqui — quem os
@@ -3286,29 +3286,44 @@ mensagens dele, e o dono de conta segue apagando tudo o que é da empresa dele.
 
 ## 74. Vendedor vinculado ao WhatsApp lê E ALTERA a configuração da instância
 
-> ⏳ **Passos 1 e 3 feitos em 23/09/2026. Falta o passo 2.**
+> ✅ **RESOLVIDO em 23/09/2026, nos três passos.** A chave da operadora não chega mais a
+> navegador nenhum — nem ao do gestor, nem ao do admin.
 >
-> **Passo 1 — a ESCRITA** (migration `20260923140000`): fechada por privilégio de coluna. Quem
-> está logado só grava `status`, `apelido` e `cor`. Conferido como vendedor vinculado: endereço
-> do servidor, chave e empresa da instância **RECUSADOS**; as três colunas do app continuam
-> gravando (2 linhas cada).
+> **Passo 1 — a ESCRITA** (migration `20260923140000`). Fechada por privilégio de coluna: quem
+> está logado só grava `status`, `apelido` e `cor`. Ensaiado como vendedor vinculado:
+> endereço do servidor, chave e empresa da instância RECUSADOS; as três colunas do app seguem
+> gravando. **O conserto é por coluna, não por regra** — estreitar a política NÃO fecha o
+> vendedor vinculado: regra de acesso decide a LINHA, quem decide a COLUNA é o `GRANT`.
 >
-> **Passo 3 — o VÍNCULO** (commit do site + `whatsapp-provision` v27): entrar num número da
-> empresa virou ato de gestor. Antes, o caminho sem `target_usuario_id` não conferia cargo
-> nenhum e qualquer pessoa logada caía no ramo "reutilizar instância da empresa". Medido: a MD
-> tem 2 números com **13 pessoas vinculadas em cada** — o modelo real é número compartilhado
-> pelo time, então o vínculo é a porta de entrada. **Decisão do dono do produto: só o gestor
-> vincula.** A tela ganhou a mesma regra (`src/lib/vinculo-de-whatsapp.ts`, 5 testes) só para
-> não oferecer um botão que o servidor vai negar; a recusa de verdade está na função. A função
-> publicada foi conferida byte a byte contra o repositório.
+> **Passo 3 — o VÍNCULO** (`whatsapp-provision` v27). Entrar num número virou ato de gestor. O
+> caminho sem `target_usuario_id` não conferia cargo nenhum, e qualquer pessoa logada caía no
+> ramo "reutilizar instância da empresa". Medido: a MD tem 2 números com **13 pessoas
+> vinculadas em cada** — o modelo real é número compartilhado pelo time, então o vínculo é a
+> porta de entrada. **Decisão do dono do produto: só o gestor vincula.**
 >
-> **Passo 2 — a LEITURA da chave — continua aberto.** Exige mover as 3 chamadas à operadora
-> (conectar, conferir status, desconectar) para função de servidor ANTES de revogar o `SELECT`
-> das colunas `api_key` e `webhook_secret`. Se o SQL for antes, três telas param com erro
-> 42501: `use-whatsapp-inbox.ts:1308`, `WhatsAppInstanciasTab.tsx:955` e
-> `AdminWhatsAppInstancias.tsx:813`, que pedem `select('*')`.
+> **Passo 2 — a LEITURA** (função `whatsapp-instancia` v1 + `REVOKE SELECT`). As três chamadas
+> à operadora (conectar, conferir, desconectar) saíam do navegador com a `api_key` no cabeçalho
+> — era só por isso que a chave precisava chegar lá, a **21 pessoas**. Agora saem da função de
+> servidor, que lê a chave com a chave de serviço e devolve a resposta crua; a interpretação
+> ficou em `src/lib/whatsapp-instancia.ts` (12 testes), onde antes estava **duplicada palavra
+> por palavra** em dois arquivos. Conectar e desconectar também viraram ato de gestor, pela
+> mesma decisão.
+>
+> **Conferido em produção depois de aplicar:** o navegador lê 11 colunas (sem `api_key` nem
+> `webhook_secret`) e grava 3; vendedor e **gestor** recebem RECUSADO ao pedir a chave;
+> `service_role` mantém as 13 colunas, então as 12 funções de servidor seguem funcionando;
+> visitante sem login recebe 0 linhas (as regras são todas "só para quem tem login").
+>
+> **Sobra uma faxina, sem efeito hoje:** o papel de visitante ainda tem privilégio de coluna
+> sobre a tabela inteira. Não alcança nada, porque nenhuma regra se aplica a ele — entra na
+> limpeza geral das permissões de visitante (item 42).
+>
+> **De quebra:** a lista explícita de colunas revelou que `AdminWhatsAppInstancias` lia
+> `configuracoes_wapi.usuario_id`, coluna que **não existe mais** no banco. Escondido atrás do
+> `select('*')`, semeava uma entrada de chave vazia. Removido — e por isso o `tsc` caiu de 36
+> para 35.
 
-**Gravidade: crítica. Leitura ainda aberta.**
+**Gravidade: crítica.** Registrado para não voltar.
 
 `configuracoes_wapi` guarda `api_key` e `webhook_secret`. As regras `wapi_config_select` e
 `wapi_config_update` têm a **mesma** condição: basta ter vínculo com a instância
