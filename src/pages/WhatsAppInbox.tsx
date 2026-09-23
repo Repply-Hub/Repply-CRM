@@ -86,6 +86,7 @@ import { ProjetoSelect } from "@/components/tarefas/ProjetoSelect";
 import { ParticipantesMultiSelect } from "@/components/tarefas/ParticipantesMultiSelect";
 import { MarcadoresMultiSelect } from "@/components/tarefas/MarcadoresMultiSelect";
 import { useAuth } from "@/hooks/use-auth";
+import { podeVincularWhatsapp } from "@/lib/vinculo-de-whatsapp";
 import { marcaDaEmpresa } from "@/lib/marca-da-empresa";
 import { CriarContatoDaConversaDialog } from "@/components/whatsapp/CriarContatoDaConversaDialog";
 import { DesvincularConversa } from "@/components/whatsapp/DesvincularConversa";
@@ -2721,6 +2722,8 @@ function ConfigDialog({
   onClose: () => void;
 }) {
   const { data: config, refetch } = useWaConfig();
+  const { profile } = useAuth();
+  const podeVincular = podeVincularWhatsapp(profile?.role);
   const { provision, isPending: isProvisioning } = useWaProvision();
   const connect = useWaConnect();
   const syncStatus = useWaSyncStatus();
@@ -2817,7 +2820,7 @@ function ConfigDialog({
                 <Loader2 className="h-8 w-8 animate-spin text-green-600" />
                 Criando sua instância WhatsApp...
               </div>
-            ) : (
+            ) : podeVincular ? (
               <div className="flex flex-col items-center gap-3 py-2 text-center">
                 <p className="text-sm text-muted-foreground">
                   Você ainda não tem uma instância de WhatsApp ativa.
@@ -2830,6 +2833,20 @@ function ConfigDialog({
                   <Wifi className="h-4 w-4 mr-2" />
                   Ativar WhatsApp
                 </Button>
+              </div>
+            ) : (
+              // 🔴 Sem cargo de gestão, a pessoa NÃO se vincula sozinha (item 74, passo 3).
+              // Entrar num número da empresa é entrar nas conversas dele — na MD são 13 pessoas
+              // por número, e 772 conversas sem responsável. Quem decide isso é o gestor.
+              // A recusa de verdade está em `whatsapp-provision`; aqui só evitamos oferecer um
+              // botão que o servidor vai negar.
+              <div className="flex flex-col items-center gap-2 py-2 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Você ainda não atende nenhum número de WhatsApp.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Peça a um gestor para liberar o seu acesso em Configurações → WhatsApp.
+                </p>
               </div>
             )}
             {qrError && (

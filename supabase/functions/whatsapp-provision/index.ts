@@ -108,15 +108,32 @@ serve(async (req) => {
     }
 
     // ── PROVISION ──────────────────────────────────────────────────────────────
-    // Se vier target_usuario_id, provisiona para outro usuário (gestor/empresa/admin)
+    // 🔴 VINCULAR ALGUEM A UM NUMERO E ATO DE GESTOR — INCLUSIVE A SI MESMO.
+    // Ate 23/09/2026 este caminho, quando vinha SEM `target_usuario_id`, nao conferia cargo
+    // nenhum: qualquer pessoa logada apertava "Ativar WhatsApp" e caia no ramo "reutilizar
+    // instancia da empresa" logo abaixo, entrando no numero que a empresa ja usava.
+    //
+    // Isso nao e detalhe de configuracao: quem entra no numero passa a ver as conversas dele
+    // (772 sem responsavel so na MD) e, enquanto a chave da operadora chegava ao navegador,
+    // tambem a credencial — que vale FORA do produto.
+    //
+    // Medido em 23/09: a MD tem 2 numeros com 13 pessoas vinculadas em CADA UM. O modelo real e
+    // numero compartilhado pelo time, entao o vinculo e a porta de entrada. Decisao do dono do
+    // produto no mesmo dia: so o gestor vincula.
+    //
+    // A lista abaixo vive duplicada em `src/lib/vinculo-de-whatsapp.ts`, que so serve para a
+    // tela nao oferecer um botao que este servidor vai recusar. ESTA aqui e a que protege.
+    const managerRoles = ["admin", "empresa", "gestor"];
+    if (!managerRoles.includes(callerData.role)) {
+      return json({
+        error: "Só um gestor pode liberar o acesso a um número de WhatsApp. Peça em Configurações → WhatsApp.",
+      }, 403);
+    }
+
     let targetAuthId = user.id;
     let empresaId = callerData.empresa_id;
 
     if (target_usuario_id) {
-      const managerRoles = ["admin", "empresa", "gestor"];
-      if (!managerRoles.includes(callerData.role)) {
-        return json({ error: "Você não tem permissão para esta ação." }, 403);
-      }
 
       const { data: target } = await supabase
         .from("usuarios")
