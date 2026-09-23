@@ -5,12 +5,12 @@ import { CATALOGO_DE_SONS, SOM_PADRAO, somDoCatalogo } from './catalogo-de-sons'
 
 describe('catálogo de sons', () => {
   it('o primeiro é o padrão de hoje', () => {
-    expect(CATALOGO_DE_SONS[0]).toMatchObject({ id: SOM_PADRAO, rotulo: 'Padrão', arquivo: '/sons/notificacao.mp3' });
+    expect(CATALOGO_DE_SONS[0]).toMatchObject({ id: SOM_PADRAO, rotulo: 'Toque suave', arquivo: '/sons/opcoes/toque-suave.mp3' });
   });
 
   it('tem os 10 sons, na ordem da tela', () => {
     expect(CATALOGO_DE_SONS.map((s) => s.rotulo)).toEqual([
-      'Padrão', 'Toque suave', 'Plim', 'Cristal', 'Arpejo', 'Pop', 'Marimba', 'Sino', 'Gota', 'Bipe duplo',
+      'Toque suave', 'Alerta', 'Plim', 'Cristal', 'Arpejo', 'Pop', 'Marimba', 'Sino', 'Gota', 'Bipe duplo',
     ]);
   });
 

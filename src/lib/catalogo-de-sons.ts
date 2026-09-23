@@ -17,11 +17,11 @@ export interface SomDeNotificacao {
   grupo: GrupoDoSom;
 }
 
-export const SOM_PADRAO = 'padrao';
+export const SOM_PADRAO = 'toque-suave';
 
 export const CATALOGO_DE_SONS: readonly SomDeNotificacao[] = [
-  { id: SOM_PADRAO, rotulo: 'Padrão', arquivo: '/sons/notificacao.mp3', grupo: 'padrao' },
-  { id: 'toque-suave', rotulo: 'Toque suave', arquivo: '/sons/opcoes/toque-suave.mp3', grupo: 'opcoes' },
+  { id: SOM_PADRAO, rotulo: 'Toque suave', arquivo: '/sons/opcoes/toque-suave.mp3', grupo: 'padrao' },
+  { id: 'padrao', rotulo: 'Alerta', arquivo: '/sons/notificacao.mp3', grupo: 'opcoes' },
   { id: 'plim', rotulo: 'Plim', arquivo: '/sons/opcoes/plim.mp3', grupo: 'opcoes' },
   { id: 'cristal', rotulo: 'Cristal', arquivo: '/sons/opcoes/cristal.mp3', grupo: 'opcoes' },
   { id: 'arpejo', rotulo: 'Arpejo', arquivo: '/sons/opcoes/arpejo.mp3', grupo: 'opcoes' },
