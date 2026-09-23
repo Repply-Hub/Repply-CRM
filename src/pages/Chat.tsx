@@ -36,6 +36,7 @@ import { downloadFile } from '@/lib/download-file';
 import { CreateGroupDialog } from '@/components/chat/CreateGroupDialog';
 import { validateFile } from '@/lib/file-validation';
 import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from '@/components/chat/FilePreviewDialog';
+import { VisualizadorDeMidia, type MidiaParaVer } from '@/components/chat/VisualizadorDeMidia';
 import { ImagemPrivada } from '@/components/shared/ImagemPrivada';
 import { useArquivosPrivados } from '@/hooks/use-arquivo-privado';
 import { ChatMessageSearch } from '@/components/chat/ChatMessageSearch';
@@ -719,6 +720,7 @@ const Chat = () => {
 
   const [text, setText] = useState('');
   const [previewFile, setPreviewFile] = useState<FilePreviewTarget | null>(null);
+  const [midiaAberta, setMidiaAberta] = useState<MidiaParaVer | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<{ file: File; previewUrl: string | null }[]>([]);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -807,16 +809,15 @@ const Chat = () => {
   const renderImagens = (items: typeof midia.imagens) => (
     <div className="grid grid-cols-3 gap-1.5">
       {items.map((m) => (
-        <a
+        <button
           key={m.id}
-          href={enderecoDe(m.arquivo_url)!}
-          target="_blank"
-          rel="noopener noreferrer"
+          type="button"
+          onClick={() => setMidiaAberta({ url: enderecoDe(m.arquivo_url)!, tipo: 'imagem', nome: m.arquivo_nome ?? 'imagem' })}
           className="aspect-square rounded-md overflow-hidden border border-border hover:opacity-80 transition-opacity"
           title={format(new Date(m.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
         >
           <img src={enderecoDe(m.arquivo_url)!} alt={m.arquivo_nome ?? 'imagem'} className="h-full w-full object-cover" />
-        </a>
+        </button>
       ))}
     </div>
   );
@@ -824,11 +825,10 @@ const Chat = () => {
   const renderVideos = (items: typeof midia.videos) => (
     <div className="grid grid-cols-3 gap-1.5">
       {items.map((m) => (
-        <a
+        <button
           key={m.id}
-          href={enderecoDe(m.arquivo_url)!}
-          target="_blank"
-          rel="noopener noreferrer"
+          type="button"
+          onClick={() => setMidiaAberta({ url: enderecoDe(m.arquivo_url)!, tipo: 'video', nome: m.arquivo_nome ?? 'vídeo' })}
           className="relative aspect-square rounded-md overflow-hidden border border-border bg-black/5 hover:opacity-80 transition-opacity"
           title={format(new Date(m.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
         >
@@ -836,7 +836,7 @@ const Chat = () => {
           <span className="absolute inset-0 flex items-center justify-center bg-black/20">
             <Play className="h-5 w-5 text-white fill-white" />
           </span>
-        </a>
+        </button>
       ))}
     </div>
   );
@@ -2104,13 +2104,17 @@ const Chat = () => {
                                       <ChatAudioPlayer src={enderecoDe(msg.arquivo_url)!} isMe={isMe} />
                                     ) : msg.arquivo_tipo?.startsWith('image/') ? (
                                       <div className="relative group/img">
-                                        <a href={enderecoDe(msg.arquivo_url)!} target="_blank" rel="noopener noreferrer">
+                                        <button
+                                          type="button"
+                                          onClick={() => setMidiaAberta({ url: enderecoDe(msg.arquivo_url)!, tipo: 'imagem', nome: msg.arquivo_nome || 'imagem' })}
+                                          className="block"
+                                        >
                                           <img
                                             src={enderecoDe(msg.arquivo_url)!}
                                             alt={msg.arquivo_nome || 'imagem'}
                                             className="max-w-[240px] max-h-[200px] rounded-lg object-cover"
                                           />
-                                        </a>
+                                        </button>
                                         <button
                                           type="button"
                                           onClick={() => downloadFile(enderecoDe(msg.arquivo_url)!, msg.arquivo_nome || 'imagem')}
@@ -2120,6 +2124,12 @@ const Chat = () => {
                                           <Download className="h-3.5 w-3.5 text-foreground" />
                                         </button>
                                       </div>
+                                    ) : msg.arquivo_tipo?.startsWith('video/') ? (
+                                      <video
+                                        src={enderecoDe(msg.arquivo_url)!}
+                                        controls
+                                        className="max-w-[240px] max-h-[200px] rounded-lg"
+                                      />
                                     ) : isPreviewable(msg.arquivo_nome || 'arquivo', msg.arquivo_tipo) ? (
                                       <button
                                         type="button"
@@ -2514,6 +2524,7 @@ const Chat = () => {
         </div>
       </div>
       <FilePreviewDialog file={previewFile} onClose={() => setPreviewFile(null)} />
+      <VisualizadorDeMidia midia={midiaAberta} onClose={() => setMidiaAberta(null)} />
     </AppLayout>
   );
 };
