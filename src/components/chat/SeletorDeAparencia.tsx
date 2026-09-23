@@ -94,24 +94,36 @@ export function SeletorDeAparencia({
         </div>
       </div>
 
-      {/* Cores: paleta clara + cor livre (fundo e ícone) */}
+      {/* Cores: paleta clara + escura + cor livre (fundo e ícone) */}
       <div className="space-y-2">
         <p className="text-[11px] font-semibold text-muted-foreground">Cores</p>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {CORES_DE_CHAT.map((c) => (
-            <button
-              key={c.nome}
-              type="button"
-              aria-label={`Cor ${c.nome}`}
-              title={c.nome}
-              onClick={() => onChange({ ...valor, fotoUrl: null, corFundo: c.fundo, corIcone: c.icone, icone: valor.icone ?? 'balao' })}
-              className="h-7 w-7 rounded-full border border-border"
-              style={{ backgroundColor: c.fundo, color: c.icone }}
-            >
-              <span className="text-xs font-bold">A</span>
-            </button>
-          ))}
-        </div>
+        {([
+          { titulo: 'Claras', variante: 'clara' as const },
+          { titulo: 'Escuras', variante: 'escura' as const },
+        ]).map(({ titulo, variante }) => (
+          <div key={variante}>
+            <p className="mb-1 text-[10px] text-muted-foreground">{titulo}</p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {CORES_DE_CHAT.map((c) => {
+                const fundo = variante === 'clara' ? c.fundo : c.fundoEscuro;
+                const icone = variante === 'clara' ? c.icone : c.iconeEscuro;
+                return (
+                  <button
+                    key={`${c.nome}-${variante}`}
+                    type="button"
+                    aria-label={`Cor ${c.nome} (${variante})`}
+                    title={`${c.nome} (${titulo.toLowerCase()})`}
+                    onClick={() => onChange({ ...valor, fotoUrl: null, corFundo: fundo, corIcone: icone, icone: valor.icone ?? 'balao' })}
+                    className="h-7 w-7 rounded-full border border-border"
+                    style={{ backgroundColor: fundo, color: icone }}
+                  >
+                    <span className="text-xs font-bold">A</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
         <div className="flex items-center gap-3 text-[11px]">
           <span className="flex items-center gap-1">Fundo:
             <SeletorCorLivre hexAtual={valor.corFundo ?? COR_FUNDO_PADRAO} onEscolher={(hex) => onChange({ ...valor, fotoUrl: null, corFundo: hex, icone: valor.icone ?? 'balao' })} />
