@@ -34,6 +34,24 @@ describe("CampoDestinatarios", () => {
     expect(onChange).toHaveBeenCalledWith("Ana Souza <ana@x.com>, bia@x.com");
   });
 
+  it("barra de espaço adiciona quando o texto já é um e-mail válido", () => {
+    const onChange = vi.fn();
+    render(<CampoDestinatarios {...props({ valor: "", onChange })} />);
+    const input = screen.getByLabelText("Para");
+    fireEvent.change(input, { target: { value: "ana@x.com" } });
+    fireEvent.keyDown(input, { key: " " });
+    expect(onChange).toHaveBeenCalledWith("ana@x.com");
+  });
+
+  it("barra de espaço NÃO adiciona quando ainda não é um e-mail válido", () => {
+    const onChange = vi.fn();
+    render(<CampoDestinatarios {...props({ valor: "", onChange })} />);
+    const input = screen.getByLabelText("Para");
+    fireEvent.change(input, { target: { value: "ana" } });
+    fireEvent.keyDown(input, { key: " " });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("vírgula também adiciona", () => {
     const onChange = vi.fn();
     render(<CampoDestinatarios {...props({ valor: "", onChange })} />);

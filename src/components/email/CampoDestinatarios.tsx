@@ -113,6 +113,17 @@ export function CampoDestinatarios({
       } else {
         confirmarTexto();
       }
+    } else if (e.key === ' ') {
+      // Barra de espaço fecha a fichinha, como Enter e vírgula — MAS só quando o
+      // que já está digitado é um e-mail válido. Sem isso, um nome com espaço
+      // ("Ana Souza <ana@x.com>", digitado à mão) seria partido no primeiro
+      // espaço. Enquanto não for e-mail válido, o espaço é digitado normalmente.
+      // Diferente do Enter, o espaço NÃO escolhe a sugestão em destaque: ele
+      // confirma o texto avulso, que é o que a pessoa acabou de escrever.
+      if (ehEmailValido(texto.trim())) {
+        e.preventDefault();
+        confirmarTexto();
+      }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (filtradas.length) {
