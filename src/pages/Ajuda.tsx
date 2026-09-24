@@ -135,11 +135,29 @@ export default function Ajuda() {
             (ver `activeMenuTab`). Não há dado de empresa nesta tela, então esconder aqui já
             basta — não é substituto de RLS porque não há RLS a substituir. */}
         <Tabs value={activeMenuTab} onValueChange={setActiveMenuTab} className="flex-1 min-h-0 flex flex-col gap-4">
-          {ehAdminMaster && (
-            <TabsList className="self-start shrink-0">
-              <TabsTrigger value="documentacao">Documentação</TabsTrigger>
-              <TabsTrigger value="api">API</TabsTrigger>
-            </TabsList>
+          {/* Busca ao lado do menuTab de nível superior — só filtra a Documentação, então some
+              na aba API (não haveria o que filtrar ali). Quando não há menuTab (quem não é
+              admin master só tem Documentação), a busca fica sozinha na fileira. */}
+          {(ehAdminMaster || activeMenuTab === 'documentacao') && (
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              {ehAdminMaster && (
+                <TabsList className="shrink-0">
+                  <TabsTrigger value="documentacao">Documentação</TabsTrigger>
+                  <TabsTrigger value="api">API</TabsTrigger>
+                </TabsList>
+              )}
+              {activeMenuTab === 'documentacao' && (
+                <div className="relative min-w-[220px] flex-1 sm:max-w-sm">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder='Buscar por uma palavra, ex.: "importar", "excluir", "catálogo"...'
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              )}
+            </div>
           )}
 
           {/* 🔴 `hidden data-[state=active]:flex`, nunca só `flex`: o Radix esconde a aba
@@ -156,9 +174,10 @@ export default function Ajuda() {
 
           <TabsContent value="documentacao" className="flex-1 min-h-0 mt-0 hidden data-[state=active]:flex data-[state=active]:flex-col">
             {/* Navegação vertical à esquerda, conteúdo à direita — igual a Configurações. A
-                busca e a lista de seções não rolam: só o painel de conteúdo, à direita, tem
-                rolagem própria (overflow-y-auto), como as telas de Configurações que usam
-                `noPageScroll`. No celular a coluna vira uma tira que rola de lado. */}
+                busca (agora na fileira do menuTab, acima) e a lista de seções não rolam: só o
+                painel de conteúdo, à direita, tem rolagem própria (overflow-y-auto), como as
+                telas de Configurações que usam `noPageScroll`. No celular a coluna vira uma
+                tira que rola de lado. */}
             <Tabs
               orientation="vertical"
               value={activeTab}
@@ -166,16 +185,6 @@ export default function Ajuda() {
               className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6 lg:gap-10"
             >
               <div className="flex flex-col gap-4 shrink-0 lg:w-64">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder='Buscar por uma palavra, ex.: "importar", "excluir", "catálogo"...'
-                    value={busca}
-                    onChange={(e) => setBusca(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-
                 <TabsList
                   className={cn(
                     "flex lg:flex-col h-auto shrink-0 items-stretch justify-start gap-0.5 bg-transparent p-0 lg:w-64",

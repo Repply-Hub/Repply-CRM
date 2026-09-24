@@ -34,6 +34,7 @@ const tela = vi.hoisted(() => ({
 
 const enviarMutateAsync = vi.hoisted(() => vi.fn());
 const removerMutate = vi.hoisted(() => vi.fn());
+const trocarPosicaoMutate = vi.hoisted(() => vi.fn());
 
 vi.mock('@/hooks/use-auth', () => ({
   useAuth: () => ({ profile: tela.profile }),
@@ -42,6 +43,7 @@ vi.mock('@/hooks/use-ajuda-imagens', () => ({
   useAjudaImagens: () => ({ data: tela.imagens }),
   useEnviarImagemDaAjuda: () => ({ mutateAsync: enviarMutateAsync, isPending: false }),
   useRemoverImagemDaAjuda: () => ({ mutate: removerMutate, isPending: false }),
+  useTrocarPosicaoImagemDaAjuda: () => ({ mutate: trocarPosicaoMutate, isPending: false }),
 }));
 
 function foto(chave: string) {
@@ -58,6 +60,7 @@ afterEach(() => {
   tela.imagens = new Map();
   enviarMutateAsync.mockReset().mockResolvedValue(undefined);
   removerMutate.mockReset();
+  trocarPosicaoMutate.mockReset();
 });
 
 describe('GaleriaDaAjuda — visibilidade', () => {
@@ -227,6 +230,42 @@ describe('GaleriaDaAjuda — numeração da sequência ao enviar', () => {
   });
 });
 
+describe('GaleriaDaAjuda — colar (Ctrl+V) sobe a imagem', () => {
+  it('colar uma imagem na área de envio dispara o envio, como se tivesse escolhido o arquivo', async () => {
+    tela.profile = { role: 'admin' };
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    const areaDeEnvio = screen.getByText(/Sequência pendente/).closest('div') as HTMLElement;
+    const arquivo = arquivoDeImagem('colado.png');
+    fireEvent.paste(areaDeEnvio, {
+      clipboardData: { items: [{ kind: 'file', type: 'image/png', getAsFile: () => arquivo }] },
+    });
+
+    await waitFor(() => expect(enviarMutateAsync).toHaveBeenCalledTimes(1));
+    expect(enviarMutateAsync.mock.calls[0][0]).toMatchObject({ chave: 'hoje-pauta-passo-1-1', arquivo });
+  });
+
+  it('colar texto (sem arquivo de imagem) não dispara envio nenhum', () => {
+    tela.profile = { role: 'admin' };
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    const areaDeEnvio = screen.getByText(/Sequência pendente/).closest('div') as HTMLElement;
+    fireEvent.paste(areaDeEnvio, {
+      clipboardData: { items: [{ kind: 'string', type: 'text/plain', getAsFile: () => null }] },
+    });
+
+    expect(enviarMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('quem não é admin master não tem a área de envio, então não há onde colar', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')]]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    expect(screen.queryByText(/Sequência pendente|Adicionar mais fotos/)).not.toBeInTheDocument();
+  });
+});
+
 describe('GaleriaDaAjuda — remover uma foto', () => {
   it('manda a chave e o path exatos da foto clicada, não da sequência inteira', () => {
     tela.profile = { role: 'admin' };
@@ -243,6 +282,78 @@ describe('GaleriaDaAjuda — remover uma foto', () => {
       { chave: 'hoje-pauta-passo-1-1', path: 'hoje-pauta-passo-1-1.png' },
       expect.anything(),
     );
+  });
+});
+
+describe('GaleriaDaAjuda — trocar a posição de uma foto', () => {
+  it('mover para frente troca a chave com a foto seguinte, não com a última', () => {
+    tela.profile = { role: 'admin' };
+    tela.imagens = new Map([
+      ['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')],
+      ['hoje-pauta-passo-1-2', foto('hoje-pauta-passo-1-2')],
+      ['hoje-pauta-passo-1-3', foto('hoje-pauta-passo-1-3')],
+    ]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    const [primeiraMoverFrente] = screen.getAllByTitle('Mover esta foto uma posição para frente');
+    fireEvent.click(primeiraMoverFrente);
+
+    expect(trocarPosicaoMutate).toHaveBeenCalledWith(
+      { chaveA: 'hoje-pauta-passo-1-1', chaveB: 'hoje-pauta-passo-1-2' },
+      expect.anything(),
+    );
+  });
+
+  it('mover para trás troca a chave com a foto anterior', () => {
+    tela.profile = { role: 'admin' };
+    tela.imagens = new Map([
+      ['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')],
+      ['hoje-pauta-passo-1-2', foto('hoje-pauta-passo-1-2')],
+    ]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    const [, segundaMoverTras] = screen.getAllByTitle('Mover esta foto uma posição para trás');
+    fireEvent.click(segundaMoverTras);
+
+    expect(trocarPosicaoMutate).toHaveBeenCalledWith(
+      { chaveA: 'hoje-pauta-passo-1-2', chaveB: 'hoje-pauta-passo-1-1' },
+      expect.anything(),
+    );
+  });
+
+  it('a primeira foto não pode mover para trás, nem a última para frente — nas pontas os botões ficam desabilitados', () => {
+    tela.profile = { role: 'admin' };
+    tela.imagens = new Map([
+      ['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')],
+      ['hoje-pauta-passo-1-2', foto('hoje-pauta-passo-1-2')],
+    ]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    const [primeiraTras, segundaTras] = screen.getAllByTitle('Mover esta foto uma posição para trás');
+    const [primeiraFrente, segundaFrente] = screen.getAllByTitle('Mover esta foto uma posição para frente');
+    expect(primeiraTras).toBeDisabled();
+    expect(segundaTras).not.toBeDisabled();
+    expect(primeiraFrente).not.toBeDisabled();
+    expect(segundaFrente).toBeDisabled();
+  });
+
+  it('com uma foto só, não mostra botão de mover nenhum — não há para onde trocar', () => {
+    tela.profile = { role: 'admin' };
+    tela.imagens = new Map([['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')]]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    expect(screen.queryByTitle(/Mover esta foto/)).not.toBeInTheDocument();
+  });
+
+  it('quem não é admin master não vê botão de mover, mesmo com várias fotos', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([
+      ['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')],
+      ['hoje-pauta-passo-1-2', foto('hoje-pauta-passo-1-2')],
+    ]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    expect(screen.queryByTitle(/Mover esta foto/)).not.toBeInTheDocument();
   });
 });
 
@@ -414,5 +525,73 @@ describe('GaleriaDaAjuda — navegar dentro do diálogo de ampliar', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.queryByTitle('Próxima foto')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Foto anterior')).not.toBeInTheDocument();
+  });
+});
+
+describe('GaleriaDaAjuda — clicar na imagem ampliada aproxima no ponto do clique', () => {
+  function imagemDoDialogo(dialogo: HTMLElement, largura: number, altura: number) {
+    const img = dialogo.querySelector('img[alt="Tela do passo 1"]') as HTMLImageElement;
+    vi.spyOn(img, 'getBoundingClientRect').mockReturnValue({
+      left: 0, top: 0, right: largura, bottom: altura, width: largura, height: altura, x: 0, y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    return img;
+  }
+
+  it('primeiro clique aproxima, centrado no ponto exato do clique (não no centro da imagem)', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')]]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    fireEvent.click(screen.getByTitle('Ampliar imagem'));
+    const dialogo = screen.getByRole('dialog');
+    // 200x100 — clique em (50, 25) cai em 25% da largura e 25% da altura.
+    const img = imagemDoDialogo(dialogo, 200, 100);
+
+    fireEvent.click(img, { clientX: 50, clientY: 25 });
+
+    expect(img.style.transform).toBe('scale(2)');
+    expect(img.style.transformOrigin).toBe('25% 25%');
+  });
+
+  it('clicar de novo, já com zoom, devolve ao tamanho normal e recentra a origem', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')]]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    fireEvent.click(screen.getByTitle('Ampliar imagem'));
+    const dialogo = screen.getByRole('dialog');
+    const img = imagemDoDialogo(dialogo, 200, 100);
+
+    fireEvent.click(img, { clientX: 50, clientY: 25 });
+    expect(img.style.transform).toBe('scale(2)');
+
+    // O ponto do segundo clique não importa: com zoom diferente de 1, qualquer clique volta
+    // ao normal — não abre um zoom novo em cima do zoom antigo.
+    fireEvent.click(img, { clientX: 199, clientY: 99 });
+
+    expect(img.style.transform).toBe('scale(1)');
+    expect(img.style.transformOrigin).toBe('50% 50%');
+  });
+
+  it('trocar de foto (Próxima/Anterior) reseta o zoom por clique e a origem, como já fazia com o zoom dos botões', () => {
+    tela.profile = { role: 'vendedor' };
+    tela.imagens = new Map([
+      ['hoje-pauta-passo-1-1', foto('hoje-pauta-passo-1-1')],
+      ['hoje-pauta-passo-1-2', foto('hoje-pauta-passo-1-2')],
+    ]);
+    render(<GaleriaDaAjuda prefixo="hoje-pauta-passo-1" legenda="Tela do passo 1" />);
+
+    fireEvent.click(screen.getAllByTitle('Ampliar imagem')[0]);
+    const dialogo = screen.getByRole('dialog');
+    const primeiraImg = imagemDoDialogo(dialogo, 200, 100);
+    fireEvent.click(primeiraImg, { clientX: 0, clientY: 0 });
+    expect(primeiraImg.style.transform).toBe('scale(2)');
+
+    fireEvent.click(screen.getByTitle('Próxima foto'));
+
+    const segundaImg = dialogo.querySelector('img[alt="Tela do passo 1"]') as HTMLImageElement;
+    expect(segundaImg.style.transform).toBe('scale(1)');
+    expect(segundaImg.style.transformOrigin).toBe('50% 50%');
   });
 });

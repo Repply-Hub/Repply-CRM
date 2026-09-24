@@ -91,6 +91,17 @@ describe('Ajuda — aba de API exclusiva do admin master', () => {
     // conteúdo é estático (FUNCOES_BORDA/ROTAS_FRONTEND), não uma leitura de banco.
     expect(FUNCOES_BORDA.length).toBeGreaterThan(0);
   });
+
+  it('para o admin master, o menuTab (Documentação/API) e a busca são irmãos na mesma fileira — lado a lado, não empilhados', () => {
+    tela.profile = { role: 'admin' };
+    renderAjuda();
+
+    const abaDocumentacao = screen.getByRole('tab', { name: 'Documentação' });
+    const busca = screen.getByPlaceholderText(/Buscar por uma palavra/);
+    // "Irmãos" de verdade: mesmo elemento pai, não só "algum ancestral em comum" — é o que
+    // garante que o CSS de fileira (`flex items-center gap-3`) governa os dois juntos.
+    expect(abaDocumentacao.parentElement?.parentElement).toBe(busca.parentElement?.parentElement);
+  });
 });
 
 describe('Ajuda — galeria de fotos por passo numérico', () => {

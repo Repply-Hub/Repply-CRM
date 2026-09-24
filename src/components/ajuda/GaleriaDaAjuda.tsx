@@ -1,6 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, ImageIcon, ImagePlus, Loader2, Maximize2, RotateCcw, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  ImageIcon,
+  ImagePlus,
+  Loader2,
+  Maximize2,
+  MoveLeft,
+  MoveRight,
+  RotateCcw,
+  Trash2,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext, type CarouselApi } from '@/components/ui/carousel';
@@ -14,11 +27,21 @@ import {
 } from '@/components/shared/DialogoResponsivo';
 import { useAuth } from '@/hooks/use-auth';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
-import { useAjudaImagens, useEnviarImagemDaAjuda, useRemoverImagemDaAjuda, type ImagemDaAjuda } from '@/hooks/use-ajuda-imagens';
+import {
+  useAjudaImagens,
+  useEnviarImagemDaAjuda,
+  useRemoverImagemDaAjuda,
+  useTrocarPosicaoImagemDaAjuda,
+  type ImagemDaAjuda,
+} from '@/hooks/use-ajuda-imagens';
 
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
 const ZOOM_PASSO = 0.25;
+/** Nível que um clique na imagem aplica — perto o bastante para ler texto miúdo de print,
+ * sem já estourar o teto (`ZOOM_MAX`) e deixar a rodada de + do rodapé sem margem. */
+const ZOOM_CLIQUE = 2;
+const ORIGEM_CENTRO = { x: 50, y: 50 };
 
 /** Escapa caracteres especiais de regex — `prefixo` vem do código, mas mais vale prevenir. */
 function escaparRegex(texto: string): string {
@@ -67,6 +90,7 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
 
   const enviar = useEnviarImagemDaAjuda();
   const remover = useRemoverImagemDaAjuda();
+  const trocarPosicao = useTrocarPosicaoImagemDaAjuda();
   const [enviandoLote, setEnviandoLote] = useState(false);
   const [arrastando, setArrastando] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +100,11 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
   // em "ampliar" já diz exatamente qual posição abrir.
   const [ampliadaIndice, setAmpliadaIndice] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
+  // Onde o zoom "abre" quando é maior que 100% — em porcentagem da imagem (CSS
+  // `transform-origin`), não em pixel: sobrevive a redimensionar a janela. Some para o
+  // centro sempre que o zoom volta a 1, para o próximo clique partir do ponto certo, não de
+  // onde a pessoa tinha ampliado da vez anterior.
+  const [origemZoom, setOrigemZoom] = useState(ORIGEM_CENTRO);
   const ampliada = ampliadaIndice !== null ? fotos[ampliadaIndice] : undefined;
 
   // A tira de miniaturas (abaixo da descrição, só com mais de uma foto) precisa saber qual
@@ -96,16 +125,37 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
 
   const abrirAmpliada = (indice: number) => {
     setZoom(1);
+    setOrigemZoom(ORIGEM_CENTRO);
     setAmpliadaIndice(indice);
   };
   const fecharAmpliada = () => setAmpliadaIndice(null);
   const irParaAnterior = () => {
     setZoom(1);
+    setOrigemZoom(ORIGEM_CENTRO);
     setAmpliadaIndice((i) => (i === null ? i : Math.max(0, i - 1)));
   };
   const irParaProxima = () => {
     setZoom(1);
+    setOrigemZoom(ORIGEM_CENTRO);
     setAmpliadaIndice((i) => (i === null ? i : Math.min(fotos.length - 1, i + 1)));
+  };
+
+  // Clicar na imagem aproxima no ponto exato do clique — como abrir uma lupa —, e clicar de
+  // novo (com QUALQUER zoom, não só o do clique) devolve ao tamanho normal. `getBoundingClientRect`
+  // porque o zoom já pode estar aplicado (`transform: scale`), então `offsetX/Y` do próprio
+  // evento mediriam em cima da imagem JÁ escalada, não da posição real na tela.
+  const aoClicarNaImagemAmpliada = (e: MouseEvent<HTMLImageElement>) => {
+    if (zoom !== 1) {
+      setZoom(1);
+      setOrigemZoom(ORIGEM_CENTRO);
+      return;
+    }
+    const retangulo = e.currentTarget.getBoundingClientRect();
+    setOrigemZoom({
+      x: ((e.clientX - retangulo.left) / retangulo.width) * 100,
+      y: ((e.clientY - retangulo.top) / retangulo.height) * 100,
+    });
+    setZoom(ZOOM_CLIQUE);
   };
 
   // Setas do teclado navegam a sequência enquanto o diálogo de zoom está aberto — mesmo
@@ -124,7 +174,20 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
 
   if (!ehAdmin && fotos.length === 0) return null;
 
-  const ocupado = enviandoLote || remover.isPending;
+  const ocupado = enviandoLote || remover.isPending || trocarPosicao.isPending;
+
+  // Troca de posição, para quando uma foto sobe no lugar errado da sequência — sem precisar
+  // apagar e reenviar. `vizinho` é sempre a posição adjacente (mover uma casa por clique, não
+  // arrastar para qualquer lugar): simples de usar e simples de entender o resultado.
+  const moverFoto = (indice: number, vizinho: number) => {
+    const atual = fotos[indice];
+    const destino = fotos[vizinho];
+    if (!atual || !destino) return;
+    trocarPosicao.mutate(
+      { chaveA: atual.chave, chaveB: destino.chave },
+      { onError: (e) => toast.error(mensagemDeErro(e, 'Não foi possível trocar a ordem das fotos.')) },
+    );
+  };
 
   // Sobe os arquivos em SEQUÊNCIA, não em paralelo: cada envio precisa saber o próximo número
   // livre, e disparar tudo de uma vez faria duas fotos brigarem pelo mesmo `<prefixo>-N` antes
@@ -182,15 +245,18 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
   return (
     <div className="space-y-1.5">
       {fotos.length > 0 && (
-        // `px-7` só entra com mais de uma foto — é o espaço reservado para as setas. Sem
+        // `px-9` só entra com mais de uma foto — é o espaço reservado para as setas. Sem
         // ele as setas (absolutas, então ignoram o padding do próprio pai) cairiam por
         // cima da imagem; com ele, `CarouselContent` (fluxo normal) nasce OFERECIDO pra
         // dentro por esse respiro, e `left-0`/`right-0` das setas — que medem a partir da
         // borda do Carousel, não do conteúdo — caem exatamente nesse respiro, do lado de
-        // fora da imagem.
+        // fora da imagem. `px-9` (36px), não `px-7` (28px): a seta tem 28px (h-7 w-7) — com
+        // `px-7` ela ocupava o respiro inteiro e encostava direto na borda da imagem, sem
+        // folga nenhuma. `px-9` sobra 8px de respiro visível, mesma folga que o diálogo de
+        // ampliar já usa entre a seta e a imagem (ver `px-10` mais abaixo, com botão de 32px).
         <Carousel
           setApi={setCarrosselApi}
-          className={fotos.length > 1 ? 'w-full px-7' : 'w-full'}
+          className={fotos.length > 1 ? 'w-full px-9' : 'w-full'}
           opts={{ align: 'start' }}
         >
           <CarouselContent className="ml-0">
@@ -209,7 +275,13 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
                       {i + 1}/{fotos.length}
                     </span>
                   )}
-                  <div className="absolute right-1.5 top-1.5 flex gap-1">
+                  {/* Todos os botões de ação (ampliar, mover, remover) empilhados no MESMO
+                      canto — direita, um embaixo do outro — em vez de espalhados nos dois
+                      cantos de cima: dois grupos (esquerda/direita) confundia mais do que
+                      ajudava, e a lupa sozinha no canto direito não deixava claro que os
+                      outros três eram do mesmo conjunto. Mover desabilita nas pontas em vez
+                      de dar a volta: mover a primeira para trás não é ir para o fim. */}
+                  <div className="absolute right-1.5 top-1.5 flex flex-col gap-1">
                     <button
                       type="button"
                       onClick={() => abrirAmpliada(i)}
@@ -218,6 +290,28 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
                     >
                       <Maximize2 className="h-3.5 w-3.5" />
                     </button>
+                    {ehAdmin && fotos.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => moverFoto(i, i - 1)}
+                          disabled={ocupado || i === 0}
+                          title="Mover esta foto uma posição para trás"
+                          className="rounded-md bg-background/80 p-1.5 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          <MoveLeft className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moverFoto(i, i + 1)}
+                          disabled={ocupado || i === fotos.length - 1}
+                          title="Mover esta foto uma posição para frente"
+                          className="rounded-md bg-background/80 p-1.5 text-foreground shadow-sm backdrop-blur transition-colors hover:bg-background disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          <MoveRight className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    )}
                     {ehAdmin && (
                       <button
                         type="button"
@@ -299,8 +393,12 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
               <img
                 src={ampliada.url}
                 alt={legenda}
-                style={{ transform: `scale(${zoom})` }}
-                className="max-h-[70dvh] w-auto max-w-full rounded-md object-contain transition-transform"
+                onClick={aoClicarNaImagemAmpliada}
+                style={{ transform: `scale(${zoom})`, transformOrigin: `${origemZoom.x}% ${origemZoom.y}%` }}
+                className={cn(
+                  'max-h-[70dvh] w-auto max-w-full rounded-md border object-contain transition-transform',
+                  zoom === 1 ? 'cursor-zoom-in' : 'cursor-zoom-out',
+                )}
               />
             )}
             {/* Navegar a sequência sem fechar o diálogo — só quando há mais de uma foto.
@@ -351,7 +449,7 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
                       'h-12 w-16 shrink-0 overflow-hidden rounded-md border-2 transition-colors',
                       ampliadaIndice === i
                         ? 'border-primary'
-                        : 'border-transparent opacity-60 hover:opacity-100',
+                        : 'border-border opacity-60 hover:opacity-100',
                     )}
                   >
                     <img
@@ -395,7 +493,10 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 rounded-full"
-                  onClick={() => setZoom(1)}
+                  onClick={() => {
+                    setZoom(1);
+                    setOrigemZoom(ORIGEM_CENTRO);
+                  }}
                   title="Restaurar zoom"
                 >
                   <RotateCcw className="h-4 w-4" />
@@ -408,6 +509,7 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
 
       {ehAdmin && (
         <div
+          tabIndex={0}
           onDragOver={(e) => {
             e.preventDefault();
             setArrastando(true);
@@ -418,7 +520,23 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
             setArrastando(false);
             void enviarArquivos(e.dataTransfer.files);
           }}
-          className={`flex flex-wrap items-center gap-2 rounded-md border border-dashed p-3 text-xs text-muted-foreground transition-colors ${
+          // Colar (Ctrl+V) sobe a imagem direto da área de transferência — o print de tela
+          // que a pessoa acabou de tirar chega ao clipboard como um `item` de arquivo, não
+          // como texto. Só dispara com o foco NESTA área (por isso o `tabIndex`, sem ele um
+          // `<div>` nunca recebe evento de colar): clicar a área ou tabular até ela antes de
+          // apertar Ctrl+V. Sem isso, colar em QUALQUER galeria da página tentaria subir a
+          // mesma imagem em todas ao mesmo tempo — um listener global não sabe qual sequência
+          // é a pretendida.
+          onPaste={(e) => {
+            const arquivos = Array.from(e.clipboardData.items)
+              .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+              .map((item) => item.getAsFile())
+              .filter((arquivo): arquivo is File => arquivo !== null);
+            if (arquivos.length === 0) return;
+            e.preventDefault();
+            void enviarArquivos(arquivos);
+          }}
+          className={`flex flex-wrap items-center gap-2 rounded-md border border-dashed p-3 text-xs text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
             arrastando ? 'border-primary bg-primary/5' : ''
           }`}
         >
@@ -437,9 +555,10 @@ export function GaleriaDaAjuda({ prefixo, legenda }: { prefixo: string; legenda:
       )}
       {ehAdmin && fotos.length === 0 && (
         <p className="text-[11px] text-muted-foreground/70">
-          PNG, JPG ou WEBP, até 5 MB cada. Selecione ou arraste mais de um arquivo de uma vez
-          para montar a sequência na ordem escolhida. A imagem fica pública: use dado fictício
-          na tela antes de fotografar, nunca nome ou valor real de cliente.
+          PNG, JPG ou WEBP, até 5 MB cada. Selecione, arraste ou clique na área acima e cole
+          (Ctrl+V) uma imagem copiada — pode ser mais de um arquivo de uma vez, na ordem
+          escolhida. A imagem fica pública: use dado fictício na tela antes de fotografar,
+          nunca nome ou valor real de cliente.
         </p>
       )}
     </div>

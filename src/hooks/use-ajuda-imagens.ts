@@ -99,6 +99,70 @@ export function useEnviarImagemDaAjuda() {
   });
 }
 
+/**
+ * Troca a ORDEM de duas fotos já enviadas — para quando uma sobe no lugar errado da
+ * sequência e não vale a pena apagar e reenviar. `chave` é quem decide a posição
+ * (`GaleriaDaAjuda` ordena por ela), então "trocar a posição" é trocar só o campo `chave`
+ * entre as duas linhas — o `path` (o arquivo de verdade no balde) fica onde está, ninguém
+ * baixa nem reenvia nada.
+ *
+ * `chave` é chave primária da tabela, então não dá para simplesmente
+ * `UPDATE ... SET chave = B WHERE chave = A` seguido do inverso: no meio do caminho as duas
+ * linhas tentariam ter o mesmo valor. A saída é o mesmo truque de trocar duas variáveis sem
+ * uma terceira — só que aqui a "terceira" É necessária, porque cada passo é uma chamada de
+ * rede separada, não uma troca atômica em memória: `A → temporária`, `B → A`,
+ * `temporária → B`.
+ */
+export function useTrocarPosicaoImagemDaAjuda() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ chaveA, chaveB }: { chaveA: string; chaveB: string }) => {
+      const recusa = () =>
+        new Error(
+          recusaSemErro('A ordem NÃO foi trocada.', 'Só o admin da plataforma pode reordenar imagens da Ajuda.'),
+        );
+      const temporaria = `${chaveA}--trocando-${crypto.randomUUID()}`;
+
+      const passo1 = await supabase
+        .from('ajuda_imagens')
+        .update({ chave: temporaria }, { count: 'exact' })
+        .eq('chave', chaveA);
+      if (passo1.error) throw passo1.error;
+      if (passo1.count === 0) throw recusa();
+
+      const passo2 = await supabase
+        .from('ajuda_imagens')
+        .update({ chave: chaveA }, { count: 'exact' })
+        .eq('chave', chaveB);
+      if (passo2.error || passo2.count === 0) {
+        // Desfaz o passo 1 para não deixar a foto A presa numa chave temporária, órfã de
+        // qualquer galeria — sem isso ela some da tela sem ninguém apagar nada.
+        await supabase.from('ajuda_imagens').update({ chave: chaveA }).eq('chave', temporaria);
+        if (passo2.error) throw passo2.error;
+        throw recusa();
+      }
+
+      const passo3 = await supabase
+        .from('ajuda_imagens')
+        .update({ chave: chaveB }, { count: 'exact' })
+        .eq('chave', temporaria);
+      if (passo3.error) throw passo3.error;
+      if (passo3.count === 0) {
+        // A esta altura a foto B já está em `chaveA`, e a A ficou presa na temporária — a
+        // troca ficou pela metade. Não tenta desfazer sozinho: melhor a pessoa ver o estado
+        // real (recarregando) do que o código adivinhar errado em cima de um erro inesperado.
+        throw new Error(
+          'A troca ficou pela metade — recarregue a página antes de tentar de novo. Se persistir, avise o suporte.',
+        );
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CHAVE_DA_QUERY });
+    },
+  });
+}
+
 export function useRemoverImagemDaAjuda() {
   const queryClient = useQueryClient();
 
