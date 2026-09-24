@@ -24,6 +24,7 @@ import {
   podeGerenciarAssinatura,
 } from "@/lib/plano-gate";
 import { corpoDoErroDaFunction, erroLegivelDaFunction } from "@/lib/erro-edge-function";
+import { linkSuporteEmail } from "@/lib/suporte";
 import { toast } from "sonner";
 
 
@@ -37,7 +38,7 @@ function ContatoSuporte() {
     <p>
       Precisa de ajuda?{" "}
       <a
-        href="mailto:suporte@repply.com.br"
+        href={linkSuporteEmail()}
         className="font-medium text-primary underline-offset-2 hover:underline"
       >
         Fale com o suporte
