@@ -1,8 +1,9 @@
 // Adaptador do Google Calendar. Único ponto que conhece a API do Google. A Fase 2 (Microsoft)
 // acrescenta _shared/calendario-microsoft.ts com a mesma forma de funções.
 
-export interface PontoGoogle { dateTime?: string; date?: string; timeZone?: string }
-export interface RecursoGoogle { summary: string; description?: string; start: PontoGoogle; end: PontoGoogle }
+// Os tipos do recurso do Google vêm do MIOLO ÚNICO (fonte de verdade), não duplicados aqui.
+import type { PontoGoogle, RecursoGoogle } from './calendario-nucleo.ts';
+export type { PontoGoogle, RecursoGoogle };
 export interface GoogleEventoListado extends RecursoGoogle { id: string; etag: string; status: string; updated: string }
 
 const CLIENT_ID = Deno.env.get('GOOGLE_CALENDAR_CLIENT_ID')!;
