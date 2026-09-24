@@ -1,4 +1,4 @@
-# Investigação — migração do scraper DOM Natal (PDF real + Edge Function)
+ # Investigação — migração do scraper DOM Natal (PDF real + Edge Function)
 
 **Fase 1 — só investigação. Nada foi alterado em banco, Storage ou código de produção.**
 

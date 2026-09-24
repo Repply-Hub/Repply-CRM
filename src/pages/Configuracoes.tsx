@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks, CreditCard } from 'lucide-react';
+import { Sun, Moon, Monitor, Loader2, Trash2, Users, UserCircle, Lock, AlertTriangle, Building2, Pencil, Camera, Crop, Globe, Mail, Smartphone, History, ListChecks, CreditCard, Zap } from 'lucide-react';
 import { CardDeSom } from '@/components/configuracoes/CardDeSom';
 import { CardDoBotaoDeAjuda } from '@/components/configuracoes/CardDoBotaoDeAjuda';
 import { PagamentosTab } from '@/components/configuracoes/PagamentosTab';
@@ -767,7 +767,7 @@ const Configuracoes = () => {
               <TabsTrigger value="whatsapp" className={NAV_TRIGGER}><Smartphone className="h-4 w-4 shrink-0" /> WhatsApp</TabsTrigger>
             )}
             {isGestor && temHoje === true && (
-              <TabsTrigger value="automacao" className={NAV_TRIGGER}><span className="w-4 shrink-0" /> Automação</TabsTrigger>
+              <TabsTrigger value="automacao" className={NAV_TRIGGER}><Zap className="h-4 w-4 shrink-0" /> Automação</TabsTrigger>
             )}
             {podeVerPagamentos && (
               <TabsTrigger value="pagamentos" className={NAV_TRIGGER}><CreditCard className="h-4 w-4 shrink-0" /> Assinatura</TabsTrigger>

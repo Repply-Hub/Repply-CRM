@@ -699,7 +699,7 @@ export default function AdminSecoes() {
 
   return (
     <AppLayout title="Seções" subtitle="O que cada empresa enxerga do sistema">
-      <div className="space-y-4">
+      <div className="mx-auto w-full max-w-5xl space-y-4 p-3 sm:p-4 md:p-6">
         <div className="flex items-start gap-2 rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
           <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
           <p>
