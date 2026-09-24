@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/hooks/use-auth';
-import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useUpdateChatGrupo, useDeleteChatGrupo, useDeleteChatMessage, useAddChatGrupoMembros, ChatGrupo, ChatMessage, QuotedMessage, useMarkChatAsRead, useMarkGroupMessagesRead, useMessageReadReceipts, useChatGeralConfig, useUpdateChatGeralConfig, useChatLastActivity, ChatLastActivity, ChatGeralConfig } from '@/hooks/use-chat';
+import { useChatMessages, useSendMessage, useChatGrupos, useClearChat, useDeleteChatGrupo, useDeleteChatMessage, ChatGrupo, ChatMessage, QuotedMessage, useMarkChatAsRead, useMarkGroupMessagesRead, useMessageReadReceipts, useChatGeralConfig, useChatLastActivity, ChatLastActivity, ChatGeralConfig } from '@/hooks/use-chat';
 import { useOnlineUsers } from '@/hooks/use-presence';
 import { useUnreadChatByTarget } from '@/hooks/use-notificacoes';
 import { alvoInicialDaUrl, chaveDoAlvo } from '@/lib/alvo-do-chat';
@@ -23,12 +23,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import {
   Send, Loader2, MessageCircle, MessageSquare, Users, Circle, PanelLeftClose, PanelLeftOpen,
   Paperclip, FileText, X, Download, Users2, Calendar, Eraser, ChevronDown,
-  Video, Link2, ExternalLink, Play, Pause, Pencil, Check, CheckCheck, Search, Trash2, UserPlus, Mic, Square, Reply, ArrowLeft, Bookmark
+  Video, Link2, ExternalLink, Play, Pause, Check, CheckCheck, Search, Trash2, Mic, Square, Reply, ArrowLeft, Bookmark
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -42,7 +41,7 @@ import { FilePreviewDialog, isPreviewable, type FilePreviewTarget } from '@/comp
 import { VisualizadorDeMidia, type MidiaParaVer } from '@/components/chat/VisualizadorDeMidia';
 import { ImagemPrivada } from '@/components/shared/ImagemPrivada';
 import { AvatarDeChat } from '@/components/chat/AvatarDeChat';
-import { SeletorDeAparencia } from '@/components/chat/SeletorDeAparencia';
+import { EditarConversaDialog } from '@/components/chat/EditarConversaDialog';
 import { useArquivosPrivados } from '@/hooks/use-arquivo-privado';
 import { ChatMessageSearch } from '@/components/chat/ChatMessageSearch';
 import {
@@ -821,15 +820,10 @@ const Chat = () => {
   const { send } = useSendMessage();
   const clearChat = useClearChat();
   const { data: grupos = [] } = useChatGrupos();
-  const updateGrupo = useUpdateChatGrupo();
   const deleteGrupo = useDeleteChatGrupo();
   const deleteMessage = useDeleteChatMessage();
   const [msgToDelete, setMsgToDelete] = useState<ChatMessage | null>(null);
   const [readReceiptsMsg, setReadReceiptsMsg] = useState<ChatMessage | null>(null);
-  const addGrupoMembros = useAddChatGrupoMembros();
-  const [addMembersOpen, setAddMembersOpen] = useState(false);
-  const [addMembersSearch, setAddMembersSearch] = useState('');
-  const [selectedNewMembers, setSelectedNewMembers] = useState<string[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [pendingAudio, setPendingAudio] = useState<{ file: File; previewUrl: string } | null>(null);
@@ -841,12 +835,7 @@ const Chat = () => {
   const [destacadaMsgId, setDestacadaMsgId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [editingGrupoNome, setEditingGrupoNome] = useState(false);
-  const [grupoNomeInput, setGrupoNomeInput] = useState('');
   const { data: geralConfig } = useChatGeralConfig();
-  const updateGeralConfig = useUpdateChatGeralConfig();
-  const [editingGeralNome, setEditingGeralNome] = useState(false);
-  const [geralNomeInput, setGeralNomeInput] = useState('');
   const geralNome = geralConfig?.nome || 'Chat Geral';
   const markAsRead = useMarkChatAsRead();
   const { data: unreadCounts = {} } = useUnreadChatByTarget();
@@ -1397,14 +1386,6 @@ const Chat = () => {
     }
   }
 
-  const handleSaveGrupoNome = () => {
-    if (!activeGrupoId) return;
-    const nome = grupoNomeInput.trim();
-    if (!nome) return;
-    updateGrupo.mutate({ grupoId: activeGrupoId, nome });
-    setEditingGrupoNome(false);
-  };
-
   const handleDeleteGrupo = () => {
     if (!activeGrupoId) return;
     deleteGrupo.mutate(activeGrupoId, {
@@ -1419,28 +1400,6 @@ const Chat = () => {
     if (!msgToDelete) return;
     deleteMessage.mutate({ id: msgToDelete.id, grupoId: activeGrupoId, recipientId: activeRecipientId });
     setMsgToDelete(null);
-  };
-
-  const toggleNewMember = (id: string) => {
-    setSelectedNewMembers(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
-  };
-
-  const handleAddMembers = () => {
-    if (!activeGrupoId || selectedNewMembers.length === 0) return;
-    addGrupoMembros.mutate({ grupoId: activeGrupoId, usuarioIds: selectedNewMembers }, {
-      onSuccess: () => {
-        setAddMembersOpen(false);
-        setSelectedNewMembers([]);
-        setAddMembersSearch('');
-      }
-    });
-  };
-
-  const handleSaveGeralNome = () => {
-    const nome = geralNomeInput.trim();
-    if (!nome) return;
-    updateGeralConfig.mutate({ nome });
-    setEditingGeralNome(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -1468,9 +1427,6 @@ const Chat = () => {
   // Resolve header info
   const activeGrupo = grupos.find(g => g.id === activeGrupoId);
   const canDeleteGrupo = !!activeGrupo && (canManageGrupos || activeGrupo.criado_por === myVendedor);
-  const addMemberEligible = members.filter(m => !grupoMembros.some(gm => gm.id === m.id));
-  const addMemberCandidates = addMemberEligible.filter(m => m.nome.toLowerCase().includes(addMembersSearch.trim().toLowerCase()));
-  const allNewMembersSelected = addMemberEligible.length > 0 && addMemberEligible.every(m => selectedNewMembers.includes(m.id));
   const selectedMemberData = target.type === 'dm' ? members.find(m => m.id === target.memberId) : null;
   
   let chatHeaderName = geralNome;
@@ -1577,12 +1533,7 @@ const Chat = () => {
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
-            <Sheet open={sheetOpen} onOpenChange={(v) => {
-              setSheetOpen(v);
-              if (v && target.type === 'grupo') setGrupoNomeInput(activeGrupo?.nome ?? '');
-              if (v && target.type === 'geral') setGeralNomeInput(geralNome);
-              if (!v) { setEditingGrupoNome(false); setEditingGeralNome(false); }
-            }}>
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
                 <button
                   type="button"
@@ -1704,39 +1655,29 @@ const Chat = () => {
                     {target.type === 'grupo' && (
                       <>
                         <div className="flex items-center gap-3 mb-4">
-                          <SeletorDeAparencia
-                            nome={chatHeaderName}
+                          <AvatarDeChat
+                            className="h-14 w-14 border border-border"
+                            fotoUrl={activeGrupo?.foto_url}
+                            icone={activeGrupo?.icone}
+                            corFundo={activeGrupo?.cor_fundo}
+                            corIcone={activeGrupo?.cor_icone}
                             IconePadrao={Users2}
-                            valor={{ icone: activeGrupo?.icone ?? null, corFundo: activeGrupo?.cor_fundo ?? null, corIcone: activeGrupo?.cor_icone ?? null, fotoUrl: activeGrupo?.foto_url ?? null }}
-                            onChange={(v) => activeGrupoId && updateGrupo.mutate({ grupoId: activeGrupoId, icone: v.icone, corFundo: v.corFundo, corIcone: v.corIcone, limparFoto: true })}
-                            onEscolherImagem={(file) => activeGrupoId && updateGrupo.mutate({ grupoId: activeGrupoId, foto: file })}
+                            nome={chatHeaderName}
+                            tamanhoIcone="h-6 w-6"
                           />
                           <div className="min-w-0 flex-1">
-                            {editingGrupoNome ? (
-                              <div className="flex items-center gap-1.5">
-                                <Input
-                                  autoFocus
-                                  value={grupoNomeInput}
-                                  onChange={(e) => setGrupoNomeInput(e.target.value)}
-                                  onKeyDown={(e) => e.key === 'Enter' && handleSaveGrupoNome()}
-                                  className="h-8 text-sm"
-                                />
-                                <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveGrupoNome}>
-                                  <Check className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => { setGrupoNomeInput(activeGrupo?.nome ?? ''); setEditingGrupoNome(true); }}
-                                className="flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-primary transition-colors"
-                              >
-                                <span className="truncate">{chatHeaderName}</span>
-                                <Pencil className="h-3 w-3 shrink-0 text-muted-foreground" />
-                              </button>
-                            )}
+                            <p className="text-sm font-semibold text-foreground truncate">{chatHeaderName}</p>
                             <p className="text-[10px] text-muted-foreground mt-0.5">Grupo</p>
                           </div>
+                          {activeGrupo && (
+                            <EditarConversaDialog
+                              alvo={{ tipo: 'grupo', grupo: activeGrupo }}
+                              membros={members}
+                              membrosAtuais={grupoMembros}
+                              meuId={myVendedor ?? null}
+                              podeEditar={canDeleteGrupo}
+                            />
+                          )}
                         </div>
                         <div className="space-y-2 mb-4">
                             <div className="flex items-center justify-between">
@@ -1744,16 +1685,6 @@ const Chat = () => {
                                 <Users2 className="h-3 w-3" /> Participantes do grupo
                                 {grupoMembros.length > 0 && ` (${grupoMembros.length})`}
                               </p>
-                              {canDeleteGrupo && (
-                                <button
-                                  type="button"
-                                  onClick={() => setAddMembersOpen(true)}
-                                  className="flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline"
-                                  title="Adicionar participante"
-                                >
-                                  <UserPlus className="h-3 w-3" /> Adicionar
-                                </button>
-                              )}
                             </div>
                             {grupoMembros.length > 0 ? (
                               <ul className="space-y-0.5">
@@ -1787,39 +1718,26 @@ const Chat = () => {
                       {target.type === 'geral' && (
                         <>
                           <div className="flex items-center gap-3 mb-4">
-                            <SeletorDeAparencia
-                              nome={geralNome}
+                            <AvatarDeChat
+                              className="h-14 w-14 border border-border"
+                              fotoUrl={geralConfig?.foto_url}
+                              icone={geralConfig?.icone}
+                              corFundo={geralConfig?.cor_fundo}
+                              corIcone={geralConfig?.cor_icone}
                               IconePadrao={MessageCircle}
-                              valor={{ icone: geralConfig?.icone ?? null, corFundo: geralConfig?.cor_fundo ?? null, corIcone: geralConfig?.cor_icone ?? null, fotoUrl: geralConfig?.foto_url ?? null }}
-                              onChange={(v) => updateGeralConfig.mutate({ icone: v.icone, corFundo: v.corFundo, corIcone: v.corIcone, limparFoto: true })}
-                              onEscolherImagem={(file) => updateGeralConfig.mutate({ foto: file })}
+                              nome={geralNome}
+                              tamanhoIcone="h-6 w-6"
                             />
                             <div className="min-w-0 flex-1">
-                              {editingGeralNome ? (
-                                <div className="flex items-center gap-1.5">
-                                  <Input
-                                    autoFocus
-                                    value={geralNomeInput}
-                                    onChange={(e) => setGeralNomeInput(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSaveGeralNome()}
-                                    className="h-8 text-sm"
-                                  />
-                                  <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveGeralNome}>
-                                    <Check className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => { setGeralNomeInput(geralNome); setEditingGeralNome(true); }}
-                                  className="flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-primary transition-colors"
-                                >
-                                  <span className="truncate">{geralNome}</span>
-                                  <Pencil className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                </button>
-                              )}
+                              <p className="text-sm font-semibold text-foreground truncate">{geralNome}</p>
                               <p className="text-[10px] text-muted-foreground mt-0.5">Toda a equipe</p>
                             </div>
+                            <EditarConversaDialog
+                              alvo={{ tipo: 'geral', config: geralConfig ?? null }}
+                              membros={[]}
+                              meuId={myVendedor ?? null}
+                              podeEditar={canManageGrupos}
+                            />
                           </div>
                           <div className="space-y-2 mb-4">
                             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -2357,90 +2275,6 @@ const Chat = () => {
               </ScrollArea>
             </SheetContent>
           </Sheet>
-
-          <Dialog open={addMembersOpen} onOpenChange={(v) => { setAddMembersOpen(v); if (!v) { setSelectedNewMembers([]); setAddMembersSearch(''); } }}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Adicionar participante</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    {addMemberEligible.length > 0 ? `${addMemberEligible.length} disponíveis` : ''}
-                  </span>
-                  {addMemberEligible.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedNewMembers(allNewMembersSelected ? [] : addMemberEligible.map(m => m.id))}
-                      className="text-[11px] font-semibold text-primary hover:underline"
-                    >
-                      {allNewMembersSelected ? 'Remover todos' : 'Selecionar todos'}
-                    </button>
-                  )}
-                </div>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar membro..."
-                    value={addMembersSearch}
-                    onChange={e => setAddMembersSearch(e.target.value)}
-                    className="h-8 pl-8 text-xs"
-                  />
-                </div>
-                <ScrollArea className="h-[240px] border rounded-lg p-2">
-                  <div className="space-y-1">
-                    {(() => {
-                      if (addMemberCandidates.length === 0) {
-                        return (
-                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 py-8">
-                            <Users2 className="h-8 w-8 opacity-30" />
-                            <p className="text-xs text-center">
-                              {addMemberEligible.length === 0
-                                ? 'Todos os membros da empresa já estão neste grupo.'
-                                : `Nenhum membro encontrado para "${addMembersSearch}".`}
-                            </p>
-                          </div>
-                        );
-                      }
-                      return addMemberCandidates.map(m => (
-                        <label
-                          key={m.id}
-                          className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-muted/50 cursor-pointer transition-colors"
-                        >
-                          <Checkbox
-                            checked={selectedNewMembers.includes(m.id)}
-                            onCheckedChange={() => toggleNewMember(m.id)}
-                          />
-                          <Avatar className="h-7 w-7 border border-border">
-                            {m.avatar_url && (
-                              <ImagemPrivada src={m.avatar_url} alt={m.nome} className="absolute inset-0 h-full w-full object-cover" onError={hideOnError} />
-                            )}
-                            <AvatarFallback className={`${colorForId(m.id)} text-white text-[9px] font-semibold`}>
-                              {getInitials(m.nome)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm truncate">{m.nome}</p>
-                            <p className="text-[10px] text-muted-foreground capitalize">{m.role}</p>
-                          </div>
-                        </label>
-                      ));
-                    })()}
-                  </div>
-                </ScrollArea>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => setAddMembersOpen(false)}>Cancelar</Button>
-                <Button
-                  size="sm"
-                  disabled={selectedNewMembers.length === 0 || addGrupoMembros.isPending}
-                  onClick={handleAddMembers}
-                >
-                  {addGrupoMembros.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Adicionar${selectedNewMembers.length > 0 ? ` (${selectedNewMembers.length})` : ''}`}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
 
           <div className="relative border-t border-border px-4 py-3">
             {mencao.aberta && (
