@@ -1,3 +1,7 @@
+import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { usePaginaRolavel } from '@/hooks/use-pagina-rolavel';
+
 /**
  * Política de Privacidade — página PÚBLICA (fora do login), em `/politica-de-privacidade`.
  *
@@ -10,10 +14,26 @@
  * privacidade) antes de publicar de vez.
  */
 export default function PoliticaDePrivacidade() {
+  // O app roda com overflow:hidden no root; este hook liga a classe `pagina-rolavel` no <html>, que
+  // reativa a rolagem nativa do documento — senão o usuário não consegue rolar (nem com o mouse).
+  usePaginaRolavel();
+  useEffect(() => {
+    const anterior = document.title;
+    document.title = 'Política de Privacidade — Repply CRM';
+    return () => { document.title = anterior; };
+  }, []);
+
   const atualizacao = '24 de setembro de 2026';
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10 text-foreground">
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
+          <span className="font-display text-lg font-bold tracking-tight text-foreground">Repply CRM</span>
+          <Link to="/" className="text-sm text-primary hover:underline">Voltar ao site</Link>
+        </div>
+      </header>
+      <main className="mx-auto max-w-3xl px-4 py-10 text-foreground">
       <h1 className="text-2xl font-extrabold tracking-tight">Política de Privacidade — Repply CRM</h1>
       <p className="mt-1 text-sm text-muted-foreground">Última atualização: {atualizacao}</p>
 
@@ -125,6 +145,7 @@ export default function PoliticaDePrivacidade() {
       </p>
 
       <p className="mt-10 text-xs text-muted-foreground">Repply CRM · crm.repplyhub.com.br</p>
-    </main>
+      </main>
+    </div>
   );
 }

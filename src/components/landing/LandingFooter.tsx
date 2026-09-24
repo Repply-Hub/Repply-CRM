@@ -61,7 +61,15 @@ export function LandingFooter() {
           <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} Repply · Ecossistema Repply
           </p>
-          <p className="text-xs text-muted-foreground">Grupo MD · Natal/RN</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
+            <Link
+              to="/politica-de-privacidade"
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Política de Privacidade
+            </Link>
+            <p className="text-xs text-muted-foreground">Grupo MD · Natal/RN</p>
+          </div>
         </div>
       </div>
     </footer>
