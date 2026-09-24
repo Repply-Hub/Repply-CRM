@@ -1,5 +1,36 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronUp, Loader2, Mail, Minus, Paperclip, Send, Settings, Trash2, X } from 'lucide-react';
+
+/**
+ * Tamanho do cartão "encaixado" (e-mail novo). Padrão MAIS LARGO e MAIS BAIXO
+ * que o de antes (era 540×até-85dvh), e a pessoa pode arrastar a alça do canto
+ * superior-esquerdo para o tamanho que quiser — guardado por navegador. Só vale
+ * em tela larga (≥ sm/640px); no celular o cartão continua em tela cheia.
+ */
+const CHAVE_TAMANHO = 'compositor-email-tamanho';
+const LARGURA_PADRAO = 720;
+const ALTURA_PADRAO = 540;
+const LARGURA_MIN = 380;
+const ALTURA_MIN = 320;
+
+function entre(valor: number, minimo: number, maximo: number): number {
+  return Math.max(minimo, Math.min(maximo, valor));
+}
+
+function lerTamanhoSalvo(): { largura: number; altura: number } {
+  try {
+    const bruto = localStorage.getItem(CHAVE_TAMANHO);
+    if (bruto) {
+      const t = JSON.parse(bruto);
+      if (typeof t?.largura === 'number' && typeof t?.altura === 'number') {
+        return { largura: t.largura, altura: t.altura };
+      }
+    }
+  } catch {
+    /* localStorage bloqueado (janela privada, etc.): cai no padrão. */
+  }
+  return { largura: LARGURA_PADRAO, altura: ALTURA_PADRAO };
+}
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EditorTextoRico } from '@/components/shared/EditorTextoRico';
@@ -97,6 +128,54 @@ export function CompositorEmail({
   onEnviarImagemCorpo,
 }: Props) {
   const inputArquivoRef = useRef<HTMLInputElement>(null);
+
+  // Tamanho do cartão encaixado, com alça de redimensionar. Só entra em tela
+  // larga; abaixo de 640px (o `sm` do Tailwind, o mesmo ponto das classes
+  // `max-sm:` que põem o cartão em tela cheia) o estilo não é aplicado, para os
+  // dois não brigarem.
+  const [tamanho, setTamanho] = useState(lerTamanhoSalvo);
+  const [telaLarga, setTelaLarga] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 640px)');
+    const aoMudar = () => setTelaLarga(mql.matches);
+    mql.addEventListener('change', aoMudar);
+    aoMudar();
+    return () => mql.removeEventListener('change', aoMudar);
+  }, []);
+
+  /**
+   * Arrasta a alça do canto superior-esquerdo. O cartão está ancorado no canto
+   * inferior-direito, então puxar para a ESQUERDA aumenta a largura e para CIMA
+   * aumenta a altura. Grava no localStorage só ao SOLTAR (não a cada pixel).
+   */
+  const iniciarRedimensionar = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const inicio = { x: e.clientX, y: e.clientY, largura: tamanho.largura, altura: tamanho.altura };
+    const mover = (ev: PointerEvent) => {
+      setTamanho({
+        largura: entre(inicio.largura + (inicio.x - ev.clientX), LARGURA_MIN, window.innerWidth - 32),
+        altura: entre(inicio.altura + (inicio.y - ev.clientY), ALTURA_MIN, window.innerHeight - 24),
+      });
+    };
+    const soltar = () => {
+      window.removeEventListener('pointermove', mover);
+      window.removeEventListener('pointerup', soltar);
+      // Funcional para pegar o valor mais recente sem depender do fechamento.
+      setTamanho((t) => {
+        try {
+          localStorage.setItem(CHAVE_TAMANHO, JSON.stringify(t));
+        } catch {
+          /* sem localStorage: o tamanho vale só nesta sessão. */
+        }
+        return t;
+      });
+    };
+    window.addEventListener('pointermove', mover);
+    window.addEventListener('pointerup', soltar);
+  };
+
   // Cc/Cco começam abertos se já vierem preenchidos no mount (e-mail novo com
   // cópia, ou "Responder a todos" recém-aberto).
   const [mostrarCc, setMostrarCc] = useState(!!valores.cc);
@@ -215,7 +294,7 @@ export function CompositorEmail({
             onChange={(html) => onChange({ ...valores, corpo: html })}
             onEnviarImagem={onEnviarImagemCorpo}
             placeholder="Escreva sua mensagem aqui..."
-            minHeight={variante === 'inline' ? 220 : 320}
+            minHeight={variante === 'inline' ? 220 : 240}
             aria-label="Corpo do e-mail"
           />
         </div>
@@ -377,12 +456,35 @@ export function CompositorEmail({
     <div
       className={cn(
         'fixed z-50 flex flex-col border bg-card shadow-2xl',
-        'bottom-0 right-4 w-[540px] max-w-[calc(100vw-2rem)] max-h-[85dvh] rounded-t-lg',
+        'bottom-0 right-4 max-w-[calc(100vw-2rem)] rounded-t-lg',
         'max-sm:inset-0 max-sm:right-0 max-sm:w-full max-sm:max-h-none max-sm:rounded-none',
       )}
+      style={
+        telaLarga
+          ? {
+              width: tamanho.largura,
+              // Minimizado: só o cabeçalho, então a altura acompanha o conteúdo.
+              height: minimizado ? undefined : tamanho.altura,
+              maxHeight: '90dvh',
+            }
+          : undefined
+      }
       role="region"
       aria-label={titulo}
     >
+      {/* Alça de redimensionar (canto superior-esquerdo). Só em tela larga e com
+          o cartão aberto — no celular ele é tela cheia, e minimizado é só a
+          barrinha. */}
+      {telaLarga && !minimizado && (
+        <div
+          onPointerDown={iniciarRedimensionar}
+          className="absolute left-0 top-0 z-20 h-4 w-4 cursor-nwse-resize"
+          title="Arraste para redimensionar"
+          aria-hidden="true"
+        >
+          <span className="pointer-events-none absolute left-1 top-1 h-2 w-2 border-l-2 border-t-2 border-muted-foreground/40" />
+        </div>
+      )}
       <div className="flex shrink-0 items-center justify-between border-b bg-muted px-4 py-2">
         <span className="truncate text-sm font-medium">{titulo}</span>
         <div className="flex items-center gap-1">
