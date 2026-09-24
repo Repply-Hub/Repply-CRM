@@ -299,10 +299,12 @@ export function CorpoEmail({
    * pior caso de HTML alheio:
    *  - `style` como TAG (não o atributo) permite CSS que vaza dados via
    *    `background: url(...)` em seletores de atributo;
-   *  - `target` sem `rel` daria `window.opener` à página aberta.
-   *
-   * `ADD_ATTR: ['target']` não entra: os links abrem na própria aba, e é
-   * melhor assim do que abrir uma aba nova com opener exposto.
+   *  - `target` vindo do HTML alheio é removido de propósito: quem decide o
+   *    destino do link somos nós, no pós-processamento abaixo, onde todo link
+   *    de verdade ganha `target="_blank"` + `rel="noopener noreferrer"`. Assim
+   *    o link abre em NOVA ABA (nunca por cima do Repply) e o `rel` corta o
+   *    acesso da página aberta ao `window.opener` — a preocupação que antes
+   *    fazia os links abrirem na própria aba.
    */
   const corpoSeguro = useMemo(
     () =>
@@ -339,6 +341,19 @@ export function CorpoEmail({
     // span de endereço sem removê-lo.
     container.querySelectorAll('span[data-endereco-clicavel]').forEach((el) => {
       if (!el.textContent) el.remove();
+    });
+
+    // Link de verdade (http/https) do corpo abre em NOVA ABA, nunca por cima do
+    // Repply — perder o e-mail aberto para seguir um link era o pior caso. O
+    // `rel` corta o `window.opener` da página aberta (por isso o sanitizador
+    // acima remove qualquer `target` que venha no HTML: o destino é decidido
+    // aqui, não pelo remetente). `mailto:` fica de fora: ele é interceptado
+    // logo abaixo para abrir a composição dentro do próprio CRM.
+    container.querySelectorAll('a[href]').forEach((a) => {
+      const href = a.getAttribute('href') ?? '';
+      if (/^mailto:/i.test(href)) return;
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
     });
 
     // Complemento defensivo: um `<a href="mailto:...">` cujo texto visível
