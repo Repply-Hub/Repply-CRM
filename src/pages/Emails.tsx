@@ -76,10 +76,6 @@ import {
   type EnderecoDoEmail,
 } from "@/components/email/LeitorEmail";
 import { type MensagemDaConversa } from "@/components/email/MensagemConversa";
-import {
-  ResultadosBusca,
-  type ResultadoBusca,
-} from "@/components/email/ResultadosBusca";
 import { CompositorEmail } from "@/components/email/CompositorEmail";
 import { ConfirmarEnviarEmailDialog } from "@/components/email/ConfirmarEnviarEmailDialog";
 import { normalizarAssinaturaAntiga } from "@/lib/assinatura-email";
@@ -338,8 +334,6 @@ const Emails = () => {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [pageSent, setPageSent] = useState(0);
   const [pageReceived, setPageReceived] = useState(0);
-  /** Página da BUSCA GLOBAL (lista unificada de resultados). */
-  const [pageBusca, setPageBusca] = useState(0);
   const PAGE_SIZE = 50;
   // Nylas no lugar do Gmail direto: o contrato do hook é o mesmo
   // (isConnected/connectedEmail/sendEmail), então a troca é de import. A
@@ -659,7 +653,6 @@ const Emails = () => {
       // resultados, e continuar na página 3 mostraria uma lista vazia.
       setPageSent(0);
       setPageReceived(0);
-      setPageBusca(0);
       // Entrando em busca (resultados sem seleção em massa), zera a seleção.
       if (termo) setSelectedIds([]);
     }, 350);
@@ -739,9 +732,13 @@ const Emails = () => {
         .order("data_mensagem", { ascending: false })
         .range(pageSent * PAGE_SIZE, (pageSent + 1) * PAGE_SIZE - 1);
 
+      // Em Enviados, a busca varre todos os enviados — assunto, prévia e também
+      // o DESTINATÁRIO (coluna gerada `busca_destinatarios`), o jeito mais comum
+      // de achar "aquele e-mail que mandei pro fulano".
       if (buscaAplicada) {
         query = query.or(
-          `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%`,
+          `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%,` +
+            `busca_destinatarios.ilike.%${buscaAplicada}%`,
         );
       }
 
@@ -826,26 +823,31 @@ const Emails = () => {
        * cliente passar de ~80, isto sai da URL e vira função no banco — e o
        * ponto a trocar são estas linhas.
        */
-      const filtro = filtroDaCaixa(pastaSelecionada, idsDosMarcadores);
-      if (filtro.precisaTer) {
-        consulta = consulta.contains("pastas", [filtro.precisaTer]);
-      }
-      for (const fora of filtro.naoPodeTer) {
-        consulta = consulta.not("pastas", "cs", `{${fora}}`);
+      // Durante a busca, o marcador selecionado é IGNORADO de propósito: quem
+      // procura quer "em todos os recebidos", não só na pasta aberta (decisão do
+      // Lucas, 24/09/2026). Sem termo, o marcador volta a filtrar normalmente.
+      if (!buscaAplicada) {
+        const filtro = filtroDaCaixa(pastaSelecionada, idsDosMarcadores);
+        if (filtro.precisaTer) {
+          consulta = consulta.contains("pastas", [filtro.precisaTer]);
+        }
+        for (const fora of filtro.naoPodeTer) {
+          consulta = consulta.not("pastas", "cs", `{${fora}}`);
+        }
       }
 
       if (somenteNaoLidas) consulta = consulta.eq("lido", false);
 
-      // A busca do topo é UMA só para a tela inteira, mas só a aba Enviados a
-      // aplicava: procurar em Recebidos devolvia a caixa inteira, como se nada
-      // tivesse sido digitado. Em Recebidos entram também remetente_nome/
-      // remetente_email — sem eles, digitar o e-mail de quem mandou (o caso
-      // mais comum de "procurar um e-mail") não encontrava nada, porque esse
-      // texto não aparece nem no assunto nem na prévia.
+      // A busca agora mantém a caixa inteira (abas, colunas, ações) e só troca
+      // QUAIS e-mails aparecem em cada aba. Em Recebidos entram assunto/prévia,
+      // remetente (nome e e-mail — o caso mais comum de "procurar um e-mail") e
+      // também os DESTINATÁRIOS (coluna gerada `busca_destinatarios`), para
+      // varrer todos os recebidos como a busca antiga fazia.
       if (buscaAplicada) {
         consulta = consulta.or(
           `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%,` +
-            `remetente_nome.ilike.%${buscaAplicada}%,remetente_email.ilike.%${buscaAplicada}%`,
+            `remetente_nome.ilike.%${buscaAplicada}%,remetente_email.ilike.%${buscaAplicada}%,` +
+            `busca_destinatarios.ilike.%${buscaAplicada}%`,
         );
       }
 
@@ -895,84 +897,6 @@ const Emails = () => {
 
   const receivedEmails = receivedData?.emails || [];
   const totalReceived = receivedData?.count || 0;
-
-  /**
-   * BUSCA GLOBAL (estilo Gmail): com um termo digitado, varre TODOS os e-mails
-   * — recebidos e enviados, de qualquer marcador — em vez de ficar preso à
-   * aba/marcador. Consulta à parte das listas por aba; só roda quando há termo.
-   * `.or(ilike)` nos mesmos campos de Recebidos (assunto/prévia/remetente).
-   */
-  const { data: buscaData, isFetching: buscaCarregando } = useQuery({
-    queryKey: ["busca_global", buscaAplicada, pageBusca],
-    queryFn: async (): Promise<{ resultados: ResultadoBusca[]; count: number }> => {
-      const { data, error, count } = await supabase
-        .from("email_mensagens")
-        .select(
-          "id, direcao, data_mensagem, snippet, assunto, remetente_nome, remetente_email, destinatarios, cc, bcc, nylas_message_id, nylas_thread_id, caixa_origem, lido",
-          { count: "exact" },
-        )
-        .eq("excluido", false)
-        .or(
-          `assunto.ilike.%${buscaAplicada}%,snippet.ilike.%${buscaAplicada}%,` +
-            `remetente_nome.ilike.%${buscaAplicada}%,remetente_email.ilike.%${buscaAplicada}%,` +
-            // Destinatários (coluna gerada `busca_destinatarios`, migration
-            // 20260922160000): faz o e-mail ENVIADO ser achado por quem recebeu.
-            `busca_destinatarios.ilike.%${buscaAplicada}%`,
-        )
-        .order("data_mensagem", { ascending: false })
-        .range(pageBusca * PAGE_SIZE, (pageBusca + 1) * PAGE_SIZE - 1);
-      if (error) throw error;
-
-      const resultados: ResultadoBusca[] = (data ?? []).map((m) => ({
-        id: m.id,
-        tipo: (m.direcao === "enviado" ? "sent" : "received") as "sent" | "received",
-        remetente: m.remetente_nome
-          ? `${m.remetente_nome} <${m.remetente_email ?? ""}>`
-          : (m.remetente_email ?? ""),
-        destinatarios: normalizarEnderecos(m.destinatarios),
-        cc: normalizarEnderecos(m.cc),
-        bcc: normalizarEnderecos(m.bcc),
-        assunto: m.assunto,
-        snippet: m.snippet ?? "",
-        data: m.data_mensagem,
-        lido: m.lido,
-        gmail_message_id: m.nylas_message_id,
-        threadId: m.nylas_thread_id ?? null,
-        caixaOrigem: m.caixa_origem ?? null,
-      }));
-      return { resultados, count: count || 0 };
-    },
-    enabled: isConnected && !!buscaAplicada,
-    placeholderData: keepPreviousData,
-  });
-  const resultadosBusca = buscaData?.resultados ?? [];
-  const totalBusca = buscaData?.count ?? 0;
-
-  /** Abre um resultado da busca no leitor por conversa (recebido ou enviado). */
-  const abrirResultado = (r: ResultadoBusca) => {
-    const enviado = r.tipo === "sent";
-    if (!enviado && r.lido === false) marcarLido(r.id);
-    const destEmails = r.destinatarios.map((d) => d?.email).filter(Boolean);
-    void abrirComCorpo({
-      id: r.id,
-      remetente: enviado ? (connectedEmail ?? "") : r.remetente,
-      destinatario: enviado ? destEmails.join(", ") : (destEmails[0] ?? ""),
-      destinatarios: r.destinatarios,
-      cc: r.cc,
-      bcc: r.bcc,
-      assunto: r.assunto,
-      corpo: r.snippet ?? "",
-      created_at: r.data,
-      criado_em: r.data,
-      type: enviado ? "sent" : "received",
-      threadId: r.threadId,
-      gmail_message_id: r.gmail_message_id,
-      lido: r.lido,
-      caixaOrigem: r.caixaOrigem,
-      respondida:
-        !enviado && !!(r.threadId && threadsRespondidos?.has(r.threadId)),
-    });
-  };
 
   // Botão de leitura em massa (barra de seleção): se TODA a seleção já está
   // lida, ele oferece "Marcar não lido"; senão, "Lido". Antes o botão era fixo
@@ -2357,16 +2281,10 @@ const Emails = () => {
                       Cancelar
                     </Button>
                   </div>
-                ) : buscaAplicada ? (
-                  // Durante a busca as abas não valem (os resultados varrem
-                  // tudo): no lugar delas, um rótulo. Limpar a busca traz as
-                  // abas de volta.
-                  <div className="flex shrink-0 items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <Search className="h-4 w-4" />
-                    <span className="hidden sm:inline">Resultados em todos os e-mails</span>
-                    <span className="sm:hidden">Resultados</span>
-                  </div>
                 ) : (
+                  // As abas ficam SEMPRE, inclusive durante a busca: buscar só
+                  // troca quais e-mails aparecem em cada aba, mantendo colunas,
+                  // ações e a navegação Recebidos/Enviados/Rascunhos.
                   <TabsList className={cn(TOGGLE_LIST_CLASS, "shrink-0")}>
                     <TabsTrigger value="received" className={TOGGLE_TRIGGER_CLASS}>
                       <Inbox className="h-4 w-4" />
@@ -2442,6 +2360,7 @@ const Emails = () => {
                       sempre grava o id, sem comparar com o atual); este chip é o
                       atalho que resolve isso sem mexer naquele clique. */}
                   {activeTab === "received" &&
+                    !buscaAplicada &&
                     pastaSelecionada &&
                     pastaSelecionada !== CAIXA_DE_ENTRADA && (
                     <Badge
@@ -2548,7 +2467,11 @@ const Emails = () => {
                   // Em Enviados nada fica destacado: o marcador não filtra aquela
                   // aba, e mostrar um item aceso ali afirmaria um filtro que não
                   // existe.
-                  selecionada={activeTab === "sent" ? null : pastaSelecionada}
+                  selecionada={
+                    // Durante a busca nenhum marcador fica aceso: a lista
+                    // ignora o marcador e varre todos os recebidos.
+                    activeTab === "sent" || buscaAplicada ? null : pastaSelecionada
+                  }
                   onSelecionar={escolherPasta}
                   // Em Enviados a barra fala da aba, não da caixa: os dois itens
                   // do topo mostram o total de enviados, que é o que a lista tem.
@@ -2568,19 +2491,6 @@ const Emails = () => {
               )}
 
               <div className="relative min-w-0 flex-1 overflow-hidden">
-                {buscaAplicada ? (
-                  <ResultadosBusca
-                    resultados={resultadosBusca}
-                    total={totalBusca}
-                    carregando={buscaCarregando}
-                    termo={buscaAplicada}
-                    pagina={pageBusca}
-                    tamanhoPagina={PAGE_SIZE}
-                    onPagina={setPageBusca}
-                    onAbrir={abrirResultado}
-                  />
-                ) : (
-                  <>
                 <TabsContent value="sent" className="m-0 h-full overflow-hidden">
                   <div className="h-full overflow-hidden flex flex-col bg-background">
                     <div className="flex-1 overflow-y-auto">
@@ -2801,7 +2711,10 @@ const Emails = () => {
                                 próxima vez já estará pronto.
                               </p>
                             </>
-                          ) : pastaSelecionada ? (
+                          ) : !buscaAplicada && pastaSelecionada ? (
+                            // Sem busca: a lista é de um marcador. Com busca, o
+                            // marcador é ignorado e cai no bloco de baixo, que
+                            // fala "em todos os e-mails".
                             <>
                               <Tag className="mb-4 h-16 w-16 opacity-10" />
                               <h3 className="mb-1 text-lg font-medium">
@@ -2810,9 +2723,7 @@ const Emails = () => {
                               <p className="max-w-xs text-sm opacity-60">
                                 {somenteNaoLidas
                                   ? "Não há mensagens por ler neste marcador."
-                                  : buscaAplicada
-                                    ? `Nada encontrado para “${buscaAplicada}” neste marcador.`
-                                    : "Este marcador não tem mensagens sincronizadas. Use o botão de atualizar para buscar de novo."}
+                                  : "Este marcador não tem mensagens sincronizadas. Use o botão de atualizar para buscar de novo."}
                               </p>
                             </>
                           ) : somenteNaoLidas || buscaAplicada ? (
@@ -3212,8 +3123,6 @@ const Emails = () => {
                     </div>
                   </div>
                 </TabsContent>
-                  </>
-                )}
               </div>
             </div>
           </Tabs>
