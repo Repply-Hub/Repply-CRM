@@ -143,21 +143,50 @@ serve(async (req) => {
       // Aqui o corpo pode ser fixo, ao contrário da ação `reconfigurar-webhook`: a instância
       // acabou de nascer, não há configuração anterior a preservar.
       const webhookSecret = gerarSegredoDeWebhook();
-      const webhookUrl = enderecoDeInstanciaNova(SUPABASE_URL, instanceName, webhookSecret);
-      const webhookRes = await fetch(`${UAZAPI_BASE_URL}/webhook`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", token },
-        body: JSON.stringify({ url: webhookUrl, enabled: true, events: ["All"] }),
-      });
 
-      if (!webhookRes.ok) {
-        const webhookText = await webhookRes.text().catch(() => "");
-        // O corpo da recusa ecoa o endereço que a operadora recebeu — e ele carrega o
-        // segredo desde a Tarefa 7. Limpar antes de registrar e antes de devolver.
-        const semSegredo = semSegredoNoTexto(webhookText, webhookSecret);
-        console.error("[whatsapp-admin-provision] erro em /webhook", { status: webhookRes.status, body: semSegredo });
+      const registrarWebhook = async (url: string) => {
+        const res = await fetch(`${UAZAPI_BASE_URL}/webhook`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", token },
+          body: JSON.stringify({ url, enabled: true, events: ["All"] }),
+        });
+        return { ok: res.ok, status: res.status, texto: await res.text().catch(() => "") };
+      };
+
+      // 🔴 REDE DE SEGURANÇA: A PROTEÇÃO NÃO PODE IMPEDIR A EMPRESA DE EXISTIR.
+      //
+      // Em 24/09/2026, no primeiro uso real, a operadora RECUSOU o endereço com senha numa
+      // instância desconectada. Enquanto não se sabe se a recusa é pela senha no endereço ou
+      // por outro motivo, a criação de instância nova não pode ficar refém disso: uma empresa
+      // nova que não consegue criar o WhatsApp é um problema maior que uma instância nascendo
+      // desprotegida — esta aparece no painel como "Sem senha" e alguém resolve depois; aquela
+      // trava o cliente na porta.
+      //
+      // Então: tenta com senha; se a operadora recusar, volta ao formato de sempre, que está
+      // em produção desde que o sistema existe. `protegida` decide se a senha é gravada — e
+      // gravar senha que a operadora não aceitou seria pior que não ter: a etapa de recusar
+      // passaria a barrar o tráfego legítimo dessa instância.
+      let protegida = true;
+      let envio = await registrarWebhook(
+        enderecoDeInstanciaNova(SUPABASE_URL, instanceName, webhookSecret),
+      );
+
+      if (!envio.ok) {
+        console.error("[whatsapp-admin-provision] operadora recusou o endereço COM senha", {
+          status: envio.status,
+          body: semSegredoNoTexto(envio.texto, webhookSecret),
+        });
+        protegida = false;
+        envio = await registrarWebhook(
+          `${SUPABASE_URL}/functions/v1/whatsapp-webhook?instance=${instanceName}`,
+        );
+      }
+
+      if (!envio.ok) {
+        const semSegredo = semSegredoNoTexto(envio.texto, webhookSecret);
+        console.error("[whatsapp-admin-provision] erro em /webhook", { status: envio.status, body: semSegredo });
         await deleteOrphan(UAZAPI_BASE_URL, token);
-        return json({ error: "Erro ao configurar webhook na uazapi", status: webhookRes.status, detail: semSegredo }, 500);
+        return json({ error: "Erro ao configurar webhook na uazapi", status: envio.status, detail: semSegredo }, 500);
       }
 
       const { data: newInst, error: insertError } = await supabase
@@ -167,7 +196,8 @@ serve(async (req) => {
           instance_name: instanceName,
           api_key: token,
           instance_url: UAZAPI_BASE_URL,
-          webhook_secret: webhookSecret,
+          // Só grava a senha se a operadora aceitou o endereço que a carrega.
+          webhook_secret: protegida ? webhookSecret : null,
           provisionada: true,
           status: "disconnected",
         })

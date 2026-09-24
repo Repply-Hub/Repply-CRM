@@ -245,20 +245,42 @@ serve(async (req) => {
     // Aqui o corpo pode ser fixo, ao contrário da ação `reconfigurar-webhook` de
     // `whatsapp-admin-provision`: a instância acabou de nascer, não há o que preservar.
     const webhookSecret = gerarSegredoDeWebhook();
-    const webhookUrl = enderecoDeInstanciaNova(SUPABASE_URL, instanceName, webhookSecret);
+
+    // 🔴 REDE DE SEGURANÇA — ver o comentário longo no mesmo ponto de
+    // `whatsapp-admin-provision`. A proteção não pode impedir a empresa de criar o WhatsApp:
+    // tenta com senha, e se a operadora recusar volta ao formato de sempre, nascendo sem
+    // proteção (o painel de admin mostra como "Sem senha") em vez de travar o cliente.
+    let protegida = true;
     try {
-      const webhookRes = await fetch(`${UAZAPI_BASE_URL}/webhook`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", token },
-        body: JSON.stringify({ url: webhookUrl, enabled: true, events: ["All"] }),
-      });
-      const webhookText = await webhookRes.text().catch(() => "");
-      if (!webhookRes.ok) {
-        // O corpo da recusa ecoa o endereço recebido, que carrega o segredo.
-        const semSegredo = semSegredoNoTexto(webhookText, webhookSecret);
-        console.error("[whatsapp-provision] erro em /webhook", { status: webhookRes.status, body: semSegredo });
+      const registrarWebhook = async (url: string) => {
+        const res = await fetch(`${UAZAPI_BASE_URL}/webhook`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", token },
+          body: JSON.stringify({ url, enabled: true, events: ["All"] }),
+        });
+        return { ok: res.ok, status: res.status, texto: await res.text().catch(() => "") };
+      };
+
+      let envio = await registrarWebhook(
+        enderecoDeInstanciaNova(SUPABASE_URL, instanceName, webhookSecret),
+      );
+
+      if (!envio.ok) {
+        console.error("[whatsapp-provision] operadora recusou o endereço COM senha", {
+          status: envio.status,
+          body: semSegredoNoTexto(envio.texto, webhookSecret),
+        });
+        protegida = false;
+        envio = await registrarWebhook(
+          `${SUPABASE_URL}/functions/v1/whatsapp-webhook?instance=${instanceName}`,
+        );
+      }
+
+      if (!envio.ok) {
+        const semSegredo = semSegredoNoTexto(envio.texto, webhookSecret);
+        console.error("[whatsapp-provision] erro em /webhook", { status: envio.status, body: semSegredo });
         await deleteOrphanInstance(UAZAPI_BASE_URL, token);
-        return json({ error: "Erro ao configurar webhook na uazapi", status: webhookRes.status, detail: semSegredo }, 500);
+        return json({ error: "Erro ao configurar webhook na uazapi", status: envio.status, detail: semSegredo }, 500);
       }
     } catch (e) {
       console.error("[whatsapp-provision] erro de rede em /webhook", e);
@@ -274,7 +296,8 @@ serve(async (req) => {
         instance_name: instanceName,
         api_key: token,
         instance_url: UAZAPI_BASE_URL,
-        webhook_secret: webhookSecret,
+        // Só grava a senha se a operadora aceitou o endereço que a carrega.
+        webhook_secret: protegida ? webhookSecret : null,
         provisionada: true,
         status: "disconnected",
       })

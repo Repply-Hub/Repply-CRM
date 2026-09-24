@@ -2,7 +2,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { WaConfig } from './use-whatsapp-inbox';
-import { erroLegivelDaFunction } from '@/lib/erro-edge-function';
+import {
+  corpoDoErroDaFunction,
+  erroLegivelDaFunction,
+  mensagemDeErroDaFunction,
+} from '@/lib/erro-edge-function';
 import { lerRespostaDeConexao, estaConectadoNaResposta } from '@/lib/whatsapp-instancia';
 
 async function getSession() {
@@ -31,7 +35,17 @@ async function callAdminProvision(body: Record<string, unknown>) {
   // `erroLegivelDaFunction` lê o corpo e devolve um `Error` com a frase de verdade. Já era
   // usado três vezes neste mesmo arquivo; faltava no caminho que todas as ações atravessam.
   if (res.error) {
-    throw await erroLegivelDaFunction(res.error, 'Não foi possível completar a ação.');
+    // 🔴 E O `detail` PRECISA VIR JUNTO. `erroLegivelDaFunction` devolve só a frase que o
+    // servidor escreveu (`error`), e descarta o `detail` — que é onde mora a resposta CRUA da
+    // operadora, já sem a senha. Medido em 24/09/2026, no primeiro uso real: a tela disse "A
+    // operadora recusou o novo endereço" e ninguém ficou sabendo POR QUE ela recusou. A frase
+    // explica o que aconteceu do nosso lado; o detalhe é o que diz o que fazer a respeito.
+    const frase = await mensagemDeErroDaFunction(res.error, 'Não foi possível completar a ação.');
+    const corpo = await corpoDoErroDaFunction(res.error);
+    const detalhe = typeof corpo?.detail === 'string' && corpo.detail.trim()
+      ? ` — a operadora respondeu: ${corpo.detail.trim().slice(0, 300)}`
+      : '';
+    throw new Error(`${frase}${detalhe}`);
   }
   // Mantido por segurança: se algum dia uma ação responder 200 com `{ error }` no corpo, a
   // tela continua contando a verdade em vez de comemorar.
