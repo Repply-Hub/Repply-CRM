@@ -240,10 +240,11 @@ async function puxar(): Promise<Response> {
       if (!etiqueta) continue;
 
       if (it.status === "cancelled") {
-        const { count } = await admin.from("eventos").delete({ count: "exact" }).eq("id", etiqueta.evento_id);
-        if (!deveTratarComoRecusa(count)) {
-          await admin.from("evento_sync_externo").delete().eq("id", etiqueta.id);
-        }
+        // Apaga a ETIQUETA ANTES do evento: assim o gatilho BEFORE DELETE não encontra etiqueta e
+        // não reenfileira um 'apagar' de volta ao Google (o evento já foi apagado LÁ — seria eco).
+        await admin.from("evento_sync_externo").delete().eq("id", etiqueta.id);
+        const { error: erroDel } = await admin.from("eventos").delete().eq("id", etiqueta.evento_id);
+        if (erroDel) await marcarContaComErro(conta.user_id, erroDel); // não engole erro (CLAUDE.md §4.6)
         continue;
       }
 

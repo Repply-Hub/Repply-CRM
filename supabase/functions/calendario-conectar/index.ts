@@ -9,17 +9,15 @@ import {
 /**
  * Conectar / retorno / desconectar o Google Calendar (OAuth) — Fase 1 da sincronização de agenda.
  *
- * Três entradas nesta função:
- * - POST { acao: 'iniciar' }: devolve a URL de consentimento do Google, com um `state` assinado
- *   (HMAC) que carrega o `user_id` — é o que o /retorno confere para evitar CSRF.
- * - GET /retorno?code&state: o Google chama aqui depois do consentimento do vendedor. Troca o
- *   código pelos tokens, cria o calendário "Repply CRM" e grava `calendario_contas` com os tokens
- *   CIFRADOS (nunca em texto claro).
- * - POST { acao: 'desconectar' }: apaga os tokens gravados e marca a conta como desconectada.
+ * - POST { acao: 'iniciar' }: gera um `nonce` aleatório de USO ÚNICO (guardado na linha do vendedor
+ *   em calendario_contas, com validade curta) e devolve a URL de consentimento do Google com o
+ *   `state = user_id.nonce`. O /retorno só aceita se o nonce bater e não tiver expirado — é o que
+ *   fecha a janela de CSRF de vinculação de conta (um `state` fixo seria reutilizável).
+ * - GET /retorno?code&state: o Google chama aqui. Confere o nonce, troca o código, cria o
+ *   calendário "Repply CRM", grava os tokens CIFRADOS e consome o nonce.
+ * - POST { acao: 'desconectar' }: apaga tokens e as etiquetas daquela conexão.
  *
- * Toda chamada à API do Google passa pelo adaptador da Tarefa 6 (`_shared/calendario-google.ts`);
- * esta função só cuida de autenticação, cifra, `state` assinado e da gravação em
- * `calendario_contas`. Não é testável localmente — a validação real é na implantação.
+ * Toda chamada à API do Google passa pelo adaptador da Tarefa 6. Não é testável localmente.
  */
 
 const corsHeaders = {
@@ -31,23 +29,22 @@ const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
-// base64 de 32 bytes — a MESMA chave que a Tarefa 8 usa para decifrar.
+// base64 de 32 bytes — a MESMA chave que a calendario-sincronizar usa para decifrar.
 const KEY_RAW = Deno.env.get("CALENDARIO_TOKEN_KEY")!;
+const NONCE_VALIDADE_MS = 10 * 60 * 1000; // 10 min entre "iniciar" e o retorno do Google
+// App é implantação única (CLAUDE.md §16); derivar do url.origin daria o domínio do Supabase.
+const APP_URL = Deno.env.get("CALENDARIO_APP_URL") ?? "https://crm.repplyhub.com.br";
 
 async function chave(): Promise<CryptoKey> {
   const bytes = Uint8Array.from(atob(KEY_RAW), (c) => c.charCodeAt(0));
   return crypto.subtle.importKey("raw", bytes, "AES-GCM", false, ["encrypt", "decrypt"]);
 }
 
-// Formato: IV de 12 bytes + ciphertext, tudo em base64. Mantido assim para a Tarefa 8 decifrar.
+// Formato: IV de 12 bytes + ciphertext, tudo em base64. A calendario-sincronizar decifra assim.
 async function cifrar(texto: string): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = new Uint8Array(
-    await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv },
-      await chave(),
-      new TextEncoder().encode(texto),
-    ),
+    await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await chave(), new TextEncoder().encode(texto)),
   );
   const junto = new Uint8Array(iv.length + ct.length);
   junto.set(iv);
@@ -55,64 +52,56 @@ async function cifrar(texto: string): Promise<string> {
   return btoa(String.fromCharCode(...junto));
 }
 
-// `state` = user_id assinado, para o retorno saber de quem é e evitar CSRF.
-async function assinarState(userId: string): Promise<string> {
-  const chaveHmac = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(KEY_RAW),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const assinatura = new Uint8Array(
-    await crypto.subtle.sign("HMAC", chaveHmac, new TextEncoder().encode(userId)),
-  );
-  return `${userId}.${btoa(String.fromCharCode(...assinatura))}`;
-}
-
-async function lerState(state: string): Promise<string | null> {
-  const [userId, assB64] = state.split(".");
-  if (!userId || !assB64) return null;
-  const esperado = await assinarState(userId);
-  return esperado === state ? userId : null;
+function novoNonce(): string {
+  const b = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  // Respostas para o app (POST do navegador) levam CORS; o retorno do Google abaixo é navegação
-  // de página inteira, não fetch — mesmo padrão de email-callback/index.ts.
   const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  // O /retorno é navegação de página inteira; erro volta para a agenda com um aviso, não texto cru.
+  const voltarParaAgenda = (erro?: string) =>
+    new Response(null, { status: 302, headers: { Location: `${APP_URL}/calendario${erro ? `?calendario_erro=${erro}` : ""}` } });
 
   const url = new URL(req.url);
 
-  // Retorno do Google (GET com ?code&state): troca o código, cria o calendário, grava a conexão.
+  // ---- Retorno do Google (GET ?code&state) --------------------------------------------------
   if (req.method === "GET" && url.pathname.endsWith("/retorno")) {
     const code = url.searchParams.get("code");
-    const state = url.searchParams.get("state") ?? "";
-    const userId = await lerState(state);
-    if (!code || !userId) return new Response("Falha na conexão.", { status: 400 });
+    const [userId, nonce] = (url.searchParams.get("state") ?? "").split(".");
+    if (!code || !userId || !nonce) return voltarParaAgenda("conexao");
+
+    // Confere o nonce guardado (uso único, com validade) — é o que barra o CSRF de vinculação.
+    const { data: pend } = await admin
+      .from("calendario_contas")
+      .select("id, oauth_nonce, oauth_nonce_expira")
+      .eq("user_id", userId)
+      .eq("provedor", "google")
+      .maybeSingle();
+    if (
+      !pend || !pend.oauth_nonce || pend.oauth_nonce !== nonce ||
+      !pend.oauth_nonce_expira || new Date(pend.oauth_nonce_expira).getTime() < Date.now()
+    ) {
+      return voltarParaAgenda("conexao");
+    }
+
+    const { data: u } = await admin.from("usuarios").select("empresa_id").eq("user_id", userId).maybeSingle();
+    if (!u?.empresa_id) return voltarParaAgenda("empresa"); // não cria conexão sem empresa (isolamento)
 
     const tok = await trocarCodigoPorToken(code);
     const cal = await criarCalendarioRepply(tok.access_token);
-    // empresa_id do usuário (para isolamento multi-empresa):
-    const { data: u } = await admin
-      .from("usuarios")
-      .select("empresa_id")
-      .eq("user_id", userId)
-      .maybeSingle();
 
-    await admin.from("calendario_contas").upsert(
-      {
-        user_id: userId,
-        empresa_id: u?.empresa_id,
-        provedor: "google",
+    // (Re)conexão cria um calendário NOVO; as etiquetas antigas apontariam para o calendário
+    // abandonado e dariam 404 no próximo empurrar. Limpa antes de gravar o vínculo novo.
+    await admin.from("evento_sync_externo").delete().eq("calendario_conta_id", pend.id);
+
+    await admin
+      .from("calendario_contas")
+      .update({
+        empresa_id: u.empresa_id,
         calendario_externo_id: cal.id,
         refresh_token: await cifrar(tok.refresh_token),
         access_token: await cifrar(tok.access_token),
@@ -120,43 +109,66 @@ serve(async (req) => {
         status: "conectada",
         ultimo_erro: null,
         sync_token: null,
-      },
-      { onConflict: "user_id,provedor" },
-    );
+        oauth_nonce: null, // consome o nonce (uso único)
+        oauth_nonce_expira: null,
+      })
+      .eq("id", pend.id);
 
-    // Redireciona de volta para a AGENDA DO APP (não o domínio da função). O app é uma implantação
-    // única em crm.repplyhub.com.br (CLAUDE.md §16); derivar do url.origin daria o domínio do
-    // Supabase, que não é o app. Dá para sobrescrever por CALENDARIO_APP_URL se um dia precisar.
-    const appUrl = Deno.env.get("CALENDARIO_APP_URL") ?? "https://crm.repplyhub.com.br";
-    return new Response(null, {
-      status: 302,
-      headers: { Location: `${appUrl}/calendario` },
-    });
+    return voltarParaAgenda();
   }
 
-  // Chamadas do app (POST { acao, provedor }) — autenticadas pelo JWT do usuário.
+  // ---- Chamadas do app (POST { acao }) — autenticadas pelo JWT do vendedor --------------------
   const authHeader = req.headers.get("Authorization") ?? "";
-  const anon = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { Authorization: authHeader } } },
-  );
+  const anon = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    global: { headers: { Authorization: authHeader } },
+  });
   const { data: { user } } = await anon.auth.getUser();
   if (!user) return json({ error: "Não autenticado." }, 401);
 
   const { acao } = await req.json();
 
   if (acao === "iniciar") {
-    return json({ url: urlDeConsentimento(await assinarState(user.id)) });
-  }
-  if (acao === "desconectar") {
-    // Marca desconectada e apaga as etiquetas; a remoção do calendário "Repply CRM" fica opcional.
-    await admin
+    const nonce = novoNonce();
+    const expira = new Date(Date.now() + NONCE_VALIDADE_MS).toISOString();
+    const { data: existente } = await admin
       .from("calendario_contas")
-      .update({ status: "desconectada", refresh_token: null, access_token: null })
+      .select("id")
       .eq("user_id", user.id)
-      .eq("provedor", "google");
+      .eq("provedor", "google")
+      .maybeSingle();
+
+    if (existente) {
+      // Só grava o nonce; NÃO mexe em status/tokens (pode ser uma reconexão de quem já está ligado).
+      await admin.from("calendario_contas")
+        .update({ oauth_nonce: nonce, oauth_nonce_expira: expira })
+        .eq("id", existente.id);
+    } else {
+      // Linha nova: empresa_id é NOT NULL, então já nasce com a empresa e status 'desconectada'.
+      const { data: u } = await admin.from("usuarios").select("empresa_id").eq("user_id", user.id).maybeSingle();
+      if (!u?.empresa_id) return json({ error: "Sua empresa não foi identificada." }, 400);
+      await admin.from("calendario_contas").insert({
+        user_id: user.id, empresa_id: u.empresa_id, provedor: "google",
+        status: "desconectada", oauth_nonce: nonce, oauth_nonce_expira: expira,
+      });
+    }
+    return json({ url: urlDeConsentimento(`${user.id}.${nonce}`) });
+  }
+
+  if (acao === "desconectar") {
+    const { data: conta } = await admin
+      .from("calendario_contas")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("provedor", "google")
+      .maybeSingle();
+    if (conta) {
+      await admin.from("evento_sync_externo").delete().eq("calendario_conta_id", conta.id);
+      await admin.from("calendario_contas")
+        .update({ status: "desconectada", refresh_token: null, access_token: null, sync_token: null, oauth_nonce: null, oauth_nonce_expira: null })
+        .eq("id", conta.id);
+    }
     return json({ ok: true });
   }
+
   return json({ error: "Ação desconhecida." }, 400);
 });

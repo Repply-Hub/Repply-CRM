@@ -3,6 +3,12 @@
 -- função de borda `calendario-sincronizar`. A tela fica dormente (SINCRONIZACAO_CALENDARIO_ATIVA)
 -- ate a Fase 1 ficar completa. NAO aplicar sem o "pode" do Lucas.
 
+-- Nonce de uso unico do OAuth (guardado entre o "iniciar" e o /retorno do Google) — fecha a janela
+-- de CSRF de vinculacao de conta. Vai aqui (nao na 20260923140100, ja publicada; nao se edita
+-- migration existente). Nao entram no GRANT de coluna para authenticated: so o service_role le/grava.
+alter table public.calendario_contas add column if not exists oauth_nonce text;
+alter table public.calendario_contas add column if not exists oauth_nonce_expira timestamptz;
+
 create table if not exists public.calendario_fila (
   id uuid primary key default gen_random_uuid(),
   operacao text not null check (operacao in ('salvar','apagar')),
@@ -37,6 +43,18 @@ begin
       from public.evento_sync_externo es
      where es.evento_id = old.id;
     return old;
+  end if;
+
+  -- No UPDATE, so enfileira se um campo SINCRONIZADO mudou de fato (titulo/descricao/inicio/fim/
+  -- dia_inteiro). Editar responsavel, observacao de visita etc. nao precisa reenviar ao Google —
+  -- evita chamada e ruido a toa (e reduz eco).
+  if tg_op = 'UPDATE'
+     and new.titulo is not distinct from old.titulo
+     and new.descricao is not distinct from old.descricao
+     and new.inicio is not distinct from old.inicio
+     and new.fim is not distinct from old.fim
+     and new.dia_inteiro is not distinct from old.dia_inteiro then
+    return new;
   end if;
 
   -- INSERT/UPDATE: so enfileira se o DONO do evento tem calendario Google conectado.
@@ -90,6 +108,14 @@ select cron.schedule(
   'calendario-sincronizar-puxar',
   '*/5 * * * *',
   $$ select public.chamar_edge_function('calendario-sincronizar', jsonb_build_object('modo','puxar'), 60000, false) $$
+);
+
+-- Rede de seguranca da SAIDA: se a chamada imediata do gatilho falhar/for descartada, este cron
+-- drena a fila `calendario_fila` a cada 5 min (senao o item ficaria com processado_em null p/ sempre).
+select cron.schedule(
+  'calendario-sincronizar-empurrar',
+  '*/5 * * * *',
+  $$ select public.chamar_edge_function('calendario-sincronizar', jsonb_build_object('modo','empurrar'), 60000, false) $$
 );
 
 comment on table public.calendario_fila is 'Fila de saida da sincronizacao de calendario (Repply -> Google). So service_role/gatilho.';
