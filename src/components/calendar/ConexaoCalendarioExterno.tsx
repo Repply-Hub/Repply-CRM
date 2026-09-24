@@ -3,12 +3,15 @@ import { Button } from '@/components/ui/button';
 import { useConexaoCalendario } from '@/hooks/use-calendario-conexao';
 
 /**
- * 🔴 TRAVA DE RECURSO — a sincronização com o Google só fica ATIVA quando a Fase 1 estiver
- * completa em produção: migration `calendario_contas` aplicada, funções de servidor
- * (`calendario-conectar`/`calendario-sincronizar`) implantadas e app aprovado no Google.
- * Enquanto `false`, a agenda NÃO mostra este bloco (o gate está no ponto de uso, em Calendario.tsx),
- * senão o vendedor veria um "Conectar meu Google" que dá erro (a tabela e a função ainda não
- * existem em produção). Virar para `true` numa linha quando a Fase 1 estiver de pé.
+ * 🔴 TRAVA DE RECURSO da Fase 1 (sincronização com o Google). Dois estágios:
+ *
+ * - Enquanto o app do Google está em "Teste" (só testadores conectam, até a verificação do Google
+ *   — que leva semanas), este bloco aparece SÓ para quem já tem uma linha em `calendario_contas`.
+ *   Os testadores recebem uma linha "desconectada" PRÉ-CRIADA no banco; os demais não veem nada.
+ *   🔴 Os e-mails/ids dos testadores ficam SÓ no banco, nunca aqui — o repositório é público
+ *   (CLAUDE.md §6.9), então o portão é por presença de linha, não por lista de e-mail no código.
+ * - Quando o Google aprovar o app para todos, virar `SINCRONIZACAO_CALENDARIO_ATIVA` para `true`:
+ *   aí o bloco aparece para TODOS (e a presença de linha deixa de ser o portão).
  */
 export const SINCRONIZACAO_CALENDARIO_ATIVA = false;
 
@@ -16,6 +19,8 @@ export const SINCRONIZACAO_CALENDARIO_ATIVA = false;
 export function ConexaoCalendarioExterno() {
   const { conexao, carregando, iniciarGoogle, desconectar, desconectando } = useConexaoCalendario();
   if (carregando) return null;
+  // Dormente: sem o recurso aberto a todos E sem linha pré-criada (não é testador) → não mostra nada.
+  if (!SINCRONIZACAO_CALENDARIO_ATIVA && !conexao) return null;
 
   return (
     <div className="rounded-lg border p-3 space-y-2">
