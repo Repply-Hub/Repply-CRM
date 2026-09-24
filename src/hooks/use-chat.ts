@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { tocarEnvio } from '@/lib/som';
 import { somLigado } from '@/hooks/use-som-ligado';
 import { camposDeMencaoParaGravar } from '@/lib/mencao';
+import { recusaSemErro } from '@/lib/recusa-do-banco';
 
 export interface ChatMessage {
   id: string;
@@ -272,6 +273,37 @@ export function useAddChatGrupoMembros() {
       console.error('Erro ao adicionar participante:', err);
       toast.error(`Erro ao adicionar participante: ${err.message || 'Você não tem permissão para isso'}`);
     }
+  });
+}
+
+export function useRemoveChatGrupoMembros() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ grupoId, usuarioIds }: { grupoId: string; usuarioIds: string[] }) => {
+      if (usuarioIds.length === 0) return;
+      const { error, count } = await supabase
+        .from('chat_grupo_membros')
+        .delete({ count: 'exact' })
+        .eq('grupo_id', grupoId)
+        .in('usuario_id', usuarioIds);
+      if (error) throw error;
+      // 🔴 Zero linhas não é sucesso (CLAUDE.md §4.6): a RLS recusa DELETE sem erro.
+      if (count === 0) {
+        throw new Error(recusaSemErro(
+          'O participante NÃO foi removido: ele continua no grupo.',
+          'Remover participante é permissão de quem criou o grupo ou de um gestor.',
+        ));
+      }
+    },
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ['chat-grupo-membros', variables.grupoId] });
+      toast.success('Participante removido do grupo.');
+    },
+    onError: (err: any) => {
+      console.error('Erro ao remover participante:', err);
+      toast.error(err?.message || 'Não foi possível remover o participante.');
+    },
   });
 }
 
