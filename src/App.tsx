@@ -53,6 +53,7 @@ const Assinar = lazyComRetry(() => import("./pages/Assinar"));
 const Login = lazyComRetry(() => import("./pages/Login"));
 const EsqueciSenha = lazyComRetry(() => import("./pages/EsqueciSenha"));
 const RedefinirSenha = lazyComRetry(() => import("./pages/RedefinirSenha"));
+const PoliticaDePrivacidade = lazyComRetry(() => import("./pages/PoliticaDePrivacidade"));
 const NotFound = lazyComRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -550,6 +551,8 @@ const AppRoutes = () => (
       }
     />
     <Route path="/redefinir-senha" element={<RedefinirSenha />} />
+    {/* Pública (sem login): o Google precisa alcançar para verificar o app de OAuth do calendário. */}
+    <Route path="/politica-de-privacidade" element={<PoliticaDePrivacidade />} />
     {/* Autenticada, mas fora do gate de plano — senão o paywall redirecionaria
         para si mesmo indefinidamente. */}
     <Route
