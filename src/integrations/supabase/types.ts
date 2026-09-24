@@ -5378,6 +5378,32 @@ export type Database = {
           conversa_is_group: boolean | null
         }[]
       }
+      /**
+       * Item 16 da dívida técnica: quantos eventos do webhook do WhatsApp
+       * chegaram com segredo nas últimas 24h, por instância.
+       *
+       * É o instrumento da etapa que autoriza passar a RECUSAR quem chama sem
+       * segredo — decisão que só se toma com 100% dos eventos conferindo.
+       *
+       * SECURITY DEFINER com checagem de admin dentro: precisa ler
+       * `configuracoes_wapi.webhook_secret`, coluna que o papel `authenticated`
+       * não enxerga desde a migration 20260923140000. Devolve só se EXISTE
+       * segredo, nunca o valor.
+       */
+      wa_conferencia_de_origem: {
+        Args: Record<string, never>
+        Returns: {
+          instancia_id: string
+          instance_name: string
+          empresa: string | null
+          status: string | null
+          tem_segredo: boolean
+          eventos_24h: number
+          com_segredo_24h: number
+          conferem_24h: number
+          ultimo_evento_em: string | null
+        }[]
+      }
       wa_iniciar_conversa: {
         Args: {
           p_cliente_id?: string

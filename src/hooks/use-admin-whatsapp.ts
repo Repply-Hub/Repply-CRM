@@ -17,7 +17,24 @@ async function callAdminProvision(body: Record<string, unknown>) {
     body,
     headers: { Authorization: `Bearer ${session.access_token}` },
   });
-  if (res.error) throw res.error;
+  // 🔴 A FRASE DO SERVIDOR MORRIA AQUI. `functions.invoke` devolve `{ data: null, error }`
+  // para QUALQUER status fora de 2xx, e a mensagem desse erro é sempre a mesma frase fixa em
+  // inglês — "Edge Function returned a non-2xx status code". O corpo, com a explicação em
+  // português que a função escreveu, fica escondido dentro do erro e só sai por leitura
+  // assíncrona. Lançar o objeto cru trocava toda recusa por essa frase genérica.
+  //
+  // Doía mais na ação `reconfigurar-webhook`, cujas respostas separam "nada foi mudado" de
+  // "foi mudado pela metade" — e é essa diferença que diz se a pessoa pode repetir o clique.
+  // Repetir depois de um envio que ACRESCENTOU endereço na operadora é o caminho para a
+  // mensagem chegar em dobro.
+  //
+  // `erroLegivelDaFunction` lê o corpo e devolve um `Error` com a frase de verdade. Já era
+  // usado três vezes neste mesmo arquivo; faltava no caminho que todas as ações atravessam.
+  if (res.error) {
+    throw await erroLegivelDaFunction(res.error, 'Não foi possível completar a ação.');
+  }
+  // Mantido por segurança: se algum dia uma ação responder 200 com `{ error }` no corpo, a
+  // tela continua contando a verdade em vez de comemorar.
   if (res.data?.error) {
     const detail = res.data.detail ? `: ${res.data.detail}` : '';
     throw new Error(`${res.data.error}${detail}`);
@@ -113,6 +130,45 @@ export function useAdminDeleteInstance() {
     },
     onError: (err: any) => {
       toast.error(err?.message ?? 'Erro ao remover instância');
+    },
+  });
+}
+
+// --- Pôr o segredo no endereço do webhook (item 16 da dívida técnica) ---
+//
+// 🔴 POR QUE É UM BOTÃO, E NÃO UM SCRIPT. Esta ação fala com a operadora sobre o número de
+// WhatsApp de um cliente pagante. Feita errada, as mensagens param de chegar EM SILÊNCIO, com
+// a instância ainda aparecendo "conectada" na tela — já aconteceu neste sistema (`0715119`).
+// Ser um botão, uma instância por vez, deixa o gesto deliberado e o resultado visível na hora.
+//
+// A função de servidor lê a configuração atual, devolve a MESMA com o endereço trocado, relê
+// para conferir, e só então grava o segredo. Enquanto a conferência não for ligada (a etapa
+// seguinte do plano), isto não muda nada para quem usa: o webhook continua aceitando todos.
+
+export function useAdminReconfigurarWebhook() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (instanceId: string) => {
+      return callAdminProvision({
+        action: 'reconfigurar-webhook',
+        instance_id: instanceId,
+      }) as Promise<{ ok: boolean; instance_name: string; conferido: boolean }>;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['empresa_wa_instancias'] });
+      qc.invalidateQueries({ queryKey: ['wa_webhook_origem'] });
+      toast.success(`Endereço do webhook protegido em ${data?.instance_name ?? 'a instância'}.`);
+    },
+    onError: (err: unknown) => {
+      // A frase do servidor já diz o que aconteceu E se algo foi mudado. Não a substitua por
+      // uma genérica: aqui a diferença entre "nada foi mudado" e "foi mudado pela metade" é o
+      // que a pessoa precisa saber para decidir se repete.
+      //
+      // O `instanceof Error` é seguro AQUI (e não é o anti-padrão do CLAUDE.md §4.6): quem
+      // lança é `erroLegivelDaFunction`, que já leu o corpo da resposta e devolve um `Error`
+      // de verdade. O anti-padrão é usar isso em cima do objeto cru do Supabase.
+      toast.error(err instanceof Error ? err.message : 'Não foi possível proteger o endereço do webhook.');
     },
   });
 }

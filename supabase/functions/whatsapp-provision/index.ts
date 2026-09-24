@@ -1,5 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  enderecoDeInstanciaNova,
+  gerarSegredoDeWebhook,
+  semSegredoNoTexto,
+} from "../_shared/endereco-do-webhook.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -232,7 +237,15 @@ serve(async (req) => {
     }
 
     // Configurar webhook
-    const webhookUrl = `${SUPABASE_URL}/functions/v1/whatsapp-webhook?instance=${instanceName}`;
+    //
+    // 🔴 Instância nova já nasce com segredo — Tarefa 7 do plano de blindagem, item 16 da
+    // dívida técnica. Sem isto, a próxima empresa reabriria o buraco pela porta dos fundos,
+    // e a etapa de passar a recusar deixaria essa empresa sem receber nada.
+    //
+    // Aqui o corpo pode ser fixo, ao contrário da ação `reconfigurar-webhook` de
+    // `whatsapp-admin-provision`: a instância acabou de nascer, não há o que preservar.
+    const webhookSecret = gerarSegredoDeWebhook();
+    const webhookUrl = enderecoDeInstanciaNova(SUPABASE_URL, instanceName, webhookSecret);
     try {
       const webhookRes = await fetch(`${UAZAPI_BASE_URL}/webhook`, {
         method: "POST",
@@ -241,9 +254,11 @@ serve(async (req) => {
       });
       const webhookText = await webhookRes.text().catch(() => "");
       if (!webhookRes.ok) {
-        console.error("[whatsapp-provision] erro em /webhook", { status: webhookRes.status, body: webhookText });
+        // O corpo da recusa ecoa o endereço recebido, que carrega o segredo.
+        const semSegredo = semSegredoNoTexto(webhookText, webhookSecret);
+        console.error("[whatsapp-provision] erro em /webhook", { status: webhookRes.status, body: semSegredo });
         await deleteOrphanInstance(UAZAPI_BASE_URL, token);
-        return json({ error: "Erro ao configurar webhook na uazapi", status: webhookRes.status, detail: webhookText }, 500);
+        return json({ error: "Erro ao configurar webhook na uazapi", status: webhookRes.status, detail: semSegredo }, 500);
       }
     } catch (e) {
       console.error("[whatsapp-provision] erro de rede em /webhook", e);
@@ -259,6 +274,7 @@ serve(async (req) => {
         instance_name: instanceName,
         api_key: token,
         instance_url: UAZAPI_BASE_URL,
+        webhook_secret: webhookSecret,
         provisionada: true,
         status: "disconnected",
       })

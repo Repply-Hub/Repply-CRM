@@ -613,7 +613,92 @@ ninguém usa.
 
 ## 16. O webhook do WhatsApp aceita qualquer um
 
-**Gravidade: crítica. Em aberto. Confirmado no código em 19/08/2026.**
+**Gravidade: crítica. Em aberto.** Confirmado no código em 19/08/2026; **remedido em
+23–24/09/2026**, e o retrato mudou bastante.
+
+> ### 📍 Onde isto está em 24/09/2026
+>
+> A Fase 3 do plano vai em quatro etapas. **A etapa de observar já está no ar há duas semanas
+> e nunca foi lida.** O que ela diz:
+>
+> | | |
+> |---|---|
+> | eventos anotados desde 09/09/2026 | **81.540** |
+> | quantos trouxeram segredo | **0** |
+> | quantos conferem | **0** |
+> | instâncias com segredo configurado | **0 de 5** |
+>
+> **Por que zero: a etapa ANTERIOR nunca foi feita.** Gerar o segredo e re-registrar o
+> endereço na operadora (Tarefa 4) ficou para trás, então não há segredo para ninguém mandar.
+> A observação estava medindo corretamente um sistema desprotegido.
+>
+> | etapa | estado |
+> |---|---|
+> | 3a — gerar o segredo e re-registrar o endereço na operadora | ⏳ **é o próximo passo** |
+> | 3b — contar quem chega com e sem segredo, aceitando todos | ✅ no ar desde 09/09 |
+> | 3c — observar até 100% chegarem com segredo | ⏳ depende do 3a |
+> | 3d — passar a recusar | ⏳ depende do 3c |
+>
+> Duas instâncias estão vivas: a da MD (5.292 eventos em 24h) e a da JHS (2.278). As outras
+> três estão paradas.
+
+### 🔴 O corpo fixo do plano teria reescrito a configuração da MD
+
+O plano mandava enviar `{ url, enabled: true, events: ["All"] }` no re-registro. Lido na
+operadora em 23/09/2026 pelo `GET /webhook`, **as duas instâncias vivas têm configuração
+diferente**:
+
+| instância | `events` guardado na operadora |
+|---|---|
+| MD Representações | `[]` — vazio |
+| JHS | `["All"]` |
+
+As duas recebem tudo, então o vazio não é defeito — é só outra forma de dizer a mesma coisa.
+Mas o corpo fixo teria **reescrito a da MD** para algo diferente do que está lá, e o jeito de
+descobrir o que isso muda seria a caixa de um cliente pagante parar.
+
+**A regra que ficou:** ler o que está lá, devolver igual, mudar só o endereço. E reler depois
+para conferir — "a operadora respondeu 200" e "a operadora aplicou" são coisas diferentes, e se
+o envio ACRESCENTAR um endereço em vez de substituir, o 200 vem igual e cada mensagem passa a
+chegar duas vezes. O `GET /webhook` devolve uma **lista**, com `id` por endereço, então os dois
+casos são possíveis.
+
+### O que ficou pronto em 24/09/2026 (o código; a operação é um clique do dono)
+
+| peça | onde |
+|---|---|
+| a lógica do recadastro, com 32 testes | `supabase/functions/_shared/endereco-do-webhook.ts` |
+| a regra que autoriza (ou não) ligar a recusa, com 14 testes | `src/lib/prontidao-do-webhook.ts` |
+| a ação `reconfigurar-webhook` | `whatsapp-admin-provision` |
+| instância nova já nasce protegida (Tarefa 7) | os dois `*-provision` |
+| o painel que mede, na tela de instâncias | `src/components/admin/ProtecaoDoWebhook.tsx` |
+| a função de banco da medição | migration `20260923190000` |
+
+**Nada disso liga a recusa.** O botão protege o endereço de UMA instância por vez, e o painel
+mostra quantos eventos já chegam com a senha. A recusa continua sendo uma mudança de código
+futura, que só se faz com o painel confirmando.
+
+Quatro decisões que valem registro, porque não são óbvias:
+
+1. **O corpo enviado é o corpo recebido.** Ver acima.
+2. **Relê depois de enviar.** "A operadora respondeu 200" e "a operadora aplicou" são coisas
+   diferentes, e o cadastro dela é uma LISTA — um envio que acrescente em vez de substituir
+   devolve 200 igual, com cada mensagem passando a chegar duas vezes.
+3. **O denominador conta só o que dava para conferir.** A janela é de 24h, então logo depois de
+   proteger uma instância ela ainda carrega horas de eventos de quando não havia senha. Contá-los
+   mostraria "12% conferem" no instante exato em que tudo passou a funcionar.
+4. **Instância parada não trava o veredito.** Três das cinco não recebem evento há semanas. Se
+   contassem como pendência, o verde seria inalcançável e a trava deixaria de proteger para só
+   emperrar. Elas saem da conta — e aparecem nomeadas, porque "não impede" não é "foi confirmada".
+
+### 🔴 E não existe alarme nenhum se as mensagens pararem
+
+Conferido em 24/09/2026: das 10 tarefas agendadas no banco, **nenhuma vigia se o WhatsApp
+ainda está recebendo**. O acidente de `0715119` — mensagens paradas por dias, instância
+aparecendo "conectada" — se repetiria do mesmo jeito. Isso vale para qualquer erro no caminho,
+não só para este conserto, e devia vir antes de a recusa ser ligada.
+
+
 
 ### O que é
 

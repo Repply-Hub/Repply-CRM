@@ -64,6 +64,7 @@ import {
   useAdminSetApelido,
 } from '@/hooks/use-admin-whatsapp';
 import type { WaConfig } from '@/hooks/use-whatsapp-inbox';
+import { ProtecaoDoWebhook } from '@/components/admin/ProtecaoDoWebhook';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -952,6 +953,11 @@ const AdminWhatsAppInstancias = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Item 16 da dívida técnica: quem pode mandar evento para o nosso webhook.
+            Fica ACIMA da lista de empresas de propósito — é um buraco aberto, não um detalhe
+            de configuração, e some da vista se ficar no fim de uma lista que rola. */}
+        <ProtecaoDoWebhook />
 
         {/* Header de empresas + botão refresh */}
         <div className="flex items-center justify-between">

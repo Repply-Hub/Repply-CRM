@@ -1,5 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  conferirReconfiguracao,
+  corpoDeReconfiguracao,
+  ehNossoEndereco,
+  enderecoComSegredo,
+  escolherWebhookParaReconfigurar,
+  enderecoDeInstanciaNova,
+  gerarSegredoDeWebhook,
+  semSegredoNoTexto,
+} from "../_shared/endereco-do-webhook.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -126,7 +136,14 @@ serve(async (req) => {
         return json({ error: "uazapi não retornou token da instância", detail: initData }, 500);
       }
 
-      const webhookUrl = `${SUPABASE_URL}/functions/v1/whatsapp-webhook?instance=${instanceName}`;
+      // 🔴 Instância nova já nasce com segredo — Tarefa 7 do plano de blindagem. Sem isto, a
+      // próxima empresa reabriria o buraco do item 16 pela porta dos fundos, e a etapa de
+      // passar a recusar deixaria essa empresa sem receber nada.
+      //
+      // Aqui o corpo pode ser fixo, ao contrário da ação `reconfigurar-webhook`: a instância
+      // acabou de nascer, não há configuração anterior a preservar.
+      const webhookSecret = gerarSegredoDeWebhook();
+      const webhookUrl = enderecoDeInstanciaNova(SUPABASE_URL, instanceName, webhookSecret);
       const webhookRes = await fetch(`${UAZAPI_BASE_URL}/webhook`, {
         method: "POST",
         headers: { "Content-Type": "application/json", token },
@@ -135,9 +152,12 @@ serve(async (req) => {
 
       if (!webhookRes.ok) {
         const webhookText = await webhookRes.text().catch(() => "");
-        console.error("[whatsapp-admin-provision] erro em /webhook", { status: webhookRes.status, body: webhookText });
+        // O corpo da recusa ecoa o endereço que a operadora recebeu — e ele carrega o
+        // segredo desde a Tarefa 7. Limpar antes de registrar e antes de devolver.
+        const semSegredo = semSegredoNoTexto(webhookText, webhookSecret);
+        console.error("[whatsapp-admin-provision] erro em /webhook", { status: webhookRes.status, body: semSegredo });
         await deleteOrphan(UAZAPI_BASE_URL, token);
-        return json({ error: "Erro ao configurar webhook na uazapi", status: webhookRes.status, detail: webhookText }, 500);
+        return json({ error: "Erro ao configurar webhook na uazapi", status: webhookRes.status, detail: semSegredo }, 500);
       }
 
       const { data: newInst, error: insertError } = await supabase
@@ -147,6 +167,7 @@ serve(async (req) => {
           instance_name: instanceName,
           api_key: token,
           instance_url: UAZAPI_BASE_URL,
+          webhook_secret: webhookSecret,
           provisionada: true,
           status: "disconnected",
         })
@@ -253,6 +274,190 @@ serve(async (req) => {
       return json({ success: true });
     }
 
+    // ── RECONFIGURAR-WEBHOOK: põe o segredo no endereço, sem destruir o que já está lá ──
+    //
+    // Item 16 da dívida técnica · Tarefa 4 do plano de blindagem.
+    //
+    // 🔴 POR QUE ESTA AÇÃO EXISTE. O webhook do WhatsApp aceita qualquer um: a coluna
+    // `webhook_secret` é lida na consulta e nunca conferida. Medido em 23/09/2026, das 81.540
+    // chamadas anotadas desde 09/09, ZERO trouxeram segredo — porque nenhuma instância tem
+    // segredo configurado. A conferência não pode ser ligada antes disto: recusaria 100% do
+    // tráfego real, e a caixa de dois clientes pagantes pararia EM SILÊNCIO.
+    //
+    // 🔴 POR QUE ELA LÊ ANTES DE ESCREVER. As duas instâncias vivas têm configuração
+    // DIFERENTE na operadora (uma com `events: []`, outra com `events: ["All"]`). Mandar um
+    // corpo fixo reescreveria a de uma delas para outra coisa. Aqui o corpo enviado é o corpo
+    // recebido, com o endereço trocado — e nada mais.
+    //
+    // 🔴 POR QUE ELA RELÊ DEPOIS. "A operadora respondeu 200" e "a operadora aplicou" são
+    // coisas diferentes. E se o envio ACRESCENTAR um endereço em vez de substituir, o 200 vem
+    // igual e cada mensagem passa a chegar duas vezes. Só a segunda leitura separa os casos.
+    //
+    // O segredo só é gravado no banco depois que a releitura confirma. Gravar antes deixaria o
+    // banco esperando um segredo que a operadora nunca vai mandar — e a etapa seguinte do
+    // plano (passar a recusar) recusaria tudo.
+    if (action === "reconfigurar-webhook") {
+      if (!instance_id) return json({ error: "instance_id é obrigatório" }, 400);
+
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+      if (!SUPABASE_URL) return json({ error: "Configuração do servidor incompleta" }, 500);
+
+      const { data: instancia } = await supabase
+        .from("configuracoes_wapi")
+        .select("id, empresa_id, instance_name, api_key, instance_url")
+        .eq("id", instance_id)
+        .single();
+
+      if (!instancia) return json({ error: "Instância não encontrada" }, 404);
+
+      if (caller.role !== "admin" && instancia.empresa_id !== caller.empresa_id) {
+        return json({ error: "Forbidden: instância fora da sua empresa" }, 403);
+      }
+      if (!instancia.api_key || !instancia.instance_url) {
+        return json({ error: "Esta instância não tem credencial da operadora gravada." }, 409);
+      }
+
+      const baseDaOperadora = instancia.instance_url.replace(/\/$/, "");
+      const cabecalhos = { "Content-Type": "application/json", token: instancia.api_key };
+
+      const lerDaOperadora = async (): Promise<
+        { ok: true; lista: unknown } | { ok: false; erro: string }
+      > => {
+        try {
+          const res = await fetch(`${baseDaOperadora}/webhook`, { headers: cabecalhos });
+          const texto = await res.text().catch(() => "");
+          if (!res.ok) return { ok: false, erro: `a operadora respondeu ${res.status}` };
+          try {
+            return { ok: true, lista: JSON.parse(texto) };
+          } catch {
+            return { ok: false, erro: "a operadora respondeu algo que não é JSON" };
+          }
+        } catch (e) {
+          return { ok: false, erro: `não foi possível falar com a operadora (${String(e)})` };
+        }
+      };
+
+      // ── 1. O que está lá hoje ──────────────────────────────────────────────────────
+      const antes = await lerDaOperadora();
+      if (!antes.ok) {
+        return json({ error: `Não deu para ler a configuração atual: ${antes.erro}. Nada foi mudado.` }, 502);
+      }
+
+      const escolha = escolherWebhookParaReconfigurar(antes.lista);
+      if (!escolha.ok) return json({ error: escolha.motivo }, 409);
+
+      const atual = escolha.webhook;
+      if (!ehNossoEndereco(atual.url, SUPABASE_URL, instancia.instance_name)) {
+        return json({
+          error: "O endereço cadastrado na operadora não é o desta instância no nosso sistema. " +
+            "Nada foi mudado — pôr o segredo num endereço alheio seria entregá-lo de bandeja.",
+        }, 409);
+      }
+
+      // ── 2. O mesmo de sempre, agora com o segredo ──────────────────────────────────
+      const segredo = gerarSegredoDeWebhook();
+      const novaUrl = enderecoComSegredo(atual.url as string, segredo);
+
+      let envioOk = false;
+      let redeFalhou = false;
+      let detalheDoEnvio = "";
+      try {
+        const res = await fetch(`${baseDaOperadora}/webhook`, {
+          method: "POST",
+          headers: cabecalhos,
+          body: JSON.stringify(corpoDeReconfiguracao(atual, novaUrl)),
+        });
+        detalheDoEnvio = await res.text().catch(() => "");
+        envioOk = res.ok;
+        if (!res.ok) {
+          console.error("[whatsapp-admin-provision] operadora recusou o webhook", {
+            status: res.status,
+            instancia: instancia.instance_name,
+          });
+        }
+      } catch (e) {
+        console.error("[whatsapp-admin-provision] erro de rede ao reconfigurar webhook", e);
+        detalheDoEnvio = String(e);
+        redeFalhou = true;
+      }
+
+      // 🔴 RECUSA E QUEDA DE REDE NÃO SÃO A MESMA COISA, e tratá-las juntas faria a tela
+      // prometer o que não sabe. Quando a operadora RECUSA, ela recebeu o pedido e disse não —
+      // o cadastro dela continua como estava. Quando a REDE cai no meio, o pedido pode ter
+      // chegado e sido aplicado; afirmar "nada foi mudado" aí seria chute com cara de fato.
+      // Por isso, na queda, a gente vai OLHAR antes de falar.
+      if (redeFalhou) {
+        const olhada = await lerDaOperadora();
+        const conferida = olhada.ok ? conferirReconfiguracao(olhada.lista, novaUrl) : null;
+        if (conferida?.ok) {
+          // O envio chegou apesar da queda. Segue o fluxo normal: grava e confirma.
+          envioOk = true;
+        } else {
+          return json({
+            error: "A conexão com a operadora caiu no meio do envio. " +
+              (olhada.ok
+                ? "O cadastro dela continua como estava, e as mensagens seguem chegando. Pode repetir."
+                : "Não deu para olhar como ficou. NÃO repita ainda: confira o cadastro na operadora primeiro."),
+            detail: semSegredoNoTexto(detalheDoEnvio, segredo).slice(0, 500),
+          }, 502);
+        }
+      }
+
+      if (!envioOk) {
+        return json({
+          error: "A operadora recusou o novo endereço. Nada foi gravado, e o webhook continua " +
+            "funcionando como antes.",
+          // 🔴 A recusa da operadora costuma ecoar o endereço que ela recebeu — e esse
+          // endereço carrega o segredo. Nunca repassar o corpo cru para a tela.
+          detail: semSegredoNoTexto(detalheDoEnvio, segredo).slice(0, 500),
+        }, 502);
+      }
+
+      // ── 3. Ficou mesmo como pedimos? ───────────────────────────────────────────────
+      const depois = await lerDaOperadora();
+      if (!depois.ok) {
+        return json({
+          error: `O envio foi aceito, mas não deu para reler e conferir: ${depois.erro}. ` +
+            "A senha NÃO foi gravada aqui. Não dá para afirmar como o cadastro da operadora " +
+            "ficou — confira antes de repetir.",
+        }, 502);
+      }
+
+      const conferencia = conferirReconfiguracao(depois.lista, novaUrl);
+      if (!conferencia.ok) {
+        // 🔴 NÃO dizer "as mensagens continuam chegando". Este ramo cobre justamente os casos
+        // em que elas PODEM ter parado (a operadora ficou sem endereço) ou passado a chegar em
+        // dobro (ela acrescentou em vez de substituir). O motivo já diz qual é; repetir uma
+        // tranquilização genérica por cima seria desmentir a própria medição.
+        return json({
+          error: `${conferencia.motivo} A senha NÃO foi gravada aqui — confira o cadastro na ` +
+            "operadora antes de repetir a ação.",
+        }, 502);
+      }
+
+      // ── 4. Só agora o banco ────────────────────────────────────────────────────────
+      // Zero linhas não é sucesso (CLAUDE.md §4.6). Aqui rodamos com chave de serviço, então
+      // zero significa que a linha sumiu no meio — e a operadora JÁ está mandando o segredo.
+      const { error: erroDoBanco, count } = await supabase
+        .from("configuracoes_wapi")
+        .update({ webhook_secret: segredo }, { count: "exact" })
+        .eq("id", instancia.id);
+
+      if (erroDoBanco || count === 0) {
+        console.error("[whatsapp-admin-provision] operadora reconfigurada mas o segredo nao foi gravado", {
+          instancia: instancia.instance_name,
+          count,
+          erro: erroDoBanco?.message,
+        });
+        return json({
+          error: "A operadora já está mandando o segredo, mas ele NÃO foi gravado aqui. " +
+            "As mensagens continuam chegando; repita a ação para gerar outro.",
+        }, 500);
+      }
+
+      return json({ ok: true, instance_name: instancia.instance_name, conferido: true });
+    }
+
     // ── DELETE: remove instância da uazapi e do banco (cascade limpa junction) ─
     if (action === "delete") {
       if (!instance_id) return json({ error: "instance_id é obrigatório" }, 400);
@@ -278,7 +483,7 @@ serve(async (req) => {
       return json({ success: true });
     }
 
-    return json({ error: "Ação inválida. Use: create, link, unlink, delete" }, 400);
+    return json({ error: "Ação inválida. Use: create, link, unlink, delete, reconfigurar-webhook" }, 400);
 
   } catch (err) {
     console.error("[whatsapp-admin-provision] erro inesperado", err);
