@@ -1,6 +1,7 @@
 import { Component, type ReactNode, type ErrorInfo } from "react";
 import { Button } from "@/components/ui/button";
 import { registrarErro } from "@/lib/registrar-erro";
+import { textoDoDiagnostico, type DiagnosticoDeCarregamento } from "@/lib/lazy-com-retry";
 
 interface Props {
   children: ReactNode;
@@ -46,9 +47,23 @@ export class ErrorBoundary extends Component<Props, State> {
     // null — gravar o erro nunca pode virar um segundo erro sobre a tela que já
     // quebrou. O setState só roda se o componente ainda estiver montado, que é
     // o caso: o fallback continua na tela.
+    // 🔴 O DIAGNÓSTICO VAI JUNTO, E NO `stack`. Falha de carregamento de página guarda dentro
+    // do erro qual caminho da cura aconteceu e qual arquivo o navegador culpou — e isso morria
+    // aqui, porque só a mensagem e a pilha eram gravadas. Em 24/09/2026 uma investigação de
+    // travamento real ficou sem saber qual dos três desfechos tinha ocorrido, justamente
+    // porque os três escrevem a mesma frase.
+    //
+    // Vai no `stack` e não na `mensagem` de propósito: mudar a mensagem quebraria a consulta
+    // que agrupa as ocorrências históricas em `app_erros`, e a série de meses seria perdida no
+    // exato momento em que a gente passou a medir.
+    const diagnostico = textoDoDiagnostico(
+      (error as { diagnostico?: DiagnosticoDeCarregamento })?.diagnostico,
+    );
+
     void registrarErro({
       mensagem: error?.message ?? "Erro desconhecido",
-      stack: error?.stack,
+      stack: diagnostico ? `${diagnostico}
+${error?.stack ?? ""}` : error?.stack,
       componentStack: info?.componentStack,
     }).then((codigo) => {
       if (codigo) this.setState({ codigo });

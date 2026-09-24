@@ -5,6 +5,9 @@ import {
   enderecoDoModulo,
   curarCacheDoModulo,
   carregarComCura,
+  textoDoDiagnostico,
+  dependenciasDoModulo,
+  curarModuloEDependencias,
 } from './lazy-com-retry';
 
 /**
@@ -175,5 +178,233 @@ describe('carregarComCura', () => {
     const buscar = (async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch;
 
     await expect(carregarComCura(importar, buscar)).rejects.toBeInstanceOf(ErroDeDownload);
+  });
+});
+
+describe('diagnóstico do carregamento', () => {
+  /**
+   * 🔴 O QUE ESTES TESTES PRENDEM, E POR QUE ELES EXISTEM.
+   *
+   * Em 24/09/2026 o dono do produto ficou preso na tela de "saiu versão nova" mesmo
+   * recarregando, e a investigação travou num ponto constrangedor: **três desfechos
+   * diferentes da cura produzem exatamente a mesma mensagem e a mesma pilha em `app_erros`**.
+   *
+   *   · o arquivo sumiu mesmo do servidor                → recarregar resolve
+   *   · o arquivo estava lá e o cache foi trocado        → recarregar resolve AGORA
+   *   · o navegador não disse qual arquivo era (nao-sei) → a cura NEM RODOU, e recarregar
+   *                                                        vai falhar de novo, para sempre
+   *
+   * O terceiro é o único que explica "preso mesmo recarregando", e era indistinguível dos
+   * outros dois no registro. Pior: o erro já carregava a causa original — com o endereço do
+   * arquivo e a mensagem real do navegador — e o gravador descartava isso, salvando só a frase
+   * final. A informação existia no instante da falha e era jogada fora antes de ser escrita.
+   *
+   * Por isso este bloco. Ele não conserta o travamento: ele faz a PRÓXIMA ocorrência dizer
+   * qual dos caminhos aconteceu, em vez de alguém especular. Diagnóstico não é conserto, e
+   * chutar aqui foi o que fez este problema voltar depois de "resolvido".
+   */
+
+  const erroComEndereco = new Error(
+    'Failed to fetch dynamically imported module: https://exemplo.invalido/assets/Pagina-abc.js',
+  );
+  const erroSemEndereco = new Error('error loading dynamically imported module');
+
+  it('🔴 arquivo fora do ar: registra o desfecho e o arquivo', async () => {
+    const buscar = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
+    const erro = await carregarComCura(() => Promise.reject(erroComEndereco), buscar).catch(e => e);
+
+    expect(erro).toBeInstanceOf(ErroDeVersao);
+    expect(erro.diagnostico?.desfecho).toBe('arquivo-sumiu');
+    expect(erro.diagnostico?.endereco).toBe('https://exemplo.invalido/assets/Pagina-abc.js');
+  });
+
+  it('🔴 o caso que explica "preso mesmo recarregando": a cura NEM RODOU', async () => {
+    // Sem endereço na mensagem não há o que curar, e o código segue para a segunda tentativa
+    // — que falha. O desfecho `nao-sei` é a marca de que o cache continua envenenado.
+    let vezes = 0;
+    const buscar = (async () => new Response('', { status: 200 })) as unknown as typeof fetch;
+    const erro = await carregarComCura(() => { vezes++; return Promise.reject(erroSemEndereco); }, buscar).catch(e => e);
+
+    expect(erro).toBeInstanceOf(ErroDeVersao);
+    expect(erro.diagnostico?.desfecho).toBe('nao-sei');
+    expect(erro.diagnostico?.endereco).toBeNull();
+    expect(vezes).toBe(2);
+  });
+
+  it('cache trocado e segunda tentativa ainda falhou: fica registrado que a cura RODOU', async () => {
+    const buscar = (async () => new Response('', { status: 200 })) as unknown as typeof fetch;
+    const erro = await carregarComCura(() => Promise.reject(erroComEndereco), buscar).catch(e => e);
+
+    expect(erro).toBeInstanceOf(ErroDeVersao);
+    expect(erro.diagnostico?.desfecho).toBe('arquivo-voltou');
+  });
+
+  it('servidor sem resposta também vem identificado', async () => {
+    const buscar = (async () => { throw new Error('rede'); }) as unknown as typeof fetch;
+    const erro = await carregarComCura(() => Promise.reject(erroComEndereco), buscar).catch(e => e);
+
+    expect(erro).toBeInstanceOf(ErroDeDownload);
+    expect(erro.diagnostico?.desfecho).toBe('sem-resposta');
+  });
+
+  it('🔴 a mensagem que a pessoa lê NÃO muda — o diagnóstico é para o registro', async () => {
+    // Se a frase mudasse, a consulta que agrupa as ocorrências em `app_erros` pararia de casar,
+    // e a série histórica seria perdida justamente ao instrumentar.
+    const buscar = (async () => new Response('', { status: 404 })) as unknown as typeof fetch;
+    const erro = await carregarComCura(() => Promise.reject(erroComEndereco), buscar).catch(e => e);
+
+    expect(erro.message).toBe('A página faz parte de uma versão anterior do sistema.');
+  });
+});
+
+describe('textoDoDiagnostico', () => {
+  it('vira uma linha legível para entrar no registro', () => {
+    const texto = textoDoDiagnostico({
+      desfecho: 'nao-sei',
+      endereco: null,
+      causa: 'error loading dynamically imported module',
+    });
+    expect(texto).toContain('nao-sei');
+    expect(texto).toContain('error loading dynamically imported module');
+  });
+
+  it('sem diagnóstico não inventa linha nenhuma', () => {
+    expect(textoDoDiagnostico(undefined)).toBe('');
+  });
+
+  it('🔴 não deixa a causa crescer sem limite — o registro tem teto de 8000 caracteres', () => {
+    const texto = textoDoDiagnostico({
+      desfecho: 'arquivo-sumiu',
+      endereco: null,
+      causa: 'x'.repeat(5000),
+    });
+    expect(texto.length).toBeLessThan(1000);
+  });
+});
+
+describe('dependenciasDoModulo', () => {
+  /**
+   * 🔴 A CAUSA RAIZ DO TRAVAMENTO, achada em 24/09/2026.
+   *
+   * Quando uma página depende de um arquivo que está envenenado no cache, o navegador culpa a
+   * PÁGINA, não o arquivo culpado. Verificado no Chrome, em produção, com um módulo de teste
+   * que importava um arquivo inexistente:
+   *
+   *   "Failed to fetch dynamically imported module: blob:https://.../ecb60356"   ← a página
+   *   (a mensagem NÃO cita o arquivo que realmente faltou)
+   *
+   * Consequência: a cura buscava a página — que estava perfeita, 200 —, concluía "era cache
+   * envenenado, já troquei", tentava importar de novo, falhava, e o arquivo de verdade
+   * envenenado nunca era tocado. Recarregar repetia o mesmo caminho, para sempre.
+   *
+   * Foi exatamente isso que prendeu o dono do produto: quatro arquivos guardados como erro, e
+   * só limpar os quatro à mão pelas ferramentas do navegador resolveu.
+   */
+
+  const base = 'https://exemplo.invalido/assets/Pagina-abc.js';
+
+  it('acha o que o pedaço de código importa, do jeito que o empacotador escreve', () => {
+    const fonte = 'import{a}from"./compartilhado-x1.js";import"./efeito-y2.js";export const z=1;';
+    expect(dependenciasDoModulo(fonte, base)).toEqual([
+      'https://exemplo.invalido/assets/compartilhado-x1.js',
+      'https://exemplo.invalido/assets/efeito-y2.js',
+    ]);
+  });
+
+  it('aceita aspas simples e espaços, que aparecem quando o build não minifica', () => {
+    const fonte = "import { a } from './um-x1.js';\nimport './dois-y2.js';";
+    expect(dependenciasDoModulo(fonte, base)).toHaveLength(2);
+  });
+
+  it('🔴 ignora o que não é arquivo nosso — nunca sair buscando endereço de fora', () => {
+    const fonte = 'import"https://cdn.invalido/pacote.js";import"./nosso-x1.js";';
+    expect(dependenciasDoModulo(fonte, base)).toEqual(['https://exemplo.invalido/assets/nosso-x1.js']);
+  });
+
+  it('não repete o mesmo arquivo duas vezes', () => {
+    const fonte = 'import"./x1.js";import{b}from"./x1.js";';
+    expect(dependenciasDoModulo(fonte, base)).toHaveLength(1);
+  });
+
+  it('código sem importação nenhuma não quebra', () => {
+    expect(dependenciasDoModulo('export const a=1;', base)).toEqual([]);
+    expect(dependenciasDoModulo('', base)).toEqual([]);
+  });
+});
+
+describe('curarModuloEDependencias', () => {
+  function servidor(respostas: Record<string, { status: number; corpo?: string }>) {
+    const pedidos: string[] = [];
+    const buscar = (async (url: string) => {
+      pedidos.push(url);
+      const r = respostas[url] ?? { status: 404 };
+      return new Response(r.corpo ?? '', { status: r.status });
+    }) as unknown as typeof fetch;
+    return { buscar, pedidos };
+  }
+
+  const pagina = 'https://exemplo.invalido/assets/Pagina-abc.js';
+  const dep = 'https://exemplo.invalido/assets/compartilhado-x1.js';
+
+  it('🔴 limpa TAMBÉM a dependência — é o conserto da causa raiz', async () => {
+    const { buscar, pedidos } = servidor({
+      [pagina]: { status: 200, corpo: 'import"./compartilhado-x1.js";' },
+      [dep]: { status: 200, corpo: 'export const a=1;' },
+    });
+
+    const r = await curarModuloEDependencias(pagina, buscar);
+
+    expect(r.desfecho).toBe('arquivo-voltou');
+    expect(pedidos).toContain(dep);
+    expect(r.dependenciasCuradas).toBe(1);
+    expect(r.dependenciasAusentes).toBe(0);
+  });
+
+  it('🔴 dependência que some de verdade fica contada — é deploy quebrado, não cache', async () => {
+    const { buscar } = servidor({
+      [pagina]: { status: 200, corpo: 'import"./compartilhado-x1.js";' },
+      [dep]: { status: 404 },
+    });
+
+    const r = await curarModuloEDependencias(pagina, buscar);
+
+    expect(r.desfecho).toBe('arquivo-voltou');
+    expect(r.dependenciasAusentes).toBe(1);
+  });
+
+  it('a página mesma fora do ar continua sendo versão velha, e não vai atrás de dependência', async () => {
+    const { buscar, pedidos } = servidor({ [pagina]: { status: 404 } });
+
+    const r = await curarModuloEDependencias(pagina, buscar);
+
+    expect(r.desfecho).toBe('arquivo-sumiu');
+    expect(pedidos).toEqual([pagina]);
+  });
+
+  it('servidor sem resposta continua sendo problema de conexão', async () => {
+    const buscar = (async () => { throw new Error('rede'); }) as unknown as typeof fetch;
+    const r = await curarModuloEDependencias(pagina, buscar);
+    expect(r.desfecho).toBe('sem-resposta');
+  });
+
+  it('sem endereço não há o que curar, e não gasta ida à rede', async () => {
+    const { buscar, pedidos } = servidor({});
+    const r = await curarModuloEDependencias(null, buscar);
+    expect(r.desfecho).toBe('nao-sei');
+    expect(pedidos).toEqual([]);
+  });
+
+  it('🔴 dependência que não responde não derruba a cura do resto', async () => {
+    let n = 0;
+    const buscar = (async (url: string) => {
+      n++;
+      if (url === pagina) return new Response('import"./compartilhado-x1.js";', { status: 200 });
+      throw new Error('rede caiu nesta');
+    }) as unknown as typeof fetch;
+
+    const r = await curarModuloEDependencias(pagina, buscar);
+
+    expect(r.desfecho).toBe('arquivo-voltou');
+    expect(n).toBe(2);
   });
 });
