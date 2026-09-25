@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DialogPortal } from '@/components/ui/dialog';
 import {
@@ -265,6 +265,56 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
     }
   }
 
+  // 🔴 Roda do mouse PRESA quando este formulário abre POR CIMA do painel do negócio.
+  // O painel (PainelDoNegocio) é um `Sheet` MODAL do Radix, que usa `react-remove-scroll`:
+  // ele registra um listener de `wheel`/`touchmove` no `document` (fase de BOLHA, {passive:false},
+  // conferido em react-remove-scroll@2.7.1/SideEffect.js) e dá `preventDefault` em tudo que não
+  // esteja DENTRO do conteúdo do Sheet. Este diálogo é `modal={false}` de propósito (o comentário
+  // do return explica) e vive noutro portal, FORA do Sheet — então a roda do mouse sobre ele era
+  // barrada e o miolo não rolava.
+  //
+  // Conserto (determinístico): um CALLBACK REF anexa, no instante em que o diálogo monta, um
+  // listener NATIVO de `wheel` que ROLA O MIOLO NA MÃO (`scrollTop += delta` no `CorpoDialogo`,
+  // marcado com `data-corpo-rolavel`) e só então consome o evento. Rolar na mão não depende de
+  // vencer o `preventDefault` do react-remove-scroll — a barra anda de qualquer jeito.
+  // (A 1ª tentativa, só `stopPropagation` por `useEffect`, NÃO pegou: corrida entre o efeito e a
+  // montagem do conteúdo do Radix deixava o nó ainda nulo; o callback ref elimina essa corrida.)
+  //
+  // Não mexe nos casos que o plano pediu para preservar: (a) formulário aberto sozinho pela tela
+  // de Tarefas — sem Sheet, o mesmo gesto rola igual; (b) o painel depois de fechar o formulário —
+  // o listener sai junto com o diálogo; (c) os seletores internos (Responsável, Empresa…), portais
+  // FORA deste nó. Na borda (topo/fim) NÃO consome o evento, então não prende a roda.
+  const limparRolagemRef = useRef<(() => void) | null>(null);
+  const refDoConteudo = useCallback((node: HTMLDivElement | null) => {
+    limparRolagemRef.current?.();
+    limparRolagemRef.current = null;
+    if (!node) return;
+    const rolarNaMao = (e: WheelEvent) => {
+      const alvo = e.target as Element | null;
+      const rolavel = (alvo?.closest('[data-corpo-rolavel]')
+        ?? node.querySelector('[data-corpo-rolavel]')) as HTMLElement | null;
+      if (!rolavel) return;
+      // deltaMode 1 = linhas, 2 = páginas; a maioria dos mouses/trackpads usa 0 = pixels.
+      const passo = e.deltaMode === 1 ? e.deltaY * 16
+        : e.deltaMode === 2 ? e.deltaY * rolavel.clientHeight
+        : e.deltaY;
+      const antes = rolavel.scrollTop;
+      rolavel.scrollTop += passo;
+      // Só consome quando REALMENTE rolou; na borda deixa o evento seguir (sem prender a roda).
+      if (rolavel.scrollTop !== antes) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    const soltarToque = (e: Event) => e.stopPropagation();
+    node.addEventListener('wheel', rolarNaMao, { passive: false });
+    node.addEventListener('touchmove', soltarToque, { passive: false });
+    limparRolagemRef.current = () => {
+      node.removeEventListener('wheel', rolarNaMao);
+      node.removeEventListener('touchmove', soltarToque);
+    };
+  }, []);
+
   return (
     // modal={false}: com o Dialog em modo modal (padrão), o lock de scroll do Radix bloqueia o
     // wheel/touch mesmo dentro dos dropdowns internos (Popover/Command de Responsável, Projeto,
@@ -282,11 +332,11 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
         />
       </DialogPortal>
 
-      <ConteudoDialogo className="max-w-lg">
+      <ConteudoDialogo ref={refDoConteudo} className="max-w-lg">
         <CabecalhoDialogo><DialogTitle>{editingTarefa ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle></CabecalhoDialogo>
         {/* Título e botões ficam parados; só os campos rolam. Em zoom alto o formulário
             passa da altura da janela, e antes o "Criar Tarefa" ia junto para fora da tela. */}
-        <CorpoDialogo className="space-y-4 mt-2">
+        <CorpoDialogo data-corpo-rolavel className="space-y-4 mt-2">
           <div><Label>Título *</Label><Input placeholder="Ex: Ligar para o cliente" value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} /></div>
           <div><Label>Descrição</Label><Textarea placeholder="Detalhes da tarefa (opcional)" value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} rows={3} /></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
