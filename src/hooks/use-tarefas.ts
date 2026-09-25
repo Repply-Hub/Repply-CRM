@@ -76,6 +76,7 @@ export interface Tarefa {
   conversa_id: string | null;
   cliente_id: string | null;
   pedido_id: string | null;
+  obra_id: string | null;
   created_at: string;
   updated_at: string;
   tarefa_anexos?: { count: number }[];

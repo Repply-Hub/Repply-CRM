@@ -4056,6 +4056,7 @@ export type Database = {
           id: string
           marcadores: string | null
           observadores: string | null
+          obra_id: string | null
           participantes: string | null
           pedido_id: string | null
           prazo_final: string | null
@@ -4076,6 +4077,7 @@ export type Database = {
           id?: string
           marcadores?: string | null
           observadores?: string | null
+          obra_id?: string | null
           participantes?: string | null
           pedido_id?: string | null
           prazo_final?: string | null
@@ -4096,6 +4098,7 @@ export type Database = {
           id?: string
           marcadores?: string | null
           observadores?: string | null
+          obra_id?: string | null
           participantes?: string | null
           pedido_id?: string | null
           prazo_final?: string | null
