@@ -117,6 +117,7 @@ gravado continua errado" — e é um item ABERTO). Foi assim que a primeira cont
 | 74 | [Vendedor vinculado ao WhatsApp lê E ALTERA a configuração da instância](#74-vendedor-vinculado-ao-whatsapp-lê-e-altera-a-configuração-da-instância) | ✅ Resolvida | Os 3 passos fechados em 23/09 — a chave não chega a navegador nenhum |
 | 75 | [Dá para forjar conversa no chat](#75-dá-para-forjar-conversa-no-chat-e-a-reescrita-não-se-fecha-por-regra-de-acesso) | Alta | Não — mas inserir mensagem em grupo alheio, com data no passado, funciona hoje |
 | 76 | ["Remover imagem" não apaga a foto do armazenamento](#76-remover-imagem-não-apaga-a-foto-do-armazenamento) | Baixa | Não — 12 arquivos órfãos, 6 MB; o botão promete o que não faz |
+| 77 | [A sincronização do Outlook pulava a Entrada e os Enviados](#77-a-sincronização-do-outlook-pulava-a-entrada-e-os-enviados) | ✅ Resolvida | Corrigida em 25/09/2026 (`email-sync` v16) — enviados 0 → 50, Entrada começou a vir |
 
 > ⚠️ Os itens **61 e 62** existem no corpo deste documento mas não têm linha aqui — quem os
 > escreveu esqueceu a tabela. Vale acrescentar ao passar por perto.
@@ -3715,3 +3716,52 @@ correta desde 23/09 — hoje ela não tem chamador nenhum.
 ⚠️ **Os 12 órfãos de hoje são limpeza de dado de produção**: listar, conferir um a um que
 nenhuma linha os referencia, e só então apagar — com o "pode" do dono, pelo método do
 `AGENTS.md` §4. O conserto do código não depende disso e vem primeiro.
+
+## 77. A sincronização do Outlook pulava a Entrada e os Enviados
+
+**Gravidade: ✅ Resolvida** — conserto publicado em 25/09/2026 (`email-sync` v16, commit `78b2fafc`).
+
+Sintoma relatado: caixa **Microsoft/Outlook** conecta, mas "não funciona igual ao Gmail" — não
+traz marcadores e não sincroniza direito. O Gmail conectava perfeitamente.
+
+### A causa (bug nosso, não configuração do Nylas)
+
+`pasta_inbox_id` e `pasta_sent_id` são resolvidos **uma vez, no connect** (`email-callback`), a
+partir de `buscarPastas`. Para o Microsoft, a lista de pastas às vezes ainda **não está pronta
+no instante do connect** (o grant acabou de nascer), então esses dois campos ficam **nulos** — e
+nada os preenche depois. O Gmail nunca sofre: a lista já vem pronta na conexão.
+
+A `email-sync` montava os alvos da varredura a partir desses dois campos, com plano B por
+atributo **só para spam e lixeira**. Com os campos nulos, ela varria lixo, spam e os marcadores
+do usuário, e **pulava justamente a Entrada e os Enviados** — a caixa principal e os enviados
+ficavam invisíveis no CRM.
+
+Medido em 25/09/2026, numa conta Outlook de demonstração (pt-BR), antes do conserto:
+
+| | antes | depois |
+|---|---|---|
+| Entrada/Enviados identificados na conta | não | **sim** |
+| Enviados sincronizados | **0** | **50** |
+| Mensagens com a Caixa de Entrada | 9 | **60** |
+
+O detalhe que enganava: o Nylas **traz sim** os atributos de sistema para o Microsoft
+(`\inbox`, `\sent`, `\trash`…), e as pastas eram espelhadas normalmente — o furo era só na
+escolha de quais varrer.
+
+### O conserto
+
+Na `email-sync`, quando os ids vêm nulos, resolver Entrada/Enviados **pelo atributo** (reusando
+`pastasDeSistema`, que prefere o atributo ao nome — funciona em conta de qualquer idioma:
+"Caixa de entrada"/"Itens enviados") e **gravar os ids de volta** na conta, para o resto do app
+— que lê essas colunas — acertar também. Provedor-neutro: não muda nada do Gmail, onde os ids já
+vêm preenchidos. Vale para qualquer conta futura que caia nesse estado.
+
+### O que ainda fica de lição, não de dívida
+
+- A conta de demonstração tem ~17 mil mensagens na Entrada; cada varredura puxa um lote das mais
+  recentes (limite de tempo da função), então o histórico completo entra aos poucos. Não é
+  defeito — é o mesmo teto por tempo do item que substituiu o corte fixo de 12 marcadores.
+- **`email-callback` continua resolvendo os ids uma vez só** e não reage ao grant que demora. Foi
+  deixado assim de propósito: a `email-sync` agora conserta sozinha na primeira varredura, então
+  não vale endurecer os dois lados. Se um dia o callback for mexido, a rede de segurança é a
+  `email-sync`, não o contrário.
