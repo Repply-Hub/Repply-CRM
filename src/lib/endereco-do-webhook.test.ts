@@ -143,7 +143,26 @@ describe('escolherWebhookParaReconfigurar', () => {
 });
 
 describe('corpoDeReconfiguracao', () => {
-  it('🔴 devolve TUDO o que veio, mudando só o endereço', () => {
+  /**
+   * 🔴 O CONSERTO DO "Invalid action", medido no primeiro uso real em 24/09/2026.
+   *
+   * A operadora recusou o envio com `{"error":"Invalid action"}`. A documentação dela explica:
+   * o endpoint tem dois modos, e o que os separa é a presença de `id`/`action`.
+   *
+   *   · MODO SIMPLES   — sem `action` e sem `id`: ela gerencia o único webhook da instância,
+   *                      criando ou atualizando sozinha. É como o cadastro de instância nova
+   *                      sempre funcionou aqui.
+   *   · MODO AVANÇADO  — `action: "add" | "update" | "delete"`. Atualizar EXIGE o `id`.
+   *
+   * Devolver a configuração inteira (para não perder campo) trazia o `id` junto, o que joga o
+   * pedido no modo avançado — mas sem dizer o que fazer. Daí a recusa.
+   *
+   * A saída não é largar o `id`: é dizer a ação. Apontar explicitamente para o endereço que a
+   * gente ACABOU de ler é mais fiel que deixar a operadora escolher qual — e fecha a dúvida que
+   * estava aberta sobre o envio criar um segundo endereço em vez de trocar o existente.
+   */
+
+  it('🔴 devolve TUDO o que veio, mudando só o endereço, e DIZ que é atualização', () => {
     const veio = webhookDaOperadora();
     const corpo = corpoDeReconfiguracao(veio, 'https://novo.exemplo/endereco');
 
@@ -154,6 +173,18 @@ describe('corpoDeReconfiguracao', () => {
     expect(corpo.addUrlEvents).toBe(false);
     expect(corpo.addUrlTypesMessages).toBe(false);
     expect(corpo.id).toBe('rexemplo123456');
+    expect(corpo.action).toBe('update');
+  });
+
+  it('🔴 sem `id` cai no modo simples: nem `action` nem `id` vão no corpo', () => {
+    // Mandar `action:"update"` sem `id` seria a mesma recusa, do outro lado.
+    const { id: _ignorado, ...semId } = webhookDaOperadora();
+    const corpo = corpoDeReconfiguracao(semId, 'https://novo.exemplo/endereco') as Record<string, unknown>;
+
+    expect(corpo.action).toBeUndefined();
+    expect(corpo.id).toBeUndefined();
+    expect(corpo.url).toBe('https://novo.exemplo/endereco');
+    expect(corpo.events).toEqual([]);
   });
 
   it('🔴 `events` vazio continua vazio — é a configuração real da instância de maior volume', () => {

@@ -40,6 +40,8 @@ export interface WebhookDaOperadora {
   url?: string;
   enabled?: boolean;
   events?: unknown;
+  /** "add" | "update" | "delete" — só no modo avançado da operadora. Ver `corpoDeReconfiguracao`. */
+  action?: string;
   [campo: string]: unknown;
 }
 
@@ -202,7 +204,27 @@ export function corpoDeReconfiguracao(
   webhook: WebhookDaOperadora,
   novaUrl: string,
 ): WebhookDaOperadora {
-  return { ...webhook, url: novaUrl };
+  const corpo: WebhookDaOperadora = { ...webhook, url: novaUrl };
+
+  // 🔴 O `id` OBRIGA A DIZER A AÇÃO. Medido no primeiro uso real, em 24/09/2026: a operadora
+  // recusou com `{"error":"Invalid action"}`.
+  //
+  // A documentação dela explica o porquê — o endpoint tem dois modos, separados pela presença
+  // de `id`/`action`:
+  //   · SIMPLES   — sem os dois: ela gerencia o único webhook da instância, criando ou
+  //                 atualizando sozinha. É como o cadastro de instância nova sempre funcionou.
+  //   · AVANÇADO  — `action: "add" | "update" | "delete"`; atualizar EXIGE o `id`.
+  //
+  // Devolver a configuração inteira, para não perder campo, trazia o `id` junto e jogava o
+  // pedido no modo avançado sem dizer o que fazer.
+  //
+  // A saída não é largar o `id`: é dizer a ação. Apontar para o endereço que acabamos de ler é
+  // mais fiel do que deixar a operadora escolher qual — e responde a dúvida que estava aberta
+  // sobre o envio ACRESCENTAR um segundo endereço: `update` troca o que existe.
+  if (typeof corpo.id === "string" && corpo.id) corpo.action = "update";
+  else delete corpo.id;
+
+  return corpo;
 }
 
 /**
