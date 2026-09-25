@@ -1,10 +1,11 @@
 import { memo } from 'react';
 import { Draggable } from '@hello-pangea/dnd';
-import { AlertTriangle, Calendar, GripVertical, Paperclip, User } from 'lucide-react';
+import { AlertTriangle, Calendar, GripVertical, Paperclip } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ResponsavelComFoto } from '@/components/shared/ResponsavelComFoto';
 import { Tarefa } from '@/hooks/use-tarefas';
 
 interface TarefaKanbanCardProps {
@@ -82,11 +83,12 @@ export const TarefaKanbanCard = memo(function TarefaKanbanCard({ tarefa, index, 
               </div>
 
               {tarefa.responsavel && (
-                <div className="mt-2 pt-2 border-t border-border/40 flex items-center gap-1.5">
-                  <User className="h-3 w-3 shrink-0 text-muted-foreground/70" />
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground truncate">
-                    {tarefa.responsavel}
-                  </span>
+                <div className="mt-2 pt-2 border-t border-border/40">
+                  <ResponsavelComFoto
+                    nome={tarefa.responsavel}
+                    tamanho="xs"
+                    className="text-[10px] font-medium text-muted-foreground"
+                  />
                 </div>
               )}
             </div>

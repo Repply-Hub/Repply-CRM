@@ -4,6 +4,7 @@ import { useTarefas, useUpdateTarefa, useDeleteTarefa, useBulkDeleteTarefas, fra
 import { useTarefasKanbanColunas } from '@/hooks/use-tarefas-kanban-colunas';
 import { useAuth } from '@/hooks/use-auth';
 import { UserProfilePopover } from '@/components/layout/UserProfilePopover';
+import { ResponsavelComFoto } from '@/components/shared/ResponsavelComFoto';
 import { useVendedores, useClientes } from '@/hooks/use-clientes';
 import { usePedidosOptions, usePedidoOptionPorId } from '@/hooks/use-pedidos';
 import { getNomeNegocio, negocioParaFichaDaTarefa } from '@/lib/nome-negocio';
@@ -13,7 +14,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
+import { Sheet, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { ConteudoDoPainel, CabecalhoDoPainel, CorpoDoPainel, RodapeDoPainel } from '@/components/shared/PainelDeDetalhes';
+import { PainelDoNegocio } from '@/components/pedidos/PainelDoNegocio';
+import { useObras } from '@/hooks/use-obras';
+import { useNegocioNoEndereco } from '@/hooks/use-negocio-no-endereco';
+import { useNavigate } from 'react-router-dom';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -74,6 +80,10 @@ export default function Tarefas() {
   const { data: vendedores = [] } = useVendedores();
   const { data: clientes = [] } = useClientes();
   const { data: pedidosOptions = [] } = usePedidosOptions(empresaId);
+  const { data: obras = [] } = useObras();
+  const navigate = useNavigate();
+  // Clicar no negócio da ficha abre o MESMO painel de todas as telas (não uma folha nova).
+  const { negocioAberto, abrirNegocio, fecharNegocio } = useNegocioNoEndereco();
   const updateTarefa = useUpdateTarefa();
   const deleteTarefa = useDeleteTarefa();
   const bulkDeleteTarefas = useBulkDeleteTarefas();
@@ -564,8 +574,9 @@ export default function Tarefas() {
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       {visibleColumns.includes('responsavel') && t.responsavel && (
-                        <span className="flex items-center gap-1">
-                          <User className="h-3 w-3" /><span onClick={(e) => e.stopPropagation()}><UserProfilePopover name={t.responsavel} className="text-xs" /></span>
+                        <span className="flex items-center gap-1.5">
+                          <ResponsavelComFoto nome={t.responsavel} mostrarNome={false} tamanho="xs" />
+                          <span onClick={(e) => e.stopPropagation()}><UserProfilePopover name={t.responsavel} className="text-xs" /></span>
                         </span>
                       )}
                       {visibleColumns.includes('prazo_final') && t.prazo_final && (
@@ -646,7 +657,7 @@ export default function Tarefas() {
 
                           if (colId === 'responsavel') {
                             return (
-                              <TableCell key={colId} className="hidden lg:table-cell text-sm whitespace-nowrap py-2 px-2.5" onClick={(e) => t.responsavel && e.stopPropagation()}>{t.responsavel ? <UserProfilePopover name={t.responsavel} /> : '—'}</TableCell>
+                              <TableCell key={colId} className="hidden lg:table-cell text-sm whitespace-nowrap py-2 px-2.5" onClick={(e) => t.responsavel && e.stopPropagation()}>{t.responsavel ? <span className="inline-flex items-center gap-1.5"><ResponsavelComFoto nome={t.responsavel} mostrarNome={false} tamanho="xs" /><UserProfilePopover name={t.responsavel} /></span> : '—'}</TableCell>
                             );
                           }
 
@@ -725,18 +736,18 @@ export default function Tarefas() {
           const si = getStatusInfo(selectedTarefa.status);
           const isOverdue = selectedTarefa.prazo_final && new Date(selectedTarefa.prazo_final) < new Date() && selectedTarefa.status !== 'concluida';
           return (
-            <SheetContent className="sm:max-w-xl p-0 flex flex-col">
-              <div className="flex-1 overflow-y-auto p-6">
-                <SheetHeader className="pb-6 border-b">
-                  <div className="space-y-1">
-                    <SheetTitle className="flex items-center gap-2">
-                      <ClipboardList className="h-5 w-5 text-primary" />
-                      <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">{selectedTarefa.titulo}</span>
-                    </SheetTitle>
-                    <SheetDescription>Detalhes da tarefa.</SheetDescription>
-                  </div>
-                </SheetHeader>
+            <ConteudoDoPainel className="sm:max-w-xl">
+              <CabecalhoDoPainel>
+                <div className="space-y-1">
+                  <SheetTitle className="flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5 text-primary" />
+                    <span className="text-base sm:text-xl font-extrabold text-foreground tracking-tight truncate md:text-xl">{selectedTarefa.titulo}</span>
+                  </SheetTitle>
+                  <SheetDescription>Detalhes da tarefa.</SheetDescription>
+                </div>
+              </CabecalhoDoPainel>
 
+              <CorpoDoPainel>
                 <div className="py-6 space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                     <div className="space-y-1">
@@ -785,21 +796,43 @@ export default function Tarefas() {
                         <User className="h-3 w-3" /> Responsável
                       </Label>
                       <p className="text-sm font-medium">
-                        {selectedTarefa.responsavel ? <UserProfilePopover name={selectedTarefa.responsavel} /> : '—'}
+                        {selectedTarefa.responsavel ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <ResponsavelComFoto nome={selectedTarefa.responsavel} mostrarNome={false} tamanho="xs" />
+                            <UserProfilePopover name={selectedTarefa.responsavel} />
+                          </span>
+                        ) : '—'}
                       </p>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <FolderKanban className="h-3 w-3" /> Projeto / Obra
+                        <FolderKanban className="h-3 w-3" /> Obra
                       </Label>
-                      <p className="text-sm font-medium">{selectedTarefa.projeto || '—'}</p>
+                      <p className="text-sm font-medium">
+                        {obras.find(o => o.id === selectedTarefa.obra_id)?.nome_obra || selectedTarefa.projeto || '—'}
+                      </p>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Empresa</Label>
                       <p className="text-sm font-medium">
-                        {selectedTarefa.cliente_id
-                          ? clientes.find(c => c.id === selectedTarefa.cliente_id)?.empresa || '—'
-                          : '—'}
+                        {(() => {
+                          const nome = selectedTarefa.cliente_id
+                            ? clientes.find(c => c.id === selectedTarefa.cliente_id)?.empresa
+                            : null;
+                          if (!nome) return '—';
+                          return (
+                            <button
+                              type="button"
+                              className="text-primary hover:underline text-left"
+                              onClick={() => {
+                                setSelectedTarefa(null);
+                                navigate(`/clientes/${selectedTarefa.cliente_id}`);
+                              }}
+                            >
+                              {nome}
+                            </button>
+                          );
+                        })()}
                       </p>
                     </div>
                     <div className="space-y-1">
@@ -809,7 +842,19 @@ export default function Tarefas() {
                           const p = negocioParaFichaDaTarefa(
                             selectedTarefa.pedido_id, pedidosOptions, negocioDaFichaPorId,
                           );
-                          return p ? getNomeNegocio(p) : '—';
+                          if (!p) return '—';
+                          return (
+                            <button
+                              type="button"
+                              className="text-primary hover:underline text-left"
+                              onClick={() => {
+                                setSelectedTarefa(null);
+                                abrirNegocio(selectedTarefa.pedido_id);
+                              }}
+                            >
+                              {getNomeNegocio(p)}
+                            </button>
+                          );
                         })()}
                       </p>
                     </div>
@@ -846,22 +891,11 @@ export default function Tarefas() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </CorpoDoPainel>
 
-              <SheetFooter className="border-t p-6 gap-3 sm:gap-0">
-                <div className="flex w-full justify-between items-center">
-                  <Button
-                    variant="ghost"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-2"
-                    onClick={() => {
-                      setDeleteTarefaTarget(selectedTarefa);
-                      setSelectedTarefa(null);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Excluir
-                  </Button>
-                  <div className="flex gap-2">
+              <RodapeDoPainel
+                esquerda={
+                  <>
                     <Button variant="outline" onClick={() => setSelectedTarefa(null)}>Fechar</Button>
                     <Button
                       className="gap-2"
@@ -873,13 +907,28 @@ export default function Tarefas() {
                       <Pencil className="h-4 w-4" />
                       Editar
                     </Button>
-                  </div>
-                </div>
-              </SheetFooter>
-            </SheetContent>
+                  </>
+                }
+              >
+                <Button
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-2"
+                  onClick={() => {
+                    setDeleteTarefaTarget(selectedTarefa);
+                    setSelectedTarefa(null);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Excluir
+                </Button>
+              </RodapeDoPainel>
+            </ConteudoDoPainel>
           );
         })()}
       </Sheet>
+
+      {/* Clicar no negócio da ficha abre o MESMO painel de todas as telas, por cima da tela. */}
+      <PainelDoNegocio pedidoId={negocioAberto} onClose={fecharNegocio} />
 
       {/* Single delete confirmation */}
       <AlertDialog open={!!deleteTarefaTarget} onOpenChange={(o) => !o && setDeleteTarefaTarget(null)}>
