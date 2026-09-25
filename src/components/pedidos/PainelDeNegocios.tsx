@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { ColumnSettings, type ColumnDefinition } from '@/components/shared/ColumnSettings';
 import { ListPagination } from '@/components/shared/ListPagination';
+import { ResponsavelComFoto } from '@/components/shared/ResponsavelComFoto';
 import { LinkAnexoPrivado } from '@/components/shared/LinkAnexoPrivado';
 import { ordenarAnexos, resumoDaColunaDeAnexos } from '@/lib/anexos-do-negocio';
 import type { AnexoDoNegocioNaLista } from '@/hooks/use-pedidos';
@@ -501,7 +502,7 @@ export function PainelDeNegocios({
       case 'valor':
         return <TableCell key={colId}>{(p.valor_total ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>;
       case 'vendedor':
-        return <TableCell key={colId}>{p.vendedor?.nome ?? '—'}</TableCell>;
+        return <TableCell key={colId}>{p.vendedor?.nome ? <ResponsavelComFoto nome={p.vendedor.nome} tamanho="xs" className="align-middle" /> : '—'}</TableCell>;
       case 'etapa':
         return (
           <TableCell key={colId}>

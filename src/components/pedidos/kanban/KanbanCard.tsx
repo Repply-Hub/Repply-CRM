@@ -5,6 +5,7 @@ import { AlertTriangle, Building2, Factory, DollarSign, GripVertical, User, Cale
 import { Order } from '@/types';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ResponsavelComFoto } from '@/components/shared/ResponsavelComFoto';
 
 interface KanbanCardProps {
   order: Order;
@@ -171,13 +172,16 @@ export const KanbanCard = memo(function KanbanCard({ order, index, onClick, visi
                 <div className="mt-2 pt-2 border-t border-border/40 flex items-center justify-between">
                   {(!visibleColumns || visibleColumns.includes('vendedor')) && (
                     <span
-                      className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground"
+                      className="inline-flex items-center gap-1.5 min-w-0"
                       title={order.qtdParticipantes ? `Também responsáveis: ${order.nomesDosParticipantes}` : undefined}
                     >
-                      {order.vendedor}
-                      {!!order.qtdParticipantes && (
-                        <span className="ml-1 opacity-70">+{order.qtdParticipantes}</span>
-                      )}
+                      <ResponsavelComFoto nome={order.vendedor} mostrarNome={false} tamanho="xs" />
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground truncate">
+                        {order.vendedor}
+                        {!!order.qtdParticipantes && (
+                          <span className="ml-1 opacity-70">+{order.qtdParticipantes}</span>
+                        )}
+                      </span>
                     </span>
                   )}
                   <div className="flex items-center gap-1">

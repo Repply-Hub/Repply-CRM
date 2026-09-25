@@ -53,6 +53,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { TOGGLE_LIST_CLASS, TOGGLE_ITEM_CLASS } from '@/lib/toggle-group-styles';
 import { ImportDialog } from '@/components/ImportDialog';
 import { ListPagination } from '@/components/shared/ListPagination';
+import { ResponsavelComFoto } from '@/components/shared/ResponsavelComFoto';
 import { SearchableSelect } from '@/components/shared/SearchableSelect';
 import { ResizableTh } from '@/components/shared/ResizableTh';
 import { SortableTh, type SortDirection } from '@/components/shared/SortableTh';
@@ -424,7 +425,7 @@ const PedidoRow = memo(({
             // tela de quem não pediu nada.
             return (
               <TableCell key={colId} className="whitespace-nowrap py-2 px-2.5">
-                {pedido.vendedor?.nome ?? '-'}
+                {pedido.vendedor?.nome ? <ResponsavelComFoto nome={pedido.vendedor.nome} tamanho="xs" className="align-middle" /> : '-'}
                 {qtdParticipantes > 0 && (
                   <span
                     className="ml-1.5 text-xs text-muted-foreground"
