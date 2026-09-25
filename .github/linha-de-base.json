@@ -2,5 +2,5 @@
   "_comentario": "Item 45 da divida tecnica. Este arquivo e a memoria do robo de conferencia (.github/workflows/conferencia.yml). A regra NAO e passar limpo: o projeto convive com saldo herdado. A regra e o numero nao piorar. Se um conserto BAIXAR um destes numeros, baixe aqui tambem no mesmo commit — senao a folga vira esconderijo da proxima regressao. Medido em 24/09/2026.",
   "tsc": 35,
   "lint": 416,
-  "testes": 2536
+  "testes": 2559
 }
