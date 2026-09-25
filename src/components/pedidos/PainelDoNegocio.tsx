@@ -194,6 +194,14 @@ export function PainelDoNegocio({
   // Enquanto o formulário de tarefa está por cima, NADA fecha o painel por clique fora.
   const formularioDeTarefaAberto = addTarefaOpen || editingTarefaNegocio !== null;
 
+  // O vínculo TRAVADO da tarefa: só negócio e cliente. A obra fica de fora de propósito — ela
+  // vai para o formulário como `obraPadrao` (pré-preenchida, mas editável) logo abaixo, nunca
+  // aqui: se entrasse em `extraFields`, o `...extraFields` do `handleSave` sobrescreveria, a
+  // cada gravação, qualquer obra diferente que a pessoa tivesse escolhido no formulário.
+  const camposTravadosDaTarefa = alvoDaTarefa
+    ? { pedido_id: alvoDaTarefa.pedido_id, cliente_id: alvoDaTarefa.cliente_id }
+    : undefined;
+
   return (
     <>
       <Sheet
@@ -659,20 +667,24 @@ export function PainelDoNegocio({
           {/* 🔴 `extraFields` sai do alvo CONGELADO no clique, nunca de `pedidoId` — que é
               `string | null` e cujo `!` escondia justamente o nulo que gravava a tarefa solta.
               Ver `alvoDaTarefaDoNegocio`, e o teste
-              `src/test/tarefa-do-painel-nasce-ligada-ao-negocio.test.ts`. */}
+              `src/test/tarefa-do-painel-nasce-ligada-ao-negocio.test.ts`.
+              `obraPadrao` (Tarefa 2) é a obra do MESMO negócio congelado, mas fora de
+              `extraFields` — ela pré-preenche o campo Obra sem travá-lo. */}
           <TarefaFormDialog
             open={addTarefaOpen}
             onOpenChange={setAddTarefaOpen}
             editingTarefa={null}
             kanbanStages={tarefaKanbanStages}
-            extraFields={alvoDaTarefa ?? undefined}
+            extraFields={camposTravadosDaTarefa}
+            obraPadrao={alvoDaTarefa?.obra_id}
           />
           <TarefaFormDialog
             open={!!editingTarefaNegocio}
             onOpenChange={(open) => { if (!open) setEditingTarefaNegocio(null); }}
             editingTarefa={editingTarefaNegocio}
             kanbanStages={tarefaKanbanStages}
-            extraFields={alvoDaTarefa ?? undefined}
+            extraFields={camposTravadosDaTarefa}
+            obraPadrao={alvoDaTarefa?.obra_id}
           />
         </>
       )}

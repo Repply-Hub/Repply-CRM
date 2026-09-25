@@ -55,6 +55,8 @@ interface SeletorComBuscaProps {
   carregando?: boolean;
   className?: string;
   contentClassName?: string;
+  /** Trava o campo (ex.: vínculo travado por `extraFields`). O valor selecionado continua visível. */
+  disabled?: boolean;
 }
 
 function semAcento(texto: string): string {
@@ -73,6 +75,7 @@ export function SeletorComBusca({
   carregando,
   className,
   contentClassName,
+  disabled,
 }: SeletorComBuscaProps) {
   const [aberto, setAberto] = React.useState(false);
   const [termo, setTermo] = React.useState('');
@@ -107,6 +110,7 @@ export function SeletorComBusca({
           variant="outline"
           role="combobox"
           aria-expanded={aberto}
+          disabled={disabled}
           className={cn('w-full justify-between font-normal', !selecionada && 'text-muted-foreground', className)}
         >
           <span className="truncate">{selecionada ? selecionada.label : placeholder}</span>

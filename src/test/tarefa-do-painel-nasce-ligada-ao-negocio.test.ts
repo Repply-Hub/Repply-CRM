@@ -59,6 +59,15 @@ describe('o alvo da tarefa é congelado no clique, nunca lido no envio', () => {
     expect(alvoDaTarefaDoNegocio({ id: 'ped-1', cliente_id: 'cli-1' })).toEqual({
       pedido_id: 'ped-1',
       cliente_id: 'cli-1',
+      obra_id: null,
+    });
+  });
+
+  it('a Tarefa 2 (Obra no formulário) traz a obra do negócio junto, para pré-preencher `obraPadrao`', () => {
+    expect(alvoDaTarefaDoNegocio({ id: 'ped-1', cliente_id: 'cli-1', obra_id: 'obra-1' })).toEqual({
+      pedido_id: 'ped-1',
+      cliente_id: 'cli-1',
+      obra_id: 'obra-1',
     });
   });
 
@@ -82,10 +91,12 @@ describe('o alvo da tarefa é congelado no clique, nunca lido no envio', () => {
     expect(alvoDaTarefaDoNegocio({ id: 'ped-1' })).toEqual({
       pedido_id: 'ped-1',
       cliente_id: null,
+      obra_id: null,
     });
     expect(alvoDaTarefaDoNegocio({ id: 'ped-1', cliente_id: null })).toEqual({
       pedido_id: 'ped-1',
       cliente_id: null,
+      obra_id: null,
     });
   });
 
@@ -101,6 +112,12 @@ describe('o alvo da tarefa é congelado no clique, nunca lido no envio', () => {
     for (const valor of extraFieldsDoPainel) {
       expect(valor).not.toMatch(/pedidoId/);
       expect(valor).not.toMatch(/!/);
+      // 🔴 Tarefa 2 (campo Obra): `obra_id` NÃO pode entrar em `extraFields`. Se entrasse, o
+      // `...extraFields` do `handleSave` sobrescreveria, a cada gravação, qualquer obra
+      // diferente que a pessoa tivesse escolhido no formulário — o campo aceitaria o clique e
+      // jogaria a resposta fora. A obra do negócio chega ao formulário por `obraPadrao`
+      // (pré-preenchida, editável), nunca por `extraFields` (travado).
+      expect(valor).not.toMatch(/obra_id/);
     }
   });
 

@@ -12,6 +12,13 @@ export interface AlvoDaTarefaDoNegocio {
   pedido_id: string;
   /** Nem todo negócio tem cliente; `null` é resposta legítima, `undefined` não. */
   cliente_id: string | null;
+  /**
+   * A obra do negócio — NÃO trava o campo (fica de fora do `extraFields` no painel, ver
+   * `PainelDoNegocio.tsx`). Existe aqui só para pré-preencher `obraPadrao` do
+   * `TarefaFormDialog`; se entrasse em `extraFields`, o `handleSave` sobrescreveria com
+   * `...extraFields` qualquer obra diferente que a pessoa escolhesse no formulário.
+   */
+  obra_id: string | null;
 }
 
 /**
@@ -50,8 +57,8 @@ export interface AlvoDaTarefaDoNegocio {
  * Teste: `src/test/tarefa-do-painel-nasce-ligada-ao-negocio.test.ts`.
  */
 export function alvoDaTarefaDoNegocio(
-  negocio: { id?: string | null; cliente_id?: string | null } | null | undefined,
+  negocio: { id?: string | null; cliente_id?: string | null; obra_id?: string | null } | null | undefined,
 ): AlvoDaTarefaDoNegocio | null {
   if (!negocio?.id) return null;
-  return { pedido_id: negocio.id, cliente_id: negocio.cliente_id ?? null };
+  return { pedido_id: negocio.id, cliente_id: negocio.cliente_id ?? null, obra_id: negocio.obra_id ?? null };
 }

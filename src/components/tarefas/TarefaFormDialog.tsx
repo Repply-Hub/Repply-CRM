@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { useCreateTarefa, useUpdateTarefa, Tarefa } from '@/hooks/use-tarefas';
 import { mensagemDeErro } from '@/lib/mensagem-de-erro';
 import { useVendedores, useClientes } from '@/hooks/use-clientes';
+import { useObras } from '@/hooks/use-obras';
 import {
   usePedidosOptions,
   usePedidoOptionPorId,
@@ -52,20 +53,27 @@ interface TarefaFormDialogProps {
   defaultStatus?: string;
   /** Campos fixos aplicados na criação (ex.: cliente_id ao abrir a partir da página de detalhes do cliente). */
   extraFields?: Partial<Tarefa>;
+  /**
+   * Obra sugerida ao CRIAR (ex.: a obra do negócio que abriu este formulário). Diferente de
+   * `extraFields`, este campo NÃO trava o seletor — a pessoa pode trocar a obra à vontade, e o
+   * `handleSave` grava o que estiver em `form.obra_id` na hora de salvar, não este valor.
+   */
+  obraPadrao?: string | null;
 }
 
 const emptyForm = {
   titulo: '', descricao: '', status: '', prazo_final: '',
   responsavel: '', participantes: '', observadores: '', projeto: '', marcadores: '',
-  pedido_id: '', cliente_id: '',
+  pedido_id: '', cliente_id: '', obra_id: '',
 };
 
-export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStages, defaultStatus, extraFields }: TarefaFormDialogProps) {
+export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStages, defaultStatus, extraFields, obraPadrao }: TarefaFormDialogProps) {
   const qc = useQueryClient();
   const { profile } = useAuth();
   const empresaId = profile?.empresa_id ?? profile?.empresas?.id ?? undefined;
   const { data: vendedores = [] } = useVendedores();
   const { data: clientes = [] } = useClientes();
+  const { data: obras = [] } = useObras();
   const createTarefa = useCreateTarefa();
   const updateTarefa = useUpdateTarefa();
   const [form, setForm] = useState(emptyForm);
@@ -97,6 +105,11 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
   // aparecer pra seleção manual.
   const negocioTravado = extraFields?.pedido_id !== undefined;
   const clienteTravado = extraFields?.cliente_id !== undefined;
+  // Primitivos (não o objeto `extraFields`, que é novo a cada render): o efeito de abertura semeia
+  // os campos travados a partir daqui e ainda satisfaz o exhaustive-deps sem re-disparar a cada
+  // render — só quando o vínculo muda de verdade.
+  const extraClienteId = extraFields?.cliente_id;
+  const extraPedidoId = extraFields?.pedido_id;
 
   // Junta o negócio já vinculado à fatia que a consulta trouxe, para os dois usos:
   // desenhar o rótulo do campo e responder à troca de empresa logo abaixo.
@@ -140,6 +153,20 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
     [clientes],
   );
 
+  // Obra: quando a empresa já está escolhida, a lista se restringe às obras DELA — igual ao
+  // negócio logo abaixo. Sem empresa escolhida, mostra todas (a `descricao` deixa claro de qual
+  // cliente é cada uma).
+  const opcoesObras = useMemo(
+    () => obras
+      .filter((o) => !form.cliente_id || o.cliente_id === form.cliente_id)
+      .map((o) => ({
+        value: o.id,
+        label: o.nome_obra ?? '(sem nome)',
+        descricao: o.clientes?.empresa ?? undefined,
+      })),
+    [obras, form.cliente_id],
+  );
+
   useEffect(() => {
     if (!open) return;
     // Arquivo escolhido antes de a tarefa existir não pode sobreviver a uma abertura seguinte —
@@ -157,15 +184,26 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
         responsavel: editingTarefa.responsavel || '', participantes: editingTarefa.participantes || '',
         observadores: editingTarefa.observadores || '', projeto: editingTarefa.projeto || '', marcadores: editingTarefa.marcadores || '',
         pedido_id: editingTarefa.pedido_id || '', cliente_id: editingTarefa.cliente_id || '',
+        obra_id: editingTarefa.obra_id || '',
       });
     } else {
       setForm({
         ...emptyForm,
         status: defaultStatus || kanbanStages[0]?.key || 'pendente',
         responsavel: profile?.nome ?? '',
+        // Sugestão, não trava: a pessoa continua livre para trocar a obra (ver `obraPadrao` em
+        // `TarefaFormDialogProps`).
+        obra_id: obraPadrao ?? '',
+        // Campos TRAVADOS (aberto de um negócio/cliente) precisam MOSTRAR o vínculo: o
+        // SeletorComBusca desabilitado lê o valor daqui, e semear `pedido_id` faz o
+        // `usePedidoOptionPorId` buscar o negócio para o rótulo aparecer (sem isto, em produção
+        // o campo do negócio ficaria vazio). O `handleSave` reaplica `...extraFields`, então o
+        // valor gravado continua o do negócio.
+        cliente_id: (extraClienteId as string) ?? '',
+        pedido_id: (extraPedidoId as string) ?? '',
       });
     }
-  }, [open, editingTarefa, kanbanStages, defaultStatus, profile]);
+  }, [open, editingTarefa, kanbanStages, defaultStatus, profile, obraPadrao, extraClienteId, extraPedidoId]);
 
   async function handleSave() {
     // Reentrada: um segundo clique enquanto o primeiro ainda está salvando (upload de anexo
@@ -174,11 +212,12 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
     if (!form.titulo.trim()) { toast.error('Título é obrigatório'); return; }
     setSalvando(true);
     try {
-      const { pedido_id, cliente_id, ...rest } = form;
+      const { pedido_id, cliente_id, obra_id, ...rest } = form;
       const payload = {
         ...rest,
         pedido_id: pedido_id || null,
         cliente_id: cliente_id || null,
+        obra_id: obra_id || null,
         ...extraFields,
         prazo_final: form.prazo_final ? new Date(form.prazo_final).toISOString() : null,
       };
@@ -278,53 +317,67 @@ export function TarefaFormDialog({ open, onOpenChange, editingTarefa, kanbanStag
               placeholder="Selecione o responsável"
             />
           </div>
-          {(!clienteTravado || !negocioTravado) && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {!clienteTravado && (
-                <div className="space-y-1.5">
-                  <Label>Empresa (cliente)</Label>
-                  <SeletorComBusca
-                    options={opcoesClientes}
-                    value={form.cliente_id}
-                    onValueChange={v => setForm(f => {
-                      // Troca de empresa: se o negócio selecionado não pertence a ela, desvincula.
-                      const pedidoAtual = pedidosOptions.find(p => p.id === f.pedido_id);
-                      const pedidoAindaValido = pedidoAtual && pedidoAtual.cliente?.id === v;
-                      return { ...f, cliente_id: v, pedido_id: pedidoAindaValido ? f.pedido_id : '' };
-                    })}
-                    placeholder="Vincular a uma empresa"
-                    searchPlaceholder="Nome, razão social ou CNPJ..."
-                    emptyMessage="Nenhuma empresa encontrada."
-                    contentClassName="w-[min(28rem,90vw)]"
-                  />
-                </div>
-              )}
-              {!negocioTravado && (
-                <div className="space-y-1.5">
-                  <Label>Negócio</Label>
-                  <SeletorComBusca
-                    options={pedidosOptionsFiltradas.map(p => ({
-                      value: p.id,
-                      label: getNomeNegocio(p),
-                      descricao: [p.cliente?.empresa, p.fabricante?.nome].filter(Boolean).join(' · ') || undefined,
-                    }))}
-                    value={form.pedido_id}
-                    onValueChange={v => setForm(f => {
-                      const pedido = pedidosOptions.find(p => p.id === v);
-                      return { ...f, pedido_id: v, cliente_id: pedido?.cliente?.id ?? f.cliente_id };
-                    })}
-                    aoBuscar={setBuscaNegocio}
-                    carregando={buscandoNegocios && pedidosEncontrados.length === 0}
-                    aviso={avisoNegocios}
-                    placeholder="Vincular a um negócio"
-                    searchPlaceholder="Nome do negócio, cliente ou fabricante..."
-                    emptyMessage="Nenhum negócio encontrado."
-                    contentClassName="w-[min(28rem,90vw)]"
-                  />
-                </div>
-              )}
+          {/* Item 5a: os dois campos aparecem SEMPRE, mesmo quando a tarefa nasce vinculada a um
+              cadastro fixo (aberta a partir do cliente ou do negócio, via `extraFields`) — antes
+              o bloco inteiro sumia nesse caso, e a pessoa não tinha como VER o vínculo. Travado,
+              o `SeletorComBusca` fica `disabled` mas mostra o valor (que veio de `extraFields`/
+              `pedidoVinculado`); o `handleSave` já aplica `...extraFields` por cima, então o que
+              é gravado continua sendo o do negócio, nunca o que aparece desabilitado na tela. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Empresa (cliente)</Label>
+              <SeletorComBusca
+                options={opcoesClientes}
+                value={form.cliente_id}
+                onValueChange={v => setForm(f => {
+                  // Troca de empresa: se o negócio selecionado não pertence a ela, desvincula.
+                  const pedidoAtual = pedidosOptions.find(p => p.id === f.pedido_id);
+                  const pedidoAindaValido = pedidoAtual && pedidoAtual.cliente?.id === v;
+                  return { ...f, cliente_id: v, pedido_id: pedidoAindaValido ? f.pedido_id : '' };
+                })}
+                placeholder="Vincular a uma empresa"
+                searchPlaceholder="Nome, razão social ou CNPJ..."
+                emptyMessage="Nenhuma empresa encontrada."
+                contentClassName="w-[min(28rem,90vw)]"
+                disabled={clienteTravado}
+              />
             </div>
-          )}
+            <div className="space-y-1.5">
+              <Label>Negócio</Label>
+              <SeletorComBusca
+                options={pedidosOptionsFiltradas.map(p => ({
+                  value: p.id,
+                  label: getNomeNegocio(p),
+                  descricao: [p.cliente?.empresa, p.fabricante?.nome].filter(Boolean).join(' · ') || undefined,
+                }))}
+                value={form.pedido_id}
+                onValueChange={v => setForm(f => {
+                  const pedido = pedidosOptions.find(p => p.id === v);
+                  return { ...f, pedido_id: v, cliente_id: pedido?.cliente?.id ?? f.cliente_id };
+                })}
+                aoBuscar={setBuscaNegocio}
+                carregando={buscandoNegocios && pedidosEncontrados.length === 0}
+                aviso={avisoNegocios}
+                placeholder="Vincular a um negócio"
+                searchPlaceholder="Nome do negócio, cliente ou fabricante..."
+                emptyMessage="Nenhum negócio encontrado."
+                contentClassName="w-[min(28rem,90vw)]"
+                disabled={negocioTravado}
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Obra</Label>
+            <SeletorComBusca
+              options={opcoesObras}
+              value={form.obra_id}
+              onValueChange={v => setForm(f => ({ ...f, obra_id: v }))}
+              placeholder="Vincular a uma obra"
+              searchPlaceholder="Nome da obra..."
+              emptyMessage="Nenhuma obra encontrada."
+              contentClassName="w-[min(28rem,90vw)]"
+            />
+          </div>
           <div className="space-y-1.5">
             <Label>Participantes</Label>
             <ParticipantesMultiSelect value={form.participantes} onChange={v => setForm(f => ({ ...f, participantes: v }))} usuarios={vendedores} />
