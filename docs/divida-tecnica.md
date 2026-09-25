@@ -14,13 +14,14 @@ acrescentados em 21/08/2026; o 58 em 30/08/2026; o 59 e o 60 em 31/08/2026; do 6
 
 ## Placar — quanto falta
 
-> Contado em **23/09/2026**. Para recontar a qualquer momento, na raiz do repositório:
-> `node scripts/contar-divida.mjs` — ele lê a tabela abaixo e imprime tudo isto atualizado.
+> Contado em **25/09/2026** por `node scripts/contar-divida.mjs`. Para recontar a qualquer
+> momento, na raiz do repositório, rode o mesmo comando — ele lê a tabela abaixo e imprime tudo
+> isto atualizado.
 
 | | |
 |---|---|
-| Itens no inventário | **76** |
-| ✅ Resolvidos | **22** |
+| Itens no inventário | **77** |
+| ✅ Resolvidos | **23** |
 | Abertos | **54** |
 
 **Dos 54 abertos:** 3 críticos · 13 altos · 20 médios · 15 baixos · 3 outros.
