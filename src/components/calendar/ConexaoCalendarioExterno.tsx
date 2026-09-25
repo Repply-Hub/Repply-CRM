@@ -10,10 +10,12 @@ import { useConexaoCalendario } from '@/hooks/use-calendario-conexao';
  *   Os testadores recebem uma linha "desconectada" PRÉ-CRIADA no banco; os demais não veem nada.
  *   🔴 Os e-mails/ids dos testadores ficam SÓ no banco, nunca aqui — o repositório é público
  *   (CLAUDE.md §6.9), então o portão é por presença de linha, não por lista de e-mail no código.
- * - Quando o Google aprovar o app para todos, virar `SINCRONIZACAO_CALENDARIO_ATIVA` para `true`:
- *   aí o bloco aparece para TODOS (e a presença de linha deixa de ser o portão).
+ * - ABERTO A TODOS desde 24/09/2026: o Google confirmou que o escopo `calendar.app.created` é NÃO
+ *   sensível ("A verificação não é necessária"), sem tela de "app não verificado" nem teto de 100
+ *   usuários. Com `true`, o bloco aparece para todos os vendedores (a presença de linha deixa de ser
+ *   o portão). Para dormentar de novo em alguma emergência, é só voltar para `false`.
  */
-export const SINCRONIZACAO_CALENDARIO_ATIVA = false;
+export const SINCRONIZACAO_CALENDARIO_ATIVA = true;
 
 /** Bloco de conectar/desconectar o calendário externo, na barra lateral da agenda. */
 export function ConexaoCalendarioExterno() {
