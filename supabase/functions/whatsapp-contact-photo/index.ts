@@ -158,10 +158,32 @@ serve(async (req) => {
     let responseText = "";
     let wapiStatus = 0;
     try {
-      const res = await fetch(`${baseUrl}/chat/details`, {
+      /**
+       * 🔴 POR QUE `/chat/avatar` COM `force`, E NÃO MAIS `/chat/details`.
+       *
+       * Relatado em 24/09/2026: alguém trocou a foto do WhatsApp meses atrás e o CRM continua
+       * mostrando a antiga. Não era o nosso cache — era o DA OPERADORA.
+       *
+       * A documentação dela diz, sobre este endpoint: "`force=true` solicita uma atualização
+       * antecipada, respeitando um intervalo mínimo de 20 segundos por imagem e instância; não
+       * use essa opção em polling contínuo."
+       *
+       * Ou seja: sem `force`, ela devolve a cópia que tem guardada. O nosso endereço vencia a
+       * cada ~6 dias, a gente perguntava de novo — e recebia a MESMA foto velha, para sempre.
+       * Trocar de foto não invalida nada do lado de lá.
+       *
+       * `/chat/details` não aceita `force` (só `number` e `preview`), e a própria documentação
+       * recomenda: "Para obter somente a imagem, prefira POST /chat/avatar". É tudo o que esta
+       * função usa — ela só extrai a imagem da resposta.
+       *
+       * 🔴 E NÃO É POLLING: só chegamos aqui quando a foto guardada venceu, o que a trava de
+       * expiração abaixo garante ser no máximo uma vez a cada poucos dias por conversa. Muito
+       * acima do piso de 20 segundos que a operadora pede.
+       */
+      const res = await fetch(`${baseUrl}/chat/avatar`, {
         method: "POST",
         headers: { "Content-Type": "application/json", token: config.api_key },
-        body: JSON.stringify({ number }),
+        body: JSON.stringify({ number, force: true }),
       });
       wapiStatus = res.status;
       responseText = await res.text().catch(() => "");
@@ -189,7 +211,20 @@ serve(async (req) => {
       });
     }
 
-    const fotoUrl = findImageUrl(wapiResult);
+    /**
+     * 🔴 `/chat/avatar` responde `{ "url": "..." }`, e string VAZIA é resposta válida ("este
+     * contato não tem foto"). A chave `url` NÃO casa com o padrão de `findImageUrl`
+     * (`image|photo|foto|avatar|picture|imgurl`) — trocar o endpoint sem tratar isso teria
+     * apagado a foto de todo mundo em silêncio, que é o pior desfecho possível para um conserto
+     * de foto.
+     *
+     * O `findImageUrl` fica como rede de segurança, para o dia em que a operadora mudar o
+     * formato sem avisar.
+     */
+    const urlDireta = (wapiResult as { url?: unknown } | null)?.url;
+    const fotoUrl = (typeof urlDireta === "string" && urlDireta.trim())
+      ? urlDireta.trim()
+      : findImageUrl(wapiResult);
 
     /**
      * "Este contato não tem foto" também é uma resposta, e precisa ser lembrada.
@@ -208,9 +243,25 @@ serve(async (req) => {
      * aparecer no CRM, e o custo de perguntar de novo é alto.
      */
     const SEM_FOTO_REPERGUNTAR_EM_DIAS = 7;
+
+    /**
+     * 🔴 PISO OBRIGATÓRIO DEPOIS QUE O `force` ENTROU.
+     *
+     * Vencimento nulo significa "revalide na próxima". Isso era seguro enquanto a pergunta era
+     * barata; com `force=true` passaria a ser uma atualização forçada A CADA CARGA DA INBOX,
+     * por conversa — exatamente o "polling contínuo" que a operadora pede para não fazer, e um
+     * jeito rápido de sermos limitados.
+     *
+     * Então: quando a URL não traz vencimento próprio, a gente estipula um. Perder alguns dias
+     * de atualidade numa foto é barato; martelar a operadora no número de WhatsApp de um
+     * cliente pagante não é.
+     */
+    const PISO_ENTRE_ATUALIZACOES_DIAS = 3;
+    const emDias = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString();
+
     const expiresAt = fotoUrl
-      ? extractExpiresAt(fotoUrl)
-      : new Date(Date.now() + SEM_FOTO_REPERGUNTAR_EM_DIAS * 86_400_000).toISOString();
+      ? (extractExpiresAt(fotoUrl) ?? emDias(PISO_ENTRE_ATUALIZACOES_DIAS))
+      : emDias(SEM_FOTO_REPERGUNTAR_EM_DIAS);
 
     await supabase
       .from("whatsapp_conversas")
