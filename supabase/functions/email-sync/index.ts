@@ -9,6 +9,7 @@ import {
   gravarPastas,
   json,
   mensagemParaLinha,
+  pastasDeSistema,
   type MensagemNylas,
 } from "../_shared/nylas.ts";
 import { papelDoToken } from "../_shared/papel-do-token.ts";
@@ -186,9 +187,28 @@ serve(async (req) => {
       const idPorAtributo = (attr: string) =>
         pastasDaCaixa.find((p) => (p.attributes ?? []).some((a) => a.toLowerCase() === attr))?.id;
 
+      // Entrada e Enviados: o id é resolvido no connect (email-callback) e
+      // guardado na conta. MAS para o Microsoft a lista de pastas às vezes ainda
+      // não está pronta no instante do connect — a conta fica com esses ids
+      // nulos e a varredura pulava JUSTO a Entrada e os Enviados (só tinha plano
+      // B por atributo para spam/lixeira). Aqui resolvemos os dois pelo atributo
+      // a partir das pastas já buscadas (mesmo caminho de spam/trash) e gravamos
+      // de volta na conta, para o resto do app — que lê essas colunas — acertar
+      // também. `pastasDeSistema` prefere o atributo ao nome, então funciona com
+      // a conta em qualquer idioma ("Caixa de entrada"/"Itens enviados").
+      const { inbox: inboxPorAtributo, sent: sentPorAtributo } = pastasDeSistema(pastasDaCaixa);
+      const inboxId = conta.pasta_inbox_id ?? inboxPorAtributo;
+      const sentId = conta.pasta_sent_id ?? sentPorAtributo;
+      if ((!conta.pasta_inbox_id && inboxId) || (!conta.pasta_sent_id && sentId)) {
+        await supabase
+          .from("email_contas")
+          .update({ pasta_inbox_id: inboxId, pasta_sent_id: sentId })
+          .eq("id", conta.id);
+      }
+
       const deSistema = [
-        conta.pasta_inbox_id,
-        conta.pasta_sent_id,
+        inboxId,
+        sentId,
         idPorAtributo("\\spam") ?? idPorAtributo("\\junk"),
         idPorAtributo("\\trash"),
       ].filter(Boolean) as string[];
