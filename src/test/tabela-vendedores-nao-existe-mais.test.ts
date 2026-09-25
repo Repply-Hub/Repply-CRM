@@ -48,7 +48,7 @@ describe('a tabela `vendedores` não existe mais', () => {
   // em 14/09/2026, na bateria inteira de uma cópia recém-criada do `origin/main`, levou 7,3 s e
   // reprovou por tempo sem defeito nenhum — o falso alarme que ensina a desligar um guarda que
   // existe para ser confiável. Os outros guardas que varrem o `src/` já tinham essa folga.
-  it('🔴 nenhuma consulta do app pede `vendedores` — o PostgREST recusaria a consulta inteira', { timeout: 20_000 }, () => {
+  it('🔴 nenhuma consulta do app pede `vendedores` — o PostgREST recusaria a consulta inteira', { timeout: 60_000 }, () => {
     const ofensores: string[] = [];
 
     for (const arquivo of arquivosDeCodigo(RAIZ)) {

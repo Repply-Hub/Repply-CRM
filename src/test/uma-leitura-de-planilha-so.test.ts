@@ -60,7 +60,7 @@ describe('uma leitura de planilha só', () => {
   // busca de `XLSX.read`, e leva ~4,5s sozinho. Com lint, build ou outra sessao
   // disputando a maquina, estourava os 5s e virava falso alarme num guarda que
   // existe justamente para ser confiavel.
-  it('🔴 nenhum arquivo novo abre planilha por conta própria', { timeout: 20_000 }, () => {
+  it('🔴 nenhum arquivo novo abre planilha por conta própria', { timeout: 60_000 }, () => {
     const permitidos = new Set(PODEM_LER_PLANILHA);
 
     const infratores = arquivosDeCodigo(RAIZ)
@@ -71,7 +71,7 @@ describe('uma leitura de planilha só', () => {
     expect(infratores).toEqual([]);
   });
 
-  it('as telas de importação não montam as linhas sozinhas', { timeout: 20_000 }, () => {
+  it('as telas de importação não montam as linhas sozinhas', { timeout: 60_000 }, () => {
     // `sheet_to_json` é o passo em que a planilha vira linha; fora do leitor comum, ele
     // significa que alguém remontou o caminho inteiro à mão outra vez.
     //

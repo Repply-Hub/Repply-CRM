@@ -34,7 +34,7 @@ describe('duplicar negócio por um caminho só', () => {
     expect(codigo).toMatch(/\/pedidos\/novo\?copiaDe=/);
   });
 
-  it('🔴 só a tela de novo negócio monta a cópia', { timeout: 20_000 }, () => {
+  it('🔴 só a tela de novo negócio monta a cópia', { timeout: 60_000 }, () => {
     const podem = new Set(['lib/copia-de-negocio.ts', 'pages/NovoPedido.tsx']);
     const infratores = arquivosDeCodigo(RAIZ)
       .filter((c) => /montarCopiaDeNegocio\s*\(/.test(readFileSync(c, 'utf8')))

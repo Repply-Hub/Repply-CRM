@@ -60,7 +60,7 @@ function avataresComImgCru(texto: string): number {
 
 describe('foto de pessoa dentro de <Avatar>', () => {
   // 20s pelo mesmo motivo do teste das planilhas: este teste lê o projeto inteiro do disco.
-  it('🔴 nenhuma tela desenha a foto com <img> cru dentro do <Avatar>', { timeout: 20_000 }, () => {
+  it('🔴 nenhuma tela desenha a foto com <img> cru dentro do <Avatar>', { timeout: 60_000 }, () => {
     const permitidos = new Set(PODEM_TER_IMG_CRU);
 
     const infratores = arquivosDeTela(RAIZ)

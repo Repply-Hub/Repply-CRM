@@ -45,12 +45,21 @@ function infratores(padrao: RegExp): string[] {
 describe('hoje no fuso de quem usa', () => {
   // 20s, e não os 5s padrão: cada caso LÊ O PROJETO INTEIRO do disco, como em
   // `uma-leitura-de-planilha-so.test.ts`, e com outra sessão disputando a máquina estourava.
-  it('🔴 ninguém recorta a data de hoje de um carimbo UTC', { timeout: 20_000 }, () => {
+  // 🔴 60 SEGUNDOS, NÃO 20. Este teste lê a árvore inteira do `src/`, e o custo dele não é
+  // o próprio trabalho: é a DISPUTA. Vários guardas fazem a mesma varredura, e a bateria os
+  // roda em paralelo. Medido em 24/09/2026: 0,5 s quando rodam poucos juntos, quase 6 s
+  // sozinho depois de um `npm ci`, e mais de 20 s na bateria completa — onde ele estourou e
+  // reprovou um envio que não tinha defeito nenhum.
+  //
+  // Guarda que acusa à toa é pior que guarda nenhum: some a confiança no robô de conferência,
+  // e aí ninguém olha quando ele estiver certo. `uma-consulta-de-cnpj-so.test.ts` já tinha
+  // 60 s pelo mesmo motivo; os outros ficaram para trás.
+  it('🔴 ninguém recorta a data de hoje de um carimbo UTC', { timeout: 60_000 }, () => {
     const hojeEmUtc = /new Date\(\)\.toISOString\(\)\.(slice\(0,\s*10\)|substring\(0,\s*10\)|split\(['"]T['"]\)\[0\])/;
     expect(infratores(hojeEmUtc)).toEqual([]);
   });
 
-  it('🔴 a data de criação não é gravada a partir de um carimbo UTC', { timeout: 20_000 }, () => {
+  it('🔴 a data de criação não é gravada a partir de um carimbo UTC', { timeout: 60_000 }, () => {
     expect(infratores(/data_criacao:\s*new Date\(\)\.toISOString\(\)/)).toEqual([]);
   });
 });
