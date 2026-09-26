@@ -40,6 +40,12 @@ vi.mock('@/hooks/use-pedidos', () => ({
   usePedidosStats: usePedidosStatsMock,
 }));
 
+// O KanbanCard agora mostra a foto do vendedor (ResponsavelComFoto → useVendedores). Sem banco no
+// teste, devolvemos lista vazia: a peça cai nas iniciais e a coluna renderiza normalmente.
+vi.mock('@/hooks/use-clientes', () => ({
+  useVendedores: () => ({ data: [] }),
+}));
+
 function negocio(id: string): PedidoWithRelations {
   return {
     id,
